@@ -1,5 +1,5 @@
-// citizens.js — the KIT. Eight species, hand-authored, the organic exception
-// to the box law (SPEC §0.5, §12.3).
+// citizens.js — the KIT. Thirteen species, hand-authored, the organic
+// exception to the box law (SPEC §0.5, §12.3).
 //
 // A citizen is 12×20 (a cub 8×12), composed at first use and cached:
 //
@@ -17,12 +17,21 @@
 // Every part is authored in the WARM fur keys w x y z (dark → light) and
 // remapped to the species' ramp at compose time; '&' '^' are the shirt (a
 // neutral concrete, so head and body separate at 1×), '+' is the eye, '('
-// is an eye-white/tooth, '-' the owl's beak. The tortoise shell is EARTH
-// (q rim, r scutes, s shade, t/u dome) — a different ramp from its olive
-// limbs on purpose: authored in olive, the shell vanished into the limbs
-// and the whole animal vanished into grass (olive 'h' sits between grass
-// 'n' and 'o'). The tortoise also gets a 1-px 'f' outline so its
-// silhouette closes against grass and asphalt alike.
+// is an eye-white/tooth, '-' the owl's and the hawk's beak. The tortoise
+// shell is EARTH (q rim, r scutes, s shade, t/u dome) — a different ramp
+// from its limbs on purpose: authored in olive, the shell vanished into the
+// limbs. The limbs are NOT olive either, any more (round 4): the species
+// table says olive, but olive 'h' sits between grass 'n' and 'o' and the
+// whole animal vanished into the lawn (luminance 43/68/96/132 against
+// grass 65/91/120/151). The kit overrides the skin ramp for the tortoise
+// alone (`SKIN`): warm tan (furWarm 0) limbs under the brown shell, and a
+// 1-px '+' outline — the only near-black — so its silhouette closes
+// against grass and asphalt alike. The palette is untouched.
+//
+// Beyond ears and tails, three species carry one more overlay: the cow's
+// black patches ('+', painted only where fur already is, so they never
+// float — `PATCHES`), the hawk's folded wings over the arms and its fanned
+// tail (`WINGS`), and the pig's ring snout, which lives in its head rows.
 //
 // ELDER = one rung lighter, but only where the light body rung has
 // headroom; a coat already at the top of its ramp (rabbit, mouse) keeps
@@ -55,12 +64,12 @@ export const FRAMES = Object.freeze(["stand", "stepA", "stepB"]);
 export const AGES = Object.freeze(["adult", "elder", "cub"]);
 /**
  * The species the KIT covers — those with a head overlay below — not every
- * row of the sim's species table. The table can grow ahead of the art
- * (pig, cow, wolf, cat, hawk are in it today); the sim's `ARRIVING` set
- * keeps those off the map until their sprites exist, and `citizenSprite`
- * throws for one, by name, rather than drawing a headless body.
+ * row of the sim's species table. The table can grow ahead of the art; the
+ * sim's `ARRIVING` set keeps a species off the map until its sprites
+ * exist, and `citizenSprite` throws for one, by name, rather than drawing
+ * a headless body. All thirteen rows of the table are drawn today.
  */
-const HEAD_SPECIES = { rabbit: 1, mouse: 1, fox: 1, beaver: 1, owl: 1, bear: 1, tortoise: 1, raccoon: 1 };
+const HEAD_SPECIES = { rabbit: 1, mouse: 1, fox: 1, beaver: 1, owl: 1, bear: 1, tortoise: 1, raccoon: 1, pig: 1, cow: 1, wolf: 1, cat: 1, hawk: 1 };
 export const SPECIES_IDS = Object.freeze(Object.keys(SPECIES_BY_ID).filter((id) => id in HEAD_SPECIES));
 
 // =========================================================================
@@ -366,6 +375,135 @@ const HEAD = {
       "...xyyyxx...",
     ]),
   },
+  // Round 4: the livestock and the predators. Each is ONE mark past the
+  // shared body: pig = the ring snout (an 'x' ring round 'z' with '+'
+  // nostrils — on the pale +1 coat the ring is the one darker rung) and
+  // small triangular ears; cow = short 'w' horns, ears out SIDEWAYS, a
+  // broad 'x' muzzle three rows deep, and '+' patches; wolf = the fox's
+  // pointed ears on the big head and a muzzle one column longer, tipped
+  // with a '+' nose; cat = two-row ears, a 'w' nose, and 1-px 'z' whiskers
+  // standing one pixel off each cheek; hawk = a round head with 'w' brows
+  // and a hooked '-' beak two columns proud of the face.
+  pig: {
+    se: part([
+      "............",
+      "..y.....y...",
+      ".yzy...yxy..",
+      ".yzyyyyyyxx.",
+      ".zzyyyyyyyx.",
+      ".zyyy+yy+yx.",
+      ".yyyywzzzwx.",
+      "..yyyw+z+wx.",
+      "...xyywwwx..",
+    ]),
+    ne: part([
+      "............",
+      "..y.....y...",
+      ".yzy...yxy..",
+      ".yzyyyyyyxx.",
+      ".zyyyyyyyyx.",
+      ".zyyyyyyyyx.",
+      ".yyyyyyyyxx.",
+      "..yyyyyyyx..",
+      "...xyyxxx...",
+    ]),
+  },
+  cow: {
+    se: part([
+      "............",
+      ".w.......w..",
+      ".wy.....yw..",
+      "..++yyyyyx..",
+      "yy++yyyyyyxx",
+      "yzzyy+yy+yxx",
+      ".zyxxxxxxxx.",
+      "..yxx+xx+xx.",
+      "...xxxxxxx..",
+    ]),
+    ne: part([
+      "............",
+      ".w.......w..",
+      ".wy.....yw..",
+      "..yyyyyyyx..",
+      "yyzyyyyyyyxx",
+      "yzyyyy+++yxx",
+      ".zyyyy+++xx.",
+      "..yyyyyyyx..",
+      "...xyyyxxx..",
+    ]),
+  },
+  wolf: {
+    se: part([
+      "..y......y..",
+      ".yzy....yxy.",
+      ".yzyy..yyxy.",
+      ".yzyyyyyyyx.",
+      ".zzyyyyyyyx.",
+      ".zyyy+yy+yx.",
+      ".yyyyyyyzzzx",
+      "..yyyyyzzzz+",
+      "...xyyxxxx..",
+    ]),
+    ne: part([
+      "..y......y..",
+      ".yzy....yxy.",
+      ".yzyy..yyxy.",
+      ".yzyyyyyyyx.",
+      ".zyyyyyyyyx.",
+      ".zyyyyyyyyx.",
+      ".yyyyyyyyxx.",
+      "..yyyyyyxxx.",
+      "...xyyyxxx..",
+    ]),
+  },
+  cat: {
+    se: part([
+      "............",
+      "............",
+      "..y.....y...",
+      "..yzy..yyx..",
+      "..zyyyyyyx..",
+      "..zyy+yy+x..",
+      "z.yyyyywyx.z",
+      "z.yyyyyyxx.z",
+      "...xyyyxx...",
+    ]),
+    ne: part([
+      "............",
+      "............",
+      "..y.....y...",
+      "..yzy..yyx..",
+      "..zyyyyyyx..",
+      "..zyyyyyyx..",
+      "..yyyyyyyx..",
+      "..yyyyyyxx..",
+      "...xyyyxx...",
+    ]),
+  },
+  hawk: {
+    se: part([
+      "............",
+      "............",
+      "............",
+      "...yyyyy....",
+      "..zyywyywx..",
+      "..zyy+yy+x..",
+      "..yyy--yyx..",
+      "..yyyy-yxx..",
+      "...xyyyxx...",
+    ]),
+    ne: part([
+      "............",
+      "............",
+      "............",
+      "...yyyyy....",
+      "..zyyyyyyx..",
+      "..zyyyyyyx..",
+      "..yyyyyyyx..",
+      "..yyyyyyxx..",
+      "...xyyyxx...",
+    ]),
+  },
 };
 
 // =========================================================================
@@ -399,6 +537,65 @@ const TAIL = {
     se: [part(["..x.", ".x..", "x...", "x..."]), 0, 13, true],
     ne: [part(["x", "x", ".x", ".x", "..x"]), 6, 13, false],
   },
+  // A curl at the rump: on the +1 coat 'x' is the ring-snout rung, one
+  // darker than the body, so the curl reads without a key of its own.
+  pig: {
+    se: [part([".xx", "x.x", "xx."]), 0, 12, true],
+    ne: [part([".xx", "x.x", "xx."]), 5, 13, false],
+  },
+  // A rope with a dark tuft.
+  cow: {
+    se: [part([".x", ".x", ".x", "ww", "ww"]), 0, 11, true],
+    ne: [part([".x", ".x", ".x", "ww", "ww"]), 5, 13, false],
+  },
+  // Bushy and held LOW — straight down the back-left to the hocks, dark
+  // edged ('x' → 'W' on the −1 coat) so it separates from the leg it hangs
+  // beside, where the fox's curls up and ends light.
+  wolf: {
+    se: [part([".yy.", "xzyy", "xzyy", "xyyy", "xyyy", "wxyy", ".wx."]), 0, 12, true],
+    ne: [part([".yy.", "yzyy", "yzyy", "yyyy", "xyyy", "xxyy", ".xw."]), 4, 12, false],
+  },
+  // A 1-px line from the rump UP the back to shoulder height, curling at
+  // the tip — the mouse's goes down.
+  cat: {
+    se: [part(["xx.", "x..", "x..", "x..", "x..", ".x.", "..x"]), 0, 9, true],
+    ne: [part([".xx", ".x.", ".x.", ".x.", ".x.", "x.."]), 9, 9, false],
+  },
+  // A fan, widening away from the hip, with 'w' feather lines.
+  hawk: {
+    se: [part(["..yy", ".xyy", "xwyw", "xw.w"]), 0, 13, true],
+    ne: [part([".yy.", "yyyy", "wywy", "wywy"]), 4, 13, false],
+  },
+};
+
+/**
+ * The hawk's folded wings: stamped over the arms (rows 9–15, both
+ * facings), two columns wider than the arm on each side and pointed at
+ * the hip, so the shoulders read as wings by silhouette alone. 'z' along
+ * the lit left wing (→ earth 't'), 'w' tips (→ 'q').
+ */
+const WINGS = part([
+  ".zy......yx.",
+  "xzy......yyx",
+  "xzy......yyx",
+  "xzy......yyx",
+  "wxy......yxw",
+  ".wx......xw.",
+  "..w......w..",
+]);
+
+/**
+ * The cow's patches, as [x, y, w, h] rectangles in frame coordinates,
+ * painted in '+' ONLY where the composed grid already has a fur pixel —
+ * so the same three rectangles land on the thigh, the shin and the arm
+ * in every frame, and a lifted leg leaves no patch floating in the air.
+ */
+const PATCHES = {
+  cow: [
+    [2, 14, 2, 2],
+    [8, 17, 2, 2],
+    [10, 10, 2, 2],
+  ],
 };
 
 /**
@@ -463,6 +660,14 @@ const CUB_MARK = {
   // bear cub minus ears.
   beaver: [part(["xx", "xx"]), 0, 10],
   tortoise: [part([".qttsq", "qtrssq", ".qqqq."]), 1, 7],
+  // Round 4. A sparse mark can span rows: stamp() skips '.', so ears at
+  // the crown and a snout / muzzle / whiskers at the cheek row travel as
+  // one part.
+  pig: [part(["..y..y..", "........", "........", "........", "...x++x."]), 0, 1],
+  cow: [part([".w....w.", "........", "........", "y......x", "..xxxxx."]), 0, 1],
+  wolf: [part([".y....y.", ".yy..yy.", "........", "........", "....zz+."]), 0, 1],
+  cat: [part(["..y..y..", "........", "........", "........", "z......z"]), 0, 1],
+  hawk: [part(["......--", "......-."]), 0, 5],
 };
 
 // =========================================================================
@@ -517,8 +722,19 @@ export const MEETING = defineSprite({
 // Composition.
 // =========================================================================
 
-const BUILD = { rabbit: "small", mouse: "small", fox: "small", owl: "small", raccoon: "small", beaver: "big", bear: "big", tortoise: "big" };
+const BUILD = {
+  rabbit: "small", mouse: "small", fox: "small", owl: "small", raccoon: "small", cat: "small", hawk: "small",
+  beaver: "big", bear: "big", tortoise: "big", pig: "big", cow: "big", wolf: "big",
+};
 const AUTHOR_KEYS = keysOf("furWarm"); // w x y z — the authoring ramp
+
+/**
+ * Skin overrides: where the ART disagrees with the species table's ramp.
+ * The tortoise's table row says olive; olive vanished into the lawn (see
+ * the header), so the kit paints its limbs warm tan instead. The sim is
+ * not consulted for colour anywhere else, so nothing else moves.
+ */
+const SKIN = { tortoise: { fur: "furWarm", furShift: 0 } };
 
 /**
  * Key map: authoring fur keys → the species' ramp, shifted. Elder = one
@@ -530,9 +746,10 @@ const AUTHOR_KEYS = keysOf("furWarm"); // w x y z — the authoring ramp
 function furMap(species, elder) {
   const sp = SPECIES_BY_ID[species];
   if (!sp) throw new Error(`citizens: unknown species '${species}'`);
-  const ramp = keysOf(sp.fur);
+  const skin = SKIN[species] || sp;
+  const ramp = keysOf(skin.fur);
   const n = ramp.length - 1;
-  const idx = (i) => Math.max(0, Math.min(n, i + sp.furShift));
+  const idx = (i) => Math.max(0, Math.min(n, i + skin.furShift));
   const up = elder && idx(2) < n ? 1 : 0;
   const map = {};
   AUTHOR_KEYS.forEach((k, i) => {
@@ -624,6 +841,15 @@ function mirrorLit(rows) {
   );
 }
 
+/** Paint `key` over the w×h rectangle at (x, y) — but only where the grid already holds a FUR pixel. */
+function patchFur(g, x, y, w, h, key) {
+  for (let py = y; py < y + h; py++)
+    for (let px = x; px < x + w; px++) {
+      if (py < 0 || py >= g.length || px < 0 || px >= g[0].length) continue;
+      if (CLASS_OF[g[py][px]] === "fur") g[py][px] = key;
+    }
+}
+
 /** A 1-px outline in `key` around every opaque pixel (4-neighbours), inside the grid. */
 function outline(rows, key) {
   const h = rows.length, w = rows[0].length;
@@ -675,6 +901,8 @@ function composeAdult(species, facing, frame, elder, hat) {
   const shellBehind = species === "tortoise" && facing === "se";
   if (shellBehind) put(SHELL.se[0], SHELL.se[1], SHELL.se[2]);
   put(body, 0, 8);
+  if (species === "hawk") put(WINGS, 0, 9);
+  if (PATCHES[species]) for (const [x, y, w, h] of PATCHES[species]) patchFur(g, x, y + lift, w, h, "+");
   if (tail && !tail[3]) put(tail[0], tail[1], tail[2]);
   const head = HEAD[species][facing];
   if (shellBehind) {
@@ -712,7 +940,7 @@ const CACHE = new Map();
  * 'adult'|'elder'|'cub' (or years). `opts.hat` adds the centenary hat.
  */
 export function citizenSprite(species, facing = "se", frame = 0, age = "adult", opts = {}) {
-  if (!(species in HEAD_SPECIES)) throw new Error(`citizens: no kit for species '${species}' — author its HEAD/BUILD/CUB_MARK here, then add it to species.js ARRIVING`);
+  if (!(species in HEAD_SPECIES)) throw new Error(`citizens: no kit for species '${species}' — author its HEAD/BUILD/CUB_MARK here and add it to HEAD_SPECIES, then to species.js ARRIVING`);
   const f = normFacing(facing);
   const fr = normFrame(frame);
   const ag = normAge(species, age);
@@ -725,7 +953,7 @@ export function citizenSprite(species, facing = "se", frame = 0, age = "adult", 
   // Mirror the AUTHORED grid (so the light stays upper-left), THEN skin it.
   if (f === "sw" || f === "nw") rows = mirrorLit(rows);
   rows = remap(rows, furMap(species, ag === "elder"));
-  if (species === "tortoise") rows = outline(rows, "f");
+  if (species === "tortoise") rows = outline(rows, "+");
   const h = rows.length;
   const anchor = ag === "cub" ? [4, 11] : [6, h - 1];
   s = defineSprite({ name: `citizen-${key}`, rows, anchor, tags: ["citizen", species, ag] });
@@ -733,7 +961,7 @@ export function citizenSprite(species, facing = "se", frame = 0, age = "adult", 
   return s;
 }
 
-/** Every citizen sprite, named, for the audit: 8 species × 4 facings × 3 frames × 3 ages (+ one hat). */
+/** Every citizen sprite, named, for the audit: 13 species × 4 facings × 3 frames × 3 ages (+ one hat). */
 export function allCitizens() {
   const out = [];
   for (const species of SPECIES_IDS)

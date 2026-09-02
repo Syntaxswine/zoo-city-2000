@@ -42,8 +42,8 @@ export function isPredatorOf(pred, prey) {
 }
 export const isPredPrey = (a, b) => isPredatorOf(a, b) || isPredatorOf(b, a);
 
-/** Species that can ARRIVE. New species join here once their sprites exist. */
-export const ARRIVING = new Set(["rabbit", "mouse", "fox", "beaver", "owl", "bear", "tortoise", "raccoon"]);
+/** Species that can ARRIVE: all thirteen (every one has kit sprites in js/art/citizens.js). */
+export const ARRIVING = new Set(SPECIES.map((s) => s.id));
 
 export const SPECIES_BY_ID = Object.freeze(Object.fromEntries(SPECIES.map((s) => [s.id, s])));
 export const SPECIES_INDEX = Object.freeze(Object.fromEntries(SPECIES.map((s, i) => [s.id, i])));

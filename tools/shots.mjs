@@ -241,7 +241,7 @@ function sheets(z) {
   // elder with the hat); row 1 elder SE + adult SW on asphalt — the
   // mirrored facing and the elder marks, on the other ground they walk on.
   {
-    const canvas = createCanvas(8 * 40, 170);
+    const canvas = createCanvas(SPECIES_IDS.length * 40, 170);
     const ctx = background(canvas);
     SPECIES_IDS.forEach((species, i) => {
       blitAt(ctx, GRASS[0], i * 40 + 20, 44);
@@ -372,6 +372,16 @@ function scene(z) {
     [6.9, 6, "mouse", "se", 0, "adult", "key 12.9 — 0.15 past the tower's 12.75, in front of its side face; lane +6", 6],
     [10.7, 6, "fox", "sw", 2, "adult", ""],
     [2, 11, "bear", "se", 0, "adult", "the edge road"],
+    // Round 4: the five new species, on the north road where no probe
+    // lives, each with flat ground south of it — (5..7, 3) is the pond —
+    // so nothing hides its feet, and ≥ 15 px from the rabbit/mouse pair at
+    // (3.5–4.25, 2). The first placing had the wolf at (8.7, 2): the
+    // factory at (9, 3) hid all but its ears.
+    [2.4, 2, "cat", "se", 1, "adult", "north road"],
+    [5.2, 2, "wolf", "se", 1, "adult", "north road, above the pond"],
+    [6.3, 2, "pig", "se", 0, "adult", "north road, above the pond"],
+    [7.5, 2, "cow", "sw", 2, "adult", "north road, above the pond"],
+    [10.6, 2, "hawk", "ne", 0, "adult", "north road, by the rubble"],
   ];
   walkers.forEach(([tx, ty, species, facing, frame, age, note, dx = 0], i) => {
     const sprite = citizenSprite(species, facing, frame, age, { hat: note.includes("hat") });
