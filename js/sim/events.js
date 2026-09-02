@@ -280,7 +280,8 @@ function robbable(w) {
   return out;
 }
 function robbers(w) {
-  return w.citizens.filter((c) => !c.dead && (c.species === "fox" || c.species === "raccoon" || c.species === "cat"));
+  // Adults only (61 of 289 fox/raccoon/cat at seed 7 y30 are cubs — the punishment panel's find).
+  return w.citizens.filter((c) => !c.dead && ageYears(w, c) >= KNOBS.ADULT_AGE && (c.species === "fox" || c.species === "raccoon" || c.species === "cat"));
 }
 function hasCTier(w, t) {
   for (let i = 0; i < w.w * w.h; i++) if (w.zone[i] === ZONE.C && w.tier[i] >= t) return true;

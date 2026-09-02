@@ -72,3 +72,10 @@ box-solid descriptions (one agent round with a critic), renderer ≈ 20
 lines (footprint 3×3 is already supported by `placeAt`), UI ≈ 30 lines,
 suite: a landmark invariant (parts point at a live anchor, capacity never
 exceeded, bulldoze clears nine). One session.
+
+## Note (later the same day)
+
+`docs/PROPOSAL-CRIME-AND-PUNISHMENT.md` proposes a fourth zone, M (meat
+markets). List M as **no landmark** here — the abattoir (a 3×3 M block,
+all tier 3, majority-carnivore staff) is a later theme on this same merge
+rule, not a second rule.

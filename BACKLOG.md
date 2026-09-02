@@ -4,6 +4,25 @@ Open work, ranked. The design record is `SPEC.md`; the numbers are in
 `js/sim/rules.js` (KNOBS). Later layers were labelled at design time so v1
 could ship whole.
 
+## Crime and punishment — PROPOSED, not built (`docs/PROPOSAL-CRIME-AND-PUNISHMENT.md`, 2026-09-02)
+- **Part I — zone M, dread, the taking**: a fourth zone on its own
+  carnivore-keyed valve; a dread field at exactly 2× a works' LV shadow;
+  herbivores mind it (mood, home, a rehome rule), carnivores do not; a
+  hall raises crime and crime is the taking's hazard rate (0.04·crime/100
+  per hall-month × hunters on staff); the cut, the licence, the raid, the
+  Greens' League. ≈ 420 lines, one session. The no-market CSV gate (P 1643
+  · W 1052 · J 1480 · cash 84,706) is the byte-equality proof.
+- **Part II — the file, the arrest, the wrongful 5%, the pacification
+  centre**: police cover as a monthly arrest probability; the cells vs the
+  centre; `fixed` read by five rules (no litter, never a hunter, no fear,
+  friendship 0.7 counted ONCE in H, mood −5); the wrong animal as a ×8
+  weight; exoneration pays §500. ≈ 600 lines, one session. **Three owner
+  questions first** (complaints? weighted or same-kind wrongful pool? may a
+  fixed wolf keep the counter?) — they set the whole volume.
+- Measured and standing: the heist has fired 0 times in 360 city-years
+  (a shop's crime tops out at 39–46 vs a gate of 70); P is cap-pinned, so
+  neither arc shows in P — read births, littersLost, afraid, pacified.
+
 ## Polish the play-testers named (browser rounds 1–3), not yet done
 - WHY NOT line should carry the tax parenthetical from SPEC §11
   ("demand −0.24 (R 12% vs neutral 8.2%)") and use the same rounded `local`

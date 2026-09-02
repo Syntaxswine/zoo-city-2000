@@ -288,6 +288,13 @@ you would SEE.
    the 2×2 only — a 3×3 needs a walker-on-adjacent-road audit in
    `shots.mjs --scene` before any sprite; then the merge/unmerge state and
    the suite invariant; then three sprites.
+1b. **Crime and punishment** — `docs/PROPOSAL-CRIME-AND-PUNISHMENT.md`
+   (later the same day, two panels): zone M meat markets with a dread
+   field and the taking (Part I), then the file, the arrest, the 5%
+   wrongful and the pacification centre (Part II). Both are proposed, not
+   built; Part II opens with three questions only the owner can answer.
+   Read the "no-market CSV gate" and "P is cap-pinned" paragraphs before
+   measuring either.
 2. **Polish the play-testers named** — top of `BACKLOG.md`: the WHY NOT
    tax parenthetical, pause/faster coupling, park hidden behind towers, a
    zoo-cost warning, a loaded city opening paused, the two R-chalk fixes.
