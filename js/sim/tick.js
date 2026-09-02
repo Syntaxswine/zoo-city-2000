@@ -21,6 +21,7 @@ export function dateOf(world, tick = world.tick) {
 export function tick(world) {
   const notices = [];
   world.departures = [];
+  world.arrivals = [];
   if (!world.byId) {
     // First tick of a fresh world.
     world.byId = new Map();

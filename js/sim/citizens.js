@@ -486,6 +486,8 @@ export function citizensTick(world, cen, dem) {
       const hh = createHousehold(world, species, size);
       placeHousehold(world, hh, lot);
       out.arrived += size;
+      // For the walker layer: these animals walk in from the edge road.
+      world.arrivals.push(...hh.members);
     }
     // Scout: a species whose weight is armed and which has no residents.
     if (world.campers.filter((c) => c.kind === "scout").length === 0) {
