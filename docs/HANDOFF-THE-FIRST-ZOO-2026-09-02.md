@@ -390,6 +390,67 @@ Population never moves with any of it (cap-pinned). The cut runs ≈ §1.4k/yr
 for two blocks; a centre and two stations cost §1.7k/yr; the crater on the
 R tax is the rest of the gap. Tick 6–7 ms at 1,700.
 
+### 10b. The crime-and-punishment rulings (the build's decisions on top of the owner's words — quote §8 for theirs, this list for mine)
+
+Each is a decision a builder could have made the other way. The reason is
+the thing to argue with, not the number; the number is a KNOB.
+
+1. **The killing replaced the staffed-hunter "taking."** The owner said
+   crime is weighted by unemployment and prey may murder too; a taking
+   rolled only by a hall's staff could do neither. Any adult rolls, by diet
+   × hunger × the hall's smell × the knives × crime at home. The hall is the
+   BUYER and the DISPOSAL, not the only killer.
+2. **Complaints are gone.** The panel's volume channel (a prey household
+   filing on a feared neighbour) was pre-crime; the owner chose hunger as
+   the driver. Arrests now ride crimes only. The cost is honest: in a fed,
+   fully-employed town the centre sees ~1 conviction per 4 years.
+3. **Diet is a species column, the `predator` flag stays what it was.** Fox
+   and owl hunt without the flag (it is the skunk-incident gate); `diet`
+   keys every new term so that flag never grows a second meaning.
+4. **The wrongful pool is proximity only, 1/(1 + d), no species term.** The
+   owner: "random based on proximity." A rabbit can be sold for a wolf's
+   killing; the census counts it and EXONERATED names it.
+5. **The sentence table.** Predator (carn or omni), first conviction → the
+   centre; prey, or anyone already fixed → the hall (sold); no bed / no
+   hall → the cells. "Pacification is once" is printed on the SOLD line.
+   Omnivores count as predators here (a bear in the cells is not a bear on
+   the counter); if the owner wants bears sold first, it is one diet test.
+6. **A fixed animal keeps any job, the counter included** ("3. yes"), and
+   is simply weight 0 in the killer pool.
+7. **Prey flight is proportional** (unfixed share of the species in the
+   3×3), because a per-species Set let one fixed wolf out of a pack of five
+   change nothing — measured 5.2 adults of the feared kind beside every
+   afraid household.
+8. **A fixed predator's prey friendships count ONCE in H**, at affinity 0.7.
+   The knife buys quiet, not the index; `census.hKnife` shows the share.
+9. **Dread is its own field, not pollution** — pollution pulls raccoons and
+   pigs and refuses R growth; the owner's rule is herbivore-specific. Twice
+   a works at every ring (105 over 4 × 0.8), carnivores net 0.
+10. **Zone M has its own valve** (0.06·carnivores + 10 − Jm), Jm ∉ Jc:
+    V_C is negative 26 of 30 baseline years and shops must not be starved.
+11. **Grey means untaxed but not unpaid**: the cut is §25 per filled job,
+    immune to the rate; the licence is what puts the jobs on the books,
+    and it is offered deterministically (a weight-2 card would come once
+    per 15–40 years).
+12. **The raid is a BOON kind** so the No-disasters toggle never masks the
+    police working; the Greens' League likewise.
+13. **Burglary is station-gated and slow** (0.006 per hot lot, cap 0.3):
+    the panel's 0.02 gave a 150-animal town six a year. Only a killing's
+    file going cold prints COLD.
+14. **The heist's thief is now any adult within 4, weighted, adults only.**
+    The old pool was a species gate and could name a cub.
+15. **Custody keeps the home and releases the job through one function.**
+    `absent()` is the one predicate; `releaseJob()` the one release
+    (retirement had been leaving `hired` stale).
+16. **The centre is an employer, not a station.** `isStation` drives
+    coverage; `isCivicEmployer` drives jobs; a centre in `isStation` would
+    have grown a police ring.
+17. **No pronoun anywhere.** The sim has no sex field; the suite greps the
+    log for he/she/his/her/him.
+18. **The no-market byte-equality gate is retired.** The killing draws once
+    a month wherever an adult lives, so every baseline hash moved; 67 checks
+    are the gate and the numbers in §10 are the re-baseline.
+
 **Where to go next** is the top of `BACKLOG.md` (hunger visibility, the
 5%'s visibility, customer walkers, supply from funerals, the abattoir).
 
