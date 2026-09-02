@@ -612,6 +612,72 @@ check("no Math.random under js/", mathRandom.length === 0, mathRandom.join(", ")
   check("title: the sim never reads a preference (the cheat is an op)", simReadsPref.length === 0, simReadsPref.join(", "));
 }
 
+// the news reader (SPEC §11b): the feed is DERIVED from the city's own event
+// log and history — the panel keeps no second copy — a row is named by its
+// words so the log's roll cannot re-bind a read mark, and the sim never hears
+// that any of this exists.
+{
+  const { newsRows, keyOf } = await import("../js/news.js");
+  const rows = newsRows(A.world);
+  const logN = A.world.events.log.length;
+  check("news: the feed is the city's own log, line for line — no synthesized second copy",
+    rows.length === logN, `${rows.length} rows vs ${logN} logged`);
+  check("news: the feed runs oldest first", rows.every((r, i) => i === 0 || rows[i - 1].t <= r.t));
+  // The bug this replaced: the advisor logs a yearly REPORT line AND the panel
+  // synthesized a second one out of world.history on load, so every loaded
+  // city printed each year twice with two different net figures.
+  const years = rows.filter((r) => r.report).map((r) => r.text.slice(0, 12));
+  check("news: a year sums itself up once", new Set(years).size === years.length,
+    `${years.length} report lines, ${new Set(years).size} distinct years`);
+  check("news: the reports the city logged are all of them",
+    rows.filter((r) => r.report).length === A.world.events.log.filter((e) => /^REPORT /.test(e.line)).length);
+  check("news: every row carries a month label and words", rows.every((r) => typeof r.text === "string" && r.text.length > 0 && typeof r.label === "string" && r.label.length > 0));
+  const named = new Map(rows.map((r) => [keyOf(r), r.text]));
+  check("news: every row has its own name", named.size === rows.length, `${named.size} names for ${rows.length} rows`);
+  // The read mark lives in the browser and the feed lives in the city, so a
+  // name must POINT AT THE SAME DISPATCH after a round trip and after the log
+  // rolls. Asking only whether a name still exists proves nothing: a name made
+  // of the row's PLACE in its month survives a roll perfectly well — bound to
+  // its neighbour. Compare the WORDS each name resolves to.
+  const rebound = (feed) => feed.filter((r) => named.has(keyOf(r)) && named.get(keyOf(r)) !== r.text);
+  const back = newsRows(load(save(A.world)));
+  const lost = back.filter((r) => !named.has(keyOf(r)));
+  check("news: a save → load leaves every name on its own dispatch",
+    back.length > 0 && lost.length === 0 && rebound(back).length === 0,
+    `${lost.length} lost, ${rebound(back).length} re-bound of ${back.length}`);
+  // Cut INSIDE a month, which is the only cut that can tell the two naming
+  // schemes apart — one landing on a month boundary cannot, and a check that
+  // cannot fail is not a check. Refuse rather than pass if the fixture has no
+  // month with two lines in it.
+  const cut = load(save(A.world));
+  const before = cut.events.log.length;
+  let at = -1;
+  for (let i = 1; i < cut.events.log.length; i++) if (cut.events.log[i].t === cut.events.log[i - 1].t) { at = i; break; }
+  cut.events.log = at > 0 ? cut.events.log.slice(at) : cut.events.log;
+  const cutRows = newsRows(cut);
+  const cutLost = cutRows.filter((r) => !named.has(keyOf(r)));
+  check("news: a roll that cuts a month in half re-binds nobody",
+    at > 0 && cutRows.length > 0 && cutLost.length === 0 && rebound(cutRows).length === 0,
+    at < 0 ? `no multi-line month in the fixture — this check proved nothing` : `cut ${at} of ${before}, inside a month: ${cutLost.length} lost, ${rebound(cutRows).length} re-bound of ${cutRows.length}`);
+  // A dead city still reads: the reader opens on a map that has made no news.
+  check("news: an empty city has an empty feed, not a crash", newsRows(createWorld({ seed: "quiet" })).length === 0);
+  check("news: no world at all is an empty feed", newsRows(null).length === 0);
+
+  const newsSrc = readFileSync(path.join(ROOT, "js", "news.js"), "utf8");
+  const uiSrc = readFileSync(path.join(ROOT, "js", "ui.js"), "utf8");
+  const html2 = readFileSync(path.join(ROOT, "index.html"), "utf8");
+  check("news: js/news.js exports newsRows and createNews", /export function newsRows\b/.test(newsSrc) && /export function createNews\b/.test(newsSrc));
+  check("news: index.html mounts #news and the footer names the key", /id="news"/.test(html2) && /R news/.test(html2));
+  check("news: the strip carries the button", /btnNews/.test(uiSrc) && /app\.news\.toggle\(\)/.test(uiSrc));
+  check("news: the panel keeps no second copy of the feed", !/logLines/.test(uiSrc) && /newsRows\(/.test(uiSrc));
+  // The bug that made the reader necessary: onTick used to call flash() once
+  // per notice, so three of a month's four headlines were never seen.
+  check("news: a month's headlines queue instead of overwriting each other", /flashRun\(/.test(uiSrc) && !/if \(TICKER_FLASH\.test\(n\)\) flash\(n\)/.test(uiSrc));
+  check("news: the reader stops the clock while it is open", /app\.news && app\.news\.isOpen\(\)/.test(uiSrc));
+  const simSeesNews = files.filter((f) => /[\\/]sim[\\/]/.test(f) && /news\.js|newsRows|readMark/.test(readFileSync(f, "utf8"))).map((f) => path.relative(ROOT, f));
+  check("news: the sim never hears about the reader", simSeesNews.length === 0, simSeesNews.join(", "));
+}
+
 // ---- Part C: the art (if present) ------------------------------------------------
 const artIndex = path.join(ROOT, "js", "art", "index.js");
 if (existsSync(artIndex)) {

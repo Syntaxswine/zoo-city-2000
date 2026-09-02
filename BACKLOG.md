@@ -46,7 +46,32 @@ could ship whole.
   field is not built; no key-binding page; the painting has no credit line
   on the screen (the owner's — say who painted it if they want it said).
 
+## The news — SHIPPED 2026-09-02 (SPEC §11b; `js/news.js`; 17 checks)
+- Built at the owner's word (*"i'd like a news button, something where you can
+  read the updates that pop up on the screen in a sequential order"*): the
+  `R news` button with its unread count, the reader (whole feed oldest first,
+  ← → steps a dispatch, four chips, mark all read), the News tab — was Log,
+  now the same one feed read chronologically — the flash QUEUE, and the
+  per-city read mark in `zoo.pref`.
+- Fixed on the way, and it had been there since the Log tab was written:
+  **every loaded city printed each yearly REPORT twice** — the advisor logs
+  one, and `setWorld` synthesized a second out of `world.history` with a
+  different net figure. The synthesis is gone; the log is the feed.
+- Left: no search box and no "this year only" chip; a dispatch does not link
+  to its tile, though the coordinates are already in the line (clicking
+  KILLING could centre the map on (30,10)); the chosen chip is not remembered
+  across opens; `mark all read` has no undo; no per-species filter.
+- **Unverified by eye: the flash RUN's pacing.** A hidden browser pane
+  throttles timers and then suspends them, so only the first two of a
+  six-line run could be timed (2.0 s apart against the 1.5 s asked, and the
+  run then stopped with the pane asleep). The SEQUENCING is verified
+  synchronously and does not depend on the clock: the first line shows,
+  labelled 1 of 6, where the old code showed the sixth and dropped five.
+  Watch a busy month with the pane in front before touching FLASH_RUN.
+
 ## Polish the play-testers named (browser rounds 1–3), not yet done
+- (the Log tab's newest-first order and its double REPORT line: fixed by the
+  news reader, SPEC §11b)
 - WHY NOT line should carry the tax parenthetical from SPEC §11
   ("demand −0.24 (R 12% vs neutral 8.2%)") and use the same rounded `local`
   as the score line (two sources today).

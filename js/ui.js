@@ -2,19 +2,26 @@
 //
 // Everything here is DOM: the tool strip, the three demand bars over the map,
 // the date/cash/population/approval strip, the hover card, the four tabs
-// (Rules · Budget · Census · Log), the CHOICE card and the new-city dialog —
+// (Rules · Budget · Census · News), the CHOICE card and the new-city dialog —
 // whose three builders (foundForm, savesList, portBox) the title screen
 // (title.js) mounts on its own card. The cheat's button beside the treasury
 // lives here too; the Options switch that unlocks it is title.js's.
 // The card's WHY NOT line is `lotReport().score.reason` — the same
 // `lotScore()` that decides growth, never a second implementation (§0.6).
+// The News tab obeys the same law: it reads `newsRows(world)` (news.js), the
+// feed the reader and the strip badge read, derived from the city's own event
+// log — this panel keeps no second copy of it.
+//
+// A month can deliver four headlines and `flash()` used to overwrite itself,
+// so three of them were never seen. `flashRun()` plays a month's run through
+// one at a time and points at the reader for anything past FLASH_MAX.
 //
 //   createUI(app) → { refresh, onTick, setTool, setCost, flash, updateHover,
 //                     showChoice, hideChoice, openNewCity, closeModals, modalOpen, setWorld }
 
 import { ZONE, CIVIC, TERRAIN, ROAD, ZONE_NAME, USE_NAME } from "./sim/world.js";
 import { dateOf, characterLine } from "./sim/tick.js";
-import { eventTitle, TICKER_BAD, TICKER_GOOD, TICKER_FLASH } from "./sim/events.js";
+import { eventTitle, TICKER_FLASH } from "./sim/events.js";
 import { lotReport, REASON } from "./sim/lots.js";
 import { exposure } from "./sim/fields.js";
 import { RULES, KNOBS } from "./sim/rules.js";
@@ -22,6 +29,7 @@ import { yearlyFigures } from "./sim/budget.js";
 import { SPECIES, SPECIES_BY_ID } from "./sim/species.js";
 import { ageYears, isWorker } from "./sim/census.js";
 import { TOOLS } from "./input.js";
+import { newsRows } from "./news.js";
 
 const $ = (sel, root = document) => root.querySelector(sel);
 const el = (tag, cls, text) => {
@@ -56,8 +64,10 @@ export function createUI(app) {
     panel: $("#panel"),
   };
   let tab = "rules";
-  let logLines = []; // [{ t, label, text }]
   let flashTimer = 0;
+  let flashQ = [];      // the rest of this month's headlines, waiting their turn
+  let newsStick = true; // the News tab follows the newest line unless you scroll up
+  let newsJump = true;
   let lastHoverKey = "";
 
   // `world.last` is this month's census / demand / budget. The sim keeps it
@@ -134,6 +144,7 @@ export function createUI(app) {
     mk("btnSave", "S", "save", "S: save a checkpoint of this city (the autosave is a separate slot)", () => app.save());
     mk("btnLoad", "L", "load", "L: reload this city's S checkpoint (not the autosave)", () => app.load());
     mk("btnOverlay", "O", "overlay", "O: cycle land value / pollution / crime / lot score overlays", () => app.cycleOverlay());
+    mk("btnNews", "R", "news", "R: the news — every dispatch this city ever made, oldest first; ← → step one at a time", () => app.news.toggle());
     mk("btnZoom", "+", "zoom", "+ / −: zoom ×1 / ×2", () => app.zoomAt(app.camera.zoom === 1 ? 1 : -1));
     sep();
     mk("btnNew", "N", "new city", "N: found a new city / load a saved one", () => openNewCity());
@@ -153,12 +164,35 @@ export function createUI(app) {
     dom.cost.classList.toggle("refused", !!refused);
   }
 
-  function flash(msg) {
-    if (app.title && app.title.isOpen()) { app.title.say(msg); return; } // the painting covers #flash; the title re-flashes it on close
+  // One message lives 2.6 s; a RUN of them gets 1.5 s each so a busy month
+  // still fits under the player's attention. A user's own flash (a refused
+  // op, a save) preempts the run — feedback on what you just did wins.
+  const FLASH_ONE = 2600, FLASH_RUN = 1500, FLASH_MAX = 5;
+
+  function show(msg, ms) {
+    if (app.title && app.title.isOpen()) { app.title.say(msg); flashQ = []; return; } // the painting covers #flash; the title re-flashes it on close
     dom.flash.textContent = msg;
     dom.flash.classList.add("on");
     clearTimeout(flashTimer);
-    flashTimer = setTimeout(() => dom.flash.classList.remove("on"), 2600);
+    flashTimer = setTimeout(() => {
+      const next = flashQ.shift();
+      if (next) { show(next[0], next[1]); return; }
+      dom.flash.classList.remove("on");
+    }, ms);
+  }
+
+  function flash(msg) { flashQ = []; show(msg, FLASH_ONE); }
+
+  /** A month's headlines, in order. Before this they overwrote each other. */
+  function flashRun(list) {
+    if (!list.length) return;
+    if (list.length === 1) { flash(list[0]); return; }
+    const head = list.slice(0, FLASH_MAX);
+    const rest = list.length - head.length;
+    flashQ = [];
+    for (let i = 1; i < head.length; i++) flashQ.push([`${head[i]}  (${i + 1}/${list.length})`, FLASH_RUN]);
+    if (rest) flashQ.push([`+${rest} more this month — R opens the news`, FLASH_RUN]);
+    show(`${head[0]}  (1/${list.length})`, FLASH_RUN);
   }
 
   function refreshClock() {
@@ -172,6 +206,17 @@ export function createUI(app) {
     pauseBtn.title = app.paused ? "Space: resume (the speed keys only set the speed while paused)" : "Space: pause";
     $("#btnOverlay").classList.toggle("on", app.overlays !== "off");
     $("#btnZoom").classList.toggle("on", app.camera.zoom === 2);
+  }
+
+  // The unread count rides on the button, and the button goes ink-filled while
+  // any stands — the same "this is on" the pause / overlay / zoom buttons use.
+  function refreshNews() {
+    const b = $("#btnNews");
+    if (!b || !app.news) return;
+    const n = app.news.unread();
+    b.lastElementChild.textContent = n ? `news ${n}` : "news";
+    b.classList.toggle("on", n > 0);
+    b.title = n ? `R: ${n} unread — every dispatch this city ever made, oldest first; ← → step one at a time` : "R: the news — every dispatch this city ever made, oldest first; ← → step one at a time";
   }
 
   // ---- demand bars ------------------------------------------------------------------------------
@@ -428,10 +473,10 @@ export function createUI(app) {
   // ---- tabs ---------------------------------------------------------------------------------------------------
   function buildTabs() {
     dom.tabs.innerHTML = "";
-    for (const [id, label] of [["rules", "Rules"], ["budget", "Budget"], ["census", "Census"], ["log", "Log"]]) {
+    for (const [id, label] of [["rules", "Rules"], ["budget", "Budget"], ["census", "Census"], ["news", "News"]]) {
       const b = el("button", "tab", label);
       b.dataset.tab = id;
-      b.addEventListener("click", () => { tab = id; renderTab(); });
+      b.addEventListener("click", () => { tab = id; newsJump = true; renderTab(); });
       dom.tabs.append(b);
     }
   }
@@ -439,12 +484,18 @@ export function createUI(app) {
   function renderTab() {
     for (const b of dom.tabs.children) b.classList.toggle("on", b.dataset.tab === tab);
     const body = dom.tabBody;
+    // The feed runs oldest-first, so "follow the news" means the BOTTOM. Read
+    // the scroll before the wipe: a player who scrolled up to read an old
+    // month must not be yanked back down by the next tick.
+    if (tab === "news" && !newsJump) newsStick = body.scrollTop + body.clientHeight >= body.scrollHeight - 24;
     body.innerHTML = "";
     const w = world();
     if (tab === "rules") renderRules(body, w);
     else if (tab === "budget") renderBudget(body, w);
     else if (tab === "census") renderCensus(body, w);
-    else renderLog(body, w);
+    else renderNews(body, w);
+    if (tab === "news" && (newsJump || newsStick)) body.scrollTop = body.scrollHeight;
+    newsJump = false;
   }
 
   function renderRules(body, w) {
@@ -583,27 +634,28 @@ export function createUI(app) {
     }
   }
 
-  function renderLog(body, w) {
-    if (!logLines.length) { body.append(el("p", "note", "Events and advisor lines land here as the months pass.")); return; }
+  // The tab is the glance; `R` opens the reader. Both read the same feed, and
+  // both run OLDEST FIRST — the order the owner asked to read them in.
+  function renderNews(body, w) {
+    const rows = newsRows(w);
+    if (!rows.length) { body.append(el("p", "note", "Events and advisor lines land here as the months pass. R opens the reader.")); return; }
     const ul = el("ul", "log");
-    for (const l of logLines.slice(-120).reverse()) {
+    for (const l of rows.slice(-120)) {
       const li = el("li");
       li.append(el("span", "dim", `${l.label} `), l.text);
-      if (TICKER_BAD.test(l.text)) li.classList.add("bad");
-      else if (TICKER_GOOD.test(l.text)) li.classList.add("good");
+      if (l.bad) li.classList.add("bad");
+      else if (l.good) li.classList.add("good");
       ul.append(li);
     }
     body.append(ul);
+    body.append(el("p", "note", rows.length > 120 ? `the last 120 of ${rows.length} — R opens the reader, from the founding` : "R opens the reader: ← → step one dispatch at a time"));
   }
 
   function onTick(notices) {
-    const w = world();
-    const label = dateOf(w, w.tick - 1).label;
-    for (const n of notices) {
-      logLines.push({ t: w.tick - 1, label, text: n });
-      if (TICKER_FLASH.test(n)) flash(n);
-    }
-    if (logLines.length > 400) logLines = logLines.slice(-300);
+    // Not one flash per notice clobbering the last: the whole month's run, in
+    // order. Nothing is dropped either way — every line is already in the
+    // city's own event log, which is what the News tab and the reader read.
+    flashRun(notices.filter((n) => TICKER_FLASH.test(n)));
     refresh();
   }
 
@@ -611,6 +663,7 @@ export function createUI(app) {
     refreshClock();
     refreshBars();
     refreshStats();
+    refreshNews();
     renderTab();
     lastHoverKey = "";
   }
@@ -746,19 +799,17 @@ export function createUI(app) {
     seed.focus();
     seed.select();
   }
-  function closeModals() { dom.newcity.hidden = true; }
+  function closeModals() { dom.newcity.hidden = true; if (app.news) app.news.close(); }
   // The title screen counts: the clock stops under it (main.js) and Esc is its own (input.js).
-  const modalOpen = () => !dom.newcity.hidden || !dom.choice.hidden || !!(app.title && app.title.isOpen());
+  // So does the news reader: months must not pass while you are reading them.
+  const modalOpen = () => !dom.newcity.hidden || !dom.choice.hidden || !!(app.title && app.title.isOpen()) || !!(app.news && app.news.isOpen());
 
   function setWorld() {
-    // A loaded city brings its event log and yearly reports back into the ticker.
-    const w = world();
-    logLines = [];
-    const rows = [];
-    for (const e of w.events.log || []) rows.push({ t: e.t, label: dateOf(w, e.t).label, text: e.line });
-    for (const h of w.history || []) rows.push({ t: h.tick, label: dateOf(w, h.tick).label, text: `REPORT ${dateOf(w, h.tick).year}: ${h.P} animals · approval ${h.approval} · unemployed ${h.U} · net ${h.income - h.upkeep < 0 ? "−" : "+"}§${Math.abs(h.income - h.upkeep).toLocaleString("en-US")}/yr · Zoo City index ${Math.round(h.H * 100)}%.` });
-    rows.sort((a, b) => a.t - b.t);
-    logLines = rows.slice(-200);
+    // A loaded city brings its own event log and yearly reports with it, and
+    // newsRows() reads them where they lie — the panel keeps no second copy,
+    // so a live session and the same city reloaded read the same document.
+    if (app.news) app.news.invalidate();
+    newsJump = true;
     lastHoverKey = "";
     tab = "rules"; // SPEC §2: the Rules tab is open by default on a new city
     refresh();

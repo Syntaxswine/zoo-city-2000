@@ -12,8 +12,10 @@
 // zoo.meta:<name>) so a month cannot pass before the panel is read.
 // The title screen (title.js) stands over whatever boot found — CONTINUE
 // drops it; NEW GAME / LOAD / SAVE / OPTIONS are its buttons — and comes
-// back on Esc. `zoo.pref` is this browser's preferences (the cheat switch),
-// never part of a city: the cheat's button posts an op the city records.
+// back on Esc. `zoo.pref` is this browser's preferences (the cheat switch,
+// and which dispatches you have read), never part of a city: the cheat's
+// button posts an op because it changes the city; being caught up on the news
+// changes nothing, so it is a preference and the sim never hears of it.
 
 import { createWorld } from "./sim/world.js";
 import { tick, dateOf } from "./sim/tick.js";
@@ -27,6 +29,7 @@ import { createWalkers } from "./walkers.js";
 import { createInput } from "./input.js";
 import { createUI } from "./ui.js";
 import { createTitle } from "./title.js";
+import { createNews } from "./news.js";
 import { KNOBS } from "./sim/rules.js";
 
 const TICK_SECONDS = 1.5;
@@ -38,7 +41,7 @@ const KEY = (name) => `zoo.city:${name}`;
 const AUTO = (name) => `zoo.auto:${name}`;
 const META = (name) => `zoo.meta:${name}`;
 const LAST = "zoo.last";
-const PREF = "zoo.pref"; // UI preferences (the cheat switch) — this browser's, never the city's
+const PREF = "zoo.pref"; // UI preferences (the cheat switch, the news read marks) — this browser's, never the city's
 
 const canvas = document.getElementById("map");
 const app = {
@@ -54,6 +57,7 @@ const app = {
   input: null,
   ui: null,
   title: null,
+  news: null,
   entered: false, // a city is in play behind the title (founded, loaded or resumed): CONTINUE, SAVE and the autosave need one
   acc: 0,
   sinceSave: 0,
@@ -317,6 +321,7 @@ function boot() {
   app.renderer = createRenderer(canvas, world, art);
   app.walkers = createWalkers(world);
   app.ui = createUI(app);
+  app.news = createNews(app); // after the UI: its close() refreshes the badge on the strip
   app.input = createInput(canvas, app);
   app.title = createTitle(app);
   if (resumed) {

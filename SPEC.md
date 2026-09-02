@@ -668,6 +668,58 @@ The `O` overlay cycle is off → LV → pollution → crime (an open file is a r
 
 ---
 
+## 11b. The news (`js/news.js`; the News tab and the strip button in `ui.js`)
+
+The owner: *"i'd like a news button, something where you can read the updates
+that pop up on the screen in a sequential order."*
+
+- **Why it was needed.** A flash lives 2.6 s and `flash()` OVERWROTE itself,
+  so a month that delivered four headlines showed exactly one — the last.
+  Months of five and six dispatches are ordinary (measured on a 30-year
+  browser city: 180 dispatches, busiest month 6).
+- **One feed.** `newsRows(world)` is the single implementation (§0.6): it is
+  `world.events.log` read where it lies, plus the reading — the month's
+  label, which chip a row answers to, and `k`, its place in its own month
+  (for ORDER only). Nothing is accumulated beside it, so a live session and
+  the same city reloaded are the same document. The panel used to keep a
+  second copy AND synthesize a yearly REPORT line out of `world.history` on
+  load — a line the advisor already logs (tick.js) — so **every loaded city
+  printed each year twice**, with two different net figures because the two
+  were computed from different books. There is one narrator, and it is the
+  richer one: the line the city actually said at the time.
+- **A row's name is its words, never its place**: `keyOf(r) = t.fnv32(text)`.
+  tick.js caps the log at 400 and save.js keeps 200, so a roll can cut a
+  month in half; a positional name would come back bound to its neighbour
+  and every read mark in that month would point at the wrong dispatch.
+- **The read mark is a SET of names in `zoo.pref`.news[city]** — this
+  BROWSER's, never the city's; the sim must not know it exists (§0.4, the
+  law the cheat obeys the other way round: a cheat is an op because it
+  changes the city; being caught up on the news changes nothing). A set, not
+  a high-water mark: under a filter you skip stories on purpose, and a
+  high-water mark would swallow every one you stepped over. Pruned to the
+  live feed on every write — 177 dispatches cost 2.6 KB. First sight of a
+  city in a browser starts you CAUGHT UP: a loaded 40-year city must not
+  open with a badge of 300 things you lived through.
+- **The reader** (`R`, or the strip's `news`): the whole feed oldest first, a
+  cursor stepped with ← →, ↑ ↓, and W A S D as well — panning a map you
+  cannot see is not a thing anyone meant to do — PgUp/PgDn by ten, Home/End,
+  `mark all read`, and four chips: all · headlines (only what popped up over
+  the map, `TICKER_FLASH`) · trouble (`TICKER_BAD`) · good (`TICKER_GOOD`).
+  It opens on the FIRST UNREAD. A row is read when the cursor LANDS on it,
+  never when it is stepped over. `Esc` closes; the clock is stopped while it
+  stands (`modalOpen()` counts it, like the title and the choice card).
+- **The strip button** carries the unread count and goes ink-filled while any
+  stands — the same "this is on" that pause / overlay / zoom use.
+- **The News tab** (was Log) is the glance at the same feed: the last 120,
+  chronological. It opens scrolled to the newest and follows it, unless you
+  have scrolled up to read — then it stays where you put it.
+- **A month's run of flashes queues** (`flashRun`): 2.6 s for one, 1.5 s each
+  for a run, labelled `(2/6)`, five at most and then `+N more — R opens the
+  news`. A flash the player caused (a refused op, a save, an undo) preempts
+  the run: feedback on what you just did wins.
+
+---
+
 ## 12. Art (`js/art/*`)
 
 ### 12.1 Palette (11 ramps dark→light, shadows cool, highlights warm; accents are a handful of pixels)

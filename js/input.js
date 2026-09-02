@@ -260,6 +260,7 @@ export function createInput(canvas, app) {
       case "s": case "S": app.save(); break;
       case "l": case "L": app.load(); break;
       case "o": case "O": app.cycleOverlay(); break;
+      case "r": case "R": app.news.toggle(); break;
       case "+": case "=": app.zoomAt(1); break;
       case "-": case "_": app.zoomAt(-1); break;
       case "n": case "N": app.ui.openNewCity(); break;
@@ -275,12 +276,22 @@ export function createInput(canvas, app) {
 
   function onKey(e) {
     if (e.key === "Escape") {
-      // The title menu first (a panel goes back, the menu closes), then the new-city dialog.
+      // The title menu first (a panel goes back, the menu closes), then the news
+      // reader, then the new-city dialog.
       if (app.title && app.title.isOpen()) { app.title.back(); e.preventDefault(); return; }
+      if (app.news && app.news.isOpen()) { app.news.close(); e.preventDefault(); return; }
       if (app.ui.modalOpen()) { app.ui.closeModals(); e.preventDefault(); return; }
     }
     if (typing(e)) return;
     if (e.ctrlKey || e.metaKey || e.altKey) return;
+    // The reader owns the keyboard while it is up — ← → step a dispatch — and
+    // it takes WASD too, because panning a map you cannot see is not a thing
+    // anyone meant to do. Anything it does not take is swallowed, not passed on.
+    if (app.news && app.news.isOpen()) {
+      held.clear(); // a pan key held when the reader opened must not run on behind it
+      if (app.news.key(e)) e.preventDefault();
+      return;
+    }
     if (app.ui.modalOpen()) return;
     // Space by its code too: a synthetic KeyboardEvent can carry key "" with code "Space".
     const key = e.code === "Space" ? " " : e.key;

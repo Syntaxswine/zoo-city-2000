@@ -209,3 +209,40 @@ main { flex: 1; display: flex; min-height: 0; }
 #title .tfoot { color: var(--dim); font-size: 10px; letter-spacing: 1px; }
 .modalbox .note { color: var(--dim); }
 #stats button.cheat { padding: 0 6px; }
+
+/* ---- the news reader (js/news.js) ----
+   Every dispatch the city ever made, oldest first, with a cursor you step.
+   The strip button carries the unread count and goes ink-filled while any
+   stands, the same way pause / overlay / zoom show they are on. ---- */
+#news .newsbox {
+  width: 660px; max-width: 94vw; max-height: 86vh;
+  display: flex; flex-direction: column; overflow: hidden;
+}
+.newstop { display: flex; align-items: baseline; gap: 8px; }
+.newstop h2 { flex: 1; margin: 0; }
+.newstop button { padding: 0 7px; }
+.newshead { margin: 2px 0 7px; }
+.newschips { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 6px; }
+.newschips .chip {
+  font: inherit; color: var(--dim); background: transparent;
+  border: 1px solid var(--border); padding: 1px 7px; letter-spacing: 1px;
+}
+.newschips .chip.on { color: #fffdf6; background: var(--ink); border-color: var(--ink); }
+ul.newsfeed {
+  list-style: none; margin: 0; padding: 3px 0; flex: 1; min-height: 140px; overflow: auto;
+  background: #fffdf6; border: 1px solid var(--border);
+}
+ul.newsfeed li.note { color: var(--dim); padding: 6px 10px; }
+li.nrow { display: flex; gap: 6px; padding: 2px 8px 2px 2px; align-items: baseline; cursor: default; }
+li.nrow .gut { width: 12px; flex: none; text-align: center; color: var(--accent); }
+li.nrow .when { width: 96px; flex: none; color: var(--dim); }
+li.nrow .txt { flex: 1; min-width: 0; }
+li.nrow .txt b { font-weight: 600; letter-spacing: 1px; }
+li.nrow.bad .txt { color: var(--bad); }
+li.nrow.good .txt { color: var(--accent); }
+li.nrow.report .txt { color: var(--dim); }
+li.nrow.unread .when { color: var(--ink); }
+li.nrow.at { background: #ece7d6; }
+li.nrow.at .gut { color: var(--ink); }
+.newsfoot { display: flex; align-items: center; gap: 8px; margin-top: 7px; }
+.newsfoot .dim { flex: 1; text-align: center; color: var(--dim); }

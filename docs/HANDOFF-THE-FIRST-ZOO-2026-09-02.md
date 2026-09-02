@@ -331,6 +331,7 @@ you would SEE.
 - *"just a quick nudge, i'd like fire departments to make fires not impossible, but statistically unlikely when there is a fire department nearby."* → `FIRE_START_COVERED 1/6`.
 - *"lets also think about adding more specialized 3x3 tile sprites for some special themed buildings.  things like themed commercial shops, an industrial dairy, or a residential apartment building."* → `docs/PROPOSAL-LANDMARKS.md`; not started.
 - *"lets write a handoff when you are done.  this is your chance to leave your keystone"* → this file.
+- *"i'd like a news button, something where you can read the updates that pop up on the screen in a sequential order."* and *"oh, looks like the news exists under the log tab"* → `js/news.js`, the strip button, the reader, the News tab, the flash queue. See §13.
 - *"lets think about how we can add predation to the game as part of crime.  perhaps with a custom zoned commercial space for grey market meat markets.  herbavores do not like living near meat markets, it should have a similar negative devaluing as industrial, but perhaps even stronger."* → zone M, dread at 2× a works, the killing; `docs/PROPOSAL-CRIME-AND-PUNISHMENT.md` Part I.
 - *"for the crime and punishment section, lets add a pacification center.  a place where troublesome predators can be fixed so they are no longer a threat to prey species.  fixed animals cannot have offspring and are no longer interested in attacking prey.  prey can also be pacified if they are caught in a crime.  and just to make things a little more realistic, lets add a 5% chance that the police arrest the wrong person."* → the file, the arrest, the centre, `fixed`; Part II.
 - *"one design change to crime and punishment, since pacification is a one time process, multiple offenses should send the citizen to the meat market.  that might also be a better first stop for prey who commit crimes.  1. crime should be weighted by unemployment, no jobs means hungry wolves.  2. no, random based on proximity.  i think it should be possible for prey to murder too, but just much less likely.  3. yes"* → the sentence table (predator → centre once; prey or the fixed → sold at the hall); the killing weighted by unemployment ×20 and by diet (herbivores 0.03); the wrongful pool by proximity; a fixed wolf keeps the counter. See §10.
@@ -638,10 +639,95 @@ Suite 91 → 103.
 Suite 103 → 113. The tranche is complete: walls (A), use-zoning and
 trespass (B), rail (C) — three commits on the proposal.
 
+## 13. Session 6 — the news (2026-09-02, late; SPEC §11b)
+
+The owner asked for one thing: *"i'd like a news button, something where you
+can read the updates that pop up on the screen in a sequential order."* Then,
+seeing the panel: *"oh, looks like the news exists under the log tab"* — it
+did, and that was most of the point. The Log tab was there, buried, and read
+NEWEST FIRST.
+
+**The cause, which the ask did not name.** `flash()` overwrote itself:
+`onTick` looped the month's notices and called it once per line, each clearing
+the last one's timer and its text. A month that delivered four headlines
+showed the fourth for 2.6 s and dropped three on the floor. On a 30-year
+browser city, 180 dispatches, the busiest month held six. So the updates were
+not merely hard to re-read — most of them were never seen at all.
+
+**What shipped.** `js/news.js`: `newsRows(world)` (the one feed) and
+`createNews(app)` (the reader). A `news` button on the strip carrying the
+unread count, ink-filled while any stands. `R` opens the reader: the whole
+feed oldest first, a cursor stepped with ← → (and ↑ ↓ / WASD), four chips
+(all · headlines · trouble · good), `mark all read`, opening on the FIRST
+UNREAD, the clock stopped under it. The Log tab became the News tab reading
+the same feed chronologically, following the newest unless you scrolled up.
+And `flashRun` plays a month's run through, `(2/6)`, capped at five with a
+`+N more — R opens the news` tail.
+
+### 13b. What the work turned up (symptom-keyed)
+
+- **Two REPORT lines a year, on every loaded city, since the Log tab was
+  written.** Symptom: the feed showed `REPORT 2029 … net +§130/yr` and
+  `REPORT 2029 … net +§980/yr` in the same month. The advisor already logs a
+  yearly REPORT (tick.js:132, the rich one — halls, justice, the character
+  line) and `setWorld` synthesized a second out of `world.history` (the thin
+  one), computed from a different book, hence the two nets. It only appeared
+  after a LOAD, which is why it survived. Fix: the log IS the feed; the
+  synthesis is gone. Canonical is the richer narrator.
+- **A read mark named by position is one roll from pointing at the wrong
+  story.** `keyOf` was `t.k` — the row's place in its month. tick.js caps the
+  log at 400 and save.js keeps 200, so a roll can cut a month in HALF and the
+  survivors come back renamed. Now `t.fnv32(text)`: a dispatch is named by
+  its own words.
+- **A check that could not fail.** The first version of that check cut the
+  log at a fixed index — which landed on a month BOUNDARY, where the two
+  naming schemes agree. It passed under the bug. The check now FINDS a month
+  with two lines in it and cuts inside, and refuses (rather than passing)
+  when the fixture has no such month.
+- **A check that could not discriminate.** The second version asked whether a
+  row's name still EXISTED after the roll. It does — bound to the neighbour.
+  Membership was the wrong question; the check now compares what each name
+  RESOLVES TO, and catches 2 re-bound rows under the mutation.
+- **A hidden browser pane throttles timers and then suspends them.** A
+  six-line flash run showed 3 of 6 at 2.0 s spacing and then stopped dead —
+  the pane, not the code. Anything paced by `setTimeout` cannot be timed in a
+  hidden pane; test the SEQUENCE synchronously instead (the first line shows,
+  labelled 1 of 6, where the old code showed the sixth) and time the pacing
+  only with the pane in front.
+- **A deterministic replay marks its own future read.** Advancing the same
+  city over the same months regenerates identical dispatches, which carry
+  identical names, which were already in the read set — so "unread" stayed 0
+  and looked broken. It was the naming working. Clear the marks AFTER the
+  fixture is loaded, not before.
+- **`z.ui.onTick(list)` only flashes lines matching `TICKER_FLASH`.** A test
+  with prettified strings (`'A FIRE one'`) queues nothing at all. Use real
+  prefixes.
+- **The CHOICE card blocks the keyboard.** A pending choice makes
+  `modalOpen()` true, so `R` does nothing and arrows do nothing. That is
+  correct, and it will look like a dead key: answer the card first.
+
+Suite 113 → 130. Verified in the browser on a 30-year, 592-animal city:
+180 dispatches, feed length == log length, 30 reports for 30 distinct years,
+badge and unread count exact against dispatches added, reader opening on the
+first unread, WASD not panning behind it, read marks surviving a real page
+reload (3 unread before, 3 after), and zero console messages throughout.
+
+### 13c. Ammunition already gathered for the NEXT arc
+
+Before the owner redirected to the news, a nine-agent census of every
+subsystem the **3×3 landmarks** touch (painter · lots/growth · citizens ·
+world/save · ops/events · art · fields/reach · UI/census · tools) ran to
+completion — symbols, file:line hooks, and the invariants a merged nine-tile
+lot would violate. It is in this session's task output; if it is gone, it is
+one workflow to re-run. Two findings worth carrying regardless:
+`depthOf(tx, ty, fw, fh)` already generalises to any footprint, and
+`OBLONG_PULLBACK` is footprint-size-BLIND — a 3×3 gets the same 0.7 a 2×2
+gets, which is exactly the audit the ranked list demands first.
+
 ## 9. Verification recipe (what "done" looks like here)
 
 ```
-node tools/check.mjs                                   # 113 checks, 0 failures — the gate
+node tools/check.mjs                                   # 130 checks, 0 failures — the gate
 node tools/playtest.mjs --years 30 --quiet             # the §4 curves (disasters off)
 node tools/playtest.mjs --years 30 --parks 2 --zoo 12 --quiet
 node tools/playtest.mjs --disasters --stations --years 40 --seed 5
