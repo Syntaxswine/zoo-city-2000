@@ -22,10 +22,13 @@ export const TOOLS = [
   { id: "tree", key: "5", label: "Tree", hint: "plant trees (drag) §4" },
   { id: "park", key: "6", label: "Park", hint: "1×1, §150 — click" },
   { id: "zoo", key: "7", label: "Zoo", hint: "2×2, §2,500 — click" },
+  { id: "fire", key: "F", label: "Fire stn", hint: "1×1, §500 — click; within 6 tiles a fire burns one month and barely spreads" },
+  { id: "police", key: "P", label: "Police", hint: "1×1, §500 — click; takes 60 off crime within 3 tiles, 30 within 6" },
   { id: "bulldoze", key: "8", label: "Bulldoze", hint: "clear (drag) §2, trees §4" },
   { id: "inspect", key: "9", label: "Inspect", hint: "pin a card; left-drag pans" },
 ];
 const TOOL_BY_KEY = Object.fromEntries(TOOLS.map((t) => [t.key, t.id]));
+const PLACE_TOOLS = new Set(["park", "zoo", "fire", "police"]);
 const ZONE_OF = { R: ZONE.R, C: ZONE.C, I: ZONE.I };
 const PAN_SPEED = 700; // projection px per second
 
@@ -78,8 +81,7 @@ export function createInput(canvas, app) {
   }
 
   function clickOp(tx, ty) {
-    if (state.tool === "park") return { kind: "park", tx, ty };
-    if (state.tool === "zoo") return { kind: "zoo", tx, ty };
+    if (state.tool === "park" || state.tool === "zoo" || state.tool === "fire" || state.tool === "police") return { kind: state.tool, tx, ty };
     return null;
   }
 
@@ -91,7 +93,7 @@ export function createInput(canvas, app) {
 
   function costLabel(op, plan) {
     const n = plan.tiles.length;
-    const name = { zone: op.zone === ZONE.R ? "R" : op.zone === ZONE.C ? "C" : "I", road: "Road", tree: "Tree", bulldoze: "Bulldoze", park: "Park", zoo: "Zoo" }[op.kind];
+    const name = { zone: op.zone === ZONE.R ? "R" : op.zone === ZONE.C ? "C" : "I", road: "Road", tree: "Tree", bulldoze: "Bulldoze", park: "Park", zoo: "Zoo", fire: "Fire station", police: "Police station" }[op.kind];
     if (plan.reason) return `${name}: blocked`;
     if (!n) return `${name}: nothing to do`;
     const bridges = plan.tiles.filter((t) => t.what === "bridge").length;
@@ -170,7 +172,7 @@ export function createInput(canvas, app) {
         state.drag.by = Math.max(0, Math.min(w.h - 1, state.drag.by));
       }
       refreshCost();
-    } else if (changed || state.tool === "park" || state.tool === "zoo") refreshCost();
+    } else if (changed || PLACE_TOOLS.has(state.tool)) refreshCost();
   }
 
   function onUp(e) {
@@ -226,7 +228,8 @@ export function createInput(canvas, app) {
   const downAt = new Map();
 
   function command(k, e) {
-    if (TOOL_BY_KEY[k]) { setTool(TOOL_BY_KEY[k]); return; }
+    const toolKey = TOOL_BY_KEY[k] || TOOL_BY_KEY[String(k).toUpperCase()];
+    if (toolKey) { setTool(toolKey); return; }
     switch (k) {
       case "d": case "D":
         state.density = state.density === 3 ? 1 : 3;
@@ -309,7 +312,7 @@ export function createInput(canvas, app) {
     if (state.pinned != null) { h.tx = state.pinned % w.w; h.ty = (state.pinned / w.w) | 0; h.pinned = true; }
     else if (state.hover) { h.tx = state.hover[0]; h.ty = state.hover[1]; }
     if (state.drag && state.cost) h.drag = { tiles: state.cost.tiles, refused: state.cost.refused };
-    if (!state.drag && state.hover && (state.tool === "park" || state.tool === "zoo") && state.mouse.inside) {
+    if (!state.drag && state.hover && PLACE_TOOLS.has(state.tool) && state.mouse.inside) {
       const [tx, ty] = state.hover;
       const size = state.tool === "zoo" ? 2 : 1;
       const ok = !!state.cost && !state.cost.refused && state.cost.tiles.length > 0;

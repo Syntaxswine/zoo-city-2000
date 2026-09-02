@@ -129,6 +129,9 @@ function advisor(world, cen, dem, fig) {
   const maxRate = Math.max(world.rates.R, world.rates.C, world.rates.I);
   if (maxRate > dem.n + 3) out.push(`ADVISOR: taxes are well above the neutral ${dem.n.toFixed(1)}%. The animals are talking about leaving.`);
   if (cen.P >= 800 && cen.zoos === 0) out.push("ADVISOR: the citizens want a Zoo.");
+  if (cen.P >= 300 && cen.fireStations === 0) out.push("ADVISOR: no fire station — a fire will burn two months and spread. One covers six tiles (§500).");
+  if (cen.meanCrime > 50 && cen.policeStations === 0) out.push(`ADVISOR: crime on the built lots averages ${Math.round(cen.meanCrime)}. A police station covers six tiles (§500).`);
+  else if (cen.meanCrime > 50) out.push(`ADVISOR: crime averages ${Math.round(cen.meanCrime)} — the stations do not reach everywhere.`);
   if (cen.meanPol > 40) out.push("ADVISOR: the air is thick. Trees and parks clear it; industry makes it.");
   if (world.cash < 0) out.push("ADVISOR: the treasury is in the red.");
   const prevN = neutralRate(world.history.length > 1 ? world.history[world.history.length - 2].P : 0);

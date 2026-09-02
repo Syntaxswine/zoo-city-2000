@@ -1,6 +1,6 @@
 // buildings.js — every built thing in the city is BOXES. SPEC §12.2.
 //
-// Nine families (3 zones × 3 tiers) × 2 variants, the two civics, and the
+// Nine families (3 zones × 3 tiers) × 2 variants, the four civics, and the
 // overlays. Nothing in this file draws a face. Each family is a list of
 // `box()`es in world units (1 tile = 16 along a and b, c in pixels) handed to
 // `solid.render`, which rasterises per screen pixel through a z-buffer — so a
@@ -418,7 +418,93 @@ export const ZOO = (() => {
   });
 })();
 
-export const CIVICS = { park: PARK, zoo: ZOO };
+// ----------------------------------------------------------- the stations
+
+// A lamp is a small box — the tower lamp 1.5 units, a 6-px glow at 1×. It is the one
+// lit key on all three faces — a glow has no shading for a flat skin to
+// lose. The blue lamp is not a glow: '6' (luminance ≈101) on the concrete
+// side wall (≈134) came out a shadow by the steps at 1× (round 1), so it
+// carries a glass '=' top — the brightest face on top, as every box — and
+// stands at door-top height against plain wall, where a lamp hangs.
+const LAMP = flatSkin("-", "-", "-");
+const BLUE_LAMP = flatSkin("=", "6", "6");
+const STEP = flatSkin(CONC[4], CONC[3], CONC[2]);
+const POST = flatSkin(SLATE[2], SLATE[1], SLATE[0]);
+
+/**
+ * The fire station: a tier-1-sized brick box under a slate slab, read at
+ * 1× by two things on its lit face — a garage door two-thirds of the face
+ * and the red '8' band over it — and by the 3×3×8 hose tower on the slab
+ * at the back corner, a '-' lamp on top. Three END_GLASS windows so the
+ * shaded face is not a blank wall. Anchored at the ground centre like PARK.
+ */
+export const FIRE_STATION = (() => {
+  const H = 12;
+  const base = litSkin(BRICK, { grain: brickGrain, height: H });
+  const skin = {
+    top: base.top,
+    side: (a, k, x, y) => {
+      const g = H - k;
+      if (a >= 1.5 && a < 9 && g < 7.5) return "+"; // the garage door
+      if (a >= 10.5 && a < 12 && g < 5.5) return "+"; // the crew door
+      if (a >= 0.5 && a < 12.5 && g >= 8 && g < 10.5) return "8"; // the red band — 2.5 units: at 1.5 it was a 1-px line at 1×
+      return base.side(a, k, x, y);
+    },
+    end: (b, k, x, y) => {
+      const g = H - k;
+      if (g >= 4.5 && g < 7.5 && ((b >= 1.5 && b < 3.5) || (b >= 4.5 && b < 6.5) || (b >= 7.5 && b < 9.5))) return END_GLASS;
+      return base.end(b, k, x, y);
+    },
+  };
+  const boxes = [
+    box(1.5, 14.5, 2.5, 13.5, 0, H, skin),
+    box(1, 15, 2, 14, H, H + 1, SLATE_SKIN),
+    box(1.5, 4.5, 2.5, 5.5, H + 1, H + 9, litSkin(BRICK, { grain: brickGrain, height: 8 })),
+    box(2.25, 3.75, 3.25, 4.75, H + 9, H + 10.5, LAMP),
+  ];
+  return solidSprite("fire-station", boxes, { tags: ["civic"] });
+})();
+
+/**
+ * The police station: a taller concrete box, read at 1× by the blue '6'
+ * lamp on a post beside its door. A glass strip along the top storey ('='
+ * on the lit face, END_GLASS on the shaded one, like every concrete
+ * family), a dark door up two steps — two slabs in front of the wall, so
+ * the door's foot sits behind them — and a plant box on the cap.
+ */
+export const POLICE_STATION = (() => {
+  const H = 14;
+  const base = litSkin(CONC_WALL, { height: H });
+  const skin = {
+    top: base.top,
+    side: (a, k, x, y) => {
+      const g = H - k;
+      if (a >= 7.5 && a < 10 && g < 7) return "+"; // the door
+      if (a >= 1 && a < 12 && g >= 8.5 && g < 11.5) return "="; // the glass strip
+      return base.side(a, k, x, y);
+    },
+    end: (b, k, x, y) => {
+      const g = H - k;
+      if (b >= 1 && b < 10 && g >= 8.5 && g < 11.5) return END_GLASS;
+      return base.end(b, k, x, y);
+    },
+  };
+  const boxes = [
+    box(1.5, 14.5, 2.5, 13.5, 0, H, skin),
+    box(1, 15, 2, 14, H, H + 1, C_ROOF),
+    box(3, 6, 4, 7, H + 1, H + 3.5, litSkin(CONC, { height: 2.5 })),
+    box(7, 10.5, 13.5, 14.5, 0, 2, STEP),
+    box(7, 10.5, 14.5, 15.5, 0, 1, STEP),
+    // The lamp is 2 units — 8 px wide at 1× — because it is the whole
+    // signature; at 1.5 it was a 5-px dot beside a 5-px door. Its screen
+    // left edge (2·(a0 − b1) = −7) is the door's right edge, no overlap.
+    box(12, 12.75, 14, 14.75, 0, 6.5, POST),
+    box(12, 14, 13.5, 15.5, 6.5, 8.5, BLUE_LAMP),
+  ];
+  return solidSprite("police-station", boxes, { tags: ["civic"] });
+})();
+
+export const CIVICS = { park: PARK, zoo: ZOO, fire: FIRE_STATION, police: POLICE_STATION };
 export function civicSprite(kind) {
   const s = CIVICS[kind];
   if (!s) throw new Error(`civicSprite: unknown kind '${kind}'`);
@@ -532,7 +618,7 @@ export function overlaySprite(kind, frame = 0) {
 export function allBuildings() {
   const out = [];
   for (const zone of [1, 2, 3]) for (const tier of [1, 2, 3]) for (const s of BUILDINGS[zone][tier]) out.push({ name: s.name, sprite: s });
-  out.push({ name: PARK.name, sprite: PARK }, { name: ZOO.name, sprite: ZOO });
+  out.push({ name: PARK.name, sprite: PARK }, { name: ZOO.name, sprite: ZOO }, { name: FIRE_STATION.name, sprite: FIRE_STATION }, { name: POLICE_STATION.name, sprite: POLICE_STATION });
   for (const [k, list] of Object.entries(OVERLAYS)) list.forEach((s, i) => out.push({ name: `overlay-${k}-${i}`, sprite: s }));
   return out;
 }

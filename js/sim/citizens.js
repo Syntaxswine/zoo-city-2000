@@ -26,6 +26,7 @@ const SURNAMES = {
   wolf: ["Greyback", "Howell", "Lupin", "Fangley"],
   cat: ["Purrington", "Whiskers", "Tabbs", "Mousewell"],
   hawk: ["Talonby", "Skyward", "Kestrel", "Windrow"],
+  skunk: ["Stripely", "Muskwell", "Blackstripe", "Whiffington"],
 };
 
 // ---------------------------------------------------------------------------
@@ -369,7 +370,10 @@ export function arrivalWeights(world, cen) {
     tortoise: 1,
     raccoon: (1 + Math.min(2, cen.meanPol / 10)) * (smog ? 2 : 1),
     // Livestock: pigs follow industry and dirt; cows follow pasture (Low lots + parks).
-    pig: 1 + Math.min(2, cen.Ji / 80) + Math.min(1, cen.meanPol / 15),
+    // Pigs follow industry hard (the owner saw none): any works at all is a pull.
+    pig: 1 + Math.min(2, cen.Ji / 40) + Math.min(1, cen.meanPol / 10) + (cen.Ji > 0 ? 0.75 : 0),
+    // Skunks follow woods and dirt; nobody hunts them (they are in no PREY_OF list).
+    skunk: 0.7 + Math.min(1.5, treeShare * 4) + Math.min(1, cen.meanPol / 12),
     cow: 1 + Math.min(1.5, 0.5 * cen.parks) + 1.0 * Math.min(1, vacLow / vacTotal),
     // Predators: wolves follow woods and a prey-rich town; cats follow shops and mice; hawks follow towers.
     wolf: 0.5 + Math.min(1.0, treeShare * 3) + (preyShare(cen, "wolf") >= 0.25 ? 0.5 : 0),
@@ -734,6 +738,8 @@ function moods(world) {
     }
     m += 5 * c.friends.length;
     m -= Math.min(20, flight);
+    if (c.home >= 0) m -= KNOBS.CRIME_MOOD * Math.max(0, world.crime[c.home] - KNOBS.CRIME_MOOD_FROM);
+    for (const e of world.events.active) if (e.moodBySpecies && e.moodBySpecies[c.species]) m += e.moodBySpecies[c.species];
     if (c.path && c.path.length - 1 <= sp.commute) m += 10;
     if (c.grief && c.grief > world.tick) m -= 10;
     if (c.moodPenalty && c.moodPenaltyUntil > world.tick) m += c.moodPenalty;

@@ -1,4 +1,4 @@
-// citizens.js — the KIT. Thirteen species, hand-authored, the organic
+// citizens.js — the KIT. Fourteen species, hand-authored, the organic
 // exception to the box law (SPEC §0.5, §12.3).
 //
 // A citizen is 12×20 (a cub 8×12), composed at first use and cached:
@@ -67,9 +67,9 @@ export const AGES = Object.freeze(["adult", "elder", "cub"]);
  * row of the sim's species table. The table can grow ahead of the art; the
  * sim's `ARRIVING` set keeps a species off the map until its sprites
  * exist, and `citizenSprite` throws for one, by name, rather than drawing
- * a headless body. All thirteen rows of the table are drawn today.
+ * a headless body. All fourteen rows of the table are drawn today.
  */
-const HEAD_SPECIES = { rabbit: 1, mouse: 1, fox: 1, beaver: 1, owl: 1, bear: 1, tortoise: 1, raccoon: 1, pig: 1, cow: 1, wolf: 1, cat: 1, hawk: 1 };
+const HEAD_SPECIES = { rabbit: 1, mouse: 1, fox: 1, beaver: 1, owl: 1, bear: 1, tortoise: 1, raccoon: 1, pig: 1, cow: 1, wolf: 1, cat: 1, hawk: 1, skunk: 1 };
 export const SPECIES_IDS = Object.freeze(Object.keys(SPECIES_BY_ID).filter((id) => id in HEAD_SPECIES));
 
 // =========================================================================
@@ -504,6 +504,42 @@ const HEAD = {
       "...xyyyxx...",
     ]),
   },
+  // Round 5: the skunk — the STRIPE. Authored straight in the cool keys
+  // the remap leaves alone, 'Z' white and 'W' near-black, because on its
+  // −1 coat the warm 'z' lands on grey 'Y' and an elder's 'z' on 'Z'
+  // itself, which would put the stripe's white on every highlight; so no
+  // 'z' in any skunk part. SE: a white crown line, a 1-px blaze under it,
+  // a pointed muzzle tipped with a '+' nose. The head sits a column right
+  // of centre and its crown line right of THAT, so three grey pixels
+  // separate it from the tail's white — the first cut had the tail's tip
+  // curling over the crown and the two whites fused into a hood at 1×.
+  // The far (screen-left) ear is a column inboard of the near one: a head
+  // seen three-quarters on, and the plume's lane. NE: the 2-px stripe down
+  // the back of the head into the tail's centre.
+  skunk: {
+    se: part([
+      "............",
+      "............",
+      ".....y...y..",
+      "...yyyZZZyx.",
+      "...yyyyZyyx.",
+      "...yyy+yy+x.",
+      "...yyyyyyyx.",
+      "....yyyyyy+.",
+      "....xyyxx...",
+    ]),
+    ne: part([
+      "............",
+      "............",
+      "....y....y..",
+      "...yyyZZyyx.",
+      "...yyyZZyyx.",
+      "...yyyZZyyx.",
+      "...yyyZZyyx.",
+      "...yyyZZyxx.",
+      "....xyZZxx..",
+    ]),
+  },
 };
 
 // =========================================================================
@@ -565,6 +601,19 @@ const TAIL = {
   hawk: {
     se: [part(["..yy", ".xyy", "xwyw", "xw.w"]), 0, 13, true],
     ne: [part([".yy.", "yyyy", "wywy", "wywy"]), 4, 13, false],
+  },
+  // Held HIGH: the plume rises past the head on both facings — the tail
+  // is taller than the head. SE (behind): a 'W'-edged, 'Z'-lined plume
+  // straight up the screen-left of the figure, 5 wide where it clears the
+  // head and fanned at the tip, its root curling to the hip; the head and
+  // the arm hide all but a 2–3 px strip below the crown. It does NOT curl
+  // over the head: that fused with the crown line at 1×. NE (in front):
+  // the plume stands over the back, 8 wide across the shoulders, and its
+  // tip shows above the head, whose own stripe carries the line across
+  // the rows the head covers.
+  skunk: {
+    se: [part([".WZW...", "WZZyW..", "WZZyW..", "WZZyW..", "WZyW...", "WZyW...", "WZyW...", "WZyW...", "WZyW...", "WZW....", "WZW....", "WZW....", "WZW....", ".WW....", "..W...."]), 0, 0, true],
+    ne: [part([".WyZZyW.", ".WyZZyW.", ".WyZZyW.", "..WZZW..", "..WZZW..", "..WZZW..", "..WZZW..", "..WZZW..", "..WZZW..", "WyyZZyyW", "WyyZZyyW", "WyyZZyyW", "WyyZZyyW", ".WyZZyW."]), 2, 0, false],
   },
 };
 
@@ -668,6 +717,11 @@ const CUB_MARK = {
   wolf: [part([".y....y.", ".yy..yy.", "........", "........", "....zz+."]), 0, 1],
   cat: [part(["..y..y..", "........", "........", "........", "z......z"]), 0, 1],
   hawk: [part(["......--", "......-."]), 0, 5],
+  // The skunk cub: no ears (the raccoon precedent) — a white crown line on
+  // the near half of the crown, two columns clear of the tail's tip, and
+  // the tail held up the screen-left, 'Z' down its length to a 'W' root
+  // that meets the belt.
+  skunk: [part(["WZ......", "WZ......", "WZ..ZZ..", "Z.......", "Z.......", "Z.......", "Z.......", "Z.......", "Z.......", "WW......"]), 0, 0],
 };
 
 // =========================================================================
@@ -723,7 +777,7 @@ export const MEETING = defineSprite({
 // =========================================================================
 
 const BUILD = {
-  rabbit: "small", mouse: "small", fox: "small", owl: "small", raccoon: "small", cat: "small", hawk: "small",
+  rabbit: "small", mouse: "small", fox: "small", owl: "small", raccoon: "small", cat: "small", hawk: "small", skunk: "small",
   beaver: "big", bear: "big", tortoise: "big", pig: "big", cow: "big", wolf: "big",
 };
 const AUTHOR_KEYS = keysOf("furWarm"); // w x y z — the authoring ramp
@@ -961,7 +1015,7 @@ export function citizenSprite(species, facing = "se", frame = 0, age = "adult", 
   return s;
 }
 
-/** Every citizen sprite, named, for the audit: 13 species × 4 facings × 3 frames × 3 ages (+ one hat). */
+/** Every citizen sprite, named, for the audit: 14 species × 4 facings × 3 frames × 3 ages (+ one hat). */
 export function allCitizens() {
   const out = [];
   for (const species of SPECIES_IDS)

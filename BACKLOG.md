@@ -23,8 +23,6 @@ could ship whole.
 - A loaded city always opens paused; players who reload a running ×3 game
   must press Space.
 - Hover-card parts do not sum to the printed total (rounding).
-- Species art: the five new species arrive once their kit sprites exist
-  (`ARRIVING` in species.js).
 
 ## L1 — cheap, visible, next
 - **Road rot** (cash < 0 for 6 ticks → 5% of roads/tick to rubble) — the
@@ -40,7 +38,7 @@ could ship whole.
 - **Minimap** (the sibling Glades has one to port).
 - **Pond removal** for a beaver dam (§40, beavers' mood −20 for a year) — the
   op exists in KNOBS.COST.pond but not in ops.js.
-- **Fire station** (halves spread within 4) once fire has been felt.
+- (fire and police stations shipped 2026-09-02: `F` and `P` tools, crime field, heist)
 - **Money tuning after real play**: the scripted mayor nets +§8k/yr at 1,800
   citizens; a real player with parks and a zoo spends more. Re-measure with
   the input log of an actual session before touching UPKEEP_*.
@@ -53,6 +51,9 @@ could ship whole.
   save size are the only costs.
 - **Power** (plant + 4-tile radius, unpowered = score −0.5) — the classic
   third gate, deliberately absent from v1.
+- **Station staffing as coverage** — today a station covers fully whether or
+  not its four jobs are filled (weights, never gates); SC-style funding
+  sliders are the L2 version.
 
 ## L3 — texture
 - Sound (the Impressions register is half walla).

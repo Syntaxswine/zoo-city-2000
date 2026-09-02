@@ -75,10 +75,10 @@ export function costOf(world, op) {
       }
       break;
     }
-    case "park": {
+    case "park": case "fire": case "police": {
       const i = idx(world, op.tx, op.ty);
       if (!inBounds(world, op.tx, op.ty) || world.terrain[i] === TERRAIN.WATER || world.road[i] || world.zone[i] || world.civic[i]) return { cost: 0, tiles, reason: "blocked" };
-      add(i, C.park + (world.terrain[i] === TERRAIN.TREE ? C.bulldozeTree : 0), "park");
+      add(i, C[op.kind] + (world.terrain[i] === TERRAIN.TREE ? C.bulldozeTree : 0), op.kind);
       break;
     }
     case "zoo": {
@@ -173,6 +173,14 @@ export function apply(world, op, { log = true } = {}) {
         world.terrain[i] = TERRAIN.GRASS;
         world.civic[i] = CIVIC.PARK;
         break;
+      case "fire":
+        world.terrain[i] = TERRAIN.GRASS;
+        world.civic[i] = CIVIC.FIRE;
+        break;
+      case "police":
+        world.terrain[i] = TERRAIN.GRASS;
+        world.civic[i] = CIVIC.POLICE;
+        break;
       case "zoo":
         world.terrain[i] = TERRAIN.GRASS;
         world.civic[i] = what === "zoo" ? CIVIC.ZOO : CIVIC.ZOO_PART;
@@ -191,6 +199,12 @@ export function apply(world, op, { log = true } = {}) {
 function removeCivic(world, i) {
   const c = world.civic[i];
   if (c === CIVIC.PARK) { world.civic[i] = CIVIC.NONE; return; }
+  if (c === CIVIC.FIRE || c === CIVIC.POLICE) {
+    for (const cz of world.citizens) if (cz.job === i) { cz.job = -1; cz.path = null; cz.hired = -1; }
+    world.staff[i] = 0;
+    world.civic[i] = CIVIC.NONE;
+    return;
+  }
   // Zoo: find the anchor and clear all four.
   const { w } = world;
   const tx = i % w;

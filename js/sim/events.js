@@ -13,6 +13,7 @@ import { post } from "./budget.js";
 import { removeHousehold, evictFromLot, fireFromLot, invalidatePaths } from "./citizens.js";
 import { neutralRate } from "./demand.js";
 import { ageYears } from "./census.js";
+import { SPECIES_BY_ID } from "./species.js";
 
 const DISASTER = "disaster";
 const BOON = "boon";
@@ -48,10 +49,16 @@ export const ROSTER = [
     id: "fire", kind: DISASTER, weight: (w, c) => 3 * (((w.tick % 12) >= 5 && (w.tick % 12) <= 7) ? 2 : 1),
     gate: (w) => builtLots(w).length > 0,
     fire: (w) => {
+      // Where it starts: every built lot, weighted 1 uncovered / FIRE_START_COVERED
+      // covered — a fire station makes a fire nearby unlikely, not impossible.
       const lots = builtLots(w);
-      const i = w.rng.pick(lots);
-      w.burning[i] = 2;
-      return `FIRE at (${i % w.w},${(i / w.w) | 0}) — bulldoze a firebreak.`;
+      let total = 0;
+      for (const l of lots) total += w.fireCov[l] ? KNOBS.FIRE_START_COVERED : 1;
+      let r = w.rng.next() * total;
+      let i = lots[lots.length - 1];
+      for (const l of lots) { r -= w.fireCov[l] ? KNOBS.FIRE_START_COVERED : 1; if (r <= 0) { i = l; break; } }
+      w.burning[i] = w.fireCov[i] ? 1 : 2;
+      return `FIRE at (${i % w.w},${(i / w.w) | 0})${w.fireCov[i] ? " — the fire station is on it." : " — bulldoze a firebreak."}`;
     },
   },
   {
@@ -216,6 +223,28 @@ export const ROSTER = [
     fire: () => `WOLF MOON — the Greybacks howl all month. The rabbits lie awake; half the town goes out to listen, and friendships form twice as fast.`,
   },
   {
+    id: "heist", kind: DISASTER, weight: () => 3,
+    gate: (w, c) => robbable(w).length > 0 && robbers(w).length > 0,
+    fire: (w) => {
+      const lot = w.rng.pick(robbable(w));
+      const thief = w.rng.pick(robbers(w));
+      const loss = 100 * w.tier[lot];
+      post(w, "heist", -Math.min(loss, Math.max(0, w.cash)));
+      lowerTier(w, lot);
+      return `HEIST — ${thief.name} ${thief.surname} (${thief.species}) cleaned out the shop at (${lot % w.w},${(lot / w.w) | 0}): −§${loss}, a storey gone. A police station covers six tiles.`;
+    },
+  },
+  {
+    id: "skunked", kind: BOON, weight: () => 2, duration: 3,
+    gate: (w, c) => c.shares.skunk >= 0.05 && w.citizens.some((x) => SPECIES_BY_ID[x.species].predator),
+    fire: (w) => {
+      const skunk = w.rng.pick(w.citizens.filter((x) => x.species === "skunk"));
+      const victim = w.rng.pick(w.citizens.filter((x) => SPECIES_BY_ID[x.species].predator));
+      w.events.active.push({ id: "skunkedMood", until: w.tick + 3, moodBySpecies: { fox: -15, wolf: -15, cat: -15, hawk: -15, owl: -15 } });
+      return `SKUNK INCIDENT — ${skunk.name} ${skunk.surname} sprayed ${victim.name} ${victim.surname} (${victim.species}). Every predator in town is sulking for three months.`;
+    },
+  },
+  {
     id: "founders", kind: BOON, weight: () => 6,
     gate: (w, c) => c.speciesPresent >= 5 && c.H >= 0.5 && c.friendships >= c.P / 4 && w.tick - w.events.lastFestival >= 120,
     fire: (w) => {
@@ -245,6 +274,14 @@ function treeShare(w) {
   for (let i = 0; i < w.terrain.length; i++) if (w.terrain[i] === TERRAIN.TREE) n++;
   return n / w.terrain.length;
 }
+function robbable(w) {
+  const out = [];
+  for (let i = 0; i < w.w * w.h; i++) if (w.zone[i] === ZONE.C && w.tier[i] > 0 && w.crime[i] > KNOBS.HEIST_CRIME) out.push(i);
+  return out;
+}
+function robbers(w) {
+  return w.citizens.filter((c) => !c.dead && (c.species === "fox" || c.species === "raccoon" || c.species === "cat"));
+}
 function hasCTier(w, t) {
   for (let i = 0; i < w.w * w.h; i++) if (w.zone[i] === ZONE.C && w.tier[i] >= t) return true;
   return false;
@@ -262,6 +299,7 @@ export const EVENT_TITLES = Object.freeze({
   recession: "Recession", foxFair: "Fox market fair", rabbitWarren: "Rabbit warren", founders: "Founders' festival",
   festivalMood: "Founders' festival (the mood)", grant: "County grant", scrubbers: "Scrubbers", truffles: "Truffle season",
   dairyFair: "Dairy fair", wolfMoon: "Wolf moon", bearWinter: "Bear winter", notice: "Notice",
+  heist: "Heist", skunked: "Skunk incident", skunkedMood: "Skunk incident (the sulk)",
 });
 export const eventTitle = (id) => EVENT_TITLES[id] || id;
 
@@ -298,12 +336,12 @@ export function eventsTick(world, cen, dem) {
       if (!inBounds(world, xx, yy)) continue;
       const j = yy * w + xx;
       if (world.tier[j] > 0 && !world.burning[j] && !world.rubble[j] && world.road[j] === ROAD.NONE && world.civic[j] !== CIVIC.PARK && world.terrain[j] !== TERRAIN.WATER) {
-        if (world.rng.chance(0.3)) ignite.push(j);
+        if (world.rng.chance(world.fireCov[j] ? KNOBS.FIRE_SPREAD_COVERED : KNOBS.FIRE_SPREAD)) ignite.push(j);
       }
     }
     if (world.burning[i] === 0) toRubble(world, i);
   }
-  for (const j of ignite) if (!world.burning[j] && world.tier[j] > 0) world.burning[j] = 2;
+  for (const j of ignite) if (!world.burning[j] && world.tier[j] > 0) world.burning[j] = world.fireCov[j] ? 1 : 2;
   // Flood recedes.
   for (let i = 0; i < n; i++) if (world.flooded[i]) world.flooded[i]--;
   // Expire timed effects.

@@ -64,6 +64,12 @@ export function census(world) {
   let maxTraffic = 0;
   let lots = 0;
   let roads = 0;
+  let fireStations = 0;
+  let policeStations = 0;
+  let burning = 0;
+  let crimeSum = 0;
+  let crimeN = 0;
+  let maxCrime = 0;
   for (let i = 0; i < n; i++) {
     const jobs = jobsOf(world, i);
     if (jobs) {
@@ -73,6 +79,10 @@ export function census(world) {
     }
     if (world.civic[i] === CIVIC.PARK) parks++;
     else if (world.civic[i] === CIVIC.ZOO) zoos++;
+    else if (world.civic[i] === CIVIC.FIRE) fireStations++;
+    else if (world.civic[i] === CIVIC.POLICE) policeStations++;
+    if (world.burning[i]) burning++;
+    if (world.tier[i] > 0) { crimeSum += world.crime[i]; crimeN++; if (world.crime[i] > maxCrime) maxCrime = world.crime[i]; }
     if (world.zone[i] !== ZONE.NONE) {
       lots++;
       if (!hasAccess(world, i)) lotsNoRoad++;
@@ -102,6 +112,8 @@ export function census(world) {
     approval: P ? moodSum / P : 50,
     native: P ? native / P : 0,
     parks, zoos, lots, roads, lotsNoRoad,
+    fireStations, policeStations, burning,
+    meanCrime: crimeN ? crimeSum / crimeN : 0, maxCrime,
     edgeRoads: Math.min(KNOBS.EDGE_ROAD_MAX, edgeRoads(world).length),
     meanLV: lvSum / n,
     meanPol: polSum / n,

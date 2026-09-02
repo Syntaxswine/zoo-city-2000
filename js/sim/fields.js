@@ -5,7 +5,8 @@
 // microseconds.
 
 import { KNOBS } from "./rules.js";
-import { TERRAIN, ROAD, ZONE, CIVIC, idx, inBounds, N4 } from "./world.js";
+import { TERRAIN, ROAD, ZONE, CIVIC, idx, inBounds, N4, isStation } from "./world.js";
+import { SPECIES_BY_ID } from "./species.js";
 
 const NO_ROAD = 255;
 
@@ -103,16 +104,20 @@ export function computePollution(world) {
   e.fill(0);
   const scrub = world.events.scrubbers ? 0.7 : 1;
   const smog = world.events.active.find((x) => x.id === "smogBank") ? 25 : 0;
-  // Pig mess: count pigs at home per lot (the owner's rule — pigs are messy,
-  // raccoons follow the mess).
-  const pigs = world._pigs || (world._pigs = new Uint8Array(n));
-  pigs.fill(0);
-  for (const c of world.citizens) if (c.species === "pig" && c.home >= 0 && !c.dead) pigs[c.home]++;
+  // Mess: pigs and skunks at home dirty their lot (the owner's rule — pigs
+  // are messy, raccoons follow the mess; the skunk stinks).
+  const mess = world._mess || (world._mess = new Float32Array(n));
+  mess.fill(0);
+  for (const c of world.citizens) {
+    if (c.dead || c.home < 0) continue;
+    const m = KNOBS.MESS[c.species];
+    if (m) mess[c.home] += m;
+  }
   for (let i = 0; i < n; i++) {
     const tx = i % w;
     const ty = (i / w) | 0;
     const t = world.tier[i];
-    if (pigs[i]) spread(e, w, h, tx, ty, KNOBS.EMIT_PIG * pigs[i], KNOBS.EMIT_PIG_RADIUS);
+    if (mess[i]) spread(e, w, h, tx, ty, mess[i], KNOBS.MESS_RADIUS);
     if (world.zone[i] === ZONE.I && t > 0) spread(e, w, h, tx, ty, KNOBS.EMIT_I[t] * scrub, KNOBS.EMIT_I_RADIUS[t]);
     else if (world.zone[i] === ZONE.C && KNOBS.EMIT_C[t] > 0) spread(e, w, h, tx, ty, KNOBS.EMIT_C[t], KNOBS.EMIT_C_RADIUS[t]);
     if (world.road[i] !== ROAD.NONE) spread(e, w, h, tx, ty, KNOBS.EMIT_ROAD + Math.min(KNOBS.EMIT_TRAFFIC_MAX, world.traffic[i] / KNOBS.EMIT_TRAFFIC_DIV), KNOBS.EMIT_ROAD_RADIUS);
@@ -207,12 +212,78 @@ export function computeLandValue(world) {
   }
 }
 
+/** Fire and police coverage from stations that have road access. */
+export function computeCoverage(world) {
+  const { w, h } = world;
+  const n = w * h;
+  world.fireCov.fill(0);
+  world.policeCov.fill(0);
+  for (let i = 0; i < n; i++) {
+    const c = world.civic[i];
+    if (!isStation(c) || world.roadDist[i] > KNOBS.ROAD_REACH) continue;
+    const tx = i % w;
+    const ty = (i / w) | 0;
+    const R = c === CIVIC.FIRE ? KNOBS.FIRE_RADIUS : KNOBS.POLICE_RADIUS;
+    for (let dy = -R; dy <= R; dy++) {
+      for (let dx = -R; dx <= R; dx++) {
+        const xx = tx + dx;
+        const yy = ty + dy;
+        if (!inBounds(world, xx, yy)) continue;
+        const j = yy * w + xx;
+        const d = Math.max(Math.abs(dx), Math.abs(dy));
+        if (c === CIVIC.FIRE) world.fireCov[j] = 1;
+        else {
+          const eff = d <= KNOBS.POLICE_NEAR ? KNOBS.POLICE_EFFECT : KNOBS.POLICE_EFFECT / 2;
+          if (eff > world.policeCov[j]) world.policeCov[j] = eff;
+        }
+      }
+    }
+  }
+}
+
+/**
+ * Crime, the Micropolis line at 0..100: base − land value + density +
+ * unemployment − police. Unemployment is counted here (not read from a
+ * stale census) so a loaded city and the straight run agree.
+ */
+export function computeCrime(world) {
+  const { w, h } = world;
+  const n = w * h;
+  let W = 0;
+  let U = 0;
+  for (const c of world.citizens) {
+    if (c.dead) continue;
+    const y = Math.floor((world.tick - c.born) / 12);
+    if (y < KNOBS.ADULT_AGE || y >= SPECIES_BY_ID[c.species].retire || c.onLeave) continue;
+    W++;
+    if (c.job < 0) U++;
+  }
+  const unemp = W ? U / W : 0;
+  for (let i = 0; i < n; i++) {
+    const tx = i % w;
+    const ty = (i / w) | 0;
+    let dens = 0;
+    for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+      const xx = tx + dx;
+      const yy = ty + dy;
+      if (inBounds(world, xx, yy)) dens += world.occupants[yy * w + xx];
+    }
+    if (!dens && world.zone[i] === ZONE.NONE) { world.crime[i] = 0; continue; }
+    const v = KNOBS.CRIME_BASE - KNOBS.CRIME_LV * world.lv[i] + KNOBS.CRIME_DENSITY * dens + KNOBS.CRIME_UNEMP * unemp - world.policeCov[i];
+    world.crime[i] = Math.max(0, Math.min(100, Math.round(v)));
+  }
+  // High crime destroys land value (SC2000 manual; Micropolis −20 above 190).
+  for (let i = 0; i < n; i++) if (world.crime[i] > KNOBS.CRIME_HIGH) world.lv[i] = Math.max(0, world.lv[i] - KNOBS.CRIME_LV_PENALTY);
+}
+
 /** Everything derived from tiles + citizens, in order. */
 export function computeFields(world) {
   if (world.roadsDirty) computeRoadDist(world);
+  computeCoverage(world);
   computeTraffic(world);
   computePollution(world);
   computeLandValue(world);
+  computeCrime(world);
 }
 
 /** Recount occupants and staff from the citizen list (derived, never saved). */

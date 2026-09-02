@@ -229,6 +229,7 @@ export function createRenderer(canvas, initialWorld, art) {
         let fill = null;
         if (mode === "lv") fill = `rgba(96,132,84,${(world.lv[i] / 100) * 0.65})`;
         else if (mode === "pol") fill = world.pol[i] > 2 ? `rgba(128,72,40,${(world.pol[i] / 100) * 0.75})` : null;
+        else if (mode === "crime") fill = world.crime[i] > 5 ? `rgba(150,50,70,${(world.crime[i] / 100) * 0.75})` : world.policeCov[i] ? "rgba(60,110,138,0.18)" : null;
         else if (mode === "score" && world.zone[i] !== ZONE.NONE) {
           const s = lotScore(world, i).score;
           fill = s >= 0 ? `rgba(80,110,150,${Math.min(1, s * 2) * 0.6 + 0.08})` : `rgba(170,70,60,${Math.min(1, -s * 2) * 0.6 + 0.08})`;
@@ -285,6 +286,8 @@ export function createRenderer(canvas, initialWorld, art) {
           standing = art.building(world.zone[i], world.tier[i], world.variant[i] & 1);
         } else if (world.civic[i] === CIVIC.PARK) standing = art.civic("park");
         else if (world.civic[i] === CIVIC.ZOO) standing = art.civic("zoo");
+        else if (world.civic[i] === CIVIC.FIRE) standing = art.civic("fire");
+        else if (world.civic[i] === CIVIC.POLICE) standing = art.civic("police");
         if (standing) items.push({ sprite: standing, tx, ty, kind: "building" });
         if (world.burning[i]) items.push({ sprite: fire, tx, ty, kind: "building", z: Z_BUILDING + 1, dy: -6 });
         if (i === plazaTile) items.push({ sprite: art.overlay("plaza"), tx, ty, kind: "ground", z: 3, dy: -2 });

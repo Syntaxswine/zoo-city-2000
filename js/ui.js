@@ -80,6 +80,7 @@ export function createUI(app) {
     const raw = [
       ["animals", KNOBS.UPKEEP_CITIZEN * w.citizens.length], ["roads", KNOBS.UPKEEP_ROAD * fig.roads], ["bridges", KNOBS.UPKEEP_BRIDGE * fig.bridges],
       ["buildings", KNOBS.UPKEEP_TIER * tiers], ["parks", KNOBS.UPKEEP_PARK * fig.parks], ["zoos", KNOBS.UPKEEP_ZOO * fig.zoos],
+      ["fire stations", KNOBS.UPKEEP_STATION * (fig.fireStations || 0)], ["police stations", KNOBS.UPKEEP_STATION * (fig.policeStations || 0)],
     ];
     const lines = raw.filter(([, v]) => v > 0).map(([name, v]) => [name, Math.round(v * k)]);
     const sum = lines.reduce((s, l) => s + l[1], 0);
@@ -125,7 +126,7 @@ export function createUI(app) {
     mk("btnUndo", "Z", "undo", "Z: undo the last op (this month only)", () => app.undo());
     mk("btnSave", "S", "save", "S: save a checkpoint of this city (the autosave is a separate slot)", () => app.save());
     mk("btnLoad", "L", "load", "L: reload this city's S checkpoint (not the autosave)", () => app.load());
-    mk("btnOverlay", "O", "overlay", "O: cycle land value / pollution / lot score overlays", () => app.cycleOverlay());
+    mk("btnOverlay", "O", "overlay", "O: cycle land value / pollution / crime / lot score overlays", () => app.cycleOverlay());
     mk("btnZoom", "+", "zoom", "+ / −: zoom ×1 / ×2", () => app.zoomAt(app.camera.zoom === 1 ? 1 : -1));
     sep();
     mk("btnNew", "N", "new city", "N: found a new city / load a saved one", () => openNewCity());
@@ -282,7 +283,8 @@ export function createUI(app) {
       lines.push(el("div", "", `${arrow} ${s.reason} (${parts}${p})`));
     }
     const env = el("div", "dim");
-    env.textContent = `LV ${rep.lv}  Pol ${rep.pol}  road ${rep.roadDist > KNOBS.ROAD_REACH ? "—" : rep.roadDist}` + (w.road[i] ? `  traffic ${rep.traffic}` : "");
+    env.textContent = `LV ${rep.lv}  Pol ${rep.pol}  crime ${rep.crime}  road ${rep.roadDist > KNOBS.ROAD_REACH ? "—" : rep.roadDist}` + (w.road[i] ? `  traffic ${rep.traffic}` : "")
+      + (rep.fireCov ? "  · fire cover" : "") + (rep.policeCov ? `  · police cover −${rep.policeCov}` : "");
     lines.push(env);
     if (rep.households.length) {
       lines.push(el("div", "", rep.households.map((h) => householdLine(h, w)).join(" · ")));
@@ -465,6 +467,8 @@ export function createUI(app) {
     tr("workers / jobs", `${c.W} / ${c.J}`);
     tr("unemployed", `${c.U} (${c.W ? Math.round((100 * c.U) / c.W) : 0}%)`);
     tr("friendships", `${c.friendships}`);
+    tr("crime (built lots, mean / max)", `${Math.round(c.meanCrime)} / ${c.maxCrime}`);
+    tr("stations", `${c.fireStations} fire · ${c.policeStations} police`);
     tr("Zoo City index (cross-species share)", hIndex(c));
     if (hSmall(c)) { const r = el("tr"); const td = el("td", "dim", `fading in over the first ${KNOBS.H_FLOOR} friendships — raw share ${pct(hRaw(c))}`); td.colSpan = 2; r.append(td); grid.append(r); }
     tr("approval (mean mood)", `${Math.round(c.approval)}`);

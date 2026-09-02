@@ -78,6 +78,7 @@ export function lotScore(world, i) {
     smog = pol > KNOBS.SMOG_REFUSE;
   } else if (z === ZONE.C) {
     local = 0.6 * clamp(residentsNear(world, i) / 80 - 0.5, -KNOBS.LOCAL_CLAMP, KNOBS.LOCAL_CLAMP) + 0.4 * ((lv - 50) / KNOBS.LOCAL_SCALE);
+    if (world.crime[i] > KNOBS.CRIME_HIGH) local -= KNOBS.CRIME_C_PENALTY; // shops need safe streets
   } else {
     local = 0.4 * ((50 - lv) / KNOBS.LOCAL_SCALE);
   }
@@ -164,6 +165,9 @@ export function lotReport(world, i) {
     pol: world.pol[i],
     roadDist: world.roadDist[i],
     traffic: world.traffic[i],
+    crime: world.crime[i],
+    fireCov: world.fireCov[i],
+    policeCov: world.policeCov[i],
     score: s,
     capacity: capacityOf(world, i),
     occupants: world.occupants[i],

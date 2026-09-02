@@ -12,6 +12,7 @@ export const KNOBS = {
   C_JOBS: [0, 3, 8, 20],
   I_JOBS: [0, 4, 10, 24],
   ZOO_JOBS: 12,
+  STATION_JOBS: 4,          // a fire or police station employs four (C-type jobs)
   // demand
   VALVE_LAG: 0.15,          // leaky integrator gain: 63% of a step in 6 months
   JOB_SEED: 40,             // +40 jobs pull on an empty map
@@ -62,8 +63,26 @@ export const KNOBS = {
   EMIT_PARK_RADIUS: 2,
   EMIT_FIRE: 50,
   EMIT_FIRE_RADIUS: 3,
-  EMIT_PIG: 1.5,            // mess per pig at home, over 1 tile — a full tenement of pigs is a small factory
-  EMIT_PIG_RADIUS: 1,
+  MESS: { pig: 1.5, skunk: 1.0 },  // mess/stink per animal at home, over 1 tile — a full tenement of pigs is a small factory
+  MESS_RADIUS: 1,
+  // services (the owner: "police and fire is noticeably absent")
+  FIRE_RADIUS: 6,           // a fire station covers Chebyshev 6: fires burn one month and spread at 0.1 instead of 0.3
+  FIRE_SPREAD: 0.3,
+  FIRE_SPREAD_COVERED: 0.1,
+  FIRE_START_COVERED: 1 / 6, // a covered lot is picked as a fire's origin at one-sixth the weight: unlikely, never impossible
+  POLICE_RADIUS: 6,         // full effect within 3, half effect to 6 (Micropolis: an 8x8 cell smoothed three times)
+  POLICE_NEAR: 3,
+  POLICE_EFFECT: 60,
+  CRIME_BASE: 40,           // crime = 40 − 0.5·LV + 0.4·density3 + 40·(U/W) − police, 0..100 (Micropolis: 128 − LV + density − police)
+  CRIME_LV: 0.5,
+  CRIME_DENSITY: 0.4,
+  CRIME_UNEMP: 40,
+  CRIME_HIGH: 60,           // above this: LV −10, shops' local score −0.2
+  CRIME_LV_PENALTY: 10,
+  CRIME_C_PENALTY: 0.2,
+  CRIME_MOOD: 0.3,          // mood lost per point of crime at home above 40
+  CRIME_MOOD_FROM: 40,
+  HEIST_CRIME: 70,          // a shop above this can be robbed
   LV_BASE: 35,
   LV_CENTRE: 40,
   LV_CENTRE_RADIUS: 24,
@@ -105,7 +124,8 @@ export const KNOBS = {
   UPKEEP_TIER: 4,
   UPKEEP_PARK: 300,
   UPKEEP_ZOO: 1500,
-  COST: { zoneR: 5, zoneC: 8, zoneI: 8, road: 10, bridge: 40, bulldoze: 2, bulldozeTree: 4, tree: 4, park: 150, zoo: 2500, pond: 40 },
+  UPKEEP_STATION: 400,
+  COST: { zoneR: 5, zoneC: 8, zoneI: 8, road: 10, bridge: 40, bulldoze: 2, bulldozeTree: 4, tree: 4, park: 150, zoo: 2500, pond: 40, fire: 500, police: 500 },
   START_CASH: 20000,
   RECEIVERSHIP: -10000,
   // events
@@ -180,7 +200,7 @@ export const RULES = Object.freeze([
   },
   {
     id: "F1", title: "Pollution",
-    formula: "each source spreads linearly over its radius: I tier 25/45/70 over 2/3/4 tiles, C tier 3 10 over 2, roads 2 + traffic/4 over 1, fire 50 over 3, pigs 1.5 each over 1 (mess); parks −12 over 2, trees −4; additive, capped 100 — no wind",
+    formula: "each source spreads linearly over its radius: I tier 25/45/70 over 2/3/4 tiles, C tier 3 10 over 2, roads 2 + traffic/4 over 1, fire 50 over 3, pigs 1.5 and skunks 1.0 each over 1 (mess); parks −12 over 2, trees −4; additive, capped 100 — no wind",
     live: (w) => `mean Pol ${f1(w.last.census.meanPol)} · max ${w.last.census.maxPol}`,
   },
   {
@@ -195,7 +215,7 @@ export const RULES = Object.freeze([
   },
   {
     id: "B2", title: "Upkeep per year",
-    formula: "12·P + 5·roads + 12·bridges + 4·Σ tiers + 300·parks + 1500·zoos",
+    formula: "12·P + 5·roads + 12·bridges + 4·Σ tiers + 300·parks + 1500·zoos + 400·stations",
     live: (w) => `≈ §${w.last.budget.upkeepYr}/yr → net §${w.last.budget.incomeYr - w.last.budget.upkeepYr}/yr`,
   },
   {
@@ -217,6 +237,21 @@ export const RULES = Object.freeze([
     id: "C4", title: "Prey flight",
     formula: "a rabbit, mouse, pig or cow loses 10 mood per predator species living next door — unless someone in the household is friends with that species",
     live: () => "the bridge is a friendship, never a wall",
+  },
+  {
+    id: "S1", title: "Crime",
+    formula: "crime = 40 − 0.5·LV + 0.4·animals in the 3×3 + 40·unemployed share − police ; above 60: LV −10, shops −0.2, a shop above 70 can be robbed ; mood −0.3 per point above 40 at home",
+    live: (w) => `mean crime on built lots ${f1(w.last.census.meanCrime)} · max ${w.last.census.maxCrime} · unemployed share ${f2(w.last.census.W ? w.last.census.U / w.last.census.W : 0)}`,
+  },
+  {
+    id: "S2", title: "Police cover",
+    formula: "a police station (§500, §400/yr, 4 jobs) takes 60 off crime within 3 tiles and 30 within 6",
+    live: (w) => `${w.last.census.policeStations} police station${w.last.census.policeStations === 1 ? "" : "s"}`,
+  },
+  {
+    id: "S3", title: "Fire cover",
+    formula: "a fire station (§500, §400/yr, 4 jobs) covers 6 tiles: a fire starts there one-sixth as often, burns one month instead of two, and spreads at 0.1 instead of 0.3 — unlikely, never impossible",
+    live: (w) => `${w.last.census.fireStations} fire station${w.last.census.fireStations === 1 ? "" : "s"} · ${w.last.census.burning} burning`,
   },
   {
     id: "X1", title: "Traffic is a readout, not a gate",

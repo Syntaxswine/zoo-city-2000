@@ -10,7 +10,8 @@ import { KNOBS } from "./rules.js";
 export const TERRAIN = Object.freeze({ GRASS: 0, WATER: 1, TREE: 2 });
 export const ROAD = Object.freeze({ NONE: 0, ROAD: 1, BRIDGE: 2 });
 export const ZONE = Object.freeze({ NONE: 0, R: 1, C: 2, I: 3 });
-export const CIVIC = Object.freeze({ NONE: 0, PARK: 1, ZOO: 2, ZOO_PART: 3 });
+export const CIVIC = Object.freeze({ NONE: 0, PARK: 1, ZOO: 2, ZOO_PART: 3, FIRE: 4, POLICE: 5 });
+export const isStation = (c) => c === CIVIC.FIRE || c === CIVIC.POLICE;
 export const ZONE_NAME = ["none", "R", "C", "I"];
 
 export const idx = (w, tx, ty) => ty * w.w + tx;
@@ -44,6 +45,9 @@ export function createWorld({ seed = "zoo", w = 64, h = 64 } = {}) {
     pol: new Uint8Array(n),
     lv: new Uint8Array(n),
     traffic: new Uint16Array(n),
+    crime: new Uint8Array(n),
+    fireCov: new Uint8Array(n),
+    policeCov: new Uint8Array(n),
     occupants: new Uint8Array(n),
     staff: new Uint8Array(n),
     roadsDirty: true,
@@ -261,21 +265,23 @@ export function capacityOf(world, i) {
   if (z === ZONE.C) return KNOBS.C_JOBS[t];
   if (z === ZONE.I) return KNOBS.I_JOBS[t];
   if (world.civic[i] === CIVIC.ZOO) return KNOBS.ZOO_JOBS;
+  if (isStation(world.civic[i])) return KNOBS.STATION_JOBS;
   return 0;
 }
 
-/** Jobs offered by a tile (C, I, or a zoo anchor). */
+/** Jobs offered by a tile (C, I, a zoo anchor, a fire or police station). */
 export function jobsOf(world, i) {
   const z = world.zone[i];
   if (z === ZONE.C) return KNOBS.C_JOBS[world.tier[i]];
   if (z === ZONE.I) return KNOBS.I_JOBS[world.tier[i]];
   if (world.civic[i] === CIVIC.ZOO) return KNOBS.ZOO_JOBS;
+  if (isStation(world.civic[i])) return KNOBS.STATION_JOBS;
   return 0;
 }
 
-/** Is this tile a job site counted as C (zoo jobs count as C)? */
+/** Is this tile a job site counted as C (zoo and station jobs count as C)? */
 export function jobZone(world, i) {
-  if (world.zone[i] === ZONE.C || world.civic[i] === CIVIC.ZOO) return ZONE.C;
+  if (world.zone[i] === ZONE.C || world.civic[i] === CIVIC.ZOO || isStation(world.civic[i])) return ZONE.C;
   if (world.zone[i] === ZONE.I) return ZONE.I;
   return ZONE.NONE;
 }

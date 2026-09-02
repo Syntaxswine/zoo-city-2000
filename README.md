@@ -47,7 +47,8 @@ them on the real map):
 | demand | leaky integrator, 63% of a step in six months |
 | the cap | `Cap = (1200 + 150·parks + 500·zoos + festival) · (1 + 0.5·H)` |
 | a lot grows | road within 3 tiles, `score = V + (LV − Pol − 40)/200 > 0.05`, 70% full, land value permits the storey |
-| pollution | every source spreads linearly over its radius; a lone works stinks next door, parks are sinks; no wind |
+| pollution | every source spreads linearly over its radius; a lone works stinks next door, pigs and skunks dirty their lot, parks are sinks; no wind |
+| crime | `40 − 0.5·LV + 0.4·density + 40·unemployed share − police`; above 60 it costs land value and shops |
 
 The hover card's **WHY NOT** line is computed by the same function that
 decides growth — it can only ever say what the rule did.
@@ -69,6 +70,15 @@ decides growth — it can only ever say what the rule did.
 | wolf | woods, and a town full of things to eat | arrive as a pack; the Wolf Moon |
 | cat | flats, shops, mice | shopkeepers; the mouse's other problem |
 | hawk | towers | commute anywhere; see the whole city |
+| skunk | woods, dirt | nobody's prey; stinks; only pigs and raccoons will live next door; sprays a predator now and then |
+
+**Services.** A fire station (§500, §400/yr) covers six tiles: a fire
+starts there a sixth as often, burns one month instead of two, and barely
+spreads. A police station covers
+six tiles against a crime field (base minus land value plus density plus
+unemployment): high crime drags land value and mood, keeps shops from
+growing, and lets a named fox, raccoon or cat rob a store. The `O` overlay
+shows crime in red and police cover in blue.
 
 **Predators and prey.** Rabbits fear foxes, wolves and hawks; mice fear
 foxes, owls, cats and hawks; pigs and cows fear wolves. A prey household

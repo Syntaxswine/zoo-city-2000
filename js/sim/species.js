@@ -21,6 +21,9 @@ export const SPECIES = Object.freeze([
   { id: "wolf",     life: 50,  litter: 3, fertile: [18, 40], retire: 45,  jobC: 0.5, jobI: 0.5, polTol: 50, homePref: "trees", commute: 40, surname: "Greyback",   fur: "furCool", furShift: -1, pack: [4, 6], predator: true },
   { id: "cat",      life: 35,  litter: 3, fertile: [14, 28], retire: 30,  jobC: 0.8, jobI: 0.2, polTol: 40, homePref: "flats", commute: 24, surname: "Purrington", fur: "furWarm", furShift: 0,  pack: [2, 4], predator: true },
   { id: "hawk",     life: 40,  litter: 2, fertile: [16, 35], retire: 35,  jobC: 0.6, jobI: 0.4, polTol: 30, homePref: "high",  commute: 64, surname: "Talonby",    fur: "earth",   furShift: 0,  pack: [2, 3], predator: true },
+  // The skunk: nobody's prey, everybody's neighbour problem. Emits a stink like the pig's mess;
+  // pigs and raccoons are allied with it; every other species is wary (affinity 0.5).
+  { id: "skunk",    life: 30,  litter: 4, fertile: [14, 26], retire: 27,  jobC: 0.4, jobI: 0.6, polTol: 95, homePref: "trees", commute: 20, surname: "Stripely",   fur: "furCool", furShift: -1, pack: [2, 4], stink: true },
 ]);
 
 /**
@@ -50,10 +53,13 @@ export const SPECIES_INDEX = Object.freeze(Object.fromEntries(SPECIES.map((s, i)
 
 // Affinity for friendship rolls: 1.0 same or allied, 0.7 neutral, 0.4 wary.
 // Raccoon 1.2 with everyone — the glue species (SPEC §7.5).
-const ALLIED = new Set(["mouse|rabbit", "bear|beaver", "owl|tortoise", "fox|owl", "cow|tortoise", "pig|raccoon", "bear|wolf", "cat|fox", "cow|pig", "hawk|owl"]);
+const ALLIED = new Set(["mouse|rabbit", "bear|beaver", "owl|tortoise", "fox|owl", "cow|tortoise", "pig|raccoon", "bear|wolf", "cat|fox", "cow|pig", "hawk|owl", "pig|skunk", "raccoon|skunk"]);
+const STINK_OK = new Set(["pig", "raccoon", "skunk"]);
 export function affinity(a, b) {
-  if (a === "raccoon" || b === "raccoon") return 1.2;
   if (a === b) return 1.0;
+  // The skunk: only the dirt crowd will sit next to one.
+  if ((a === "skunk" || b === "skunk") && !(STINK_OK.has(a) && STINK_OK.has(b))) return 0.5;
+  if (a === "raccoon" || b === "raccoon") return 1.2;
   if (isPredPrey(a, b)) return 0.4;
   const k = a < b ? `${a}|${b}` : `${b}|${a}`;
   if (ALLIED.has(k)) return 1.0;
@@ -75,4 +81,5 @@ export const NAME_PARTS = Object.freeze({
   wolf:     { a: ["Fen", "Gre", "Lu", "Ash", "Ran", "Sil", "Ror", "Vel"], b: ["rir", "yfang", "pa", "en", "ulf", "as", "ek", "da"] },
   cat:      { a: ["Tab", "Mit", "Sil", "Pur", "Whis", "Mar", "Sook", "Tom"], b: ["itha", "tens", "kie", "l", "kers", "mal", "ie", "kin"] },
   hawk:     { a: ["Kes", "Tal", "Sky", "Gyr", "Per", "Fal", "Wind", "Ael"], b: ["trel", "on", "la", "e", "egrine", "co", "row", "ric"] },
+  skunk:    { a: ["Pep", "Mus", "Whif", "Stin", "Flo", "Odo", "Pun", "Rik"], b: ["per", "ky", "fy", "ky", "ra", "ra", "gent", "ki"] },
 });

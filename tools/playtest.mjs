@@ -115,6 +115,15 @@ for (let t = 0; t < totalTicks; t++) {
       if (r.ok) break outer;
     }
   }
+  // --stations: one fire and one police station beside the start road at year 2.
+  if (flag("--stations") && t === 24) {
+    for (const kind of ["fire", "police"]) {
+      outer3: for (let dy = -6; dy <= 6; dy++) for (let dx = -6; dx <= 6; dx++) {
+        const r = apply(world, { kind, tx: sx + dx, ty: sy + dy });
+        if (r.ok) break outer3;
+      }
+    }
+  }
   if (parks < parksWanted && t >= 24 && month === 6) {
     outer2: for (let dy = -6; dy <= 6; dy++) for (let dx = -6; dx <= 6; dx++) {
       const r = apply(world, { kind: "park", tx: sx + dx, ty: sy + dy });
@@ -157,7 +166,7 @@ for (let t = 0; t < totalTicks; t++) {
   lastP.push(cen.P);
   if (lastP.length > 3) lastP.shift();
   if (month === 11) {
-    rows.push({ year: year + 1, P: cen.P, W: cen.W, J: cen.J, U: cen.U, VR: world.valves.R, VC: world.valves.C, VI: world.valves.I, cash: world.cash, inc: world.last.budget.incomeYr, up: world.last.budget.upkeepYr, appr: Math.round(cen.approval), H: cen.H, pol: cen.meanPol, lv: cen.meanLV, shares: cen.shares, n: world.last.demand.n, cap: world.last.demand.cap, lots: cen.lots, noRoad: cen.lotsNoRoad, fr: cen.friendships });
+    rows.push({ year: year + 1, P: cen.P, W: cen.W, J: cen.J, U: cen.U, VR: world.valves.R, VC: world.valves.C, VI: world.valves.I, cash: world.cash, inc: world.last.budget.incomeYr, up: world.last.budget.upkeepYr, appr: Math.round(cen.approval), H: cen.H, pol: cen.meanPol, lv: cen.meanLV, shares: cen.shares, n: world.last.demand.n, cap: world.last.demand.cap, lots: cen.lots, noRoad: cen.lotsNoRoad, fr: cen.friendships, crime: cen.meanCrime, maxCrime: cen.maxCrime, stations: cen.fireStations + cen.policeStations });
   }
 }
 
@@ -169,10 +178,10 @@ if (csv) {
 } else {
   console.log(`playtest seed=${seed} layout=${layout} rates=${rates.join("/")} years=${years}`);
   console.log(`local-term census at year 1: ${firstLocalReport.forbid}/${firstLocalReport.zoned} accessible zoned lots forbidden at V=+0.1 (${(firstLocalReport.frac * 100).toFixed(0)}%) — target < 30%`);
-  console.log(" yr     P     W     J     U    V_R   V_C   V_I     cash   inc/yr  up/yr appr    H   fr  pol   lv   n   cap lots  top species");
+  console.log(" yr     P     W     J     U    V_R   V_C   V_I     cash   inc/yr  up/yr appr    H   fr  pol   lv crime  n   cap lots  top species");
   for (const r of rows) {
     const top = Object.entries(r.shares).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([k, v]) => `${k} ${(v * 100).toFixed(0)}%`).join(" ");
-    console.log(`${String(r.year).padStart(3)} ${String(r.P).padStart(5)} ${String(r.W).padStart(5)} ${String(r.J).padStart(5)} ${String(r.U).padStart(5)} ${f(r.VR).padStart(6)} ${f(r.VC).padStart(5)} ${f(r.VI).padStart(5)} ${String(r.cash).padStart(8)} ${String(r.inc).padStart(8)} ${String(r.up).padStart(6)} ${String(r.appr).padStart(4)} ${f(r.H).padStart(4)} ${String(r.fr).padStart(4)} ${f(r.pol, 0).padStart(4)} ${f(r.lv, 0).padStart(4)} ${f(r.n, 1).padStart(3)} ${String(Math.round(r.cap)).padStart(5)} ${String(r.lots).padStart(4)}  ${top}`);
+    console.log(`${String(r.year).padStart(3)} ${String(r.P).padStart(5)} ${String(r.W).padStart(5)} ${String(r.J).padStart(5)} ${String(r.U).padStart(5)} ${f(r.VR).padStart(6)} ${f(r.VC).padStart(5)} ${f(r.VI).padStart(5)} ${String(r.cash).padStart(8)} ${String(r.inc).padStart(8)} ${String(r.up).padStart(6)} ${String(r.appr).padStart(4)} ${f(r.H).padStart(4)} ${String(r.fr).padStart(4)} ${f(r.pol, 0).padStart(4)} ${f(r.lv, 0).padStart(4)} ${f(r.crime, 0).padStart(3)}/${String(r.maxCrime).padEnd(3)} ${f(r.n, 1).padStart(3)} ${String(Math.round(r.cap)).padStart(5)} ${String(r.lots).padStart(4)}  ${top}`);
   }
   console.log(`ledger: ${Object.entries(world.ledger).map(([k, v]) => `${k} ${v}`).join(" · ")}`);
   const last = tickMs.slice(-12);

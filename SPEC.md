@@ -287,6 +287,7 @@ FRICTION: 0.4% of FRIENDLESS adults' households per month wander off regardless
 | Wolf | 50 | 3 | 18–40 | 45 | 0.5:0.5 | 50 | trees within 3; arrives as a PACK of 4–6 | 40 | woods, a prey-rich town | Wolf moon |
 | Cat | 35 | 3 | 14–28 | 30 | 0.8:0.2 | 40 | flats (tier ≥ 2) | 24 | high-LV vacancies, shops, mice | the mouse's other problem |
 | Hawk | 40 | 2 | 16–35 | 35 | 0.6:0.4 | 30 | High lots (towers) | 64 | tier-3 vacancies | sees the whole city |
+| Skunk | 30 | 4 | 14–26 | 27 | 0.4:0.6 | 95 | trees within 3 | 20 | woods, dirt | nobody's prey; stinks (mess 1.0); only pigs and raccoons will sit next to one (affinity 0.5 for everyone else); the Skunk incident |
 
 **Predators and prey (the owner's note: "a notable absence of predator species").**
 `PREY_OF`: rabbit ← fox, wolf, hawk; mouse ← fox, owl, cat, hawk; pig ← wolf;
@@ -363,11 +364,35 @@ kinds. Timed effects are `{id, until, params}` structs saved with the city.
 | 18 | Truffle season | boon | pigs ≥ 15% and trees ≥ 8% of the map; once per 5 years; w2 | +§2,000 | keep some woods |
 | 19 | Dairy fair | boon | cows ≥ 15% and parks ≥ 2; w2 | V_C +0.3 for 6 ticks; +§1,000 | zone C near the pasture |
 | 20 | Wolf moon | mixed | wolves ≥ 10%; w2 | 3 ticks: prey flight doubles for wolf-prey, friendships form ×2 | the month the town mixes |
+| 21 | Heist | disaster | a shop with crime > 70 and a fox/raccoon/cat in town; w3 | −§100·tier, the shop loses a storey; the thief is named | a police station within 6 |
+| 22 | Skunk incident | mixed | skunks ≥ 5% and any predator; w2 | every predator species −15 mood for 3 ticks; the sprayer and the sprayed are named | none — it is the skunk's whole point |
 
 L1 (labelled, not started): road rot, owl academy, wedding, fire station,
 school.
 
 ---
+
+## 9b. Services — fire and police (`js/sim/fields.js`, `events.js`)
+
+The owner: *"police and fire is noticeably absent."* Two 1×1 civics, §500
+each, §400/yr each, four C-type jobs each, effective only with road access.
+
+```
+fireCov(i)   = 1 within Chebyshev 6 of a fire station
+               a covered lot is picked as a fire's ORIGIN at 1/6 the weight (unlikely, never impossible),
+               a fire on a covered lot burns ONE month (else two) and spreads at 0.1 (else 0.3)
+policeCov(i) = 60 within 3 of a police station, 30 within 6 (max over stations)
+crime(i)     = clamp(40 − 0.5·LV + 0.4·animals in the 3×3 + 40·(U/W) − policeCov, 0, 100)
+               (Micropolis: 128 − LV + density − police; 0 on empty unzoned tiles)
+crime > 60   → LV −10 on that tile; a C lot's local score −0.2 ("shops need safe streets")
+mood         −= 0.3 · max(0, crime_home − 40)
+HEIST        event (w3): a C lot with crime > 70 and any fox / raccoon / cat in town →
+               −§100·tier, the shop loses a storey, the thief is named
+```
+Unemployment is counted inside `computeCrime` rather than read from the
+census so a loaded city and the straight run agree (the save/load hash law).
+The crime overlay (`O`) shows crime in red and police cover in blue; the
+hover card prints crime and both covers; the Rules tab has S1–S3.
 
 ## 10. Goals and pacing
 
@@ -390,8 +415,8 @@ school.
 ## 11. Zoning UX (`js/input.js`, `js/ui.js`)
 
 Tool strip (field-guide chrome: one monospace row, no icons above 16 px):
-`1 R · 2 C · 3 I · 4 Road · 5 Tree · 6 Park · 7 Zoo · 8 Bulldoze · 9 Inspect ·
-D density Low/High · Space pause · , . speed · Z undo · S save · L load`.
+`1 R · 2 C · 3 I · 4 Road · 5 Tree · 6 Park · 7 Zoo · F Fire station · P Police ·
+8 Bulldoze · 9 Inspect · D density Low/High · Space pause · , . speed · Z undo · S save · L load`.
 
 - **Zones, trees, bulldoze:** rectangle drag; live cost in the strip
   ("R ×36 = §180"); an unaffordable drag draws the refused hatch and does

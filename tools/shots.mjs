@@ -20,7 +20,7 @@ import { fileURLToPath } from "node:url";
 import { installCanvas, createCanvas, encodePNG, zoom as zoomCanvas } from "./headless-canvas.mjs";
 import { rasterize } from "../js/art/format.js";
 import { art } from "../js/art/index.js";
-import { BUILDINGS, PARK, ZOO, OVERLAYS } from "../js/art/buildings.js";
+import { BUILDINGS, PARK, ZOO, FIRE_STATION, POLICE_STATION, OVERLAYS } from "../js/art/buildings.js";
 import { ROADS, BRIDGES, N, E, S, W, DECK_TOP } from "../js/art/roads.js";
 import { GRASS, CHALK, CHALK_KEYS, RUBBLE, WATER_TILE, KERB, TREE_LIST, ZOTS, PLAZA, CURSOR, GHOST, waterTint, WATER_FRAMES } from "../js/art/terrain.js";
 import { ink } from "../js/art/format.js";
@@ -108,6 +108,8 @@ function sheets(z) {
   const c = [
     { sprite: PARK, label: "park", onTile: true },
     { sprite: ZOO, label: "zoo (2×2)", onTile: false },
+    { sprite: FIRE_STATION, label: "fire station", onTile: true },
+    { sprite: POLICE_STATION, label: "police station", onTile: true },
     { sprite: OVERLAYS.scaffold[0], label: "scaffold (over store)", onTile: true, under: BUILDINGS[2][2][0] },
     { sprite: OVERLAYS.fire[0], label: "fire 0 (over cottage)", onTile: true, under: BUILDINGS[1][1][0], lift: 6 },
     { sprite: OVERLAYS.fire[1], label: "fire 1 (over cottage)", onTile: true, under: BUILDINGS[1][1][0], lift: 6 },
@@ -115,16 +117,16 @@ function sheets(z) {
     { sprite: RUBBLE, label: "rubble", onTile: false },
   ];
   {
-    const cellW = 150, cellH = 110, groundY = 90;
-    const canvas = createCanvas(4 * cellW, 2 * cellH);
+    const cols = 5, cellW = 150, cellH = 110, groundY = 90;
+    const canvas = createCanvas(cols * cellW, Math.ceil(c.length / cols) * cellH);
     const ctx = background(canvas);
     c.forEach((cell, i) => {
-      const cx = (i % 4) * cellW + cellW / 2;
-      const cy = Math.floor(i / 4) * cellH + groundY;
+      const cx = (i % cols) * cellW + cellW / 2;
+      const cy = Math.floor(i / cols) * cellH + groundY;
       if (cell.onTile) blitAt(ctx, GRASS[0], cx, cy);
       if (cell.under) blitAt(ctx, cell.under, cx, cy);
       blitAt(ctx, cell.sprite, cx, cy - (cell.lift || 0));
-      console.log(`  civics [r${Math.floor(i / 4)} c${i % 4}] ${cell.label}`);
+      console.log(`  civics [r${Math.floor(i / cols)} c${i % cols}] ${cell.label}`);
     });
     out.push(save("sheet-civics.png", canvas, z));
   }

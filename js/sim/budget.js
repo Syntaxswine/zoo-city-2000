@@ -5,7 +5,7 @@
 // greps js/ for any other `cash +=` / `cash -=` / `cash =`.
 
 import { KNOBS } from "./rules.js";
-import { ZONE, CIVIC, ROAD } from "./world.js";
+import { ZONE, CIVIC, ROAD, isStation } from "./world.js";
 
 export function post(world, kind, amount) {
   const a = Math.round(amount);
@@ -38,6 +38,8 @@ export function yearlyFigures(world) {
   let tiers = 0;
   let parks = 0;
   let zoos = 0;
+  let fireStations = 0;
+  let policeStations = 0;
   const n = world.w * world.h;
   for (let i = 0; i < n; i++) {
     if (world.road[i] === ROAD.ROAD) roads++;
@@ -45,11 +47,13 @@ export function yearlyFigures(world) {
     tiers += world.tier[i];
     if (world.civic[i] === CIVIC.PARK) parks++;
     else if (world.civic[i] === CIVIC.ZOO) zoos++;
+    else if (world.civic[i] === CIVIC.FIRE) fireStations++;
+    else if (world.civic[i] === CIVIC.POLICE) policeStations++;
   }
-  let upkeepYr = KNOBS.UPKEEP_CITIZEN * citizens.length + KNOBS.UPKEEP_ROAD * roads + KNOBS.UPKEEP_BRIDGE * bridges + KNOBS.UPKEEP_TIER * tiers + KNOBS.UPKEEP_PARK * parks + KNOBS.UPKEEP_ZOO * zoos;
+  let upkeepYr = KNOBS.UPKEEP_CITIZEN * citizens.length + KNOBS.UPKEEP_ROAD * roads + KNOBS.UPKEEP_BRIDGE * bridges + KNOBS.UPKEEP_TIER * tiers + KNOBS.UPKEEP_PARK * parks + KNOBS.UPKEEP_ZOO * zoos + KNOBS.UPKEEP_STATION * (fireStations + policeStations);
   const winter = world.events.active.find((e) => e.id === "bearWinter");
   if (winter) upkeepYr *= 0.8;
-  return { incomeYr: Math.round(incomeYr), upkeepYr: Math.round(upkeepYr), fc, fi, roads, bridges, parks, zoos };
+  return { incomeYr: Math.round(incomeYr), upkeepYr: Math.round(upkeepYr), fc, fi, roads, bridges, parks, zoos, fireStations, policeStations };
 }
 
 /** The monthly slice: post tax and upkeep, apply receivership rules. */
