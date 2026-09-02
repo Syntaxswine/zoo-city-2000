@@ -643,7 +643,8 @@ The `O` overlay cycle is off → LV → pollution → crime (an open file is a r
 - **Tabs:** Rules (every equation with live numbers substituted, gridlands
   style), Budget (three rate steppers 0–20, income by zone, expenses by line,
   net/yr), Census (population, species histogram, unemployment, friendships,
-  H, approval, milestones), Log (ticker of events and advisor lines).
+  H, approval, milestones), News (the city's own dispatch feed, chronological
+  — the last 120, opening on the newest and following it; §11b).
 - **Zots** above a lot that wants to grow but cannot: no road, smog, no job,
   no demand.
 - **The title screen** (`js/title.js`): the owner's painting
@@ -673,14 +674,21 @@ The `O` overlay cycle is off → LV → pollution → crime (an open file is a r
 The owner: *"i'd like a news button, something where you can read the updates
 that pop up on the screen in a sequential order."*
 
-- **Why it was needed.** A flash lives 2.6 s and `flash()` OVERWROTE itself,
-  so a month that delivered four headlines showed exactly one — the last.
-  Months of five and six dispatches are ordinary (measured on a 30-year
-  browser city: 180 dispatches, busiest month 6).
+- **Why it was needed.** Measured over four seeds × 30 years, same layout:
+  **74–84% of a city's dispatches never popped up at all.** Only
+  `TICKER_FLASH` lines do, and they are 16–26% of the log; the rest lived
+  only in a buried, newest-first tab. Separately `flash()` OVERWROTE itself —
+  a month with four headlines showed the last — which is a real fault but a
+  rare one, about one headline lost per thirty city-years in a scripted town.
+  Expect it to matter in a crime-heavy city, where the sentence table can put
+  SOLD, TAKEN IN and CELLS in one month. (handoff §13 has the table.)
 - **One feed.** `newsRows(world)` is the single implementation (§0.6): it is
   `world.events.log` read where it lies, plus the reading — the month's
-  label, which chip a row answers to, and `k`, its place in its own month
-  (for ORDER only). Nothing is accumulated beside it, so a live session and
+  label and which chip a row answers to — and no positional field at all, so
+  nobody is tempted back into naming a row by its index. It is capped where
+  the city caps it: `tick.js` keeps the last 400 lines and `save.js` the last
+  200, so a long city's founding years are GONE, not hidden.
+  Nothing is accumulated beside it, so a live session and
   the same city reloaded are the same document. The panel used to keep a
   second copy AND synthesize a yearly REPORT line out of `world.history` on
   load — a line the advisor already logs (tick.js) — so **every loaded city
@@ -700,22 +708,25 @@ that pop up on the screen in a sequential order."*
   live feed on every write — 177 dispatches cost 2.6 KB. First sight of a
   city in a browser starts you CAUGHT UP: a loaded 40-year city must not
   open with a badge of 300 things you lived through.
-- **The reader** (`R`, or the strip's `news`): the whole feed oldest first, a
+- **The reader** (`R`, or the strip's `news`): the feed oldest first, a
   cursor stepped with ← →, ↑ ↓, and W A S D as well — panning a map you
   cannot see is not a thing anyone meant to do — PgUp/PgDn by ten, Home/End,
   `mark all read`, and four chips: all · headlines (only what popped up over
   the map, `TICKER_FLASH`) · trouble (`TICKER_BAD`) · good (`TICKER_GOOD`).
-  It opens on the FIRST UNREAD. A row is read when the cursor LANDS on it,
-  never when it is stepped over. `Esc` closes; the clock is stopped while it
-  stands (`modalOpen()` counts it, like the title and the choice card).
+  It opens on the FIRST UNREAD — and opening MARKS that row read, so the badge
+  drops by one the moment you look. A row is read when the cursor LANDS on it,
+  never when it is stepped over, which is why the mark is a set and not a
+  high-water line. `Esc`, `R` again, the `×`, or a click on the scrim closes
+  it; the clock is stopped while it stands (`modalOpen()` counts it, like the
+  title and the choice card).
 - **The strip button** carries the unread count and goes ink-filled while any
   stands — the same "this is on" that pause / overlay / zoom use.
 - **The News tab** (was Log) is the glance at the same feed: the last 120,
   chronological. It opens scrolled to the newest and follows it, unless you
   have scrolled up to read — then it stays where you put it.
 - **A month's run of flashes queues** (`flashRun`): 2.6 s for one, 1.5 s each
-  for a run, labelled `(2/6)`, five at most and then `+N more — R opens the
-  news`. A flash the player caused (a refused op, a save, an undo) preempts
+  for a run, labelled `(2/6)`, five at most and then `+N more this month — R
+  opens the news`. A flash the player caused (a refused op, a save, an undo) preempts
   the run: feedback on what you just did wins.
 
 ---

@@ -46,7 +46,7 @@ could ship whole.
   field is not built; no key-binding page; the painting has no credit line
   on the screen (the owner's — say who painted it if they want it said).
 
-## The news — SHIPPED 2026-09-02 (SPEC §11b; `js/news.js`; 17 checks)
+## The news — SHIPPED 2026-09-02 (SPEC §11b; `js/news.js`; 19 checks)
 - Built at the owner's word (*"i'd like a news button, something where you can
   read the updates that pop up on the screen in a sequential order"*): the
   `R news` button with its unread count, the reader (whole feed oldest first,
@@ -57,6 +57,13 @@ could ship whole.
   **every loaded city printed each yearly REPORT twice** — the advisor logs
   one, and `setWorld` synthesized a second out of `world.history` with a
   different net figure. The synthesis is gone; the log is the feed.
+- **Measured reach (`node tools/newsprobe.mjs` — 4 seeds × 30 y, its own
+  eight-block layout with a staffed meat market; handoff §13 has the table):** 74–84% of a city's dispatches NEVER popped up at all — only
+  `TICKER_FLASH` lines do, and they are 16–26% of the log. That share is what
+  the reader is for. The flash OVERWRITE it also fixed cost only about one
+  headline per thirty city-years in a scripted town (max 2 in a month); look
+  for it in a crime-heavy city, where the sentence table can put SOLD, TAKEN
+  IN and CELLS in one month, not in a balanced one.
 - Left: no search box and no "this year only" chip; a dispatch does not link
   to its tile, though the coordinates are already in the line (clicking
   KILLING could centre the map on (30,10)); the chosen chip is not remembered
@@ -66,8 +73,28 @@ could ship whole.
   six-line run could be timed (2.0 s apart against the 1.5 s asked, and the
   run then stopped with the pane asleep). The SEQUENCING is verified
   synchronously and does not depend on the clock: the first line shows,
-  labelled 1 of 6, where the old code showed the sixth and dropped five.
-  Watch a busy month with the pane in front before touching FLASH_RUN.
+  labelled 1 of 6, where the old code showed the sixth. Note the run was
+  HAND-MADE — see the measured-reach bullet above; a month of six does not
+  occur in a scripted town. Watch a crime-heavy month with the pane in front
+  before touching FLASH_RUN.
+- **`FLASH_MAX 5` and the `+N more this month` tail have never fired in a real
+  game**, and on the measured evidence may not in a balanced one. Correct code
+  guarding a case the scripted town does not reach.
+- **The `TICKER_*` regexes are hand-maintained and the suite cannot help.** A
+  new event whose line starts with a word nobody added lands in the reader's
+  "all" chip and nowhere else, silently — the trap session 3 hit when HEIST
+  went unprinted. **And they are not purely prefix-anchored:** `TICKER_FLASH`'s
+  last alternative, `ONE HUNDRED`, sits OUTSIDE the `^(...)` group and matches
+  anywhere, which is the only reason the tortoise centenary flashes (its line
+  starts with a citizen's name). A check now holds that exception open —
+  anchoring it to tidy the regex fails the suite instead of killing the plaque
+  line in silence. A per-event chip check is the real fix and is not built.
+- **The read set is keyed by city NAME.** Two cities called `zoo` in one
+  browser share their marks; an import renames to `<seed>-import` and starts a
+  fresh set. The cheapest thing that works; revisit if saves grow real ids.
+- **Cost, unmeasured:** the badge walks the whole feed on EVERY panel refresh
+  whatever tab is open, taking an FNV of each row's text, and the tab rebuilds
+  the feed too. Only the reader memoises. Far under the tick, but unprofiled.
 
 ## Polish the play-testers named (browser rounds 1–3), not yet done
 - (the Log tab's newest-first order and its double REPORT line: fixed by the

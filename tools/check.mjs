@@ -618,6 +618,15 @@ check("no Math.random under js/", mathRandom.length === 0, mathRandom.join(", ")
 // that any of this exists.
 {
   const { newsRows, keyOf } = await import("../js/news.js");
+  const { TICKER_FLASH } = await import("../js/sim/events.js");
+  // The tortoise centenary's line begins with a CITIZEN'S NAME, which is in no
+  // list. It reaches the flash run and the reader's "headlines" chip only
+  // because TICKER_FLASH's last alternative, ONE HUNDRED, sits OUTSIDE the
+  // ^(...) group and so matches anywhere. Anchoring it to tidy the regex kills
+  // the plaque line in silence, so the suite holds the exception open.
+  check("news: the centenary flashes though its line starts with a name",
+    TICKER_FLASH.test("Ada Shellworth is ONE HUNDRED. A plaque goes up; the street is worth more for it.")
+    && !TICKER_FLASH.test("Ada Shellworth is ninety-nine. Nothing goes up."));
   const rows = newsRows(A.world);
   const logN = A.world.events.log.length;
   check("news: the feed is the city's own log, line for line — no synthesized second copy",
@@ -676,6 +685,13 @@ check("no Math.random under js/", mathRandom.length === 0, mathRandom.join(", ")
   check("news: the reader stops the clock while it is open", /app\.news && app\.news\.isOpen\(\)/.test(uiSrc));
   const simSeesNews = files.filter((f) => /[\\/]sim[\\/]/.test(f) && /news\.js|newsRows|readMark/.test(readFileSync(f, "utf8"))).map((f) => path.relative(ROOT, f));
   check("news: the sim never hears about the reader", simSeesNews.length === 0, simSeesNews.join(", "));
+  // The read mark is the BROWSER's. A save that carried one would travel in an
+  // export and mark a different player's news read on a city they never saw.
+  const saveText = save(A.world);
+  const saveKeys = Object.keys(JSON.parse(saveText));
+  check("news: a save carries no read mark",
+    !saveText.includes('"news"') && !saveKeys.some((k) => /^(news|read)/i.test(k)),
+    saveKeys.filter((k) => /^(news|read)/i.test(k)).join(", "));
 }
 
 // ---- Part C: the art (if present) ------------------------------------------------

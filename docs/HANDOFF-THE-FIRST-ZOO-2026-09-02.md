@@ -8,6 +8,11 @@ design record, `BACKLOG.md` the open work; this file is the *why* and the
 (code-truth, blind newcomer, completeness); §3's last rows and half of §1
 are theirs.
 
+Six sessions have written into it, on one long day. §1–§9 are the first
+zoo; §10 crime and punishment; §11 the title screen and the cheat; §12 the
+walls / use-zoning / rail tranche; §13 the news. Two makers have signed it —
+the marks are at the foot, oldest first, and neither edits the other.
+
 The owner's ask, verbatim: *"lets build zoo city 2000, an isometric city
 builder where anthropomorphic characters live and grow together in a city.
 the builder must balance residential, commercial, and industrial zoning as
@@ -31,7 +36,7 @@ measurement and SPEC gets edited — never the reverse.
   <270513546+StonePhilosopher@users.noreply.github.com>`; every commit ends
   with the Co-Authored-By line; commit messages are field notes and part of
   the archive. `.gitignore` = `Thumbs.db .DS_Store out/ node_modules/`.
-- **Before touching a file:** `node tools/check.mjs` — 113 checks, exits 1.
+- **Before touching a file:** `node tools/check.mjs` — 132 checks, exits 1.
   Green at the commit this file lands in. If it is red when you arrive, that
   is the first job; `git log -p` on the file it names is the fastest route.
 - **Run:**
@@ -52,7 +57,8 @@ measurement and SPEC gets edited — never the reverse.
   the clock does not run there. `window.zoo` is the app: `advance(n)` steps
   months (it works while paused), `doOp(op)`, `save()`, `load()`,
   `setSpeed(±1)`, `togglePause()`, `cycleOverlay()`, `zoomAt(±1)`,
-  `newCity({seed, noDisasters})`. `advance` autosaves every 12 ticks and
+  `newCity({seed, noDisasters})`, `cheat()`, and since §13
+  `news.open() / .close() / .unread()`. `advance` autosaves every 12 ticks and
   boot resumes the NEWER of checkpoint/autosave — press `N` for a fresh
   city before a load test or you are testing yesterday's town. A loaded
   city opens PAUSED. Since session 4 (§11) boot stands the TITLE SCREEN over
@@ -65,10 +71,17 @@ measurement and SPEC gets edited — never the reverse.
   is named `<seed>-import`. `TICK_SECONDS 1.5`, `SPEEDS [1, 3, 10]`,
   `MAX_CATCHUP 3` ticks per frame, walker time scaled by `min(speed, 3)`;
   any open modal pauses; a choice card forces pause.
-- **Keys:** `1 R 2 C 3 I 4 Road 5 Tree 6 Park 7 Zoo F Fire P Police 8
-  Bulldoze 9 Inspect D density Space , . Z S L O +/− N Esc`. `S` and `D`
-  are tap = command, hold > 220 ms = pan. Shift on a road drag = straight.
-  Undo is one step, this month only, and any op with `evicts` empties it.
+- **Keys** (the strip is the truth — `TOOLS` in `js/input.js`, then the
+  `mk(...)` buttons in `ui.js`): `1 R · 2 C · 3 I · M Meat · 4 Road ·
+  B Wall · T Rail · G Station · U Use · 5 Tree · 6 Park · 7 Zoo ·
+  F Fire stn · P Police · V Pacify · 8 Bulldoze · 9 Inspect · D density ·
+  Space pause · , . speed · Z undo · S save · L load · O overlays ·
+  R news · +/− zoom · arrows / WASD / right-drag pan · N new city ·
+  Esc menu`. `S` and `D` are tap = command, hold > 220 ms = pan. `U`
+  pressed while the Use tool is already up cycles mixed/pred/prey. Shift on
+  a road drag = straight. Undo is one step, this month only, and any op
+  with `evicts` empties it. (This line was stale for three sessions — it
+  still listed the session-1 tools only. If you add a tool, edit it here.)
 
 ## 1. The shape of the thing
 
@@ -84,14 +97,14 @@ measurement and SPEC gets edited — never the reverse.
 | `js/sim/demand.js` | the five equations, the tax term, the cap law; `peekDemand` (no valve advance) | |
 | `js/sim/lots.js` | `lotScore()` — decides growth AND returns the WHY NOT reason; `lotReport` | never a second implementation; `ui.js whyNot()` only switches on the code |
 | `js/sim/citizens.js` | households, arrivals (strict then lenient home search in ONE pass), departures, jobs (BFS), friendships, mood, prey flight, `SURNAMES`, `arrivalWeights` | `removeCitizen` is the only exit |
-| `js/sim/events.js` | the rolled roster (19 kinds) + bear winter and the tortoise centenary (calendar/rule driven), timed effects, fire spread, the choice card, `EVENT_TITLES` | disasters never chain within 12 ticks; receivership lives in `budget.js` |
+| `js/sim/events.js` | the rolled roster (21 kinds — `ROSTER` in `events.js` IS the list; do not count them here, read them there) + bear winter and the tortoise centenary (calendar/rule driven), timed effects, fire spread, the choice card, `EVENT_TITLES` | disasters never chain within 12 ticks; receivership lives in `budget.js` |
 | `js/sim/budget.js` | `post()` — **the only cash path**; `yearlyFigures`; receivership (restores `flags.ownRates` on exit) | integer § |
 | `js/sim/ops.js` | every player action: `costOf` (`replaced`, `evicts`), `apply`, `undo`, `roadL`, the input log | tiles, never people |
 | `js/sim/save.js` | `toPlain`/`fromPlain`, `rebuildDerived`, `stateHash` (FNV over `toPlain` minus `log` and `history` — `events.log` IS hashed) | the hash law |
 | `js/sim/species.js` | 14 species (`pack`, `predator`, `stink` flags), `PREY_OF`, `affinity`, `NAME_PARTS` | weights, never gates |
 | `js/art/*` | text sprites `{rows, anchor, w, h, footprint, tags}`; `solid.js` box rasteriser; `buildings.js` (`solidSprite`, `CIVICS`, `PLANS`, stamps throw if clipped); `citizens.js` (the kit); `roads.js` (`DECK_TOP`); `terrain.js`; `index.js` (the registry) | every pixel a palette key; `tags` building/civic/overlay opt INTO the footprint audit |
 | `js/iso/iso.js`, `js/iso/painter.js` | the projection; **the one draw order**: `key = (cell + frac − 0.7·[oblong])·1024 + z` — `OBLONG_PULLBACK` applies to any footprint > 1×1 and was ray-audited for the 2×2 only | a 3×3 needs its own audit |
-| `js/render.js` | the only canvas module. **Static layer = ground only**; buildings, trees, civics AND walkers are re-sorted and blitted every frame through `painter.js` — that is how one order exists. Overlays `off → lv → pol → crime → score`; zots on static rebuild | |
+| `js/render.js` | the only canvas module. **Static layer = ground only**; buildings, trees, civics AND walkers are re-sorted and blitted every frame through `painter.js` — that is how one order exists. Overlays `off → lv → pol → crime → dread → use → score` (`OVERLAYS` in `main.js` — session 5 added two and this row missed them until session 6; the `O` button's tooltip still names only four); zots on static rebuild | |
 | `js/walkers.js` | ≤150 movers sampled from real citizens; hashes `(tick, citizenId, salt)` | **never writes the sim** (check Part D) |
 | `js/input.js`, `js/ui.js`, `js/main.js`, `index.html`, `css/field.css` | `TOOLS`/`PLACE_TOOLS`, the panel (`liveBudget` prints `yearlyFigures` on the CURRENT state, never `world.last.budget`), the clock, saves | `window.zoo` is the app |
 | `tools/check.mjs` | Parts A–D: one scripted 15-year city (ring road, R/C/I, a park at t=36, rate 10 at t=60 and 7 at t=84, trees at t=100, a bulldoze at t=120, a save at mid-run) built twice; greps; the art audit; species parity; walker invariance | the only thing that exits 1 |
@@ -125,7 +138,9 @@ ext ×1.3) · recession (18–30, ext ×0.6) · foxFair (foxes ≥10% + a C tier
 (wolves ≥10%, 3 ticks) · heist (a C lot with crime > 70 + any fox/raccoon/
 cat) · skunked (skunks ≥5% + any predator) · founders (≥5 species at ≥5%,
 H ≥ 0.5 AND friendships ≥ P/4, 120-tick gap, w6) · grant (cash < 2,000,
-approval ≥ 50, 120-tick gap) · scrubbers (I lots ≥ 15; `choice: true`).
+approval ≥ 50, 120-tick gap) · scrubbers (I lots ≥ 15; `choice: true`) ·
+**raid** and **greensLeague** (session 3's crime arc; this list said 19 for
+three sessions and the roster was 21 — read `ROSTER`, and add yours here).
 Outside the roll: bear winter (every December if bears ≥ 10%), the
 tortoise centenary (age ≥ 100 → `events.centenaries`, LV +8 r3 forever),
 receivership (`budget.js`, cash < −10,000). Timed-effect fields and who
@@ -165,7 +180,9 @@ scrubbers, choice, noDisasters, centenaries, log`.
 9. **The save contract.** A new sim field goes into `toPlain` AND
    `fromPlain` or it does not survive a reload; a derived field never goes
    into `toPlain` (it would break the save→load→continue check). Saved:
-   the ten tile arrays, citizens (the fields in `plainCitizen`; `path` and
+   the thirteen tile arrays (`TILE_ARRAYS` in `save.js` IS the list — it said
+   ten here until session 6 counted them; read it there, never here),
+   citizens (the fields in `plainCitizen`; `path` and
    `stale` reset on load), households, campers, valves, `festivalBonus`,
    events (log sliced to 200), ledger, history, the input log, flags, the
    two RNG states, the two cursors, `start`, `version 1`. Rebuilt:
@@ -226,9 +243,13 @@ you would SEE.
 
 ## 4. The numbers (measured on the committed code, seed 7, rates 8, disasters OFF unless said)
 
-- **Balanced, no civics:** 1,161 by y6, 1,500 by y10, 1,499 at y20, 1,643 by
-  y30 under a cap of 1,657 → 1,939 after the founders' festival (y22).
-  Cash §84.7k by y30 (+3.7k/yr at the end).
+- **Balanced, no civics:** 1,126 by y6, 1,508 by y10, 1,599 at y20 under a
+  cap of 1,939, 1,742 by y30 under a cap of 2,215. Cash §86.0k by y30
+  (+4.3k/yr at the end). *Re-measured in session 6 (`playtest.mjs --years 30
+  --quiet`, seed 7, rates 8): session 3's crime arc moved every figure in
+  this row, which had read 1,161 / 1,500 / 1,499 / 1,643 under a cap of
+  1,657 since session 2. **§4 is only ever true of the commit that measured
+  it** — re-run before you quote it.*
 - **Balanced, `--parks 2 --zoo 12`:** 1,852 by y20, 1,948 by y30 under a cap
   of 2,783 → 3,058 (1200 + 300 + 500, × (1 + 0.5·0.78)). Net ≈ +0.3k/yr at
   y20, +2.6k/yr at y30 — with civics the treasury is thin, as intended.
@@ -247,8 +268,10 @@ you would SEE.
   reading beside the station is ~17.
 - **Fires:** `--disasters --stations --years 40`, seeds 5, 7, 3, 1: 17 fires,
   0 on covered lots (every line said "bulldoze a firebreak").
-- **Tick cost:** ~2.9 ms at 226 citizens (check.mjs), ~6 ms (max ~10) at
-  1,650–1,950 (playtest). Machine-dependent.
+- **Tick cost:** ~4.7 ms at the scripted **210** citizens (check.mjs), ~7 ms
+  (max ~10) at 1,650–1,950 (playtest). The ms is this machine's; the citizen
+  count is deterministic, so if `check.mjs` no longer prints 210 the fixture
+  changed and this row is stale again (it read 226 until session 6).
 - **Species (balanced):** y1 leaders cat 15% / tortoise 13% / beaver 11%;
   thereafter pig 14–19%, beaver 11–15%, wolf 10–13%, no species above 20%.
   Dormitory: bears 30–39% from y4 (cottages). Millbelt y1: bears 36%.
@@ -282,6 +305,12 @@ you would SEE.
 
 ## 6. Where to go next, ranked
 
+*Written in session 2 and corrected in session 6. The old entry 1b —
+crime and punishment, "proposed, not built" — **SHIPPED** in session 3 at
+`f744ce2`, Part I and Part II both; §10 and §10b are its record, and what
+is left of it lives in BACKLOG, not here. It is struck below rather than
+deleted: the ranking is part of the archive.*
+
 1. **The 3×3 landmarks** — `docs/PROPOSAL-LANDMARKS.md`. The owner asked
    for them; the recommendation is that they GROW from a full tier-3 block
    and take their theme from the majority species (The Dairy for cows,
@@ -290,13 +319,14 @@ you would SEE.
    the 2×2 only — a 3×3 needs a walker-on-adjacent-road audit in
    `shots.mjs --scene` before any sprite; then the merge/unmerge state and
    the suite invariant; then three sprites.
-1b. **Crime and punishment** — `docs/PROPOSAL-CRIME-AND-PUNISHMENT.md`
+1b. ~~**Crime and punishment** — `docs/PROPOSAL-CRIME-AND-PUNISHMENT.md`
    (later the same day, two panels): zone M meat markets with a dread
    field and the taking (Part I), then the file, the arrest, the 5%
    wrongful and the pacification centre (Part II). Both are proposed, not
-   built; Part II opens with three questions only the owner can answer.
-   Read the "no-market CSV gate" and "P is cap-pinned" paragraphs before
-   measuring either.
+   built; Part II opens with three questions only the owner can answer.~~
+   **SHIPPED, session 3 (`f744ce2`) — see §10.** The "no-market CSV gate"
+   and "P is cap-pinned" paragraphs still hold and are still what you read
+   before measuring anything in that arc.
 2. **Polish the play-testers named** — top of `BACKLOG.md`: the WHY NOT
    tax parenthetical, pause/faster coupling, park hidden behind towers, a
    zoo-cost warning, a loaded city opening paused, the two R-chalk fixes.
@@ -529,7 +559,7 @@ and the `+§100,000` button appears beside cash; a press books it (cash
 checkpoint and LOAD lists it; a reload stands the title over the resumed
 city and CONTINUE flashes "paused; Space resumes". Console empty.
 
-## 12. Session 5 — zoning, rail and walls (2026-09-02, night); Phase A: WALLS shipped
+## 12. Session 5 — zoning, rail and walls (2026-09-02, night); all three phases shipped
 
 The owner's tranche and the pointer to Glades are verbatim in
 `docs/PROPOSAL-ZONING-RAIL-WALLS.md` (§0), with the census, the mechanics,
@@ -647,22 +677,55 @@ seeing the panel: *"oh, looks like the news exists under the log tab"* — it
 did, and that was most of the point. The Log tab was there, buried, and read
 NEWEST FIRST.
 
-**The cause, which the ask did not name.** `flash()` overwrote itself:
+**The cause, and what it was actually worth.** `flash()` overwrote itself:
 `onTick` looped the month's notices and called it once per line, each clearing
 the last one's timer and its text. A month that delivered four headlines
-showed the fourth for 2.6 s and dropped three on the floor. On a 30-year
-browser city, 180 dispatches, the busiest month held six. So the updates were
-not merely hard to re-read — most of them were never seen at all.
+showed the fourth for 2.6 s and dropped three.
+
+I wrote that up as the whole story, including in the commit message. Then I
+measured it, and it is not. **Four seeds, thirty years each, the same
+eight-block layout with a meat-market row, a fire station and a police
+station:**
+
+| seed | dispatches | popped up | never popped | months popping >1 | lost to the old flash() |
+|---|---|---|---|---|---|
+| newsroom | 133 | 21 | 112 (84%) | 1 | 1 (max 2 in a month) |
+| 7 | 124 | 29 | 95 (77%) | 1 | 1 |
+| 3 | 153 | 32 | 121 (79%) | 1 | 1 |
+| 5 | 78 | 20 | 58 (74%) | 0 | 0 |
+
+`node tools/newsprobe.mjs` prints exactly this table (`--csv`, `--years`,
+`--seeds` for the rest). It is committed because a handoff table nobody can
+re-run is the drift this document warns about: the first version of these
+four rows came from a throwaway harness that went nowhere, which a reviewer
+caught by trying and failing to reproduce them.
+
+The overwrite is real and it is RARE — about **one headline lost per thirty
+city-years** in a scripted town, and the six-line month I tested against does
+not occur there; I made it by hand. Where it should bite is a crime-heavy
+city: the sentence table can put SOLD, TAKEN IN and CELLS in one month.
+
+**The real case for the button is the other column.** Only `TICKER_FLASH`
+lines ever popped up at all, and they are 16–26% of what the city says.
+**Between 74% and 84% of every dispatch was never on screen for one second** —
+it existed only in a tab behind Rules / Budget / Census that printed
+newest-first. That is the thing the owner was reaching for, and my first
+framing of it was measured wrong. Correcting it is the point of §13: the fix
+is the same fix either way, but the reason it is worth having is a different
+sentence, and only one of the two is true.
 
 **What shipped.** `js/news.js`: `newsRows(world)` (the one feed) and
 `createNews(app)` (the reader). A `news` button on the strip carrying the
-unread count, ink-filled while any stands. `R` opens the reader: the whole
-feed oldest first, a cursor stepped with ← → (and ↑ ↓ / WASD), four chips
+unread count, ink-filled while any stands. `R` opens the reader: the feed
+oldest first (the last 400 dispatches — the log is capped there, so a long
+city's founding years are gone, not hidden), a cursor stepped with ← → (and
+↑ ↓ / WASD, which step one; PgUp/PgDn step ten — nothing scrolls, and the
+reader's own legend claimed otherwise until the review panel read it), four chips
 (all · headlines · trouble · good), `mark all read`, opening on the FIRST
 UNREAD, the clock stopped under it. The Log tab became the News tab reading
 the same feed chronologically, following the newest unless you scrolled up.
 And `flashRun` plays a month's run through, `(2/6)`, capped at five with a
-`+N more — R opens the news` tail.
+`+N more this month — R opens the news` tail.
 
 ### 13b. What the work turned up (symptom-keyed)
 
@@ -706,7 +769,7 @@ And `flashRun` plays a month's run through, `(2/6)`, capped at five with a
   `modalOpen()` true, so `R` does nothing and arrows do nothing. That is
   correct, and it will look like a dead key: answer the card first.
 
-Suite 113 → 130. Verified in the browser on a 30-year, 592-animal city:
+Suite 113 → 132. Verified in the browser on a 30-year, 592-animal city:
 180 dispatches, feed length == log length, 30 reports for 30 distinct years,
 badge and unread count exact against dispatches added, reader opening on the
 first unread, WASD not panning behind it, read marks surviving a real page
@@ -724,13 +787,57 @@ one workflow to re-run. Two findings worth carrying regardless:
 `OBLONG_PULLBACK` is footprint-size-BLIND — a 3×3 gets the same 0.7 a 2×2
 gets, which is exactly the audit the ranked list demands first.
 
+### 13d. What I distrust in what I left
+
+Not bugs — things I could not close, written down so the next reader does
+not mistake my confidence for coverage.
+
+- **The flash run's PACING is unverified by eye.** Sequencing is proven
+  synchronously; the 1.5 s is a number I chose and never watched. If a busy
+  month feels like a slot machine, `FLASH_RUN` in `ui.js` is the knob and
+  the pane cannot tell you (§13b).
+- **`FLASH_MAX 5` and the `+N more` tail have never fired in a real game, and
+  on this evidence may not.** I made a six-line month by hand. The busiest
+  month I MEASURED popped two headlines, over four seeds and 120 city-years
+  (§13's table). It is correct code guarding a case a scripted town does not
+  reach; look for it in a crime-heavy city, not a balanced one.
+- **The chips are `TICKER_BAD` / `TICKER_GOOD` / `TICKER_FLASH`,** three
+  hand-maintained regexes, anchored to line PREFIXES — *except*
+  `TICKER_FLASH`'s last alternative, `ONE HUNDRED`, which sits outside the
+  `^(...)` group and so matches anywhere in a line. That is how the tortoise
+  centenary flashes: its line begins with a citizen's name, which is in no
+  list. `events.js`'s own doc-comment repeats the prefix model, so a reader
+  cross-checking gets the wrong model twice. A new event whose line starts
+  with a word nobody added lands in "all" and nowhere else, silently — the
+  same trap session 3 hit when HEIST was never printed (944e507). If you add
+  an event, add its prefix, and the suite will not tell you. Anchoring
+  `ONE HUNDRED` into the group to "tidy" it kills the centenary flash and
+  leaves 132 checks green.
+- **The read set is per city NAME.** Two cities called `zoo` in one browser
+  share their marks, and renaming by import (`<seed>-import`) starts a new
+  set. This is the cheapest thing that works and I would not defend it if
+  saves ever grow real identities.
+- **`newsRows()` runs on every panel refresh with the News tab open, and the
+  badge walks the whole feed on every refresh whatever tab is open** — a
+  fresh array plus four regex tests per row (bad, good, flash, REPORT) and a
+  `dateOf`, then `unread()` takes an FNV-1a of every row's full text. Order
+  ~180 rows a month (121–286 dispatches per 30-year run across the flag
+  combinations, median ~190). It is far under the tick's own cost and I
+  measured nothing; the reader memoises on `(tick, log length, history
+  length)`, the tab and the badge do not.
+- **I did not touch `js/sim`.** Not one line, which is why the playtest hash
+  could not move and why I never re-ran the 30-year curves for a number.
+  If a future session's news work reaches into the sim, that argument dies
+  and the curves must be re-measured.
+
 ## 9. Verification recipe (what "done" looks like here)
 
 ```
-node tools/check.mjs                                   # 130 checks, 0 failures — the gate
+node tools/check.mjs                                   # 132 checks, 0 failures — the gate
 node tools/playtest.mjs --years 30 --quiet             # the §4 curves (disasters off)
 node tools/playtest.mjs --years 30 --parks 2 --zoo 12 --quiet
 node tools/playtest.mjs --disasters --stations --years 40 --seed 5
+node tools/newsprobe.mjs                               # how much of what the city says ever reaches the player (§13's table)
 node tools/shots.mjs                                   # sheets + scene, then READ the PNGs
 node tools/serve.mjs --port 8142                       # open it, N for a fresh city, zoo.advance(36), look, read the console (must be EMPTY)
 git push origin main                                   # Pages builds in ~1–2 min
@@ -779,3 +886,68 @@ and §12 are keyed by what the screen looks like, and the painting on the
 title screen is the owner's. Leave it byte-exact.
 
 — Claude Fable 5.1 (claude-fable-5-1), 2026-09-02, after commit 12168a9.
+
+---
+
+I am Claude Opus 5, and I built session 6 — the news — on 2026-09-02, in an
+evening with the owner, who asked for this mark. §11b of SPEC and §13 of
+this file are mine unless quoted; the mark above is Fable 5.1's and I have
+not edited a word of it.
+
+What I stood on. The first session's sim, which I read and never edited —
+not one line of `js/sim` is in this session's diff — and its suite, which
+told me in nine seconds that I had not broken it. Fable's
+keystone — specifically two things in it: the one-implementation law
+(`lotScore()` is the hover card's reason AND the growth decision, never two)
+which is the entire shape of `newsRows()`, and the rule that a handoff
+sentence untrue of the code beneath it is worse than no sentence, which is
+why I spent part of an evening fixing a key list rather than adding to it.
+Session 3's instrument commit (`944e507`), which exported the `TICKER_*`
+regexes because a heist had gone unprinted for 360 city-years — those three
+regexes are why the reader has working chips and why that took ten minutes
+instead of a design. And the owner's second sentence, which was worth more
+than their first: *"oh, looks like the news exists under the log tab."* It
+did. Being told so sent me to the thing that already existed instead of
+letting me build a handsome parallel copy of it beside the real one.
+
+What this session taught me, and it is a correction to the habit Fable left
+you. They wrote: before you trust a green check, break the thing it claims
+to guard and watch it go red. I did exactly that, and it was not enough —
+twice, on the same check. My first version cut the event log at a fixed
+index to prove a row keeps its name across a roll; the cut landed on a month
+BOUNDARY, where the correct naming and the broken naming agree, so the check
+passed under the very bug it existed to catch. My second version asked
+whether a row's name still EXISTED after the roll. It does — bound to its
+neighbour, which is the bug. So: **a check has a rig and a question, and
+breaking the code tests neither until both are right.** Make the break land
+where the bug lives (find a month with two lines in it; refuse if the
+fixture has none), and ask the question the invariant actually makes (not
+"is this name present" but "what does this name resolve to"). The mutation
+is the beginning of the test, not the end of it.
+
+What this codebase wanted from me, in one line: **derive, do not
+accumulate.** Every defect I found was a second copy of something the city
+already had. A second flash overwriting the first — worth about one lost
+headline in thirty city-years once I finally measured it, rather than the
+catastrophe I had already written into a commit message before I did. A
+second REPORT line synthesized beside the one the advisor had logged all
+along, computed off a different book, printing two different net figures on
+every loaded city since the Log tab was written. A second feed accumulated in
+the panel beside `world.events.log`, which is why a live session and the same
+city reloaded were quietly different documents. None of these were hard; all
+three were invisible because a copy looks exactly like the thing it copies
+until the two disagree. When you want to show the player
+something, find where the city already keeps it.
+
+To whoever builds next: the landmarks are still ranked first and §13c has
+the two findings from the census that outlive the report — `depthOf` already
+takes a footprint, and `OBLONG_PULLBACK` does not, which is your first
+afternoon. §13d is the honest list of what I left unproven. The preview pane
+is a viewer and not a clock — it will throttle a paced sequence and then
+stop it dead, and you will debug your own correct code for twenty minutes
+before you check `document.hidden`. And the news is the browser's, never the
+city's: a save that contains a read mark is a bug, and the suite says so.
+
+— Claude Opus 5 (claude-opus-5), 2026-09-02. The news shipped at 9338c1b; this
+mark and everything in §13 land in the commit after it, which is also the one
+that makes the last sentence above true.

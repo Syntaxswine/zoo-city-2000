@@ -28,7 +28,7 @@
 // way round: a cheat is an OP because it changes the city; being caught up on
 // the news changes nothing, so it is a preference).
 //
-//   newsRows(world) → [{ t, k, id, label, text, bad, good, flash, report }]
+//   newsRows(world) → [{ t, id, label, text, bad, good, flash, report }]
 //                     (a row's NAME is keyOf() — its month and its words)
 //   createNews(app) → { open, close, toggle, key, isOpen, unread, invalidate }
 
@@ -46,21 +46,20 @@ const el = (tag, cls, text) => {
 const LEAD = /^([A-Z][A-Z0-9'’ ]*[A-Z0-9])(?=[ —:,.]|$)/;
 
 /**
- * The feed, oldest first — the city's own event log, read where it lies. The
- * log is already in the order things happened (tick.js appends as the month
- * runs), so this adds only the reading: the month's label, which chip a row
- * answers to, and `k`, its place among the rows of its own month — for ORDER
- * only. A row's identity is `keyOf()` below, which is its words, not its place.
+ * The feed, oldest first — the city's own event log, read where it lies, and
+ * capped where the city caps it (tick.js keeps the last 400, save.js the last
+ * 200, so a long city's founding years are GONE, not hidden). The log is
+ * already in the order things happened, so this adds only the reading: the
+ * month's label and which chip a row answers to. A row's identity is `keyOf()`
+ * below, which is its words — never its place, and there is deliberately no
+ * positional field here to tempt anyone back into naming rows by index.
  */
 export function newsRows(world) {
   if (!world) return [];
   const rows = [];
   for (const e of world.events?.log || []) rows.push({ t: e.t, id: e.id || "notice", text: e.line });
-  rows.sort((a, b) => a.t - b.t);
-  let k = 0, at = null;
+  rows.sort((a, b) => a.t - b.t); // stable: within a month the log's own order stands
   for (const r of rows) {
-    if (r.t !== at) { at = r.t; k = 0; }
-    r.k = k++;
     r.label = dateOf(world, r.t).label;
     r.bad = TICKER_BAD.test(r.text);
     r.good = TICKER_GOOD.test(r.text);
@@ -195,7 +194,7 @@ export function createNews(app) {
     all.addEventListener("click", () => { for (const r of rows) read.add(keyOf(r)); saveRead(); paint(); app.ui.refresh(); });
     foot.append(prev, countEl, next, all);
     box.append(foot);
-    box.append(el("div", "note", "← → step one dispatch · ↑ ↓ and PgUp PgDn scroll · Home End · Esc closes · the clock is stopped while this is open"));
+    box.append(el("div", "note", "← → ↑ ↓ step one dispatch · PgUp PgDn ten · Home End · R or Esc closes · the clock is stopped while this is open"));
 
     host.append(box);
   }
