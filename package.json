@@ -1,0 +1,16 @@
+{
+  "name": "zoo-city-2000",
+  "version": "0.1.0",
+  "private": true,
+  "description": "An isometric city builder where anthropomorphic animals live and grow together. Balance residential, commercial and industrial zoning, taxes, and whatever the year throws at you.",
+  "type": "module",
+  "license": "MIT",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "serve": "node tools/serve.mjs",
+    "check": "node tools/check.mjs",
+    "playtest": "node tools/playtest.mjs",
+    "shots": "node tools/shots.mjs"
+  },
+  "//": "No dependencies, and there will not be any. The game runs from source with no build step; tools/ uses Node built-ins only."
+}

@@ -1,0 +1,284 @@
+// world.js — the state, and the map it starts with. SPEC §2, §15.
+//
+// One flat object holds everything; typed arrays per tile, plain arrays for
+// citizens and households. Derived fields (roadDist, pol, lv, traffic,
+// occupants, staff, paths) are rebuilt by `rebuildDerived` and never saved.
+
+import { makeRng, seedFromString, hash01 } from "./rng.js";
+import { KNOBS } from "./rules.js";
+
+export const TERRAIN = Object.freeze({ GRASS: 0, WATER: 1, TREE: 2 });
+export const ROAD = Object.freeze({ NONE: 0, ROAD: 1, BRIDGE: 2 });
+export const ZONE = Object.freeze({ NONE: 0, R: 1, C: 2, I: 3 });
+export const CIVIC = Object.freeze({ NONE: 0, PARK: 1, ZOO: 2, ZOO_PART: 3 });
+export const ZONE_NAME = ["none", "R", "C", "I"];
+
+export const idx = (w, tx, ty) => ty * w.w + tx;
+export const inBounds = (w, tx, ty) => tx >= 0 && ty >= 0 && tx < w.w && ty < w.h;
+
+/** A fresh, generated world. */
+export function createWorld({ seed = "zoo", w = 64, h = 64 } = {}) {
+  const seedNum = seedFromString(String(seed));
+  const n = w * h;
+  const world = {
+    version: 1,
+    seed: String(seed),
+    seedNum,
+    w,
+    h,
+    tick: 0,
+    cash: KNOBS.START_CASH,
+    rates: { R: 8, C: 8, I: 8 },
+    terrain: new Uint8Array(n),
+    road: new Uint8Array(n),
+    zone: new Uint8Array(n),
+    maxTier: new Uint8Array(n).fill(3),
+    tier: new Uint8Array(n),
+    civic: new Uint8Array(n),
+    burning: new Uint8Array(n),
+    rubble: new Uint8Array(n),
+    variant: new Uint8Array(n),
+    flooded: new Uint8Array(n),
+    // derived
+    roadDist: new Uint8Array(n),
+    pol: new Uint8Array(n),
+    lv: new Uint8Array(n),
+    traffic: new Uint16Array(n),
+    occupants: new Uint8Array(n),
+    staff: new Uint8Array(n),
+    roadsDirty: true,
+    // sim
+    valves: { R: 0, C: 0, I: 0 },
+    festivalBonus: 0,
+    citizens: [],
+    households: [],
+    campers: [],
+    nextId: 1,
+    nextHouseholdId: 1,
+    events: { active: [], cooldown: 0, log: [], lastGrant: -100000, lastFestival: -100000, choice: null, noDisasters: false, scrubbers: false, revoltArmed: 0, centenaries: [] },
+    ledger: {},
+    history: [],
+    log: [],
+    flags: { receivership: false, milestone: 0 },
+    notices: [],
+    rng: makeRng(seedNum ^ 0x5a17),
+    rngNames: makeRng(seedNum ^ 0x9e37),
+    last: null,
+  };
+  for (let i = 0; i < n; i++) world.variant[i] = Math.floor(hash01(i % w, (i / w) | 0, seedNum) * 256);
+  generateTerrain(world);
+  placeStartingRoad(world);
+  return world;
+}
+
+// ---------------------------------------------------------------------------
+// Terrain: one river as a biased random walk edge to edge, 1–2 ponds, tree
+// clumps. Uses its own stream so the sim stream starts identical for every
+// map size.
+// ---------------------------------------------------------------------------
+
+function generateTerrain(world) {
+  const { w, h, terrain } = world;
+  const rng = makeRng(world.seedNum ^ 0x7e11);
+  terrain.fill(TERRAIN.GRASS);
+
+  // River: pick an axis; walk from one edge to the other with lateral drift.
+  const vertical = rng.chance(0.5);
+  const len = vertical ? h : w;
+  const span = vertical ? w : h;
+  let pos = Math.floor(span * (0.3 + 0.4 * rng.next()));
+  let width = 2;
+  let drift = 0;
+  for (let t = 0; t < len; t++) {
+    drift += (rng.next() - 0.5) * 0.9;
+    drift = Math.max(-1.2, Math.min(1.2, drift));
+    pos += drift;
+    if (pos < 4) { pos = 4; drift = Math.abs(drift); }
+    if (pos > span - 5) { pos = span - 5; drift = -Math.abs(drift); }
+    if (t % 9 === 0) width = 2 + (rng.chance(0.4) ? 1 : 0);
+    const c = Math.round(pos);
+    for (let k = 0; k < width; k++) {
+      const p = c + k - (width >> 1);
+      if (p < 0 || p >= span) continue;
+      const tx = vertical ? p : t;
+      const ty = vertical ? t : p;
+      terrain[idx(world, tx, ty)] = TERRAIN.WATER;
+    }
+  }
+
+  // Ponds: 1–2 ellipses on dry land.
+  const ponds = 1 + (rng.chance(0.5) ? 1 : 0);
+  for (let p = 0; p < ponds; p++) {
+    for (let attempt = 0; attempt < 20; attempt++) {
+      const cx = 6 + rng.int(w - 12);
+      const cy = 6 + rng.int(h - 12);
+      if (terrain[idx(world, cx, cy)] === TERRAIN.WATER) continue;
+      const rx = 2 + rng.int(3);
+      const ry = 1 + rng.int(3);
+      for (let ty = cy - ry; ty <= cy + ry; ty++) {
+        for (let tx = cx - rx; tx <= cx + rx; tx++) {
+          if (!inBounds(world, tx, ty)) continue;
+          const dx = (tx - cx) / (rx + 0.5);
+          const dy = (ty - cy) / (ry + 0.5);
+          if (dx * dx + dy * dy <= 1) terrain[idx(world, tx, ty)] = TERRAIN.WATER;
+        }
+      }
+      break;
+    }
+  }
+
+  // Trees: clumps until ~18% of land.
+  const land = countLand(world);
+  const target = Math.floor(land * 0.18);
+  let planted = 0;
+  let guard = 0;
+  while (planted < target && guard++ < 4000) {
+    const cx = rng.int(w);
+    const cy = rng.int(h);
+    const r = 1 + rng.int(4);
+    for (let ty = cy - r; ty <= cy + r; ty++) {
+      for (let tx = cx - r; tx <= cx + r; tx++) {
+        if (!inBounds(world, tx, ty)) continue;
+        const d2 = (tx - cx) ** 2 + (ty - cy) ** 2;
+        if (d2 > r * r) continue;
+        const i = idx(world, tx, ty);
+        if (terrain[i] !== TERRAIN.GRASS) continue;
+        if (rng.chance(0.75 - d2 / (r * r + 1) * 0.5)) {
+          terrain[i] = TERRAIN.TREE;
+          planted++;
+        }
+      }
+    }
+  }
+}
+
+function countLand(world) {
+  let n = 0;
+  for (let i = 0; i < world.terrain.length; i++) if (world.terrain[i] !== TERRAIN.WATER) n++;
+  return n;
+}
+
+/**
+ * The opening beat: one edge road, a 6-tile stub entering from the map edge
+ * nearest the centroid of the largest dry region, ending in a T.
+ */
+function placeStartingRoad(world) {
+  const { w, h } = world;
+  // Largest dry component by flood fill.
+  const seen = new Uint8Array(w * h);
+  let best = null;
+  for (let s = 0; s < w * h; s++) {
+    if (seen[s] || world.terrain[s] === TERRAIN.WATER) continue;
+    const stack = [s];
+    seen[s] = 1;
+    let count = 0;
+    let sx = 0;
+    let sy = 0;
+    while (stack.length) {
+      const i = stack.pop();
+      count++;
+      sx += i % w;
+      sy += (i / w) | 0;
+      const tx = i % w;
+      const ty = (i / w) | 0;
+      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        const nx = tx + dx;
+        const ny = ty + dy;
+        if (!inBounds(world, nx, ny)) continue;
+        const j = idx(world, nx, ny);
+        if (seen[j] || world.terrain[j] === TERRAIN.WATER) continue;
+        seen[j] = 1;
+        stack.push(j);
+      }
+    }
+    if (!best || count > best.count) best = { count, cx: sx / count, cy: sy / count };
+  }
+  const cx = Math.round(best.cx);
+  const cy = Math.round(best.cy);
+  // Nearest edge to the centroid.
+  const cands = [
+    { d: cx, dir: [1, 0], start: [0, cy] },
+    { d: w - 1 - cx, dir: [-1, 0], start: [w - 1, cy] },
+    { d: cy, dir: [0, 1], start: [cx, 0] },
+    { d: h - 1 - cy, dir: [0, -1], start: [cx, h - 1] },
+  ].sort((a, b) => a.d - b.d);
+  for (const c of cands) {
+    // Walk 6 tiles in from the edge; require all dry.
+    const tiles = [];
+    let ok = true;
+    for (let k = 0; k < 6; k++) {
+      const tx = c.start[0] + c.dir[0] * k;
+      const ty = c.start[1] + c.dir[1] * k;
+      if (!inBounds(world, tx, ty) || world.terrain[idx(world, tx, ty)] === TERRAIN.WATER) { ok = false; break; }
+      tiles.push([tx, ty]);
+    }
+    if (!ok) continue;
+    for (const [tx, ty] of tiles) {
+      const i = idx(world, tx, ty);
+      world.road[i] = ROAD.ROAD;
+      world.terrain[i] = TERRAIN.GRASS;
+    }
+    // The T: two tiles either side of the stub's end, perpendicular.
+    const [ex, ey] = tiles[tiles.length - 1];
+    const perp = [c.dir[1], c.dir[0]];
+    for (const s of [-1, 1]) {
+      for (let k = 1; k <= 2; k++) {
+        const tx = ex + perp[0] * s * k;
+        const ty = ey + perp[1] * s * k;
+        if (!inBounds(world, tx, ty) || world.terrain[idx(world, tx, ty)] === TERRAIN.WATER) break;
+        const i = idx(world, tx, ty);
+        world.road[i] = ROAD.ROAD;
+        world.terrain[i] = TERRAIN.GRASS;
+      }
+    }
+    world.start = { tx: ex, ty: ey };
+    return;
+  }
+  world.start = { tx: cx, ty: cy };
+}
+
+// ---------------------------------------------------------------------------
+// Small shared helpers used by several sim modules.
+// ---------------------------------------------------------------------------
+
+export const N4 = Object.freeze([[1, 0], [-1, 0], [0, 1], [0, -1]]);
+
+export function isRoad(world, i) {
+  return world.road[i] !== ROAD.NONE;
+}
+
+/** Zoned lots that can hold a building (not rubble is handled by callers). */
+export function isLot(world, i) {
+  return world.zone[i] !== ZONE.NONE;
+}
+
+export function capacityOf(world, i) {
+  const z = world.zone[i];
+  const t = world.tier[i];
+  if (z === ZONE.R) return KNOBS.R_CAP[t];
+  if (z === ZONE.C) return KNOBS.C_JOBS[t];
+  if (z === ZONE.I) return KNOBS.I_JOBS[t];
+  if (world.civic[i] === CIVIC.ZOO) return KNOBS.ZOO_JOBS;
+  return 0;
+}
+
+/** Jobs offered by a tile (C, I, or a zoo anchor). */
+export function jobsOf(world, i) {
+  const z = world.zone[i];
+  if (z === ZONE.C) return KNOBS.C_JOBS[world.tier[i]];
+  if (z === ZONE.I) return KNOBS.I_JOBS[world.tier[i]];
+  if (world.civic[i] === CIVIC.ZOO) return KNOBS.ZOO_JOBS;
+  return 0;
+}
+
+/** Is this tile a job site counted as C (zoo jobs count as C)? */
+export function jobZone(world, i) {
+  if (world.zone[i] === ZONE.C || world.civic[i] === CIVIC.ZOO) return ZONE.C;
+  if (world.zone[i] === ZONE.I) return ZONE.I;
+  return ZONE.NONE;
+}
+
+/** Deterministic per-tile hash in [0,1) for the painter and variants. */
+export function tileHash(world, i, salt = 0) {
+  return hash01(i % world.w, (i / world.w) | 0, world.seedNum ^ salt);
+}
