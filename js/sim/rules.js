@@ -62,6 +62,8 @@ export const KNOBS = {
   EMIT_PARK_RADIUS: 2,
   EMIT_FIRE: 50,
   EMIT_FIRE_RADIUS: 3,
+  EMIT_PIG: 1.5,            // mess per pig at home, over 1 tile — a full tenement of pigs is a small factory
+  EMIT_PIG_RADIUS: 1,
   LV_BASE: 35,
   LV_CENTRE: 40,
   LV_CENTRE_RADIUS: 24,
@@ -86,6 +88,8 @@ export const KNOBS = {
   FRIEND_P: 0.05,
   FRIEND_MAX: 4,
   FUNERAL_P: 0.5,
+  PREY_FLIGHT: 10,          // mood lost per predator species next door without a bridging friend
+  PREDPREY_WEIGHT: 2,       // a predator–prey friendship counts twice in H
   JOB_SEARCHES: 64,
   CAMPERS_MAX: 8,
   CAMPER_TICKS: 3,
@@ -94,7 +98,7 @@ export const KNOBS = {
   TAX_R_PER_CITIZEN: 1.0,
   TAX_C_PER_JOB: 1.5,
   TAX_I_PER_JOB: 2.0,
-  UPKEEP_CITIZEN: 14,
+  UPKEEP_CITIZEN: 12,
   UPKEEP_ROAD: 5,
   UPKEEP_BRIDGE: 12,
   UPKEEP_TIER: 4,
@@ -175,7 +179,7 @@ export const RULES = Object.freeze([
   },
   {
     id: "F1", title: "Pollution",
-    formula: "each source spreads linearly over its radius: I tier 25/45/70 over 2/3/4 tiles, C tier 3 10 over 2, roads 2 + traffic/4 over 1, fire 50 over 3; parks −12 over 2, trees −4; additive, capped 100 — no wind",
+    formula: "each source spreads linearly over its radius: I tier 25/45/70 over 2/3/4 tiles, C tier 3 10 over 2, roads 2 + traffic/4 over 1, fire 50 over 3, pigs 1.5 each over 1 (mess); parks −12 over 2, trees −4; additive, capped 100 — no wind",
     live: (w) => `mean Pol ${f1(w.last.census.meanPol)} · max ${w.last.census.maxPol}`,
   },
   {
@@ -190,7 +194,7 @@ export const RULES = Object.freeze([
   },
   {
     id: "B2", title: "Upkeep per year",
-    formula: "14·P + 5·roads + 12·bridges + 4·Σ tiers + 300·parks + 1500·zoos",
+    formula: "12·P + 5·roads + 12·bridges + 4·Σ tiers + 300·parks + 1500·zoos",
     live: (w) => `≈ §${w.last.budget.upkeepYr}/yr → net §${w.last.budget.incomeYr - w.last.budget.upkeepYr}/yr`,
   },
   {
@@ -205,8 +209,13 @@ export const RULES = Object.freeze([
   },
   {
     id: "C3", title: "Live and grow together",
-    formula: "friendships form at work, next door and in parks (p = 0.05·affinity) ; H = cross-species share ; a funeral befriends the mourners",
-    live: (w) => `${w.last.census.friendships} friendships · ${f2(w.last.census.H)} cross-species share · approval ${Math.round(w.last.census.approval)}`,
+    formula: "friendships form at work, next door and in parks (p = 0.05·affinity; predator–prey pairs 0.4) ; H = cross-species share, a predator–prey friendship counts twice ; a funeral befriends the mourners",
+    live: (w) => `${w.last.census.friendships} friendships · ${w.last.census.predPrey} predator–prey · Zoo City index ${f2(w.last.census.H)} · approval ${Math.round(w.last.census.approval)}`,
+  },
+  {
+    id: "C4", title: "Prey flight",
+    formula: "a rabbit, mouse, pig or cow loses 10 mood per predator species living next door — unless someone in the household is friends with that species",
+    live: () => "the bridge is a friendship, never a wall",
   },
   {
     id: "X1", title: "Traffic is a readout, not a gate",

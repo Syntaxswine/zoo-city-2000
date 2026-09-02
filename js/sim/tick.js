@@ -78,8 +78,8 @@ export function characterLine(cen) {
   const sorted = SPECIES.map((s) => [s.id, cen.shares[s.id]]).sort((a, b) => b[1] - a[1]);
   if (!cen.P) return "an empty map with a road into it";
   const [a, b] = sorted;
-  const nouns = { rabbit: "warren", mouse: "tenement", fox: "market town", beaver: "mill-town", owl: "college town", bear: "hamlet", tortoise: "retirement river", raccoon: "junkyard" };
-  const problems = { rabbit: "rabbit problem", mouse: "mouse problem", fox: "fox problem", beaver: "beaver habit", owl: "night shift", bear: "bear winter", tortoise: "slow lane", raccoon: "bin situation" };
+  const nouns = { rabbit: "warren", mouse: "tenement", fox: "market town", beaver: "mill-town", owl: "college town", bear: "hamlet", tortoise: "retirement river", raccoon: "junkyard", pig: "works town", cow: "dairy parish", wolf: "pack territory", cat: "high street", hawk: "eyrie" };
+  const problems = { rabbit: "rabbit problem", mouse: "mouse problem", fox: "fox problem", beaver: "beaver habit", owl: "night shift", bear: "bear winter", tortoise: "slow lane", raccoon: "bin situation", pig: "mud problem", cow: "cud habit", wolf: "howling problem", cat: "cat problem", hawk: "hawk overhead" };
   if (b[1] < 0.15) return `a ${a[0]} ${nouns[a[0]]}`;
   return `a ${a[0]} ${nouns[a[0]]} with a ${problems[b[0]]}`;
 }

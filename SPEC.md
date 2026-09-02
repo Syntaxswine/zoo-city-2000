@@ -282,6 +282,30 @@ FRICTION: 0.4% of FRIENDLESS adults' households per month wander off regardless
 | Bear | 80 | 1 | 20–45 | 65 | 0.4:0.6 | 50 | Low lots (falls back) | 40 | low-density R, trees | Bear winter |
 | Tortoise | 150 | 1 | 25–80 | 120 | 0.5:0.5 | 50 | any | 8 | base | Centenary |
 | Raccoon | 35 | 3 | 16–28 | 30 | 0.6:0.4 | 80 | any | 20 | mean pollution | the smog readout with a face |
+| Pig | 30 | 5 | 14–24 | 26 | 0.2:0.8 | 90 | water within 6 (mud) | 16 | I jobs, dirt | Truffle season (+§2,000) |
+| Cow | 45 | 1 | 18–35 | 40 | 0.4:0.6 | 60 | Low lots + a park (pasture) | 20 | parks, Low vacancies | Dairy fair |
+| Wolf | 50 | 3 | 18–40 | 45 | 0.5:0.5 | 50 | trees within 3; arrives as a PACK of 4–6 | 40 | woods, a prey-rich town | Wolf moon |
+| Cat | 35 | 3 | 14–28 | 30 | 0.8:0.2 | 40 | flats (tier ≥ 2) | 24 | high-LV vacancies, shops, mice | the mouse's other problem |
+| Hawk | 40 | 2 | 16–35 | 35 | 0.6:0.4 | 30 | High lots (towers) | 64 | tier-3 vacancies | sees the whole city |
+
+**Predators and prey (the owner's note: "a notable absence of predator species").**
+`PREY_OF`: rabbit ← fox, wolf, hawk; mouse ← fox, owl, cat, hawk; pig ← wolf;
+cow ← wolf. Three rules, all weights and mood terms, never gates:
+- a predator–prey pair is *wary* (affinity 0.4) — such friendships form slowly;
+- **prey flight**: a prey citizen loses 10 mood per predator species living
+  next door (Chebyshev 1) — unless someone in its household is FRIENDS with
+  that species. The bridge is a friendship, never a wall;
+- a predator–prey friendship counts **twice** in H, the Zoo City index. The
+  wolf befriending the rabbit is the town's proudest statistic.
+**Pig mess (the owner's rule):** every pig adds 1.5 to its home lot's emission
+over 1 tile — a full tenement of pigs smells like a small factory — and
+raccoons' home preference is *dirt* (+12 for a lot with Pol ≥ 15), so the
+raccoons settle beside the pigs. They are allied (affinity 1.0) and both
+tolerate the smell (90 / 80); everyone else moves away from the block.
+Livestock and predators arrive by weight like everyone else (pigs follow
+industry and dirt, cows follow pasture, wolves follow woods and a prey-rich
+town, cats follow shops and mice, hawks follow towers); wolves arrive as
+packs of 4–6 and take a whole townhouse.
 
 `fit_s(city)` reads what the player built: I jobs → beavers; tier-3 R
 vacancies → mice; LV ≥ 50 vacancies → foxes; mean Pol → raccoons; trees +
@@ -336,6 +360,9 @@ kinds. Timed effects are `{id, until, params}` structs saved with the city.
 | 15 | Tortoise centenary | boon | a tortoise reaches 100 | LV +8 within 3 of its home, permanent; hat on the walker; plaque in the card | none — the city's memory |
 | 16 | Scrubbers offer | CHOICE | I lots ≥ 15; w2 | card pauses the sim: pay §1,500 → all I emissions ×0.7 permanently, or decline | the one event that asks a question |
 | 17 | Receivership | state | cash < −10,000 | see §8 | wait it out |
+| 18 | Truffle season | boon | pigs ≥ 15% and trees ≥ 8% of the map; once per 5 years; w2 | +§2,000 | keep some woods |
+| 19 | Dairy fair | boon | cows ≥ 15% and parks ≥ 2; w2 | V_C +0.3 for 6 ticks; +§1,000 | zone C near the pasture |
+| 20 | Wolf moon | mixed | wolves ≥ 10%; w2 | 3 ticks: prey flight doubles for wolf-prey, friendships form ×2 | the month the town mixes |
 
 L1 (labelled, not started): road rot, owl academy, wedding, fire station,
 school.

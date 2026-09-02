@@ -2,7 +2,7 @@
 // counted from the state every tick and never stored. SPEC §4 (census), §10.
 
 import { KNOBS } from "./rules.js";
-import { SPECIES, SPECIES_BY_ID } from "./species.js";
+import { SPECIES, SPECIES_BY_ID, isPredPrey } from "./species.js";
 import { ZONE, CIVIC, ROAD, jobsOf, jobZone } from "./world.js";
 import { hasAccess, edgeRoads } from "./fields.js";
 
@@ -29,6 +29,7 @@ export function census(world) {
   for (const s of SPECIES) counts[s.id] = 0;
   let friendships = 0;
   let cross = 0;
+  let predPrey = 0;
   const byId = world._byId || (world._byId = new Map());
   byId.clear();
   for (const c of citizens) byId.set(c.id, c);
@@ -43,7 +44,10 @@ export function census(world) {
       if (f > c.id) {
         friendships++;
         const o = byId.get(f);
-        if (o && o.species !== c.species) cross++;
+        if (o && o.species !== c.species) {
+          cross++;
+          if (isPredPrey(c.species, o.species)) predPrey++;
+        }
       }
     }
   }
@@ -85,11 +89,15 @@ export function census(world) {
   const shares = {};
   for (const s of SPECIES) shares[s.id] = P ? counts[s.id] / P : 0;
   const speciesPresent = SPECIES.filter((s) => shares[s.id] >= 0.05).length;
-  const H = friendships ? cross / friendships : 0;
+  // The Zoo City index: cross-species share of friendships, with a
+  // predator–prey link counting PREDPREY_WEIGHT times (the wolf and the rabbit).
+  const wCross = cross + (KNOBS.PREDPREY_WEIGHT - 1) * predPrey;
+  const wAll = friendships + (KNOBS.PREDPREY_WEIGHT - 1) * predPrey;
+  const H = wAll ? wCross / wAll : 0;
   return {
     P, W, J, Jc, Ji, F, U, Lab,
     counts, shares, speciesPresent,
-    friendships, cross, H,
+    friendships, cross, predPrey, H,
     approval: P ? moodSum / P : 50,
     native: P ? native / P : 0,
     parks, zoos, lots, roads, lotsNoRoad,

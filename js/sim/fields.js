@@ -103,10 +103,16 @@ export function computePollution(world) {
   e.fill(0);
   const scrub = world.events.scrubbers ? 0.7 : 1;
   const smog = world.events.active.find((x) => x.id === "smogBank") ? 25 : 0;
+  // Pig mess: count pigs at home per lot (the owner's rule — pigs are messy,
+  // raccoons follow the mess).
+  const pigs = world._pigs || (world._pigs = new Uint8Array(n));
+  pigs.fill(0);
+  for (const c of world.citizens) if (c.species === "pig" && c.home >= 0 && !c.dead) pigs[c.home]++;
   for (let i = 0; i < n; i++) {
     const tx = i % w;
     const ty = (i / w) | 0;
     const t = world.tier[i];
+    if (pigs[i]) spread(e, w, h, tx, ty, KNOBS.EMIT_PIG * pigs[i], KNOBS.EMIT_PIG_RADIUS);
     if (world.zone[i] === ZONE.I && t > 0) spread(e, w, h, tx, ty, KNOBS.EMIT_I[t] * scrub, KNOBS.EMIT_I_RADIUS[t]);
     else if (world.zone[i] === ZONE.C && KNOBS.EMIT_C[t] > 0) spread(e, w, h, tx, ty, KNOBS.EMIT_C[t], KNOBS.EMIT_C_RADIUS[t]);
     if (world.road[i] !== ROAD.NONE) spread(e, w, h, tx, ty, KNOBS.EMIT_ROAD + Math.min(KNOBS.EMIT_TRAFFIC_MAX, world.traffic[i] / KNOBS.EMIT_TRAFFIC_DIV), KNOBS.EMIT_ROAD_RADIUS);

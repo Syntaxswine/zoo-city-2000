@@ -64,6 +64,18 @@ decides growth — it can only ever say what the rule did.
 | bear | cottages, trees | sleep from December to March; loyal |
 | tortoise | a short commute | live 150 years; a centenary raises the street's value forever |
 | raccoon | nothing — they come when it is dirty | the smog readout with a face |
+| pig | mud, industry | litters of five; the works' workforce; messy — a tenement of pigs smells like a small factory, and raccoons move in next door; truffle season |
+| cow | pasture: cottages and parks | slow, calm; the Dairy Fair |
+| wolf | woods, and a town full of things to eat | arrive as a pack; the Wolf Moon |
+| cat | flats, shops, mice | shopkeepers; the mouse's other problem |
+| hawk | towers | commute anywhere; see the whole city |
+
+**Predators and prey.** Rabbits fear foxes, wolves and hawks; mice fear
+foxes, owls, cats and hawks; pigs and cows fear wolves. A prey household
+loses mood for every predator species living next door — unless someone in
+it is *friends* with that species. Such friendships form slowly (the pair is
+wary) and count double in the Zoo City index. The bridge is a friendship,
+never a wall.
 
 Species are weights, never gates: a factory belt by the river fills with
 beavers, a leafy suburb with owls, a dirty core with raccoons. The census

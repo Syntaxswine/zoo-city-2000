@@ -60,6 +60,7 @@ export function budgetTick(world) {
   const notices = [];
   if (!world.flags.receivership && world.cash < KNOBS.RECEIVERSHIP) {
     world.flags.receivership = true;
+    world.flags.ownRates = { ...world.rates };
     notices.push("RECEIVERSHIP: the county has taken the books. Rates are forced up and building is frozen until the treasury is back above zero.");
   }
   if (world.flags.receivership) {
@@ -70,7 +71,11 @@ export function budgetTick(world) {
     world.rates.I = Math.max(world.rates.I, forced);
     if (world.cash >= 0) {
       world.flags.receivership = false;
-      notices.push("The county hands the books back. You may build again.");
+      // Hand the books back with the mayor's own rates, so the exit is an
+      // exit and not a permanent over-tax (measured: a scripted mayor left at
+      // n+2 lost 28% of the town over the next eight years).
+      if (world.flags.ownRates) { world.rates = { ...world.flags.ownRates }; delete world.flags.ownRates; }
+      notices.push("The county hands the books back at your old rates. You may build again.");
     }
   }
   return { fig, notices };

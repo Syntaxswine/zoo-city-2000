@@ -15,7 +15,9 @@
 // Part B — the code: budget.post is the only cash mutator; every import is
 //   relative (Pages serves under /zoo-city-2000/); no Math.random under js/.
 // Part C — the art (when js/art/index.js exists): every pixel a palette key,
-//   every anchor inside its sprite, 16/16 road masks, the painter key.
+//   every anchor inside its sprite, 16/16 road masks, no solid pixel outside
+//   its footprint prism, every stamped part inside its grid, the painter key
+//   (including the 2×2 band beside the zoo).
 
 import { readFileSync, readdirSync, statSync, existsSync } from "node:fs";
 import path from "node:path";
@@ -236,11 +238,63 @@ if (existsSync(artIndex)) {
   let masks = 0;
   for (let m = 0; m < 16; m++) if (art.road(m, false)) masks++;
   check("art: 16/16 road masks", masks === 16, `${masks}`);
+  // SPEC §12.5: a box solid emits no pixel outside its projected footprint
+  // + height — the pixel half of the gate. The footprint prism
+  // [0, 16·fw] × [0, 16·fh] × [0, ∞) projects to x ∈ [−2B, 2A] and
+  // y ≤ 2·min(A, B + x/2) − x/2 (the ground diamond's lower edges),
+  // measured from the anchor at world (hub, hub, 0), with one pixel of
+  // rounding slack. Buildings, civics and overlays; not trees or citizens,
+  // which are billboards and hang over their tile by design.
+  const { STAMP_LOG, PLANS } = await import("../js/art/buildings.js");
+  // The gate proper is on the PLAN (buildings.js explains why a pixel test
+  // cannot see an overhang at height): every box inside the footprint.
+  const planBad = [];
+  for (const { name, footprint, boxes } of PLANS) {
+    const A = 16 * footprint[0], B = 16 * footprint[1];
+    for (const bx of boxes) if (bx.a0 < 0 || bx.a1 > A || bx.b0 < 0 || bx.b1 > B || bx.c0 < 0) planBad.push(`${name} [${bx.a0},${bx.a1}]×[${bx.b0},${bx.b1}]×[${bx.c0},${bx.c1}]`);
+  }
+  check("art: every box of every solid lies inside its footprint", PLANS.length >= 20 && planBad.length === 0, planBad.join("; "));
+  let overhang = [];
+  for (const { name, sprite } of list) {
+    const tags = sprite.tags || [];
+    if (!(tags.includes("building") || tags.includes("civic") || tags.includes("overlay"))) continue;
+    if (name.startsWith("overlay-fire") || name.startsWith("overlay-rubble") || name.startsWith("overlay-flood")) continue; // ground tiles / flames, not solids
+    const [fw, fh] = sprite.footprint || [1, 1];
+    const A = 16 * fw, B = 16 * fh;
+    const ay = sprite.anchor[1] - (8 * fw + 8 * fh); // grid row of world y = 0
+    let bad = 0;
+    for (let py = 0; py < sprite.rows.length; py++)
+      for (let px = 0; px < sprite.rows[py].length; px++) {
+        if (sprite.rows[py][px] === ".") continue;
+        const x = px - sprite.anchor[0], y = py - ay;
+        const yMax = 2 * Math.min(A, B + x / 2) - x / 2;
+        if (x < -2 * B - 1 || x > 2 * A + 1 || y > yMax + 1) bad++;
+      }
+    if (bad) overhang.push(`${name}: ${bad}px`);
+  }
+  check("art: no solid emits a pixel outside its footprint prism", overhang.length === 0, overhang.join(", "));
+  const clipped = STAMP_LOG.filter((s) => s.dropped > 0);
+  check("art: every stamped part lands inside its solid's grid", STAMP_LOG.length >= 5 && clipped.length === 0, clipped.map((s) => `${s.part}→${s.sprite}`).join(", "));
   const painterPath = path.join(ROOT, "js", "iso", "painter.js");
   if (existsSync(painterPath)) {
-    const { sortKey } = await import("../js/iso/painter.js");
+    const { sortKey, keyOf, Z_BUILDING } = await import("../js/iso/painter.js");
     check("painter: building after ground on the same tile", sortKey(3, 4, 768) > sortKey(3, 4, 0));
     check("painter: a walker at frac 0.5 sits between its tile's ground and the next tile", sortKey(3, 4, 512 + 32) > sortKey(3, 4, 0) && sortKey(3, 4, 512 + 32) < sortKey(4, 4, 0));
+    // The 2×2 band: a walker on the road beside an oblong's back-east tile
+    // (2, 4.0..4.2) paints AFTER the zoo at (0,4); a walker behind it, and
+    // every ground tile under it, still paint before.
+    const zoo = { sprite: art.civic("zoo"), tx: 0, ty: 4, kind: "building" };
+    const walker = (tx, ty) => ({ sprite: art.citizen("rabbit", "se", 0, "adult"), tx, ty, kind: "walker" });
+    const ground = (tx, ty) => ({ sprite: art.ground("grass", 0), tx, ty, kind: "ground" });
+    let band = true;
+    for (const ty of [4, 4.1, 4.2, 4.5, 5, 5.9]) if (!(keyOf(walker(2, ty)) > keyOf(zoo))) band = false;
+    for (const tx of [0, 1, 1.9]) if (!(keyOf(walker(tx, 6)) > keyOf(zoo))) band = false;
+    check("painter: a walker on the road beside a 2×2 paints over it", band);
+    let behind = true;
+    for (const [tx, ty] of [[0, 3.9], [1, 3.5], [2, 3.5], [-1, 4.5], [-1, 5.5], [1.5, 3.9]]) if (!(keyOf(walker(tx, ty)) < keyOf(zoo))) behind = false;
+    for (const [tx, ty] of [[0, 4], [1, 4], [0, 5], [1, 5]]) if (!(keyOf(ground(tx, ty)) < keyOf(zoo))) behind = false;
+    check("painter: everything behind or under a 2×2 paints before it", behind);
+    check("painter: keyOf agrees with sortKey for a 1×1", keyOf({ sprite: art.building(1, 1, 0), tx: 3, ty: 4, kind: "building" }) === sortKey(3, 4, Z_BUILDING));
   }
   console.log(`art: ${list.length} sprites audited`);
 } else {

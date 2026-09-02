@@ -7,7 +7,7 @@
 // occupant and staff counts. check.mjs recounts all of it.
 
 import { KNOBS } from "./rules.js";
-import { SPECIES, SPECIES_BY_ID, NAME_PARTS, affinity } from "./species.js";
+import { SPECIES, SPECIES_BY_ID, NAME_PARTS, affinity, ARRIVING, PREY_OF } from "./species.js";
 import { ZONE, CIVIC, TERRAIN, ROAD, idx, inBounds, capacityOf, jobsOf, jobZone } from "./world.js";
 import { roadPath, doorOf, edgeRoads, hasAccess } from "./fields.js";
 import { ageYears, ageMonths, isWorker } from "./census.js";
@@ -21,6 +21,11 @@ const SURNAMES = {
   bear: ["Ursin", "Honeycomb", "Brambleton", "Grumbold"],
   tortoise: ["Shelby", "Slowcombe", "Mossback", "Testudo"],
   raccoon: ["Binsworth", "Ringtail", "Scrapley", "Midnight"],
+  pig: ["Trotter", "Rasher", "Sowerby", "Hamhock"],
+  cow: ["Cudworth", "Buttercup", "Daisyfield", "Mooreland"],
+  wolf: ["Greyback", "Howell", "Lupin", "Fangley"],
+  cat: ["Purrington", "Whiskers", "Tabbs", "Mousewell"],
+  hawk: ["Talonby", "Skyward", "Kestrel", "Windrow"],
 };
 
 // ---------------------------------------------------------------------------
@@ -161,6 +166,17 @@ function waterWithin(world, i, r) {
   }
   return false;
 }
+function parkWithin(world, i, r) {
+  const { w } = world;
+  const tx = i % w;
+  const ty = (i / w) | 0;
+  for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) {
+    const xx = tx + dx;
+    const yy = ty + dy;
+    if (inBounds(world, xx, yy) && world.civic[yy * w + xx] === CIVIC.PARK) return true;
+  }
+  return false;
+}
 function treeWithin(world, i, r) {
   const { w } = world;
   const tx = i % w;
@@ -185,6 +201,9 @@ function homeScore(world, species, i, strict) {
     case "lv50": if (lv >= 50) s += 20; else if (strict) return -Infinity; break;
     case "water": if (waterWithin(world, i, 6)) s += 15; break;
     case "trees": if (treeWithin(world, i, 3)) s += 15; break;
+    case "pasture": if (world.maxTier[i] === 1 || world.tier[i] === 1) s += 10; if (parkWithin(world, i, 4)) s += 10; break;
+    case "flats": if (world.tier[i] >= 2) s += 15; break;
+    case "dirt": if (pol >= 15) s += 12; break;   // raccoons like it messy — they settle beside the pigs
     default: break;
   }
   return s;
@@ -349,8 +368,23 @@ export function arrivalWeights(world, cen) {
     bear: 1 + 1.0 * Math.min(1, vacLow / vacTotal) + Math.min(0.75, treeShare * 3),
     tortoise: 1,
     raccoon: (1 + Math.min(2, cen.meanPol / 10)) * (smog ? 2 : 1),
+    // Livestock: pigs follow industry and dirt; cows follow pasture (Low lots + parks).
+    pig: 1 + Math.min(2, cen.Ji / 80) + Math.min(1, cen.meanPol / 15),
+    cow: 1 + Math.min(1.5, 0.5 * cen.parks) + 1.0 * Math.min(1, vacLow / vacTotal),
+    // Predators: wolves follow woods and a prey-rich town; cats follow shops and mice; hawks follow towers.
+    wolf: 0.5 + Math.min(1.0, treeShare * 3) + (preyShare(cen, "wolf") >= 0.25 ? 0.5 : 0),
+    cat: 1 + 1.0 * Math.min(1, vacLV50 / vacTotal) + Math.min(1, cen.Jc / 100) + (cen.shares.mouse >= 0.12 ? 0.75 : 0),
+    hawk: 1 + 2 * Math.min(1, vacHigh / vacTotal),
   };
+  for (const s of SPECIES) if (!ARRIVING.has(s.id)) w[s.id] = 0;
   return w;
+}
+
+/** Share of the town that a predator species preys on. */
+function preyShare(cen, pred) {
+  let sh = 0;
+  for (const [prey, preds] of Object.entries(PREY_OF)) if (preds.includes(pred)) sh += cen.shares[prey] || 0;
+  return sh;
 }
 
 function pickSpecies(world, weights) {
@@ -478,7 +512,8 @@ export function citizensTick(world, cen, dem) {
     }
     for (let k = 0; k < households; k++) {
       const species = pickSpecies(world, weights);
-      const size = 2 + rng.int(3);
+      const pack = SPECIES_BY_ID[species].pack || [2, 4];
+      const size = pack[0] + rng.int(pack[1] - pack[0] + 1);
       const strict = true;
       let lot = bestHome(world, species, size, strict);
       if (lot < 0) lot = bestHome(world, species, size, false);
@@ -633,9 +668,40 @@ function friendships(world, out) {
 function moods(world) {
   const { w } = world;
   const moodBoost = world.events.active.reduce((m, e) => m + (e.moodBoost || 0), 0);
+  // Which species live on each lot (for the prey-flight rule).
+  const lotSpecies = new Map();
+  for (const c of world.citizens) {
+    if (c.dead || c.home < 0) continue;
+    let set = lotSpecies.get(c.home);
+    if (!set) lotSpecies.set(c.home, (set = new Set()));
+    set.add(c.species);
+  }
+  const wolfMoon = world.events.active.some((e) => e.id === "wolfMoon");
   for (const c of world.citizens) {
     if (c.dead) continue;
     const sp = SPECIES_BY_ID[c.species];
+    // PREY FLIGHT: a predator of my kind next door (Chebyshev 1) costs mood,
+    // unless I have a friend of that species — the bridge. Weights, never gates.
+    let flight = 0;
+    const preds = PREY_OF[c.species];
+    if (preds && c.home >= 0) {
+      const tx = c.home % w;
+      const ty = (c.home / w) | 0;
+      const near = new Set();
+      for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+        const xx = tx + dx;
+        const yy = ty + dy;
+        if (!inBounds(world, xx, yy)) continue;
+        const set = lotSpecies.get(yy * w + xx);
+        if (set) for (const p of preds) if (set.has(p)) near.add(p);
+      }
+      for (const p of near) {
+        let bridged = false;
+        for (const f of c.friends) { const o = world.byId.get(f); if (o && o.species === p) { bridged = true; break; } }
+        if (!bridged) flight += KNOBS.PREY_FLIGHT;
+      }
+      if (wolfMoon && preds.includes("wolf")) flight += KNOBS.PREY_FLIGHT;
+    }
     const adult = ageYears(world, c) >= KNOBS.ADULT_AGE;
     const worker = isWorker(world, c);
     let m = 50;
@@ -654,6 +720,7 @@ function moods(world) {
       if (park) m += 10;
     }
     m += 5 * c.friends.length;
+    m -= Math.min(20, flight);
     if (c.path && c.path.length - 1 <= sp.commute) m += 10;
     if (c.grief && c.grief > world.tick) m -= 10;
     if (c.moodPenalty && c.moodPenaltyUntil > world.tick) m += c.moodPenalty;

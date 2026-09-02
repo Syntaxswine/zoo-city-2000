@@ -197,6 +197,21 @@ export const ROSTER = [
     fire: () => `RABBIT WARREN — the Burroweses have found the parks. Births double for a year.`,
   },
   {
+    id: "truffles", kind: BOON, weight: () => 2,
+    gate: (w, c) => c.shares.pig >= 0.15 && treeShare(w) >= 0.08 && w.tick - (w.events.lastTruffle ?? -100000) >= 60,
+    fire: (w) => { post(w, "grant", 2000); w.events.lastTruffle = w.tick; return `TRUFFLE SEASON — the Trotters came back from the woods with §2,000 worth.`; },
+  },
+  {
+    id: "dairyFair", kind: BOON, weight: () => 2, duration: 6, valveBoost: { C: 0.3 },
+    gate: (w, c) => c.shares.cow >= 0.15 && c.parks >= 2,
+    fire: (w) => { post(w, "grant", 1000); return `DAIRY FAIR — the Cudworths' cheese draws a crowd; shops boom for six months and the till rings §1,000.`; },
+  },
+  {
+    id: "wolfMoon", kind: BOON, weight: () => 2, duration: 3, friendMult: 2,
+    gate: (w, c) => c.shares.wolf >= 0.10,
+    fire: () => `WOLF MOON — the Greybacks howl all month. The rabbits lie awake; half the town goes out to listen, and friendships form twice as fast.`,
+  },
+  {
     id: "founders", kind: BOON, weight: () => 6,
     gate: (w, c) => c.speciesPresent >= 5 && c.H >= 0.5 && c.friendships >= c.P / 4 && w.tick - w.events.lastFestival >= 120,
     fire: (w) => {
@@ -221,6 +236,11 @@ export const ROSTER = [
   },
 ];
 
+function treeShare(w) {
+  let n = 0;
+  for (let i = 0; i < w.terrain.length; i++) if (w.terrain[i] === TERRAIN.TREE) n++;
+  return n / w.terrain.length;
+}
 function hasCTier(w, t) {
   for (let i = 0; i < w.w * w.h; i++) if (w.zone[i] === ZONE.C && w.tier[i] >= t) return true;
   return false;

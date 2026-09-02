@@ -17,6 +17,7 @@ import { lotScore } from "../js/sim/lots.js";
 import { KNOBS } from "../js/sim/rules.js";
 import { stateHash } from "../js/sim/save.js";
 import { hasAccess } from "../js/sim/fields.js";
+import { SPECIES, ARRIVING } from "../js/sim/species.js";
 
 const argv = process.argv.slice(2);
 const arg = (k, d) => { const i = argv.indexOf(k); return i >= 0 ? argv[i + 1] : d; };
@@ -32,6 +33,8 @@ const parksWanted = Number(arg("--parks", 0));
 const zooYear = arg("--zoo", null);
 const csv = flag("--csv");
 const quiet = flag("--quiet");
+// --all: let every species in the roster arrive (the ones without sprites yet included).
+if (flag("--all")) for (const sp of SPECIES) ARRIVING.add(sp.id);
 
 const world = createWorld({ seed });
 apply(world, { kind: "rate", zone: "R", value: rates[0] });
@@ -171,6 +174,7 @@ if (csv) {
     const top = Object.entries(r.shares).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([k, v]) => `${k} ${(v * 100).toFixed(0)}%`).join(" ");
     console.log(`${String(r.year).padStart(3)} ${String(r.P).padStart(5)} ${String(r.W).padStart(5)} ${String(r.J).padStart(5)} ${String(r.U).padStart(5)} ${f(r.VR).padStart(6)} ${f(r.VC).padStart(5)} ${f(r.VI).padStart(5)} ${String(r.cash).padStart(8)} ${String(r.inc).padStart(8)} ${String(r.up).padStart(6)} ${String(r.appr).padStart(4)} ${f(r.H).padStart(4)} ${String(r.fr).padStart(4)} ${f(r.pol, 0).padStart(4)} ${f(r.lv, 0).padStart(4)} ${f(r.n, 1).padStart(3)} ${String(Math.round(r.cap)).padStart(5)} ${String(r.lots).padStart(4)}  ${top}`);
   }
+  console.log(`ledger: ${Object.entries(world.ledger).map(([k, v]) => `${k} ${v}`).join(" · ")}`);
   const last = tickMs.slice(-12);
   console.log(`hash ${stateHash(world)} · ${world.citizens.length} citizens · ${world.households.length} households · ${world.events.log.length} events · last-year tick ${(last.reduce((a, b) => a + b, 0) / last.length).toFixed(2)} ms (max ${Math.max(...last).toFixed(1)})`);
 }
