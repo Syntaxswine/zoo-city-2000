@@ -343,12 +343,28 @@ function works() {
 // down the valance. It survives flipPlan: a stripe keyed on floor(a)
 // turned into three long bands along the mirrored awning. (brickGrain
 // keys on screen pixels too — house precedent.)
-const STRIPE = (x) => (Math.floor(x / 2) & 1 ? CONC[4] : BRICK[0]);
+//
+// AND IT MIRRORS WITH THE PLAN. flipPlan sends screen column x to −1 − x,
+// but floor(x / 2) & 1 is not symmetric about that seam (column 17 is
+// dark, column −18 light), so a hook that hung under a light stripe in
+// variant 0 hung under a dark one in variant 1. The stripe is keyed on
+// the column's distance from the seam, m = x < 0 ? −1 − x : x, which IS
+// mirror-symmetric, and the seam itself (x = −1 | 0) lies inside the
+// body — the awning spans x ∈ [−22, −5] or its mirror — so no awning
+// ever shows the 4-px stripe the fold would make there.
+const STRIPE = (x) => {
+  const m = x < 0 ? -1 - x : x;
+  return Math.floor(m / 2) & 1 ? BRICK[0] : CONC[4];
+};
 const AWNING_M = { top: (a, b, x) => STRIPE(x), side: (a, k, x) => STRIPE(x), end: (b, k, x) => STRIPE(x) };
 // Sawdust: a loose spill, so the top and the side are both the lightest
 // earth — a heap has no crisp lit edge the way TIMBER does.
 const SAWDUST = flatSkin(EARTH[4], EARTH[4], EARTH[3]);
-const BRACKET = flatSkin(RUST[3], RUST[2], RUST[1]);
+// The sign bracket: the three DARKER rusts, so the one '$' dot (lum 157)
+// on the slab is the brightest thing on the sign. With ']' (lum 170) on
+// top the bracket's 4 px outshone the dot and the mark read as a gold
+// tick on the bracket, not a dot on the slab.
+const BRACKET = flatSkin(RUST[2], RUST[1], RUST[0]);
 
 /**
  * The stall: a tier-1 brick kiosk, 10 × 10 units under a slate cap, read
@@ -370,6 +386,20 @@ const BRACKET = flatSkin(RUST[3], RUST[2], RUST[1]);
  * column — a face whose two edges both land on pixel columns is 2 px wide
  * under the rasteriser's inclusive bounds — and paints no end face, which
  * at 2:1 turned each tick into an inverted T.
+ *
+ * AND UNDER THE LIGHT STRIPES. The stripe has a 4-px period on screen and
+ * the hooks are one period apart, so their phase against it is the same
+ * for all three: at a = 5, 7, 9 every tick hung under a dark '!' stripe
+ * (lum 48 over lum 38 — three stripes 2 px longer than their neighbours,
+ * not hooks) and in the flipped variant two of the three fell on the
+ * END_GLASS window. At a = 5.5, 7.5, 9.5 the ticks sit under the light
+ * '(' stripes (~170 luminance contrast), 2 px tall in both variants.
+ *
+ * The end-face window sits at the FRONT of the shaded face (b 8–10 of the
+ * body's 0–10): flipPlan hangs the awning off this face, and its top-face
+ * overhang hides the wall band under it for every column it covers
+ * (b ≤ 10.5 on the mirrored stall) — a window at b 2.5–5.5 kept 4 of its
+ * 18 px in variant 1.
  */
 const HOOK = { top: () => "+", side: () => "+", end: () => null };
 function stall() {
@@ -384,7 +414,7 @@ function stall() {
     },
     end: (b, k, x, y) => {
       const g = H - k;
-      if (b >= 2.5 && b < 5.5 && g >= 2 && g < 5) return END_GLASS;
+      if (b >= 8 && b < 10 && g >= 2 && g < 5) return END_GLASS;
       return base.end(b, k, x, y);
     },
   };
@@ -394,7 +424,7 @@ function stall() {
     box(2.5, 13.5, 2.5, 13.5, H, H + 1, SLATE_SKIN),
     box(4, 10.5, 13, 14.5, 0, 1, SAWDUST),
   ];
-  for (const a of [5, 7, 9]) boxes.push(box(a - 0.25, a + 0.25, 14, 14.5, 4, 6, HOOK));
+  for (const a of [5.5, 7.5, 9.5]) boxes.push(box(a - 0.25, a + 0.25, 14, 14.5, 4, 6, HOOK));
   return boxes;
 }
 
@@ -440,10 +470,13 @@ function meatHall() {
     side: (a, k, x, y) => (a >= 1.5 && a < 2.5 && 9 - k >= 6 && 9 - k < 8 ? "+" : annexBase.side(a, k, x, y)),
     end: annexBase.end,
   };
+  // The dot sits mid-slab on BOTH long faces: flipPlan turns the slab's
+  // side into its end (a 15.5–16 × b 7.5–11), and a dot on the side face
+  // alone left every variant-1 sign blank.
   const sign = {
     top: () => SLATE[2],
     side: (a, k) => (a >= 1.5 && a < 2 && k >= 1 && k < 2 ? BRICK[3] : SLATE[1]),
-    end: () => SLATE[0],
+    end: (b, k) => (b >= 1.5 && b < 2 && k >= 1 && k < 2 ? BRICK[3] : SLATE[0]),
   };
   return [
     box(1, 11, 1.5, 14.5, 0, H, skin),
