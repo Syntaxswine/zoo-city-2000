@@ -303,6 +303,17 @@ export const EVENT_TITLES = Object.freeze({
 });
 export const eventTitle = (id) => EVENT_TITLES[id] || id;
 
+/**
+ * Ticker prefixes — ONE source for ui.js (colour, flash) and playtest.mjs
+ * (print). Three regexes lived in three files and none of them knew the
+ * heist: HEIST, SKUNK INCIDENT, WOLF MOON, TRUFFLE and DAIRY lines were
+ * logged and never shown or counted (found by the predation research,
+ * 2026-09-02). A new event line adds its prefix here and nowhere else.
+ */
+export const TICKER_BAD = /^(FIRE|FLOOD|TORNADO|TAX REVOLT|RECESSION|RECEIVERSHIP|A SMOG|HEIST)/;
+export const TICKER_GOOD = /^(MILESTONE|BOOM|FOUNDERS|COUNTY|FOX|RABBIT|MOUSE|TRUFFLE|DAIRY)/;
+export const TICKER_FLASH = /^(MILESTONE|FIRE|FLOOD|TORNADO|TAX REVOLT|RECESSION|BOOM|FOUNDERS|COUNTY|BEAR|RECEIVERSHIP|The Gnawleys|A SMOG|MOUSE|RABBIT|FOX|The Scrubbers|HEIST|SKUNK INCIDENT|WOLF MOON|TRUFFLE|DAIRY)|ONE HUNDRED/;
+
 /** Resolve the choice card. */
 export function resolveChoice(world, accept) {
   const ch = world.events.choice;

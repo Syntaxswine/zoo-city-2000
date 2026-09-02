@@ -11,7 +11,7 @@
 
 import { ZONE, CIVIC, TERRAIN, ROAD, ZONE_NAME } from "./sim/world.js";
 import { dateOf, characterLine } from "./sim/tick.js";
-import { eventTitle } from "./sim/events.js";
+import { eventTitle, TICKER_BAD, TICKER_GOOD, TICKER_FLASH } from "./sim/events.js";
 import { lotReport, REASON } from "./sim/lots.js";
 import { RULES, KNOBS } from "./sim/rules.js";
 import { yearlyFigures } from "./sim/budget.js";
@@ -521,8 +521,8 @@ export function createUI(app) {
     for (const l of logLines.slice(-120).reverse()) {
       const li = el("li");
       li.append(el("span", "dim", `${l.label} `), l.text);
-      if (/^(FIRE|FLOOD|TORNADO|TAX REVOLT|RECESSION|RECEIVERSHIP|A SMOG)/.test(l.text)) li.classList.add("bad");
-      else if (/^(MILESTONE|BOOM|FOUNDERS|COUNTY|FOX|RABBIT|MOUSE)/.test(l.text)) li.classList.add("good");
+      if (TICKER_BAD.test(l.text)) li.classList.add("bad");
+      else if (TICKER_GOOD.test(l.text)) li.classList.add("good");
       ul.append(li);
     }
     body.append(ul);
@@ -533,7 +533,7 @@ export function createUI(app) {
     const label = dateOf(w, w.tick - 1).label;
     for (const n of notices) {
       logLines.push({ t: w.tick - 1, label, text: n });
-      if (/^(MILESTONE|FIRE|FLOOD|TORNADO|TAX REVOLT|RECESSION|BOOM|FOUNDERS|COUNTY|BEAR|RECEIVERSHIP|The Gnawleys|A SMOG|MOUSE|RABBIT|FOX|The Scrubbers)/.test(n) || /ONE HUNDRED/.test(n)) flash(n);
+      if (TICKER_FLASH.test(n)) flash(n);
     }
     if (logLines.length > 400) logLines = logLines.slice(-300);
     refresh();

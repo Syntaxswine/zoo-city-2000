@@ -12,6 +12,7 @@
 
 import { createWorld, ZONE, TERRAIN, idx, inBounds } from "../js/sim/world.js";
 import { tick } from "../js/sim/tick.js";
+import { TICKER_FLASH } from "../js/sim/events.js";
 import { apply } from "../js/sim/ops.js";
 import { lotScore } from "../js/sim/lots.js";
 import { KNOBS } from "../js/sim/rules.js";
@@ -25,7 +26,7 @@ const flag = (k) => argv.includes(k);
 const seed = arg("--seed", "7");
 const years = Number(arg("--years", 30));
 const layout = arg("--layout", "balanced");
-const rates = arg("--rates", "8,8,8").split(",").map(Number);
+const rates = ((r) => (r.length === 1 ? [r[0], r[0], r[0]] : r))(arg("--rates", "8,8,8").split(",").map(Number)); // one number = all three
 const schedule = (arg("--schedule", "") || "").split(",").filter(Boolean).map((s) => s.split(":").map(Number));
 const recessionYear = arg("--recession", null);
 const parksWanted = Number(arg("--parks", 0));
@@ -146,7 +147,7 @@ for (let t = 0; t < totalTicks; t++) {
   const t0 = performance.now();
   const { notices } = tick(world);
   tickMs.push(performance.now() - t0);
-  if (!quiet) for (const s of notices) if (/^(FIRE|FLOOD|TORNADO|BOOM|RECESSION|TAX REVOLT|MILESTONE|RECEIVERSHIP|FOUNDERS|MOUSE|RABBIT|BEAR|COUNTY|FOX|The Gnawleys|A SMOG)/.test(s)) console.log(`  ${t}: ${s}`);
+  if (!quiet) for (const s of notices) if (TICKER_FLASH.test(s)) console.log(`  ${t}: ${s}`);
   const cen = world.last.census;
   // First printed number (SPEC §17): fraction of zoned lots whose local term alone forbids growth at V = +0.1.
   if (firstLocalReport === null && t === 12) {

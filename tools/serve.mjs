@@ -11,7 +11,7 @@ import { fileURLToPath } from "node:url";
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const argv = process.argv.slice(2);
 const pi = argv.indexOf("--port");
-const PORT = pi >= 0 ? Number(argv[pi + 1]) : 8139;
+const PORT = pi >= 0 ? Number(argv[pi + 1]) : Number(process.env.PORT) || 8139; // --port, else PORT env (the preview pane assigns one), else 8139
 
 const MIME = {
   ".html": "text/html; charset=utf-8",

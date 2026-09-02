@@ -4,8 +4,11 @@
     {
       "name": "zoo-city-2000",
       "runtimeExecutable": "node",
-      "runtimeArgs": ["tools/serve.mjs"],
-      "port": 8139
+      "runtimeArgs": [
+        "tools/serve.mjs"
+      ],
+      "port": 8139,
+      "autoPort": true
     }
   ]
 }
