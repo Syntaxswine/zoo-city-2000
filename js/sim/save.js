@@ -10,6 +10,7 @@ import { createWorld } from "./world.js";
 import { makeRng } from "./rng.js";
 import { computeFields, recountRosters, roadPath, doorOf } from "./fields.js";
 import { rebuildMaps } from "./citizens.js";
+import { refreshLast } from "./tick.js";
 
 const TILE_ARRAYS = ["terrain", "road", "zone", "maxTier", "tier", "civic", "burning", "rubble", "variant", "flooded"];
 
@@ -93,7 +94,9 @@ export function rebuildDerived(world) {
     c.path = a != null && b != null ? roadPath(world, a, b) : null;
   }
   computeFields(world);
-  world.last = null;
+  // A loaded city reads complete at once (the play-tester saw placeholders
+  // in the header until the first tick).
+  refreshLast(world);
 }
 
 /** FNV-1a over the canonical state (everything but the input log and history). */

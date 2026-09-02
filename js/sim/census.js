@@ -93,7 +93,8 @@ export function census(world) {
   // predator–prey link counting PREDPREY_WEIGHT times (the wolf and the rabbit).
   const wCross = cross + (KNOBS.PREDPREY_WEIGHT - 1) * predPrey;
   const wAll = friendships + (KNOBS.PREDPREY_WEIGHT - 1) * predPrey;
-  const H = wAll ? wCross / wAll : 0;
+  // A sample of one is not an index: H fades in over the first H_FLOOR friendships.
+  const H = wAll ? (wCross / wAll) * Math.min(1, friendships / KNOBS.H_FLOOR) : 0;
   return {
     P, W, J, Jc, Ji, F, U, Lab,
     counts, shares, speciesPresent,

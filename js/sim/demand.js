@@ -35,6 +35,21 @@ export function capacityLaw(world, c) {
   return (KNOBS.CAP_BASE + KNOBS.CAP_PARK * c.parks + KNOBS.CAP_ZOO * c.zoos + world.festivalBonus) * (1 + KNOBS.CAP_H_GAIN * c.H);
 }
 
+/** The breakdown for the current state WITHOUT advancing the valves (a loaded city, a rate change while paused). */
+export function peekDemand(world, c) {
+  const { P, W, J, Jc, Lab } = c;
+  const n = neutralRate(P);
+  const ext = externalMarket(world, c);
+  const r = {
+    R: clamp((J + KNOBS.JOB_SEED - W) / Math.max(W, KNOBS.JOB_SEED), -1, 1),
+    C: clamp((KNOBS.C_PER_CITIZEN * P + KNOBS.C_SEED - Jc) / Math.max(Jc, 40) + 0.5 * Math.min(0, (J ? W / J : 1) - 1), -1, 1),
+    I: clamp((ext * KNOBS.I_EXT_GAIN * Lab - 1) * 2, -1, 1),
+  };
+  const T = { R: taxTerm(world.rates.R, n), C: taxTerm(world.rates.C, n), I: taxTerm(world.rates.I, n) };
+  const cap = capacityLaw(world, c);
+  return { n, ext, r, T, cap, capped: world.valves.R >= 1 - P / cap - 1e-9, boost: { R: 0, C: 0, I: 0 } };
+}
+
 /** Compute the demand breakdown and advance the valves in place. */
 export function updateDemand(world, c) {
   const { P, W, J, Jc, Lab } = c;

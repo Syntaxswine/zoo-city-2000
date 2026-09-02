@@ -64,6 +64,8 @@ export function createWorld({ seed = "zoo", w = 64, h = 64 } = {}) {
     rng: makeRng(seedNum ^ 0x5a17),
     rngNames: makeRng(seedNum ^ 0x9e37),
     last: null,
+    byId: new Map(),
+    hhById: new Map(),
   };
   for (let i = 0; i < n; i++) world.variant[i] = Math.floor(hash01(i % w, (i / w) | 0, seedNum) * 256);
   generateTerrain(world);

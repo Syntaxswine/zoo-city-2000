@@ -90,6 +90,7 @@ export const KNOBS = {
   FUNERAL_P: 0.5,
   PREY_FLIGHT: 10,          // mood lost per predator species next door without a bridging friend
   PREDPREY_WEIGHT: 2,       // a predator–prey friendship counts twice in H
+  H_FLOOR: 20,              // H fades in over the first 20 friendships (a sample of one is not an index)
   JOB_SEARCHES: 64,
   CAMPERS_MAX: 8,
   CAMPER_TICKS: 3,
@@ -154,7 +155,7 @@ export const RULES = Object.freeze([
   },
   {
     id: "D5", title: "The cap: a city can only hold so many until it mixes",
-    formula: "Cap = (1200 + 150·parks + 500·zoos + festival) · (1 + 0.5·H) ;  V_R ≤ 1 − P/Cap",
+    formula: "Cap = (1200 + 150·parks + 500·zoos + festival) · (1 + 0.5·H) ;  V_R ≤ 1 − P/Cap ;  H fades in over the first 20 friendships",
     live: (w) => `Cap = (1200 + 150·${w.last.census.parks} + 500·${w.last.census.zoos} + ${w.festivalBonus}) · (1 + 0.5·${f2(w.last.census.H)}) = ${Math.round(w.last.demand.cap)} ; P ${w.last.census.P}`,
   },
   {

@@ -3,7 +3,8 @@
 import { KNOBS } from "./rules.js";
 import { computeFields, recountRosters } from "./fields.js";
 import { census } from "./census.js";
-import { updateDemand, neutralRate } from "./demand.js";
+import { updateDemand, peekDemand, neutralRate } from "./demand.js";
+import { yearlyFigures } from "./budget.js";
 import { lotsTick } from "./lots.js";
 import { citizensTick, compact } from "./citizens.js";
 import { budgetTick } from "./budget.js";
@@ -62,8 +63,28 @@ export function tick(world) {
   }
   const ms = milestone(world, cen);
   if (ms) notices.push(ms);
+  // Every line the ticker shows goes into the log too, so a loaded city can
+  // show its own history (rolled events already logged themselves).
+  for (const line of notices) if (!evNotices.includes(line)) world.events.log.push({ t: world.tick, id: "notice", line });
+  if (world.events.log.length > 400) world.events.log.splice(0, world.events.log.length - 400);
   world.tick++;
   return { notices, events: evNotices };
+}
+
+/**
+ * Rebuild `world.last` from the current state without ticking (after a
+ * load, or after a rate change while paused) so the panel never shows
+ * placeholders. Valves are not advanced; counts are current.
+ */
+export function refreshLast(world) {
+  computeFields(world);
+  recountRosters(world);
+  const cen = census(world);
+  const dem = peekDemand(world, cen);
+  const fig = yearlyFigures(world);
+  const prev = world.last || {};
+  world.last = { census: cen, demand: dem, budget: fig, grew: prev.grew || 0, decayed: prev.decayed || 0, arrived: prev.arrived || 0, left: prev.left || 0, births: prev.births || 0, deaths: prev.deaths || 0, funerals: prev.funerals || 0 };
+  return world.last;
 }
 
 function milestone(world, cen) {

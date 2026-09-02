@@ -10,6 +10,7 @@ import { TERRAIN, ROAD, ZONE, CIVIC, idx, inBounds } from "./world.js";
 import { post, canSpend } from "./budget.js";
 import { clearLot, invalidatePaths } from "./citizens.js";
 import { resolveChoice } from "./events.js";
+import { refreshLast } from "./tick.js";
 
 const C = KNOBS.COST;
 
@@ -29,6 +30,8 @@ const isBuilt = (world, i) => world.tier[i] > 0 || world.burning[i] || world.rub
 export function costOf(world, op) {
   const tiles = [];
   let cost = 0;
+  let replaced = 0;
+  let evicts = 0;
   const add = (i, c, what) => { tiles.push({ i, cost: c, what }); cost += c; };
   switch (op.kind) {
     case "zone": {
@@ -50,6 +53,7 @@ export function costOf(world, op) {
         let c = world.terrain[i] === TERRAIN.WATER ? C.bridge : C.road;
         if (world.terrain[i] === TERRAIN.TREE) c += C.bulldozeTree;
         add(i, c, world.terrain[i] === TERRAIN.WATER ? "bridge" : "road");
+        if (world.zone[i]) replaced++; // an empty zoned lot under the road: the strip says so
       }
       break;
     }
@@ -58,7 +62,7 @@ export function costOf(world, op) {
         if (world.terrain[i] === TERRAIN.WATER && !world.road[i]) continue;
         if (world.road[i]) { add(i, C.bulldoze, "road"); continue; }
         if (world.civic[i]) { add(i, C.bulldoze, "civic"); continue; }
-        if (isBuilt(world, i)) { add(i, C.bulldoze, "building"); continue; }
+        if (isBuilt(world, i)) { add(i, C.bulldoze, "building"); if (world.occupants[i] || world.staff[i]) evicts++; continue; }
         if (world.zone[i]) { add(i, 0, "unzone"); continue; }
         if (world.terrain[i] === TERRAIN.TREE) { add(i, C.bulldozeTree, "tree"); continue; }
       }
@@ -91,7 +95,10 @@ export function costOf(world, op) {
     default:
       return { cost: 0, tiles };
   }
-  return { cost, tiles };
+  // `replaced`: empty zoned lots a road will take (no refund; the chalk was
+  // a few §). `evicts`: built lots with animals in them; a bulldoze that
+  // displaces citizens is NOT undoable (undo restores tiles, never people).
+  return { cost, tiles, replaced, evicts };
 }
 
 function snapshot(world, tiles) {
@@ -110,6 +117,7 @@ export function apply(world, op, { log = true } = {}) {
     if (!["R", "C", "I"].includes(op.zone)) return { ok: false, cost: 0, reason: "bad zone" };
     world.rates[op.zone] = v;
     if (log) world.log.push({ t: world.tick, op: { kind: "rate", zone: op.zone, value: v } });
+    if (world.last) refreshLast(world); // the Budget tab follows the stepper at once
     return { ok: true, cost: 0 };
   }
   if (op.kind === "toggle") {
@@ -169,9 +177,9 @@ export function apply(world, op, { log = true } = {}) {
   }
   if (roads) { world.roadsDirty = true; invalidatePaths(world); }
   post(world, "build", -plan.cost);
-  world.undoStack = [{ op, snap, cost: plan.cost, roads, t: world.tick }];
+  world.undoStack = plan.evicts ? [] : [{ op, snap, cost: plan.cost, roads, t: world.tick }];
   if (log) world.log.push({ t: world.tick, op: stripOp(op) });
-  return { ok: true, cost: plan.cost };
+  return { ok: true, cost: plan.cost, replaced: plan.replaced, evicts: plan.evicts, undoable: !plan.evicts };
 }
 
 function removeCivic(world, i) {
