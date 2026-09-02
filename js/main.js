@@ -80,7 +80,13 @@ function adopt(world, name, { paused = false } = {}) {
   if (app.walkers) app.walkers.setWorld(world);
   if (app.input) app.input.unpin();
   if (app.ui) app.ui.setWorld();
-  centreOn(world.start.tx, world.start.ty);
+  // The start road is an EDGE road by design, so centring on it puts half a
+  // screen of void on the map side of nothing. Look 6 tiles inward from the
+  // stub toward the middle of the map: the road stays in view, the ground
+  // the mayor will zone fills the rest.
+  const inX = Math.sign(world.w / 2 - world.start.tx);
+  const inY = Math.sign(world.h / 2 - world.start.ty);
+  centreOn(world.start.tx + 6 * inX, world.start.ty + 6 * inY);
   if (app.walkers) app.walkers.notify();
   if (world.events.choice) { app.paused = true; app.ui.showChoice(); }
   store.set(LAST, name);

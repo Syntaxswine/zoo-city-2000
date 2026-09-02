@@ -4,6 +4,28 @@ Open work, ranked. The design record is `SPEC.md`; the numbers are in
 `js/sim/rules.js` (KNOBS). Later layers were labelled at design time so v1
 could ship whole.
 
+## Polish the play-testers named (browser rounds 1–3), not yet done
+- WHY NOT line should carry the tax parenthetical from SPEC §11
+  ("demand −0.24 (R 12% vs neutral 8.2%)") and use the same rounded `local`
+  as the score line (two sources today).
+- A maxed tier-3 lot says "WHY NOT: —"; SPEC lists "capacity reached — build
+  a park or a Zoo" for the CAPPED case only; decide whether a full lot
+  should say "full".
+- `.` faster while paused silently resumes; the pause button label does not
+  change with state.
+- A park placed up-left of a tower is hidden behind it (correct iso order);
+  a hover-only cue is thin — consider a park glyph in the overlay or a
+  minimap.
+- The opening camera shows the map edge (the start road is an edge road by
+  design); centre the view so the void is not half the screen.
+- A zoo costs §1,500/yr — warn on placement in a small town (net/yr goes
+  negative at once).
+- A loaded city always opens paused; players who reload a running ×3 game
+  must press Space.
+- Hover-card parts do not sum to the printed total (rounding).
+- Species art: the five new species arrive once their kit sprites exist
+  (`ARRIVING` in species.js).
+
 ## L1 — cheap, visible, next
 - **Road rot** (cash < 0 for 6 ticks → 5% of roads/tick to rubble) — the
   budget needs a bite besides receivership.
