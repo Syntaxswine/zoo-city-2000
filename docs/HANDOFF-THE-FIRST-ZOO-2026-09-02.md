@@ -329,6 +329,69 @@ you would SEE.
 - *"just a quick nudge, i'd like fire departments to make fires not impossible, but statistically unlikely when there is a fire department nearby."* → `FIRE_START_COVERED 1/6`.
 - *"lets also think about adding more specialized 3x3 tile sprites for some special themed buildings.  things like themed commercial shops, an industrial dairy, or a residential apartment building."* → `docs/PROPOSAL-LANDMARKS.md`; not started.
 - *"lets write a handoff when you are done.  this is your chance to leave your keystone"* → this file.
+- *"lets think about how we can add predation to the game as part of crime.  perhaps with a custom zoned commercial space for grey market meat markets.  herbavores do not like living near meat markets, it should have a similar negative devaluing as industrial, but perhaps even stronger."* → zone M, dread at 2× a works, the killing; `docs/PROPOSAL-CRIME-AND-PUNISHMENT.md` Part I.
+- *"for the crime and punishment section, lets add a pacification center.  a place where troublesome predators can be fixed so they are no longer a threat to prey species.  fixed animals cannot have offspring and are no longer interested in attacking prey.  prey can also be pacified if they are caught in a crime.  and just to make things a little more realistic, lets add a 5% chance that the police arrest the wrong person."* → the file, the arrest, the centre, `fixed`; Part II.
+- *"one design change to crime and punishment, since pacification is a one time process, multiple offenses should send the citizen to the meat market.  that might also be a better first stop for prey who commit crimes.  1. crime should be weighted by unemployment, no jobs means hungry wolves.  2. no, random based on proximity.  i think it should be possible for prey to murder too, but just much less likely.  3. yes"* → the sentence table (predator → centre once; prey or the fixed → sold at the hall); the killing weighted by unemployment ×20 and by diet (herbivores 0.03); the wrongful pool by proximity; a fixed wolf keeps the counter. See §10.
+
+## 10. Session 3 — crime and punishment (2026-09-02, later; SPEC §9c)
+
+**What shipped, in one paragraph.** A fourth zone, M (meat halls: stall /
+meat hall / cold store), on its own carnivore-keyed valve, with a DREAD
+field at exactly twice a works' LV shadow that herbivores read (mood, home
+score, a rehome rule) and carnivores do not; a hall is a crime hill, pays
+an untaxed cut, can be licensed (a deterministic card), raided, and
+marched on. THE KILLING (`justice.js`): any adult may kill a neighbour,
+weighted by diet (carn 1 / omni 0.1 / herb 0.03), unemployment ×20, a
+hall's smell ×3, hall staff ×2, crime at home; the victim is the killer's
+prey ×1 or anyone ×0.1, a friendship ×0.1; the wake befriends the mourners.
+Every incident (a killing, the heist — now any adult, weighted — a
+burglary, a raid) opens a FILE; police cover is the monthly arrest
+probability; 5% of arrests take the wrong animal by proximity; the
+SENTENCE is the owner's table (a predator's first conviction → the
+pacification centre, six months, home FIXED; prey or the already-fixed →
+sold at the hall; else the cells); `fixed` is one saved boolean read by
+five rules; EXONERATION pays §500 when the real one is taken. Fourteen
+files, one new module, 67 checks.
+
+**New laws (the suite enforces them).** `absent(world, c)` (world.js) is
+the ONE custody predicate — isWorker, computeCrime's inline copy (the
+two worker predicates are checked against each other), prey flight,
+births, walkers and every pool read it. `releaseJob(world, c)` is the ONE
+job release (retirement, decay, bulldoze, custody — retirement used to
+leave `hired` stale). `events.files` is the one incident list: the crime
+stain, the investigation and the overlay ring are all the same struct.
+Ticker prefixes live only in `events.js` `TICKER_*`. No pronoun in any
+line (the sim has no sex field; the suite greps the log). Every named
+culprit is an adult (the old `robbers()` could name a cub).
+
+**Traps this session, keyed by what you see:**
+
+| you see | it is | do |
+|---|---|---|
+| the suite's dread check reports `halls 0` | the scripted city's M row burned in a year-7 fire (disasters are on in `buildCity`) — rubble carries no dread | measure field invariants on a clone with the tiers FORCED (the check does), never on the city's history |
+| a forced killing empties the town, then `wrongful 0` | `KNOBS.KILL_P = 1` makes `k = floor(Σ + r)` ≈ Σ killings — every adult a killer; the arrest then finds no neighbour to wrong | force exactly ONE: `KILL_P = 1 / killTotal(world)` (exported for this) |
+| `held 0` after a forced conviction | the target was prey, or already fixed, and a hall stood → SOLD, not taken in | the sentence table is doing its job; loop the forcing until a bed fills (the check does) |
+| COLD lines every month | burglary files closing — a 150-animal town with a hot R block and a station made six a year at `BURGLARY_P 0.02` | 0.006 now, and only a killing's file prints COLD |
+| the M lots read NO_DEMAND from year 6 | `V_M` goes negative once ~72 M jobs stand (rM caps at 0.06·carnivores + 10) — by design, the legible cap | more carnivores, not more halls |
+| `--rates 8` / the print regex / a cub named as a thief | three instrument faults the panels found on the way (944e507, def96dc) | — |
+| the baseline hash moved (a9b2665b → d19d6969 on seed 7) | the killing draws once a month wherever an adult lives, and the demographics move with it (seed 7's cap rose 1939 → 2215: a second Founders' festival fired) | the no-market byte-equality gate is retired; 67 checks are the gate; re-baseline on a sim bump |
+
+**The numbers (30 years, rates 8, disasters off; `playtest --markets 2 --stations --pacify`):**
+
+| rig (seed 7 · 3 · 5) | killings | arrests (wrongful) | fixed · sold | halls (jobs) | herbivores in the smell | cash y30 |
+|---|---|---|---|---|---|---|
+| no hall, no station | 7 · 4 · 3 | 1 · 0 · 0 | — | — | — | 86k · 105k · 105k |
+| two hall blocks | 13 · 5 · 16 | 1 · 0 · 2 (0 · 0 · 1) | 0 · 0 · 0 / 0 · 0 · 1 | 16 · 11 · 16 (71 · 64 · 68) | 18 · 3 · 6 | 78k · 135k · 112k |
+| + a police station, a fire station, a centre | 11 · 8 · 14 | 9 · 6 · 7 (0) | 1 · 3 · 2 / 4 · 2 · 2 | 15 · 19 · 14 | 19 · 5 · 0 | 21k · 34k · 54k |
+| stations + centre, no hall | 7 · 6 · 6 | 4 · 4 · 8 (0 · 0 · 1) | 3 · 1 · 7 / 0 | — | — | 17k · 36k · 40k |
+| a jobless dormitory of 80 (20 y) | 3 | 0 | — | — | — | −2k |
+
+Population never moves with any of it (cap-pinned). The cut runs ≈ §1.4k/yr
+for two blocks; a centre and two stations cost §1.7k/yr; the crater on the
+R tax is the rest of the gap. Tick 6–7 ms at 1,700.
+
+**Where to go next** is the top of `BACKLOG.md` (hunger visibility, the
+5%'s visibility, customer walkers, supply from funerals, the abattoir).
 
 ## 9. Verification recipe (what "done" looks like here)
 

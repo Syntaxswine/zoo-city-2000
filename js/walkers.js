@@ -429,6 +429,7 @@ export function createWalkers(initialWorld) {
       cursor = (cursor + 1) % cs.length;
       const c = cs[cursor];
       if (c.dead || c.home < 0 || activeIds.has(c.id)) continue;
+      if ((c.held || 0) > world.tick) continue; // in the cells or the centre
       if (winter && c.species === "bear") continue;
       if (!inView(c.home, vp)) continue;
       const r = hash01(world.tick, c.id, 0x77);

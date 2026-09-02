@@ -13,7 +13,9 @@ import { post } from "./budget.js";
 import { removeHousehold, evictFromLot, fireFromLot, invalidatePaths } from "./citizens.js";
 import { neutralRate } from "./demand.js";
 import { ageYears } from "./census.js";
-import { SPECIES_BY_ID } from "./species.js";
+import { SPECIES_BY_ID, SPECIES } from "./species.js";
+import { thiefPool, openFile } from "./justice.js";
+import { hasAccess } from "./fields.js";
 
 const DISASTER = "disaster";
 const BOON = "boon";
@@ -224,14 +226,18 @@ export const ROSTER = [
   },
   {
     id: "heist", kind: DISASTER, weight: () => 3,
-    gate: (w, c) => robbable(w).length > 0 && robbers(w).length > 0,
+    gate: (w, c) => robbable(w).length > 0,
     fire: (w) => {
       const lot = w.rng.pick(robbable(w));
-      const thief = w.rng.pick(robbers(w));
+      // Any adult within reach, weighted (unemployed ×3, a hot home ×2, fox/raccoon/cat ×2, a record ×2) — never a species gate.
+      const thief = thiefPool(w, lot);
+      if (!thief) return null;
       const loss = 100 * w.tier[lot];
       post(w, "heist", -Math.min(loss, Math.max(0, w.cash)));
       lowerTier(w, lot);
-      return `HEIST — ${thief.name} ${thief.surname} (${thief.species}) cleaned out the shop at (${lot % w.w},${(lot / w.w) | 0}): −§${loss}, a storey gone. A police station covers six tiles.`;
+      const line = `HEIST — ${thief.name} ${thief.surname} (${thief.species}) cleaned out the shop at (${lot % w.w},${(lot / w.w) | 0}): −§${loss}, a storey gone. A file is open for six months.`;
+      openFile(w, { tile: lot, culpritId: thief.id, cause: "heist", line });
+      return line;
     },
   },
   {
@@ -260,6 +266,36 @@ export const ROSTER = [
     fire: (w) => { post(w, "grant", 5000); w.events.lastGrant = w.tick; return `COUNTY GRANT — a liked but poor mayor gets §5,000.`; },
   },
   {
+    // The raid: the police working, so a BOON kind — the No-disasters toggle must not mask it.
+    id: "raid", kind: BOON, weight: () => 3,
+    gate: (w) => !w.events.licence && w.tick - (w.events.lastRaid ?? -100000) >= 24 && raidable(w).length > 0,
+    fire: (w) => {
+      const lot = w.rng.pick(raidable(w));
+      const tier = w.tier[lot];
+      // The last hired is named and sent home; a file opens on them.
+      let last = null;
+      for (const c of w.citizens) if (c.job === lot && !c.dead && (!last || c.hired > last.hired || (c.hired === last.hired && c.id > last.id))) last = c;
+      lowerTier(w, lot);
+      post(w, "fines", KNOBS.RAID_FINE * tier);
+      w.events.lastRaid = w.tick;
+      const who = last ? ` ${last.name} ${last.surname} (${last.species}) was seen leaving by the back.` : "";
+      const line = `RAID — the constables went through the meat hall at (${lot % w.w},${(lot / w.w) | 0}): a storey shut, §${KNOBS.RAID_FINE * tier} in fines.${who}`;
+      if (last && !last.dead) openFile(w, { tile: lot, culpritId: last.id, cause: "raid", line });
+      return line;
+    },
+  },
+  {
+    id: "greensLeague", kind: BOON, weight: () => 2, duration: 6, valveBoost: { C: -0.3 },
+    gate: (w, c) => c.markets >= 1 && herbShare(c) >= 0.40 && w.events.files.some((f) => f.cause === "killing" && f.until > w.tick),
+    fire: (w, c) => {
+      const top = SPECIES.filter((s) => s.diet === "herb").sort((a, b) => c.shares[b.id] - c.shares[a.id]).slice(0, 2);
+      const names = top.map((s) => `the ${SURNAME_OF[s.id]}s`).join(" and ");
+      const hall = firstHall(w);
+      w.events.active.push({ id: "greensMood", until: w.tick + 6, moodBySpecies: Object.fromEntries(SPECIES.filter((s) => s.diet === "herb").map((s) => [s.id, 5])) });
+      return `THE GREENS' LEAGUE — ${names} marched on the meat hall at (${hall % w.w},${(hall / w.w) | 0}) with placards. Shops lose custom for six months; the marchers are in fine spirits.`;
+    },
+  },
+  {
     id: "scrubbers", kind: BOON, weight: () => 2, choice: true,
     gate: (w, c) => !w.events.scrubbers && countI(w) >= 15 && !w.events.choice,
     fire: (w) => {
@@ -279,10 +315,21 @@ function robbable(w) {
   for (let i = 0; i < w.w * w.h; i++) if (w.zone[i] === ZONE.C && w.tier[i] > 0 && w.crime[i] > KNOBS.HEIST_CRIME) out.push(i);
   return out;
 }
-function robbers(w) {
-  // Adults only (61 of 289 fox/raccoon/cat at seed 7 y30 are cubs — the punishment panel's find).
-  return w.citizens.filter((c) => !c.dead && ageYears(w, c) >= KNOBS.ADULT_AGE && (c.species === "fox" || c.species === "raccoon" || c.species === "cat"));
+function raidable(w) {
+  const out = [];
+  for (let i = 0; i < w.w * w.h; i++) if (w.zone[i] === ZONE.M && w.tier[i] > 0 && w.policeCov[i] > 0 && w.crime[i] > KNOBS.RAID_CRIME && w.staff[i] > 0) out.push(i);
+  return out;
 }
+function firstHall(w) {
+  for (let i = 0; i < w.w * w.h; i++) if (w.zone[i] === ZONE.M && w.tier[i] > 0) return i;
+  return 0;
+}
+function herbShare(c) {
+  let s = 0;
+  for (const sp of SPECIES) if (sp.diet === "herb") s += c.shares[sp.id] || 0;
+  return s;
+}
+const SURNAME_OF = { rabbit: "Burrowes", mouse: "Whiskerton", beaver: "Gnawley", tortoise: "Shelby", pig: "Trotter", cow: "Cudworth" };
 function hasCTier(w, t) {
   for (let i = 0; i < w.w * w.h; i++) if (w.zone[i] === ZONE.C && w.tier[i] >= t) return true;
   return false;
@@ -301,6 +348,8 @@ export const EVENT_TITLES = Object.freeze({
   festivalMood: "Founders' festival (the mood)", grant: "County grant", scrubbers: "Scrubbers", truffles: "Truffle season",
   dairyFair: "Dairy fair", wolfMoon: "Wolf moon", bearWinter: "Bear winter", notice: "Notice",
   heist: "Heist", skunked: "Skunk incident", skunkedMood: "Skunk incident (the sulk)",
+  killing: "Killing", fear: "Killing (the fear)", burglary: "Burglary", arrest: "Arrest", cold: "File closed cold", home: "Home from the centre", released: "Released from the cells",
+  exonerated: "Exonerated", namedMood: "Exonerated (the town)", raid: "Raid", greensLeague: "The Greens' League", greensMood: "The Greens' League (the march)", licence: "The Butchers' licence",
 });
 export const eventTitle = (id) => EVENT_TITLES[id] || id;
 
@@ -311,9 +360,9 @@ export const eventTitle = (id) => EVENT_TITLES[id] || id;
  * logged and never shown or counted (found by the predation research,
  * 2026-09-02). A new event line adds its prefix here and nowhere else.
  */
-export const TICKER_BAD = /^(FIRE|FLOOD|TORNADO|TAX REVOLT|RECESSION|RECEIVERSHIP|A SMOG|HEIST)/;
-export const TICKER_GOOD = /^(MILESTONE|BOOM|FOUNDERS|COUNTY|FOX|RABBIT|MOUSE|TRUFFLE|DAIRY)/;
-export const TICKER_FLASH = /^(MILESTONE|FIRE|FLOOD|TORNADO|TAX REVOLT|RECESSION|BOOM|FOUNDERS|COUNTY|BEAR|RECEIVERSHIP|The Gnawleys|A SMOG|MOUSE|RABBIT|FOX|The Scrubbers|HEIST|SKUNK INCIDENT|WOLF MOON|TRUFFLE|DAIRY)|ONE HUNDRED/;
+export const TICKER_BAD = /^(FIRE|FLOOD|TORNADO|TAX REVOLT|RECESSION|RECEIVERSHIP|A SMOG|HEIST|KILLING|BURGLARY|SOLD|CELLS|TAKEN IN|RAID)/;
+export const TICKER_GOOD = /^(MILESTONE|BOOM|FOUNDERS|COUNTY|FOX|RABBIT|MOUSE|TRUFFLE|DAIRY|HOME|EXONERATED)/;
+export const TICKER_FLASH = /^(MILESTONE|FIRE|FLOOD|TORNADO|TAX REVOLT|RECESSION|BOOM|FOUNDERS|COUNTY|BEAR|RECEIVERSHIP|The Gnawleys|A SMOG|MOUSE|RABBIT|FOX|The Scrubbers|HEIST|SKUNK INCIDENT|WOLF MOON|TRUFFLE|DAIRY|KILLING|BURGLARY|SOLD|CELLS|TAKEN IN|HOME|RELEASED|EXONERATED|COLD|RAID|THE GREENS|The Butchers)|ONE HUNDRED/;
 
 /** Resolve the choice card. */
 export function resolveChoice(world, accept) {
@@ -324,6 +373,11 @@ export function resolveChoice(world, accept) {
     post(world, "scrubbers", -ch.cost);
     world.events.scrubbers = true;
     return "Scrubbers fitted. The air will clear.";
+  }
+  if (ch.id === "licence" && accept && world.cash >= ch.cost) {
+    post(world, "licence", -ch.cost);
+    world.events.licence = true;
+    return "The meat halls are licensed. An inspector in every one; the till pays tax.";
   }
   return accept ? "You cannot afford it." : "Declined.";
 }
@@ -382,6 +436,18 @@ export function eventsTick(world, cen, dem) {
       c.centenary = true;
       ev.centenaries.push({ tile: c.home, radius: 3, bonus: 8, name: `${c.name} ${c.surname}` });
       notices.push(`${c.name} ${c.surname} is ONE HUNDRED. A plaque goes up; the street is worth more for it.`);
+    }
+  }
+
+  // The Butchers' licence: offered DETERMINISTICALLY the month the first hall
+  // reaches tier 2 (a weight-2 roster card would arrive once per 15–40 years).
+  if (!ev.licence && !ev.choice && world.tick - (ev.lastLicenceOffer ?? -100000) >= 120) {
+    let hall2 = false;
+    for (let i = 0; i < n && !hall2; i++) if (world.zone[i] === ZONE.M && world.tier[i] >= 2 && hasAccess(world, i)) hall2 = true;
+    if (hall2) {
+      ev.lastLicenceOffer = world.tick;
+      ev.choice = { id: "licence", title: "The Butchers' Licence", text: `The Butchers' Guild has a licence on your desk: an inspector in every meat hall, §${KNOBS.LICENCE_COST} and §${KNOBS.UPKEEP_LICENCE} a year each. The till pays tax at the C rate; crime around the halls halves; the halls buy half as eagerly.`, cost: KNOBS.LICENCE_COST, accept: `Pay §${KNOBS.LICENCE_COST}`, decline: "Decline" };
+      notices.push("The Butchers' Licence is on your desk.");
     }
   }
 

@@ -27,7 +27,9 @@ import { tick } from "../js/sim/tick.js";
 import { apply, replay } from "../js/sim/ops.js";
 import { save, load, stateHash, toPlain } from "../js/sim/save.js";
 import { KNOBS } from "../js/sim/rules.js";
-import { doorOf, hasAccess } from "../js/sim/fields.js";
+import { doorOf, hasAccess, computeFields } from "../js/sim/fields.js";
+import { census } from "../js/sim/census.js";
+import { CIVIC } from "../js/sim/world.js";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const argv = process.argv.slice(2);
@@ -53,11 +55,15 @@ function buildCity(seed, years, { withSave = null } = {}) {
   apply(world, { kind: "road", tiles: ring.filter((i) => i >= 0) });
   apply(world, { kind: "zone", zone: ZONE.R, x0: sx - 3, y0: sy - 3, x1: sx, y1: sy + 3, density: 3 });
   apply(world, { kind: "zone", zone: ZONE.C, x0: sx + 1, y0: sy - 3, x1: sx + 3, y1: sy - 1, density: 3 });
-  apply(world, { kind: "zone", zone: ZONE.I, x0: sx + 1, y0: sy, x1: sx + 3, y1: sy + 3, density: 3 });
-  const grewWithAccess = { ok: true };
+  apply(world, { kind: "zone", zone: ZONE.I, x0: sx + 1, y0: sy, x1: sx + 3, y1: sy + 2, density: 3 });
+  // Zone M at t = 0 (a corner carved from the I block), and assert it, so the
+  // market invariants can never pass over an empty set (a later placement is seed-fragile: costOf skips built tiles).
+  const rM = apply(world, { kind: "zone", zone: ZONE.M, x0: sx + 1, y0: sy + 3, x1: sx + 3, y1: sy + 3, density: 3 });
+  const grewWithAccess = { ok: true, mZoned: rM.ok && rM.cost > 0 };
   let saved = null;
   for (let t = 0; t < years * 12; t++) {
     if (t === 36) apply(world, { kind: "park", tx: sx - 5, ty: sy - 5 });
+    if (t === 48) { apply(world, { kind: "police", tx: sx + 5, ty: sy - 5 }); apply(world, { kind: "centre", tx: sx - 5, ty: sy + 5 }); }
     if (t === 60) apply(world, { kind: "rate", zone: "R", value: 10 });
     if (t === 84) apply(world, { kind: "rate", zone: "R", value: 7 });
     if (t === 100) apply(world, { kind: "tree", x0: sx + 5, y0: sy + 5, x1: sx + 7, y1: sy + 7 });
@@ -67,7 +73,7 @@ function buildCity(seed, years, { withSave = null } = {}) {
     for (let i = 0; i < world.w * world.h; i++) if (world.tier[i] > before[i] && !hasAccess(world, i)) grewWithAccess.ok = false;
     if (withSave != null && t === withSave) saved = save(world);
   }
-  return { world, saved, grewWithAccess: grewWithAccess.ok };
+  return { world, saved, grewWithAccess: grewWithAccess.ok, mZoned: grewWithAccess.mZoned };
 }
 
 // ---- Part A -----------------------------------------------------------------
@@ -84,7 +90,7 @@ for (const v of Object.values(world.ledger)) sum += v;
 check("ledger conservation", world.cash === KNOBS.START_CASH + sum, `cash ${world.cash} vs ${KNOBS.START_CASH + sum}`);
 check("cash is an integer", Number.isInteger(world.cash));
 // valves
-for (const z of ["R", "C", "I"]) check(`valve ${z} bounded`, world.valves[z] >= -1 && world.valves[z] <= 1, String(world.valves[z]));
+for (const z of ["R", "C", "I", "M"]) check(`valve ${z} bounded`, world.valves[z] >= -1 && world.valves[z] <= 1, String(world.valves[z]));
 // NaN
 const plain = JSON.stringify(toPlain(world));
 check("no NaN in state", !/NaN|null(?=,"|\})/.test(plain.replace(/"(home|job|hired)":-1/g, "")) || !/NaN/.test(plain), "NaN found");
@@ -153,6 +159,126 @@ check("population grew", world.citizens.length > 100, `${world.citizens.length}`
 check("every lot that grew had road access", A.grewWithAccess);
 check("history has one row per year", world.history.length === YEARS, `${world.history.length}`);
 
+// ---- crime and punishment (docs/PROPOSAL-CRIME-AND-PUNISHMENT.md) ------------------
+function auditIds(w) {
+  const ids = new Set(w.citizens.map((c) => c.id));
+  let bad = 0;
+  for (const c of w.citizens) { if (c.dead) bad++; for (const f of c.friends) if (!ids.has(f)) bad++; }
+  const hhs = new Map(w.households.map((h) => [h.id, h]));
+  for (const c of w.citizens) { const h = hhs.get(c.household); if (!h || !h.members.includes(c.id) || h.home !== c.home) bad++; }
+  for (const h of w.households) for (const m of h.members) if (!ids.has(m)) bad++;
+  const occ = new Uint16Array(w.w * w.h);
+  const st = new Uint16Array(w.w * w.h);
+  for (const c of w.citizens) { if (c.home >= 0) occ[c.home]++; if (c.job >= 0) st[c.job]++; }
+  for (let i = 0; i < w.w * w.h; i++) { if (occ[i] !== w.occupants[i]) bad++; if (st[i] !== w.staff[i]) bad++; }
+  return bad;
+}
+{
+  check("M zoned in the scripted city", A.mZoned === true);
+  // Dread: on every built hall, nowhere beyond a hall's radius, gone when the halls go.
+  // Measured on a clone with the M row FORCED built (the scripted city's row
+  // burned in a year-7 fire on seed 7 — disasters are on — and rubble carries no dread).
+  const D = load(save(world));
+  let builtM = 0, dreadOnM = 0, dreadFar = 0;
+  const W = world.w;
+  const halls = [];
+  for (let i = 0; i < W * world.h; i++) if (D.zone[i] === ZONE.M) { D.rubble[i] = 0; D.burning[i] = 0; D.tier[i] = 2; halls.push(i); }
+  computeFields(D);
+  for (const i of halls) { builtM++; if (D.dread[i] > 0) dreadOnM++; }
+  for (let i = 0; i < W * world.h; i++) {
+    if (!D.dread[i]) continue;
+    let near = false;
+    for (const h of halls) if (Math.max(Math.abs((h % W) - (i % W)), Math.abs(((h / W) | 0) - ((i / W) | 0))) <= KNOBS.DREAD_RADIUS[D.tier[h]]) { near = true; break; }
+    if (!near) dreadFar++;
+  }
+  check("dread: on every built hall, nowhere beyond a hall's radius", builtM > 0 && dreadOnM === builtM && dreadFar === 0, `halls ${builtM} · with dread ${dreadOnM} · stray ${dreadFar}`);
+  const dreadPeak = Math.max(...halls.map((i) => D.dread[i]));
+  check("dread: a tier-2 hall reads 70 on its own tile", dreadPeak >= 70, `${dreadPeak}`);
+  for (const i of halls) { D.zone[i] = ZONE.NONE; D.tier[i] = 0; }
+  computeFields(D);
+  let stray = 0;
+  for (let i = 0; i < W * world.h; i++) if (D.dread[i]) stray++;
+  check("dread: zero with the halls unzoned", stray === 0, `${stray}`);
+  // The two copies of the worker predicate agree.
+  computeFields(world);
+  const cen = census(world);
+  check("computeCrime's W/U equal the census", world._crimeW === cen.W && world._crimeU === cen.U, `${world._crimeW}/${world._crimeU} vs ${cen.W}/${cen.U}`);
+  check("Jc + Ji + Jm === J", cen.Jc + cen.Ji + cen.Jm === cen.J, `${cen.Jc} + ${cen.Ji} + ${cen.Jm} vs ${cen.J}`);
+  // Forced killing, forced arrest, the wrongful 5%, the centre, a reload with a held and a fixed animal.
+  const mid = Math.floor((YEARS * 12) / 2);
+  const sx = world.start.tx, sy = world.start.ty;
+  const F = load(A.saved);
+  const { killTotal } = await import("../js/sim/justice.js");
+  const saveP = KNOBS.KILL_P;
+  KNOBS.KILL_P = 1 / killTotal(F); // exactly one killing this month (k = floor(1 + r))
+  tick(F);
+  KNOBS.KILL_P = saveP;
+  check("a forced month kills", F.events.killings > 0 && F.events.files.some((f) => f.cause === "killing"), `${F.events.killings}`);
+  check("the killed are gone (dangling-id law)", auditIds(F) === 0, `${auditIds(F)}`);
+  // A police station and a centre, then force the arrest and the wrongful branch.
+  const ci = (sy + 5) * F.w + (sx - 5);
+  const rc = F.civic[ci] === CIVIC.CENTRE ? { ok: true } : apply(F, { kind: "centre", tx: sx - 5, ty: sy + 5 });
+  check("a centre stands in the scripted city", rc.ok === true && F.civic[ci] === CIVIC.CENTRE, rc.reason || "");
+  // Force killing + arrest (the wrongful branch every time) until a conviction
+  // lands in the centre: a prey target is SOLD at the hall instead (the
+  // sentence table), so one round is not guaranteed to fill a bed.
+  const saveA = KNOBS.ARREST_BASE, saveW = KNOBS.WRONGFUL_P;
+  let rounds = 0;
+  while (F.events.justice.takenIn === 0 && rounds < 8) {
+    KNOBS.KILL_P = 1 / Math.max(1e-9, killTotal(F));
+    tick(F);
+    KNOBS.KILL_P = saveP;
+    KNOBS.ARREST_BASE = 1; KNOBS.WRONGFUL_P = 1;
+    tick(F);
+    KNOBS.ARREST_BASE = saveA; KNOBS.WRONGFUL_P = saveW;
+    rounds++;
+  }
+  const j = F.events.justice;
+  check("forced months convict, the wrong animal among them, and one lands in the centre", j.takenIn > 0 && j.wrongful > 0, `taken in ${j.takenIn} · cells ${j.cells} · sold ${j.sold} · wrongful ${j.wrongful} · rounds ${rounds}`);
+  let heldBad = 0, heldN = 0, bedsOver = 0;
+  const beds = new Map();
+  for (const c of F.citizens) {
+    if ((c.held || 0) > F.tick) { heldN++; if (c.job >= 0) heldBad++; if (c.heldAt >= 0) beds.set(c.heldAt, (beds.get(c.heldAt) || 0) + 1); }
+  }
+  for (const [i, n] of beds) if (F.civic[i] !== CIVIC.CENTRE || n > KNOBS.CENTRE_BEDS) bedsOver++;
+  check("held citizens hold no job; beds point at a centre and never exceed it", heldN > 0 && heldBad === 0 && bedsOver === 0, `held ${heldN} · with a job ${heldBad} · bad beds ${bedsOver}`);
+  check("the sold are gone (dangling-id law)", auditIds(F) === 0, `${auditIds(F)}`);
+  // Reload with a held animal, continue 24 ticks (the centre releases fixed on the way): hash-equal.
+  const G = load(save(F));
+  for (let t = 0; t < 24; t++) { tick(F); tick(G); }
+  check("save → load → 24 ticks with a held and a fixed animal hash-equals", stateHash(F) === stateHash(G), `${stateHash(F)} vs ${stateHash(G)}`);
+  const fixedN = F.citizens.filter((c) => c.fixed).length;
+  check("the centre fixes", fixedN > 0 && F.events.justice.pacified > 0, `fixed ${fixedN} · pacified ${F.events.justice.pacified}`);
+  // No cub to a household with fewer than two unfixed fertile adults — run a year and audit every birth.
+  const { SPECIES_BY_ID } = await import("../js/sim/species.js");
+  const { ageYears } = await import("../js/sim/census.js");
+  let badBirth = 0;
+  for (let t = 0; t < 12; t++) {
+    const before = new Set(F.citizens.map((c) => c.id));
+    tick(F);
+    for (const c of F.citizens) {
+      if (before.has(c.id) || !c.native || ageYears(F, c) > 0) continue; // a cub born this tick
+      const hh = F.households.find((h) => h.id === c.household);
+      if (!hh) { badBirth++; continue; }
+      let ok = 0;
+      for (const id of hh.members) { const m = F.citizens.find((x) => x.id === id); if (!m || m === c || m.fixed || (m.held || 0) > F.tick - 1) continue; const y = ageYears(F, m); const sp = SPECIES_BY_ID[m.species]; if (y >= sp.fertile[0] && y <= sp.fertile[1] + 0) ok++; }
+      if (ok < 2) badBirth++;
+    }
+  }
+  check("no cub to a household without two unfixed fertile adults", badBirth === 0, `${badBirth}`);
+  // Adults only, no pronoun: every named culprit and victim in the log is an adult; no he/she/his/her.
+  const pron = F.events.log.filter((l) => /\b(he|she|his|her|him)\b/i.test(l.line));
+  check("the ticker uses no pronoun", pron.length === 0, pron.slice(0, 2).map((l) => l.line).join(" | "));
+  // An old save without the new fields loads and ticks.
+  const plainOld = JSON.parse(save(world));
+  for (const c of plainOld.citizens) { delete c.held; delete c.heldAt; delete c.fixed; delete c.record; delete c.wrongful; delete c.wrongedBy; delete c.exonerated; delete c.moodPenalty; delete c.moodPenaltyUntil; }
+  delete plainOld.valves.M;
+  delete plainOld.events.files; delete plainOld.events.justice; delete plainOld.events.arrests; delete plainOld.events.killings;
+  let oldOk = true;
+  try { const O = load(JSON.stringify(plainOld)); tick(O); tick(O); } catch (e) { oldOk = false; }
+  check("an old save without the justice fields loads and ticks", oldOk);
+}
+
 // determinism: build twice
 const B = buildCity(SEED, YEARS);
 check("determinism: same seed + same inputs ⇒ same hash", stateHash(A.world) === stateHash(B.world), `${stateHash(A.world)} vs ${stateHash(B.world)}`);
@@ -168,6 +294,7 @@ check("determinism: same seed + same inputs ⇒ same hash", stateHash(A.world) =
   for (let t = mid + 1; t < YEARS * 12; t++) {
     if (t === 60) apply(loaded, { kind: "rate", zone: "R", value: 10 });
     if (t === 84) apply(loaded, { kind: "rate", zone: "R", value: 7 });
+    if (t === 48) { apply(loaded, { kind: "police", tx: sx + 5, ty: sy - 5 }); apply(loaded, { kind: "centre", tx: sx - 5, ty: sy + 5 }); }
     if (t === 100) apply(loaded, { kind: "tree", x0: sx + 5, y0: sy + 5, x1: sx + 7, y1: sy + 7 });
     if (t === 120) apply(loaded, { kind: "bulldoze", x0: sx + 1, y0: sy + 3, x1: sx + 1, y1: sy + 3 });
     tick(loaded);
@@ -316,6 +443,11 @@ if (existsSync(artIndex)) {
     return /undefined/.test(characterLine({ P: 100, shares }));
   }).map((sp) => sp.id);
   check("species: every roster row has a character-line noun", badLine.length === 0, badLine.join(", "));
+  const noDiet = SPECIES.filter((sp) => !["herb", "omni", "carn"].includes(sp.diet)).map((sp) => sp.id);
+  check("species: every roster row has a diet", noDiet.length === 0, noDiet.join(", "));
+  let artM = true;
+  try { art.chalk(4, false); art.chalk(4, true); for (const t of [1, 2, 3]) for (const v of [0, 1]) art.building(4, t, v); art.civic("centre"); } catch (e) { artM = false; }
+  check("art: zone M (chalk, three tiers) and the centre exist — the renderer, not the sim, gates a fourth zone", artM);
   console.log(`art: ${list.length} sprites audited · ${SPECIES.length} species checked`);
 } else {
   console.log("art: js/art/index.js not present yet — Part C skipped");

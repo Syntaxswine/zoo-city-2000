@@ -1,5 +1,20 @@
 # PROPOSAL — Crime and punishment: the meat market, the taking, the pacification centre
 
+> **BUILT, 2026-09-02 (later the same day).** The record of what shipped is
+> SPEC §9c; the code is `js/sim/justice.js` plus the seams the proposal
+> named. Deviations from the text below, all from the owner's rulings at the
+> end of this document: the staffed-hunter "taking" became **the killing**
+> (any adult, weighted by diet, unemployment ×20, a hall's smell ×3, hall
+> staff ×2, crime at home); **complaints were dropped**; the wrongful pool
+> is **random by proximity** (weight 1/(1 + d), no species term); the
+> **sentence table** sends a first-conviction predator to the centre, a prey
+> animal or anyone already fixed to the meat hall (sold); **a fixed wolf
+> keeps the counter**; burglary runs at 0.006 per hot lot (0.02 gave a
+> 150-animal town six a year); only a killing's file going cold prints a
+> line. The no-market byte-equality gate is retired — the killing draws
+> once a month wherever an adult lives — and the suite carries 20 new
+> checks instead (67 total).
+
 The owner (2026-09-02), two asks in one afternoon:
 
 > *"lets think about how we can add predation to the game as part of crime.
@@ -379,6 +394,52 @@ takings arrive.
 1. **Complaints.** Is a predator *troublesome* because prey next door fear it (arrestable on a complaint, one station away), or only when caught — a taking, a theft? With the first, one station gives ~0.5 arrests a year and the centre is a decision at year 10; with the second (`COMPLAINT_P = 0`) the centre fills once a decade and the 5% is a line most games never print.
 2. **The wrong animal.** Weighted toward the culprit's kind (×8; law-clean; now and then a rabbit is fixed for a wolf's crime, which is what "the wrong person" means), or the culprit's kind only (cleaner satire; prey are never pacified for a predator's taking; but a species deciding who can be arrested is a gate)?
 3. **The counter.** May a fixed wolf keep the hall job (deadpan; the hall takes less per fixed hand) or does *no longer a threat* mean off the hunter staff altogether?
+
+---
+
+## The owner's rulings (2026-09-02, later) — and what they change
+
+> *"one design change to crime and punishment, since pacification is a one
+> time process, multiple offenses should send the citizen to the meat
+> market. that might also be a better first stop for prey who commit
+> crimes."*
+> *"1. crime should be weighted by unemployment, no jobs means hungry
+> wolves."*
+> *"2. no, random based on proximity. i think it should be possible for
+> prey to murder too, but just much less likely."*
+> *"3. yes"*
+
+Applied, in order:
+
+- **The sentence table.** A first conviction sends a predator (carnivore or
+  omnivore) to the centre; a **prey** animal's first conviction sends it
+  to the **meat market** if the town has one (removed, cause `sold`; the
+  hall posts the sale to the cut), else to the centre. **Any fixed animal
+  convicted again goes to the meat market.** No market → the cells, as
+  before. Pacification is once; the market is the town's disposal for what
+  pacification could not fix.
+- **Hunger, not complaints.** The complaint channel is dropped. The crime
+  source is **the killing**: any adult may kill a neighbour, weighted —
+  carnivores ×1, omnivores ×0.1, herbivores ×0.03 (*"possible for prey to
+  murder too, but much less likely"*); **unemployed ×8** (*"no jobs means
+  hungry wolves"*); a meat market within the smell ×3 (a buyer); hall
+  staff ×2 (the knives); fixed ×0. Victims are adults within 3 of the
+  killer's home, the killer's prey ×1, anyone else ×0.1, a friendship
+  bridge ×0.1. Part I's staffed-hunter taking is replaced by this; the
+  hall's dread, crime hill, valve, cut and licence stand. The crime FIELD
+  also gains a local unemployment term (unemployed adults in the 3×3, hunters
+  double), beside the global one.
+- **The wrong animal is random by proximity.** Pool = adults within 4 of
+  the file, weight 1/(1 + d), no species weight at all. A rabbit can be
+  taken for a wolf's killing.
+- **A fixed wolf keeps the counter.**
+
+The numbers in Part II that rested on complaints (0.45–0.57 arrests/yr
+from one station) no longer apply; the arrest volume now rides
+unemployment, so a well-run town is quiet and a jobless one is not. That
+is a lever the player already holds. The killing draws every month in
+every town with an adult carnivore, so the no-market CSV gate becomes an
+attributable re-baseline rather than byte-equality.
 
 ---
 

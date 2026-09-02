@@ -398,6 +398,84 @@ census so a loaded city and the straight run agree (the save/load hash law).
 The crime overlay (`O`) shows crime in red and police cover in blue; the
 hover card prints crime and both covers; the Rules tab has S1–S3.
 
+## 9c. Crime and punishment — zone M, the killing, the file, the centre (`js/sim/justice.js`, `fields.js`, `events.js`)
+
+The owner (2026-09-02): *"lets think about how we can add predation to the
+game as part of crime. perhaps with a custom zoned commercial space for grey
+market meat markets. herbavores do not like living near meat markets, it
+should have a similar negative devaluing as industrial, but perhaps even
+stronger."* — *"lets add a pacification center … fixed animals cannot have
+offspring and are no longer interested in attacking prey. prey can also be
+pacified if they are caught in a crime … a 5% chance that the police arrest
+the wrong person."* — *"multiple offenses should send the citizen to the meat
+market … a better first stop for prey who commit crimes. 1. crime should be
+weighted by unemployment, no jobs means hungry wolves. 2. no, random based
+on proximity. i think it should be possible for prey to murder too, but just
+much less likely. 3. yes."* Designed by two panels
+(`docs/PROPOSAL-CRIME-AND-PUNISHMENT.md`), built as stated there with the
+rulings applied. Every constant is in KNOBS; the rules tab has M1–M3, K1,
+P1–P3.
+
+```
+DIET     herb = rabbit, mouse, beaver, tortoise, pig, cow · omni = bear, raccoon, skunk · carn = fox, owl, wolf, cat, hawk
+         (fox and owl hunt without the `predator` flag, which stays the skunk-incident gate)
+
+ZONE M   key M, "Meat", §12 a tile, drag-zoned; tiers stall / meat hall / cold store, M_JOBS [0, 3, 8, 16];
+         its own valve rM = clamp((0.06·carnivores + 10 − Jm)/max(Jm, 20), −1, 1), T_M = T_C — a 1,600 town wants ~72 hall jobs;
+         Jm ∈ J and Lab, ∉ Jc (no crowd-out of shops); local_M = 0.6·clamp(carnivores within 5 / 40 − 0.5, ±0.3) + 0.4·(50 − LV)/200;
+         maxTier 3 like I; staffed by diet JOB_M {carn 0.9, omni 0.5, herb 0.1} (a weight — pigs and beavers, jobC 0.2, will walk to one)
+DREAD    world.dread (derived): a hall spreads [0, 40, 70, 105] over radius [0, 2, 3, 4] (the pollution shape); LV −= 0.8·dread
+         → a tier-3 hall −84/−67/−50/−34/−17 LV at d 0..4, exactly twice a works (−42/−34/−25/−17/−8)
+         herbivores: mood −min(25, 0.25·dread) (halved with a carnivore friend); home score −dread; arrivals ×(1 − 0.3·min(1, halls/3));
+                     REHOME: a herbivore household at dread ≥ 40 moves along the road (≤ 12 tiles) at 3%/month, to a lot with less dread
+         carnivores: +5 mood inside the smell; home score +0.8·dread (net 0 — they do not mind); arrivals +0.3·min(1, Jm/40)
+         omnivores: nothing. NOT pollution (pollution pulls raccoons and pigs and refuses R growth — the rule is herbivore-specific)
+CRIME    crime += a hall's [0, 10, 18, 25] over [0, 1, 2, 3] (×0.5 licensed) + 15 within 2 of every open FILE
+         + 3 per unemployed adult in the 3×3 (a carnivore ×2)   ← "no jobs means hungry wolves", counted from live state
+MONEY    unlicensed: the CUT, §25 per filled M job per year, ledger "cut", untaxed; a killing near a hall +§50; a convict sold +§100
+         LICENCE (offered deterministically the month the first hall reaches tier 2; §2,000 + §400/yr per hall): M jobs taxed at the C rate,
+                 the crime hill ×0.5, the buyer's pull ×0.5 (3 → 1.5); the smell is unchanged
+         RAID (a BOON kind so the No-disasters toggle never masks it; w3; cooldown 24): an unlicensed hall with police cover, crime > 50
+                 and staff → a storey shut, +§200·tier fines, the last hired named and a file opened on them
+         THE GREENS' LEAGUE (w2, 6 months): herbivores ≥ 40% and a killing's file standing → V_C −0.3, herbivore mood +5
+
+THE KILLING (justice.js killingTick, every month, before the files):
+         Σ = Σ over adults of KILL_DIET {carn 1, omni 0.1, herb 0.03} × 20 if unemployed × 3 within a hall's smell (1.5 licensed)
+             × 2 if on a hall's staff × (0.5 + crime at home/100); fixed, held and cubs 0
+         killings this month k = floor(0.00005·Σ + rng) — drawn once wherever an adult lives (the baseline hash moves; see §4)
+         killer = weighted pick; victim = weighted pick of adults within Chebyshev 3 of the killer's home (not the household):
+                  the killer's prey ×1, anyone else ×0.1, a friendship (the killer's, or of the killer's kind) ×0.1; none → nothing
+         → removeCitizen "killed"; the funeral rule (mourners ≥ 3 befriend at the wake; grief a year for mourners and household);
+           the victim's species −15 mood city-wide for 6 months; −§200 inquest; a FILE at the victim's home; the line names both
+THE FILE events.files [{tile, radius 2, crime 15, opened, until +24, culpritId, victimId, cause, line, closed}] — saved under events;
+         opened by a killing, a heist (the thief is now any adult within 4, weighted: unemployed ×3, hot home ×2, fox/raccoon/cat ×2,
+         a record ×2), a BURGLARY (with a police station: once a month over built lots with crime > 60, p = min(0.3, 0.006·hot),
+         −§20·tier), a raid. INVESTIGATION for 6 months: each month p = 0.02 + 0.18·policeCov/60 + 0.05·record
+         → 11% / 50% / 74% over the file at cover 0 / 30 / 60; a killing's file that lapses prints COLD and names the culprit
+THE WRONG ANIMAL 5% of arrests: any adult within 4 of the file, weighted 1/(1 + d) — no species weight ("random based on proximity")
+         the innocent is sentenced like the guilty; the culprit stays; c.wrongful / c.wrongedBy saved; when the real one is later taken:
+         EXONERATED, −§500 compensation, the town −5 mood for 6 months, "there is no way to unfix / unsell"
+THE SENTENCE (the owner's table): a predator's (carn or omni) first conviction → the PACIFICATION CENTRE if one has road access and a bed;
+         a prey animal, or anyone already fixed → the MEAT HALL if one has road access (removed, cause "sold", +§100 to the cut);
+         otherwise the CELLS, 3 months, home with a record. Every conviction is record++.
+CUSTODY  c.held = untilTick (saved), c.heldAt = the centre or −1; the job is released (releaseJob — ONE function for retirement,
+         decay, bulldoze, custody); home kept; absent(world, c) = held > tick is ONE predicate read by isWorker, computeCrime's inline
+         copy, prey flight, births, the walkers, every pool; mood −15 while held
+FIXED    permanent, saved; no litter (a pair needs two unfixed fertile adults — skipped households count in last.littersLost);
+         never a killer; PREY FLIGHT is proportional — flight = 10 × (unfixed adults of that species in the 3×3 / all of them);
+         a fixed predator's friendship with its prey rolls at 0.7 (not 0.4) and counts ONCE in H (census.hKnife is the share
+         "by pacification"); mood −5 for life; may keep any job, the counter included (the owner: "3. yes")
+THE CENTRE CIVIC.CENTRE, 1×1, key V, §1,500, §900/yr, 4 C-type jobs (isCivicEmployer — NOT isStation, which is coverage),
+         6 beds counted from heldAt; LV −6 within 2; carnivores −5 mood within 4 (the van); bulldozing it releases the inmates
+         unfixed and is not undoable
+```
+
+Measured (`tools/playtest.mjs`, 30 years, rates 8, seeds 7/3/5, disasters off): killings 3–7 per 30 years in a fed town
+with no hall; 5–16 with two hall blocks (11–19 halls, ~70 jobs, the cut ≈ §1.4k/yr); arrests 4–9 per 30 years with a station
+and a centre (fixed 1–7, sold 2–4, wrongful 0–1 — the 5% is rare at that volume); herbivores within a hall's smell 0–19 of ~750
+(the push and the rehome empty the street); a jobless dormitory of 80 sees one killing every ~7 years. Population is cap-pinned
+and never moves; read killings, arrests, fixed, littersLost, herbNear.
+
 ## 10. Goals and pacing
 
 - **Milestones** (plaque + advisor line, never a fail state): hamlet 50,
@@ -419,8 +497,9 @@ hover card prints crime and both covers; the Rules tab has S1–S3.
 ## 11. Zoning UX (`js/input.js`, `js/ui.js`)
 
 Tool strip (field-guide chrome: one monospace row, no icons above 16 px):
-`1 R · 2 C · 3 I · 4 Road · 5 Tree · 6 Park · 7 Zoo · F Fire station · P Police ·
+`1 R · 2 C · 3 I · M Meat · 4 Road · 5 Tree · 6 Park · 7 Zoo · F Fire station · P Police · V Pacify ·
 8 Bulldoze · 9 Inspect · D density Low/High · Space pause · , . speed · Z undo · S save · L load`.
+The `O` overlay cycle is off → LV → pollution → crime (an open file is a ring) → dread → score.
 
 - **Zones, trees, bulldoze:** rectangle drag; live cost in the strip
   ("R ×36 = §180"); an unaffordable drag draws the refused hatch and does

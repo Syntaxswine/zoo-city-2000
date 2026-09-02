@@ -20,7 +20,7 @@ import { fileURLToPath } from "node:url";
 import { installCanvas, createCanvas, encodePNG, zoom as zoomCanvas } from "./headless-canvas.mjs";
 import { rasterize } from "../js/art/format.js";
 import { art } from "../js/art/index.js";
-import { BUILDINGS, PARK, ZOO, FIRE_STATION, POLICE_STATION, OVERLAYS } from "../js/art/buildings.js";
+import { BUILDINGS, PARK, ZOO, FIRE_STATION, POLICE_STATION, PACIFICATION_CENTRE, OVERLAYS } from "../js/art/buildings.js";
 import { ROADS, BRIDGES, N, E, S, W, DECK_TOP } from "../js/art/roads.js";
 import { GRASS, CHALK, CHALK_KEYS, RUBBLE, WATER_TILE, KERB, TREE_LIST, ZOTS, PLAZA, CURSOR, GHOST, waterTint, WATER_FRAMES } from "../js/art/terrain.js";
 import { ink } from "../js/art/format.js";
@@ -100,9 +100,9 @@ function sheet(name, cells, { cols, cellW, cellH, groundY, z }) {
 
 function sheets(z) {
   const out = [];
-  // Buildings: 3 zones × 3 tiers × 2 variants, then civics and overlays.
+  // Buildings: 4 zones × 3 tiers × 2 variants (a row per zone: R, C, I, M), then civics and overlays.
   const b = [];
-  for (const zone of [1, 2, 3]) for (const tier of [1, 2, 3]) for (const v of [0, 1]) b.push({ sprite: BUILDINGS[zone][tier][v], label: BUILDINGS[zone][tier][v].name, onTile: true });
+  for (const zone of [1, 2, 3, 4]) for (const tier of [1, 2, 3]) for (const v of [0, 1]) b.push({ sprite: BUILDINGS[zone][tier][v], label: BUILDINGS[zone][tier][v].name, onTile: true });
   out.push(sheet("sheet-buildings.png", b, { cols: 6, cellW: 80, cellH: 100, groundY: 84, z }));
 
   const c = [
@@ -110,6 +110,7 @@ function sheets(z) {
     { sprite: ZOO, label: "zoo (2×2)", onTile: false },
     { sprite: FIRE_STATION, label: "fire station", onTile: true },
     { sprite: POLICE_STATION, label: "police station", onTile: true },
+    { sprite: PACIFICATION_CENTRE, label: "pacification centre", onTile: true },
     { sprite: OVERLAYS.scaffold[0], label: "scaffold (over store)", onTile: true, under: BUILDINGS[2][2][0] },
     { sprite: OVERLAYS.fire[0], label: "fire 0 (over cottage)", onTile: true, under: BUILDINGS[1][1][0], lift: 6 },
     { sprite: OVERLAYS.fire[1], label: "fire 1 (over cottage)", onTile: true, under: BUILDINGS[1][1][0], lift: 6 },
@@ -175,18 +176,18 @@ function sheets(z) {
     out.push(save("sheet-roadnet.png", canvas, z));
   }
 
-  // Terrain: grass ×3, chalk 3×2, rubble, water ×6 cycle frames, kerbs ×4 on grass, trees, zots, glyphs.
+  // Terrain: grass ×3, chalk 4×2, rubble, water ×6 cycle frames, kerbs ×4 on grass, trees, zots, glyphs.
   const t = [];
   GRASS.forEach((s, i) => t.push({ sprite: s, label: `grass ${i}` }));
-  for (const zone of [1, 2, 3]) CHALK[zone].forEach((s) => t.push({ sprite: s, label: s.name }));
+  for (const zone of [1, 2, 3, 4]) CHALK[zone].forEach((s) => t.push({ sprite: s, label: s.name }));
   t.push({ sprite: RUBBLE, label: "rubble" });
   for (let f = 0; f < WATER_FRAMES; f++) t.push({ sprite: WATER_TILE, label: `water frame ${f}`, tint: waterTint(f) });
   // Chalk coverage: how much of each tile is accent vs grass. "Translucent"
   // is a number here — the first round's High tiles measured 65% accent.
   // The R chalk is drawn in grass keys 'p' (line) and 'm' (shade), not in
   // ACCENT '5' (see terrain.js); grass-0 itself is ≈5% 'p', so the R line
-  // number carries that floor.
-  for (const zone of [1, 2, 3])
+  // number carries that floor. The M chalk is ACCENT 'A'.
+  for (const zone of [1, 2, 3, 4])
     for (const s of CHALK[zone]) {
       const total = ink(s.rows);
       const [lineKey, shadeKey] = CHALK_KEYS[zone];

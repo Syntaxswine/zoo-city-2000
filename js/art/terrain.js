@@ -98,7 +98,7 @@ export const GRASS = [0, 1, 2].map((v) =>
  * shows through (that is what "translucent" means in a palette with no
  * alpha). Low = one direction, a 1-px line every 4th unit, plus a 0.75-unit
  * border; High = the same line in BOTH directions (cross-hatch). Zone 1 R,
- * 2 C, 3 I.
+ * 2 C, 3 I, 4 M.
  *
  * ONE PIXEL WIDE means frac(a) < 0.25: a pixel step in x moves `a` by 0.25,
  * so a quarter-unit band is a single-pixel staircase (2 across, 1 down —
@@ -118,9 +118,13 @@ export const GRASS = [0, 1, 2].map((v) =>
  * — a 1-px light / 1-px dark staircase, 88 luminance across the pair, and
  * a 0.5-unit 'p' border with an 'm' inner edge. Same geometry as C and I,
  * whose accents '6' (≈101) and '7' (≈138) stand alone.
+ *
+ * Zone 4 M (the meat markets) draws in its own accent 'A' (dried liver,
+ * ≈79 — 42 BELOW grass mid, on the far side of the hue wheel from both '6'
+ * and '7'), the C/I geometry, no shade key.
  */
-const CHALK_KEY = { 1: G[3], 2: "6", 3: "7" };
-const CHALK_SHADE = { 1: G[0], 2: null, 3: null };
+const CHALK_KEY = { 1: G[3], 2: "6", 3: "7", 4: "A" };
+const CHALK_SHADE = { 1: G[0], 2: null, 3: null, 4: null };
 const CHALK_PERIOD = 4;
 export function chalkKey(zone, high, a, b, px, py) {
   const k = CHALK_KEY[zone];
@@ -143,15 +147,15 @@ export function chalkKey(zone, high, a, b, px, py) {
   return grassKey(px, py, 0);
 }
 /** The keys a zone's chalk is drawn in, for the census in tools/shots.mjs. */
-export const CHALK_KEYS = { 1: [G[3], G[0]], 2: ["6"], 3: ["7"] };
+export const CHALK_KEYS = { 1: [G[3], G[0]], 2: ["6"], 3: ["7"], 4: ["A"] };
 function chalkRows(zone, high) {
   return diamond((a, b, px, py) => chalkKey(zone, high, a, b, px, py));
 }
 export const CHALK = {};
-for (const zone of [1, 2, 3]) {
+for (const zone of [1, 2, 3, 4]) {
   CHALK[zone] = [false, true].map((high) =>
     defineSprite({
-      name: `chalk-${["", "R", "C", "I"][zone]}-${high ? "high" : "low"}`,
+      name: `chalk-${["", "R", "C", "I", "M"][zone]}-${high ? "high" : "low"}`,
       anchor: TILE_ANCHOR,
       rows: chalkRows(zone, high),
       tags: ["ground", "chalk"],
@@ -503,7 +507,7 @@ export const GHOST = defineSprite({
 export function allTerrain() {
   const out = [];
   GRASS.forEach((s) => out.push({ name: s.name, sprite: s }));
-  for (const zone of [1, 2, 3]) CHALK[zone].forEach((s) => out.push({ name: s.name, sprite: s }));
+  for (const zone of [1, 2, 3, 4]) CHALK[zone].forEach((s) => out.push({ name: s.name, sprite: s }));
   out.push({ name: RUBBLE.name, sprite: RUBBLE });
   out.push({ name: WATER_TILE.name, sprite: WATER_TILE });
   KERB.forEach((s) => out.push({ name: s.name, sprite: s }));

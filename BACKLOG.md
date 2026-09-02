@@ -4,24 +4,26 @@ Open work, ranked. The design record is `SPEC.md`; the numbers are in
 `js/sim/rules.js` (KNOBS). Later layers were labelled at design time so v1
 could ship whole.
 
-## Crime and punishment — PROPOSED, not built (`docs/PROPOSAL-CRIME-AND-PUNISHMENT.md`, 2026-09-02)
-- **Part I — zone M, dread, the taking**: a fourth zone on its own
-  carnivore-keyed valve; a dread field at exactly 2× a works' LV shadow;
-  herbivores mind it (mood, home, a rehome rule), carnivores do not; a
-  hall raises crime and crime is the taking's hazard rate (0.04·crime/100
-  per hall-month × hunters on staff); the cut, the licence, the raid, the
-  Greens' League. ≈ 420 lines, one session. The no-market CSV gate (P 1643
-  · W 1052 · J 1480 · cash 84,706) is the byte-equality proof.
-- **Part II — the file, the arrest, the wrongful 5%, the pacification
-  centre**: police cover as a monthly arrest probability; the cells vs the
-  centre; `fixed` read by five rules (no litter, never a hunter, no fear,
-  friendship 0.7 counted ONCE in H, mood −5); the wrong animal as a ×8
-  weight; exoneration pays §500. ≈ 600 lines, one session. **Three owner
-  questions first** (complaints? weighted or same-kind wrongful pool? may a
-  fixed wolf keep the counter?) — they set the whole volume.
-- Measured and standing: the heist has fired 0 times in 360 city-years
-  (a shop's crime tops out at 39–46 vs a gate of 70); P is cap-pinned, so
-  neither arc shows in P — read births, littersLost, afraid, pacified.
+## Crime and punishment — SHIPPED 2026-09-02 (SPEC §9c; `js/sim/justice.js`); what is left
+- **Hunger visibility.** The scripted towns run at U 0–4, so the ×20 hunger
+  term only bites in dormitory / over-taxed towns (measured: one killing per
+  ~7 years in a jobless town of 80). If the owner wants the hungry-wolf line
+  in a healthy town, `KILL_HUNGRY` and the unemployment advisor are the knobs.
+- **The wrongful 5% is rarely seen** at 4–9 arrests per 30 years (0–1 per
+  run). `WRONGFUL_P` is the owner's number; the lever for visibility is the
+  arrest volume (police cover, `ARREST_COVER`).
+- **Customer walkers** to the hall (walkers.js `isShop` could include M);
+  the meat hall's staff skinned by species; a "sold" departure walker.
+- **Supply from funerals** as the hall's local term (Beastars: the market
+  buys the dead) — the honest grey economy, v2.
+- **The abattoir** — a 3×3 M landmark on the landmarks proposal's merge rule.
+- **Per-species fixed counts** on the census histogram (`wolf 129 · 11 fixed`).
+- **The scripted suite city loses its M row to a year-7 fire** (seed 7,
+  disasters on); the dread invariant force-builds the halls on a clone
+  instead — fine, but a firebreak in `buildCity` would let the row live.
+- Measured and standing: the heist gate (a shop above 70) still never arms
+  in a scripted town without two adjacent halls; P is cap-pinned, so the arc
+  never shows in P — read killings, arrests, fixed, sold, littersLost, herbNear.
 
 ## Polish the play-testers named (browser rounds 1–3), not yet done
 - WHY NOT line should carry the tax parenthetical from SPEC §11

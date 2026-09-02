@@ -9,6 +9,7 @@ import { lotsTick } from "./lots.js";
 import { citizensTick, compact } from "./citizens.js";
 import { budgetTick } from "./budget.js";
 import { eventsTick } from "./events.js";
+import { justiceTick } from "./justice.js";
 import { SPECIES } from "./species.js";
 import { ZONE } from "./world.js";
 
@@ -45,11 +46,14 @@ export function tick(world) {
   // 7. events
   const evNotices = eventsTick(world, cen, dem);
   notices.push(...evNotices);
-  // Events can remove households (revolt, rubble); compact before anything
-  // counts or saves — a dead citizen must never survive a tick boundary.
+  // 7b. crime and punishment: releases, the killing, burglary, the files.
+  const jNotices = justiceTick(world, cen);
+  notices.push(...jNotices);
+  // Events can remove households (revolt, rubble, a killing, a sale); compact
+  // before anything counts or saves — a dead citizen must never survive a tick boundary.
   compact(world);
   // 8. history, report, advisor, milestones
-  world.last = { census: cen, demand: dem, budget: bud.fig, grew: lots.grew, decayed: lots.decayed, arrived: cit.arrived, left: cit.left, births: cit.births, deaths: cit.deaths, funerals: cit.funerals };
+  world.last = { census: cen, demand: dem, budget: bud.fig, grew: lots.grew, decayed: lots.decayed, arrived: cit.arrived, left: cit.left, births: cit.births, deaths: cit.deaths, funerals: cit.funerals, littersLost: cit.littersLost, rehomed: cit.rehomed };
   world.notices = notices;
   const month = world.tick % 12;
   if (month === 0) {
@@ -65,7 +69,7 @@ export function tick(world) {
   if (ms) notices.push(ms);
   // Every line the ticker shows goes into the log too, so a loaded city can
   // show its own history (rolled events already logged themselves).
-  for (const line of notices) if (!evNotices.includes(line)) world.events.log.push({ t: world.tick, id: "notice", line });
+  for (const line of notices) if (!evNotices.includes(line) && !jNotices.includes(line)) world.events.log.push({ t: world.tick, id: "notice", line });
   if (world.events.log.length > 400) world.events.log.splice(0, world.events.log.length - 400);
   world.tick++;
   return { notices, events: evNotices };
@@ -83,7 +87,7 @@ export function refreshLast(world) {
   const dem = peekDemand(world, cen);
   const fig = yearlyFigures(world);
   const prev = world.last || {};
-  world.last = { census: cen, demand: dem, budget: fig, grew: prev.grew || 0, decayed: prev.decayed || 0, arrived: prev.arrived || 0, left: prev.left || 0, births: prev.births || 0, deaths: prev.deaths || 0, funerals: prev.funerals || 0 };
+  world.last = { census: cen, demand: dem, budget: fig, grew: prev.grew || 0, decayed: prev.decayed || 0, arrived: prev.arrived || 0, left: prev.left || 0, births: prev.births || 0, deaths: prev.deaths || 0, funerals: prev.funerals || 0, littersLost: prev.littersLost || 0, rehomed: prev.rehomed || 0 };
   return world.last;
 }
 
@@ -112,15 +116,19 @@ function advisor(world, cen, dem, fig) {
   let lotsR = 0;
   let lotsC = 0;
   let lotsI = 0;
+  let lotsM = 0;
   const n = world.w * world.h;
   for (let i = 0; i < n; i++) {
     if (world.zone[i] === ZONE.R) lotsR++;
     else if (world.zone[i] === ZONE.C) lotsC++;
     else if (world.zone[i] === ZONE.I) lotsI++;
+    else if (world.zone[i] === ZONE.M) lotsM++;
   }
-  const lots = lotsR + lotsC + lotsI;
-  const net = fig.incomeYr - fig.upkeepYr;
-  out.push(`REPORT ${year}: ${cen.P} animals · approval ${Math.round(cen.approval)} · unemployed ${cen.U} · net ${net < 0 ? "−" : "+"}§${Math.abs(net).toLocaleString("en-US")}/yr · Zoo City index ${(cen.H * 100).toFixed(0)}% · ${characterLine(cen)}.`);
+  const lots = lotsR + lotsC + lotsI + lotsM;
+  const net = fig.incomeYr + (fig.cutYr || 0) - fig.upkeepYr;
+  const j = world.events.justice;
+  const justice = j && (j.pacified || j.sold) ? ` · pacified ${j.pacified} (${j.wrongful} wrongful) · sold ${j.sold}` : "";
+  out.push(`REPORT ${year}: ${cen.P} animals · approval ${Math.round(cen.approval)} · unemployed ${cen.U} · net ${net < 0 ? "−" : "+"}§${Math.abs(net).toLocaleString("en-US")}/yr · Zoo City index ${(cen.H * 100).toFixed(0)}%${cen.markets ? ` · ${cen.markets} meat hall${cen.markets === 1 ? "" : "s"}` : ""}${justice} · ${characterLine(cen)}.`);
   if (cen.P === 0 && lots === 0) out.push("ADVISOR: zone R, C and I within 3 tiles of a road. Animals arrive when there are jobs.");
   if (world.valves.R > 0.3 && cen.vacantR < 10) out.push("ADVISOR: the animals want more housing.");
   if (world.valves.C > 0.3 && lotsC < lotsR / 4) out.push("ADVISOR: the town wants shops.");
@@ -139,5 +147,11 @@ function advisor(world, cen, dem, fig) {
     if (world.rates[z] <= prevN && world.rates[z] > dem.n) out.push(`ADVISOR: your city outgrew its ${world.rates[z]}% ${z} rate — neutral is now ${dem.n.toFixed(1)}%.`);
   }
   if (cen.P >= 800 && dem.capped) out.push("ADVISOR: the town is at capacity. Parks, a Zoo, or friendships across species raise it.");
+  // Crime and punishment.
+  if (cen.U >= 20 && cen.diet.carn >= 50) out.push(`ADVISOR: ${cen.U} animals have no work. No jobs means hungry wolves — zone shops and works.`);
+  if (cen.markets > 0 && cen.herbNear > 0) out.push(`ADVISOR: ${cen.herbNear} herbivores live within the smell of a meat hall; parks, friends across the line and a licence soften it.`);
+  if (cen.markets > 0 && !cen.policeStations) out.push("ADVISOR: a meat hall with no police cover is where the killings go unsolved.");
+  if (world.events.killings > 0 && cen.centres === 0 && cen.policeStations > 0) out.push("ADVISOR: the cells release an animal in three months, unchanged. A pacification centre (§1,500) sends a predator home fixed — and stops its litters.");
+  if (cen.centres > 0 && cen.held >= KNOBS.CENTRE_BEDS * cen.centres) out.push("ADVISOR: the centre is full — the next one goes to the cells.");
   return out;
 }

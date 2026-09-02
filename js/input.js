@@ -18,18 +18,20 @@ export const TOOLS = [
   { id: "R", key: "1", label: "R", hint: "zone residential (drag)" },
   { id: "C", key: "2", label: "C", hint: "zone commercial (drag)" },
   { id: "I", key: "3", label: "I", hint: "zone industrial (drag)" },
+  { id: "M", key: "M", label: "Meat", hint: "zone meat market (drag) §12 — grey, off the books; carnivores staff it, herbivores smell it four tiles off" },
   { id: "road", key: "4", label: "Road", hint: "L-drag; Shift = straight; over water = bridge §40" },
   { id: "tree", key: "5", label: "Tree", hint: "plant trees (drag) §4" },
   { id: "park", key: "6", label: "Park", hint: "1×1, §150 — click" },
   { id: "zoo", key: "7", label: "Zoo", hint: "2×2, §2,500 — click" },
   { id: "fire", key: "F", label: "Fire stn", hint: "1×1, §500 — click; within 6 tiles a fire burns one month and barely spreads" },
   { id: "police", key: "P", label: "Police", hint: "1×1, §500 — click; takes 60 off crime within 3 tiles, 30 within 6" },
+  { id: "centre", key: "V", label: "Pacify", hint: "1×1, §1,500, §900/yr, 4 jobs, 6 beds — click; a convicted predator comes home fixed in six months" },
   { id: "bulldoze", key: "8", label: "Bulldoze", hint: "clear (drag) §2, trees §4" },
   { id: "inspect", key: "9", label: "Inspect", hint: "pin a card; left-drag pans" },
 ];
 const TOOL_BY_KEY = Object.fromEntries(TOOLS.map((t) => [t.key, t.id]));
-const PLACE_TOOLS = new Set(["park", "zoo", "fire", "police"]);
-const ZONE_OF = { R: ZONE.R, C: ZONE.C, I: ZONE.I };
+const PLACE_TOOLS = new Set(["park", "zoo", "fire", "police", "centre"]);
+const ZONE_OF = { R: ZONE.R, C: ZONE.C, I: ZONE.I, M: ZONE.M };
 const PAN_SPEED = 700; // projection px per second
 
 export function createInput(canvas, app) {
@@ -67,7 +69,7 @@ export function createInput(canvas, app) {
     if (!d) return null;
     const w = world();
     switch (state.tool) {
-      case "R": case "C": case "I":
+      case "R": case "C": case "I": case "M":
         return { kind: "zone", zone: ZONE_OF[state.tool], x0: d.ax, y0: d.ay, x1: d.bx, y1: d.by, density: state.density };
       case "tree":
         return { kind: "tree", x0: d.ax, y0: d.ay, x1: d.bx, y1: d.by };
@@ -81,7 +83,7 @@ export function createInput(canvas, app) {
   }
 
   function clickOp(tx, ty) {
-    if (state.tool === "park" || state.tool === "zoo" || state.tool === "fire" || state.tool === "police") return { kind: state.tool, tx, ty };
+    if (PLACE_TOOLS.has(state.tool)) return { kind: state.tool, tx, ty };
     return null;
   }
 
@@ -93,7 +95,7 @@ export function createInput(canvas, app) {
 
   function costLabel(op, plan) {
     const n = plan.tiles.length;
-    const name = { zone: op.zone === ZONE.R ? "R" : op.zone === ZONE.C ? "C" : "I", road: "Road", tree: "Tree", bulldoze: "Bulldoze", park: "Park", zoo: "Zoo", fire: "Fire station", police: "Police station" }[op.kind];
+    const name = { zone: op.zone === ZONE.R ? "R" : op.zone === ZONE.C ? "C" : op.zone === ZONE.M ? "Meat" : "I", road: "Road", tree: "Tree", bulldoze: "Bulldoze", park: "Park", zoo: "Zoo", fire: "Fire station", police: "Police station", centre: "Pacification centre" }[op.kind];
     if (plan.reason) return `${name}: blocked`;
     if (!n) return `${name}: nothing to do`;
     const bridges = plan.tiles.filter((t) => t.what === "bridge").length;

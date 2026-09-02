@@ -1,6 +1,6 @@
 // buildings.js — every built thing in the city is BOXES. SPEC §12.2.
 //
-// Nine families (3 zones × 3 tiers) × 2 variants, the four civics, and the
+// Twelve families (4 zones × 3 tiers) × 2 variants, the five civics, and the
 // overlays. Nothing in this file draws a face. Each family is a list of
 // `box()`es in world units (1 tile = 16 along a and b, c in pixels) handed to
 // `solid.render`, which rasterises per screen pixel through a z-buffer — so a
@@ -324,18 +324,197 @@ function works() {
   ];
 }
 
+// ------------------------------------------------------------ meat market
+//
+// Zone 4, "M": the grey-market meat markets. Every "meat" cue is a BROWN —
+// brick, earth, rust, the lightest brick '$' for the one dot on the sign —
+// never the zot red '0', which is reserved for the zots and would make a
+// butcher's read as a warning. What breaks the field guide: carcasses,
+// drips, lettering, saturated red. What a silhouette carries at 1×
+// instead: a striped awning, a row of hooks, a windowless annex, a sign
+// with one dot, a chimney. The family walks brick → brick-and-slate →
+// concrete up its tiers, the way R is brick, C concrete and I rust.
+
+// The butcher's awning: 1-unit stripes of the darkest brick '!' and the
+// lightest concrete '(' — the red-white stripe with the red dried to
+// liver. The stripe is keyed on the SCREEN column, floor(x / 2): on the
+// top face that is the world diagonal a − b (x = 2a − 2b), a band running
+// from the wall to the lip, 2 px wide at 1×, and the same band continues
+// down the valance. It survives flipPlan: a stripe keyed on floor(a)
+// turned into three long bands along the mirrored awning. (brickGrain
+// keys on screen pixels too — house precedent.)
+const STRIPE = (x) => (Math.floor(x / 2) & 1 ? CONC[4] : BRICK[0]);
+const AWNING_M = { top: (a, b, x) => STRIPE(x), side: (a, k, x) => STRIPE(x), end: (b, k, x) => STRIPE(x) };
+// Sawdust: a loose spill, so the top and the side are both the lightest
+// earth — a heap has no crisp lit edge the way TIMBER does.
+const SAWDUST = flatSkin(EARTH[4], EARTH[4], EARTH[3]);
+const BRACKET = flatSkin(RUST[3], RUST[2], RUST[1]);
+
+/**
+ * The stall: a tier-1 brick kiosk, 10 × 10 units under a slate cap, read
+ * at 1× by the striped awning off its lit face (2 px thick, 14 px long),
+ * three 1-px '+' hooks hanging under it (1 × 2 px each, 4 px apart — a
+ * butcher's rail), a dark door beside them and a sawdust step spilling
+ * on the ground in front. One END_GLASS window on the shaded face so it
+ * is not a blank wall.
+ *
+ * WHERE THE HOOKS GO: ON THE RAIL, NOT THE WALL. An awning hides the
+ * wall under it. On one screen column the lip stands d units further
+ * along a as well as b, so an awning d units deep between c_bot and c_top
+ * covers the wall band [c_bot − 2d, c_top] — the top face alone eats 2d
+ * units. Round 1 hung the hooks on the wall at 3–5 under a 3-deep lip and
+ * showed none of them; round 2, 1.5 deep, showed none again. So the hooks
+ * are three thin boxes hanging from the lip's underside, a butcher's
+ * rail: 1 × 2 px dark ticks under the striped valance, 4 px apart, and
+ * they flip with the awning. Each is a quarter-unit either side of its
+ * column — a face whose two edges both land on pixel columns is 2 px wide
+ * under the rasteriser's inclusive bounds — and paints no end face, which
+ * at 2:1 turned each tick into an inverted T.
+ */
+const HOOK = { top: () => "+", side: () => "+", end: () => null };
+function stall() {
+  const H = 8;
+  const base = litSkin(BRICK, { grain: brickGrain, height: H });
+  const skin = {
+    top: base.top,
+    side: (a, k, x, y) => {
+      const g = H - k;
+      if (a >= 7.5 && a < 9.5 && g < 6) return "+"; // the door
+      return base.side(a, k, x, y);
+    },
+    end: (b, k, x, y) => {
+      const g = H - k;
+      if (b >= 2.5 && b < 5.5 && g >= 2 && g < 5) return END_GLASS;
+      return base.end(b, k, x, y);
+    },
+  };
+  const boxes = [
+    box(3, 13, 3, 13, 0, H, skin),
+    box(3.5, 10.5, 13, 14.5, 6, 8, AWNING_M),
+    box(2.5, 13.5, 2.5, 13.5, H, H + 1, SLATE_SKIN),
+    box(4, 10.5, 13, 14.5, 0, 1, SAWDUST),
+  ];
+  for (const a of [5, 7, 9]) boxes.push(box(a - 0.25, a + 0.25, 14, 14.5, 4, 6, HOOK));
+  return boxes;
+}
+
+/**
+ * The meat hall: brick to storey 8, slate above, with a clerestory of
+ * 1-unit windows in the slate band ('=' on the lit face, END_GLASS on
+ * the shaded one). Off its end a WINDOWLESS slate annex — the cold store —
+ * with one 2-px '+' vent high on its lit face. Over the door a slate sign
+ * slab hangs a unit off the wall on a 1-px rust bracket, carrying one '$'
+ * dot and no lettering: the cut, not the word.
+ *
+ * THE ANNEX SITS ON THE BACK HALF OF THE END (b 3.5–8), not the full
+ * depth: flipPlan sends the end to the front, and a full-depth annex
+ * mirrored to a 3.5–12.5 × b 11–15.5 stood in front of the whole lit face
+ * and hid the door (round 1: 31 door pixels in variant 0, 4 in variant 1).
+ * The half-depth annex mirrored covers the lit face only up to a = 8, and
+ * the door lives at a ≥ 8.5. Same rule in the cold store.
+ */
+function meatHall() {
+  const H = 14;
+  const BRICK_TO = 8;
+  const brick = litSkin(BRICK, { grain: brickGrain, height: BRICK_TO });
+  const slate = litSkin(SLATE, { height: H - BRICK_TO });
+  // k is depth below the box top; the brick band is its own 8-unit wall
+  // and shades from ITS top (c = 8), so it is handed k − (H − 8).
+  const skin = {
+    top: slate.top,
+    side: (a, k, x, y) => {
+      const g = H - k;
+      if (a >= 7.5 && a < 10 && g < 6) return "+"; // the hall door
+      if (g >= 10 && g < 12 && Math.floor(a) % 3 === 1) return "="; // the clerestory
+      return g < BRICK_TO ? brick.side(a, k - (H - BRICK_TO), x, y) : slate.side(a, k, x, y);
+    },
+    end: (b, k, x, y) => {
+      const g = H - k;
+      if (g >= 10 && g < 12 && Math.floor(b) % 3 === 1) return END_GLASS;
+      return g < BRICK_TO ? brick.end(b, k - (H - BRICK_TO), x, y) : slate.end(b, k, x, y);
+    },
+  };
+  const annexBase = litSkin(SLATE, { height: 9 });
+  const annex = {
+    top: annexBase.top,
+    side: (a, k, x, y) => (a >= 1.5 && a < 2.5 && 9 - k >= 6 && 9 - k < 8 ? "+" : annexBase.side(a, k, x, y)),
+    end: annexBase.end,
+  };
+  const sign = {
+    top: () => SLATE[2],
+    side: (a, k) => (a >= 1.5 && a < 2 && k >= 1 && k < 2 ? BRICK[3] : SLATE[1]),
+    end: () => SLATE[0],
+  };
+  return [
+    box(1, 11, 1.5, 14.5, 0, H, skin),
+    box(0.5, 11.5, 1, 15, H, H + 1, SLATE_SKIN),
+    box(11, 15.5, 3.5, 8, 0, 9, annex),
+    box(10.5, 16, 3, 8.5, 9, 10, SLATE_SKIN),
+    box(9, 9.5, 14.5, 15.5, 10, 10.5, BRACKET),
+    box(7.5, 11, 15.5, 16, 7.5, 10, sign),
+  ];
+}
+
+/**
+ * The cold store: a windowless concrete block — cold rooms have no
+ * windows — under a band of glass along its top storey ('=' lit, END_GLASS
+ * shaded, as every concrete family), a loading door two-thirds of the way
+ * along its lit face, a ribbed condenser on the cap, the annex grown to
+ * two storeys with a vent per storey, and a RUST ring-grain chimney at the
+ * back corner standing 10 units over the roof — the pun that says
+ * industrial-strength.
+ */
+function coldStore() {
+  const H = 20;
+  const base = litSkin(CONC_WALL, { height: H });
+  const skin = {
+    top: base.top,
+    side: (a, k, x, y) => {
+      const g = H - k;
+      if (a >= 6.5 && a < 10 && g < 7) return "+"; // the loading door — at a ≥ 7.5 abs, clear of the mirrored annex (see meatHall)
+      if (a >= 0.5 && a < 10 && g >= 15 && g < 18) return "="; // the office band
+      return base.side(a, k, x, y);
+    },
+    end: (b, k, x, y) => {
+      const g = H - k;
+      if (b >= 0.5 && b < 13.5 && g >= 15 && g < 18) return END_GLASS;
+      return base.end(b, k, x, y);
+    },
+  };
+  const A = 13;
+  const annexBase = litSkin(SLATE, { height: A });
+  const annex = {
+    top: annexBase.top,
+    side: (a, k, x, y) => {
+      const g = A - k;
+      if (a >= 1.5 && a < 2.5 && ((g >= 4 && g < 6) || (g >= 10 && g < 12))) return "+"; // a vent per storey
+      return annexBase.side(a, k, x, y);
+    },
+    end: annexBase.end,
+  };
+  return [
+    box(1, 11.5, 1, 15, 0, H, skin),
+    box(0.5, 12, 0.5, 15.5, H, H + 1, C_ROOF),
+    box(2.5, 7, 3, 6, H + 1, H + 4, litSkin(CONC, { grain: ribGrain, height: 3 })),
+    box(11.5, 15.5, 3.5, 7.5, 0, A, annex),
+    box(11, 16, 3, 8, A, A + 1, SLATE_SKIN),
+    box(12.5, 14.5, 0.5, 2.5, 0, H + 10, litSkin(RUST, { grain: ringGrain, height: H + 10 })),
+  ];
+}
+
 // ------------------------------------------------------------- the table
 
 const FAMILY = {
   1: { 1: ["cottage", cottage], 2: ["two-storey", twoStorey], 3: ["apartment", apartment] },
   2: { 1: ["shop", shop], 2: ["store", store], 3: ["tower", tower] },
   3: { 1: ["shed", shed], 2: ["factory", factory], 3: ["works", works] },
+  4: { 1: ["stall", stall], 2: ["meat-hall", meatHall], 3: ["cold-store", coldStore] },
 };
-const ZONE_LETTER = { 1: "R", 2: "C", 3: "I" };
+const ZONE_LETTER = { 1: "R", 2: "C", 3: "I", 4: "M" };
 
-/** BUILDINGS[zone][tier][variant] — 18 sprites. */
+/** BUILDINGS[zone][tier][variant] — 24 sprites. */
 export const BUILDINGS = {};
-for (const zone of [1, 2, 3]) {
+for (const zone of [1, 2, 3, 4]) {
   BUILDINGS[zone] = {};
   for (const tier of [1, 2, 3]) {
     const [name, make] = FAMILY[zone][tier];
@@ -348,7 +527,7 @@ for (const zone of [1, 2, 3]) {
 }
 
 export function buildingSprite(zone, tier, variant = 0) {
-  const z = typeof zone === "string" ? { R: 1, C: 2, I: 3 }[zone] : zone;
+  const z = typeof zone === "string" ? { R: 1, C: 2, I: 3, M: 4 }[zone] : zone;
   const fam = BUILDINGS[z] && BUILDINGS[z][tier];
   if (!fam) throw new Error(`buildingSprite: no family for zone ${zone} tier ${tier}`);
   return fam[variant & 1];
@@ -504,7 +683,63 @@ export const POLICE_STATION = (() => {
   return solidSprite("police-station", boxes, { tags: ["civic"] });
 })();
 
-export const CIVICS = { park: PARK, zoo: ZOO, fire: FIRE_STATION, police: POLICE_STATION };
+/**
+ * The pacification centre: a LOW white block — H 10 against the police
+ * station's 14, and the full concrete ramp where the station wears
+ * CONC_WALL, so its lit face is '*' to the station's '&'. A '+' double
+ * door (two 3-px leaves, a 1-px mullion) under a 3 × 3 px earth-brown 's'
+ * cross — brown on white reads at 1×; one barred window on the shaded end
+ * (END_GLASS with a concrete post every 1.5 units, so every third column
+ * is wall), a flat cap and a '-' lamp on its corner. THE SIGNATURE at 1×
+ * is the van at the door: a furCool box 4.5 × 2.5 × 3.5 units on a STEP
+ * apron, its nose toward the door, a '=' windscreen on the nose and two
+ * '+' wheels under it with the apron showing between them. Nothing on it
+ * is red.
+ *
+ * THE CROSS IS DRAWN IN SCREEN PIXELS, not in wall units: a world-
+ * horizontal arm on the receding face is a 2:1 staircase, and at three
+ * pixels that is a squiggle, not a cross (round 1 — and the cap's rim,
+ * which overhangs the wall by half a unit, took the upright's top row).
+ * The wall column x = −9 is a = 9; the centre sits at c = 7.5, screen
+ * y = 15, with the rim two rows above and the door two rows below.
+ */
+export const PACIFICATION_CENTRE = (() => {
+  const H = 10;
+  const base = litSkin(CONC, { height: H });
+  const CROSS_X = -9, CROSS_Y = 15;
+  const skin = {
+    top: base.top,
+    side: (a, k, x, y) => {
+      const g = H - k;
+      if ((x === CROSS_X && Math.abs(y - CROSS_Y) <= 1) || (y === CROSS_Y && Math.abs(x - CROSS_X) <= 1)) return EARTH[2]; // the cross
+      const mullion = a >= 7.5 && a < 8; // one column, under the cross's upright
+      if (a >= 6 && a < 9.5 && g < 5.5 && !mullion) return "+"; // the double door
+      return base.side(a, k, x, y);
+    },
+    end: (b, k, x, y) => {
+      const g = H - k;
+      if (b >= 2 && b < 8 && g >= 4 && g < 7) return (b - 2) % 1.5 < 0.25 ? base.end(b, k, x, y) : END_GLASS; // the barred window
+      return base.end(b, k, x, y);
+    },
+  };
+  const VAN = { top: () => "Z", side: () => "Y", end: (b, k) => (k < 2 ? "=" : "X") };
+  const WHEEL = flatSkin("+", "+", "+");
+  const boxes = [
+    box(1.5, 14.5, 2.5, 13.5, 0, H, skin),
+    box(1, 15, 2, 14, H, H + 1, C_ROOF),
+    box(12, 13.5, 12, 13.5, H + 1, H + 2.5, LAMP),
+    box(7.5, 11, 13.5, 14.5, 0, 1, STEP), // the door step
+    // The van: apron, wheels, body — listed bottom up so the shared plane
+    // at the wheel tops belongs to the body.
+    box(1.5, 7.5, 13, 16, 0, 0.5, STEP),
+    box(2.5, 3.5, 15.5, 16, 0.5, 1.5, WHEEL),
+    box(5, 6, 15.5, 16, 0.5, 1.5, WHEEL),
+    box(2, 6.5, 13.5, 16, 1.5, 5, VAN),
+  ];
+  return solidSprite("pacification-centre", boxes, { tags: ["civic"] });
+})();
+
+export const CIVICS = { park: PARK, zoo: ZOO, fire: FIRE_STATION, police: POLICE_STATION, centre: PACIFICATION_CENTRE };
 export function civicSprite(kind) {
   const s = CIVICS[kind];
   if (!s) throw new Error(`civicSprite: unknown kind '${kind}'`);
@@ -617,8 +852,8 @@ export function overlaySprite(kind, frame = 0) {
 /** Every building sprite, named, for the audit. */
 export function allBuildings() {
   const out = [];
-  for (const zone of [1, 2, 3]) for (const tier of [1, 2, 3]) for (const s of BUILDINGS[zone][tier]) out.push({ name: s.name, sprite: s });
-  out.push({ name: PARK.name, sprite: PARK }, { name: ZOO.name, sprite: ZOO }, { name: FIRE_STATION.name, sprite: FIRE_STATION }, { name: POLICE_STATION.name, sprite: POLICE_STATION });
+  for (const zone of [1, 2, 3, 4]) for (const tier of [1, 2, 3]) for (const s of BUILDINGS[zone][tier]) out.push({ name: s.name, sprite: s });
+  out.push({ name: PARK.name, sprite: PARK }, { name: ZOO.name, sprite: ZOO }, { name: FIRE_STATION.name, sprite: FIRE_STATION }, { name: POLICE_STATION.name, sprite: POLICE_STATION }, { name: PACIFICATION_CENTRE.name, sprite: PACIFICATION_CENTRE });
   for (const [k, list] of Object.entries(OVERLAYS)) list.forEach((s, i) => out.push({ name: `overlay-${k}-${i}`, sprite: s }));
   return out;
 }

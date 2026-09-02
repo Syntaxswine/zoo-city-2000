@@ -81,6 +81,7 @@ export function createUI(app) {
       ["animals", KNOBS.UPKEEP_CITIZEN * w.citizens.length], ["roads", KNOBS.UPKEEP_ROAD * fig.roads], ["bridges", KNOBS.UPKEEP_BRIDGE * fig.bridges],
       ["buildings", KNOBS.UPKEEP_TIER * tiers], ["parks", KNOBS.UPKEEP_PARK * fig.parks], ["zoos", KNOBS.UPKEEP_ZOO * fig.zoos],
       ["fire stations", KNOBS.UPKEEP_STATION * (fig.fireStations || 0)], ["police stations", KNOBS.UPKEEP_STATION * (fig.policeStations || 0)],
+      ["pacification centres", KNOBS.UPKEEP_CENTRE * (fig.centres || 0)], ["licence inspectors", fig.licence ? KNOBS.UPKEEP_LICENCE * (fig.markets || 0) : 0],
     ];
     const lines = raw.filter(([, v]) => v > 0).map(([name, v]) => [name, Math.round(v * k)]);
     const sum = lines.reduce((s, l) => s + l[1], 0);
@@ -89,7 +90,7 @@ export function createUI(app) {
       for (const l of lines) if (l[1] > big[1]) big = l;
       big[1] += fig.upkeepYr - sum;
     }
-    return { fig, winter, lines, net: fig.incomeYr - fig.upkeepYr };
+    return { fig, winter, lines, net: fig.incomeYr + (fig.cutYr || 0) - fig.upkeepYr };
   }
 
   // ---- the tool strip -----------------------------------------------------------------------
@@ -229,7 +230,7 @@ export function createUI(app) {
   const hTitle = (c) => `cross-species share of ${plural(c.friendships, "friendship")}${hSmall(c) ? ` — fading in until ${KNOBS.H_FLOOR}; the raw share is ${pct(hRaw(c))}` : ""}`;
 
   // ---- hover card --------------------------------------------------------------------------------------
-  const TIER_NAME = { 1: ["cottage", "shop", "shed"], 2: ["two-storey", "store", "factory"], 3: ["apartment", "tower", "works"] };
+  const TIER_NAME = { 1: ["cottage", "shop", "shed", "stall"], 2: ["two-storey", "store", "factory", "meat hall"], 3: ["apartment", "tower", "works", "cold store"] };
   function speciesList(members, w) {
     const counts = {};
     for (const c of members) counts[c.species] = (counts[c.species] || 0) + 1;
@@ -255,6 +256,8 @@ export function createUI(app) {
     else if (rep.civic === CIVIC.ZOO || rep.civic === CIVIC.ZOO_PART) what = "Zoo";
     else if (rep.civic === CIVIC.FIRE) what = "Fire station";
     else if (rep.civic === CIVIC.POLICE) what = "Police station";
+    else if (rep.civic === CIVIC.CENTRE) what = "Pacification centre";
+    else if (rep.zone === ZONE.M) what = `Meat market ${rep.maxTier === 1 ? "Low" : "High"}`;
     else if (rep.zone !== ZONE.NONE) what = `${ZONE_NAME[rep.zone]} ${rep.maxTier === 1 ? "Low" : "High"}`;
     else if (w.terrain[i] === TERRAIN.WATER) what = "Water";
     else if (w.terrain[i] === TERRAIN.TREE) what = "Trees";
@@ -269,6 +272,12 @@ export function createUI(app) {
       }
     }
     if (rep.civic === CIVIC.ZOO) head.append(el("span", "", `  jobs ${rep.staff}/${rep.jobs}`));
+    if (rep.civic === CIVIC.CENTRE) {
+      const held = w.citizens.filter((c) => c.heldAt === i && (c.held || 0) > w.tick);
+      head.append(el("span", "", `  beds ${held.length}/${KNOBS.CENTRE_BEDS} · jobs ${rep.staff}/${rep.jobs}`));
+      for (const c of held) lines.push(el("div", "", `held: ${c.name} ${c.surname} (${c.species}), home in ${c.held - w.tick} month${c.held - w.tick === 1 ? "" : "s"}${c.wrongful ? " — the wrong animal" : ""}`));
+      lines.push(el("div", "dim", "Six beds, six months. They come home calm and childless; one arrest in twenty was the wrong animal."));
+    }
     if (pinned) head.append(el("span", "pin", " pinned (Esc)"));
     lines.push(head);
 
@@ -286,15 +295,21 @@ export function createUI(app) {
     }
     const env = el("div", "dim");
     env.textContent = `LV ${rep.lv}  Pol ${rep.pol}  crime ${rep.crime}  road ${rep.roadDist > KNOBS.ROAD_REACH ? "—" : rep.roadDist}` + (w.road[i] ? `  traffic ${rep.traffic}` : "")
-      + (rep.fireCov ? "  · fire cover" : "") + (rep.policeCov ? `  · police cover −${rep.policeCov}` : "");
+      + (rep.dread ? `  dread ${rep.dread}` : "") + (rep.fireCov ? "  · fire cover" : "") + (rep.policeCov ? `  · police cover −${rep.policeCov}` : "");
     lines.push(env);
+    if (rep.dread) lines.push(el("div", "dim", `dread ${rep.dread}: herbivores −${Math.min(KNOBS.DREAD_MOOD_CAP, Math.round(KNOBS.DREAD_MOOD_HERB * rep.dread))} mood and −${Math.round(KNOBS.DREAD_HOME_HERB * rep.dread)} on the home score; LV −${Math.round(KNOBS.LV_DREAD * rep.dread)}; carnivores do not mind`));
+    for (const f of w.events.files) {
+      if (f.tile !== i || f.until <= w.tick) continue;
+      const culprit = w.byId ? w.byId.get(f.culpritId) : null;
+      lines.push(el("div", f.closed ? "dim" : "warn", `a ${f.cause} here, ${w.tick - f.opened} month${w.tick - f.opened === 1 ? "" : "s"} ago — crime +${f.crime} within ${f.radius} for ${f.until - w.tick} more${f.closed ? "" : `; the file is open${culprit ? ` on ${culprit.name} ${culprit.surname} (${culprit.species})` : ""}`}`));
+    }
     if (rep.households.length) {
       lines.push(el("div", "", rep.households.map((h) => householdLine(h, w)).join(" · ")));
       const jobless = rep.households.flatMap((h) => h.members).filter((c) => isWorker(w, c) && c.job < 0);
       if (jobless.length) lines.push(el("div", "warn", `${jobless.length} looking for work: ${jobless.slice(0, 4).map((c) => c.name).join(", ")}${jobless.length > 4 ? "…" : ""}`));
     }
     if (rep.workers.length) {
-      const names = rep.workers.slice(0, 5).map((c) => `${c.name} ${c.surname} (${c.species})`).join(", ");
+      const names = rep.workers.slice(0, 5).map((c) => `${c.name} ${c.surname} (${c.species}${c.fixed ? ", fixed" : ""})`).join(", ");
       lines.push(el("div", "", `workers: ${names}${rep.workers.length > 5 ? ` +${rep.workers.length - 5}` : ""}`));
     }
     if (rep.zone !== ZONE.NONE) {
@@ -325,7 +340,7 @@ export function createUI(app) {
       case REASON.SMOG: return `smog ${rep.pol} > ${KNOBS.SMOG_REFUSE}`;
       case REASON.NO_DEMAND: case REASON.EMPTY: {
         const v = s.parts.valve;
-        const rate = w.rates[z];
+        const rate = w.rates[z] ?? w.rates.C; // a meat hall rides the C rate
         return `demand ${f2(v)}${rate > n ? ` (${z} ${rate}% vs neutral ${n.toFixed(1)}%)` : s.parts.local < 0 ? ` (local ${f2(s.parts.local)})` : ""}`;
       }
       case REASON.LV_CAP: return `LV ${rep.lv} < ${rep.tier === 1 ? KNOBS.LV_TIER[0] : KNOBS.LV_TIER[1]} — parks and trees raise it`;
@@ -350,6 +365,11 @@ export function createUI(app) {
       const homeS = c.home >= 0 ? `(${c.home % w.w},${(c.home / w.w) | 0})` : "none";
       const jobS = c.job >= 0 ? `(${c.job % w.w},${(c.job / w.w) | 0})` : isWorker(w, c) ? `none${c.jobless ? ` — ${c.jobless} months looking` : ""}` : "—";
       lines.push(el("div", "", `home ${homeS} · job ${jobS} · mood ${Math.round(c.mood)}`));
+      const status = [];
+      if ((c.held || 0) > w.tick) status.push(c.heldAt >= 0 ? `at the Pacification Centre until ${dateOf(w, c.held).label}` : `in the cells until ${dateOf(w, c.held).label}`);
+      if (c.fixed) status.push(`fixed${c.wrongful ? " — the wrong animal" : ""}${c.exonerated ? ", exonerated" : ""}`);
+      if (c.record) status.push(`record ${c.record}`);
+      if (status.length) lines.push(el("div", "warn", status.join(" · ")));
       const friends = c.friends.map((f) => w.byId.get(f)).filter(Boolean);
       lines.push(el("div", "dim", friends.length ? `friends: ${friends.map((f) => `${f.name} ${f.surname} (${f.species})`).join(", ")}` : "no friends yet"));
       const doing = { commuter: "commuting", stroller: "out for a stroll", cub: "off to the park", arrival: "just arrived — walking home", meeting: "meeting a new friend" }[wk.kind] || wk.kind;
@@ -437,13 +457,15 @@ export function createUI(app) {
     const { fig, winter, lines, net } = liveBudget(w);
     const cInc = w.rates.C * fig.fc * KNOBS.TAX_C_PER_JOB;
     const iInc = w.rates.I * fig.fi * KNOBS.TAX_I_PER_JOB;
-    const rInc = Math.max(0, fig.incomeYr - cInc - iInc);
+    const mInc = fig.licence ? w.rates.C * (fig.fm || 0) * KNOBS.TAX_C_PER_JOB : 0;
+    const rInc = Math.max(0, fig.incomeYr - cInc - iInc - mInc);
     const table = el("table", "ledger");
     const tr = (k, v, cls) => { const r = el("tr", cls); r.append(el("td", "", k), el("td", "num", v)); table.append(r); };
     tr("INCOME / yr", money(fig.incomeYr), "h");
     tr(`R: ${w.rates.R}% × Σ(0.5 + LV/100)`, money(rInc));
     tr(`C: ${w.rates.C}% × 1.5 × ${fig.fc} jobs`, money(cInc));
     tr(`I: ${w.rates.I}% × 2.0 × ${fig.fi} jobs`, money(iInc));
+    if (fig.fm || fig.markets) tr(fig.licence ? `M (licensed): ${w.rates.C}% × 1.5 × ${fig.fm} jobs` : `M cut (grey, untaxed): §${KNOBS.CUT_PER_JOB} × ${fig.fm} jobs`, money(fig.licence ? mInc : fig.cutYr || 0));
     tr(`UPKEEP / yr${winter ? " (bear winter −20%)" : ""}`, money(fig.upkeepYr), "h");
     for (const [k, v] of lines) tr(k, money(v));
     tr("NET / yr", (net < 0 ? "−" : "+") + money(Math.abs(net)).slice(1), net < 0 ? "h bad" : "h");
@@ -470,8 +492,18 @@ export function createUI(app) {
     tr("unemployed", `${c.U} (${c.W ? Math.round((100 * c.U) / c.W) : 0}%)`);
     tr("friendships", `${c.friendships}`);
     tr("crime (built lots, mean / max)", `${Math.round(c.meanCrime)} / ${c.maxCrime}`);
-    tr("stations", `${c.fireStations} fire · ${c.policeStations} police`);
+    tr("stations", `${c.fireStations} fire · ${c.policeStations} police${c.centres ? ` · ${c.centres} pacification` : ""}`);
+    if (c.markets) tr("meat halls", `${c.markets} (${c.Jm} jobs) · ${c.herbNear} herbivores within the smell`);
+    { const j = w.events.justice || {}; const open = (w.events.files || []).filter((f) => !f.closed).length;
+      if (w.events.killings || j.takenIn || j.cells || j.sold) {
+        tr("killings since founding", `${w.events.killings}`);
+        tr("files open / gone cold", `${open} / ${j.cold || 0}`);
+        tr("pacified (wrongful · exonerated)", `${j.pacified || 0} (${j.wrongful || 0} · ${j.exonerated || 0})`);
+        tr("held · cells · sold at the hall", `${c.held} · ${j.cells || 0} · ${j.sold || 0}`);
+        tr("litters lost last month", `${fig.littersLost || 0}`);
+      } }
     tr("Zoo City index (cross-species share)", hIndex(c));
+    if (c.fixed) tr("— of which by pacification", pct(c.hKnife));
     if (hSmall(c)) { const r = el("tr"); const td = el("td", "dim", `fading in over the first ${KNOBS.H_FLOOR} friendships — raw share ${pct(hRaw(c))}`); td.colSpan = 2; r.append(td); grid.append(r); }
     tr("approval (mean mood)", `${Math.round(c.approval)}`);
     tr("native-born", pct(c.native));

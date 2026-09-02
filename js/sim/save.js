@@ -20,6 +20,9 @@ function plainCitizen(c) {
     home: c.home, job: c.job, household: c.household, friends: c.friends.slice(), mood: c.mood,
     jobless: c.jobless, native: c.native, onLeave: c.onLeave, hired: c.hired,
     grief: c.grief || 0, centenary: !!c.centenary,
+    // crime and punishment: custody, the record, the knife
+    held: c.held || 0, heldAt: c.heldAt ?? -1, fixed: !!c.fixed, record: c.record || 0, wrongful: !!c.wrongful, wrongedBy: c.wrongedBy || 0, exonerated: !!c.exonerated,
+    moodPenalty: c.moodPenalty || 0, moodPenaltyUntil: c.moodPenaltyUntil || 0,
   };
 }
 
@@ -55,10 +58,14 @@ export function fromPlain(o) {
   world.cash = o.cash;
   world.rates = { ...o.rates };
   world.start = o.start;
-  world.valves = { ...o.valves };
+  world.valves = { ...world.valves, ...o.valves }; // an old save without M keeps the default 0
   world.festivalBonus = o.festivalBonus;
   for (const k of TILE_ARRAYS) world[k].set(o[k]);
-  world.citizens = o.citizens.map((c) => ({ ...c, friends: c.friends.slice(), path: null, stale: false }));
+  world.citizens = o.citizens.map((c) => ({
+    ...c, friends: c.friends.slice(), path: null, stale: false,
+    held: c.held || 0, heldAt: c.heldAt ?? -1, fixed: !!c.fixed, record: c.record || 0, wrongful: !!c.wrongful, wrongedBy: c.wrongedBy || 0, exonerated: !!c.exonerated,
+    moodPenalty: c.moodPenalty || 0, moodPenaltyUntil: c.moodPenaltyUntil || 0,
+  }));
   world.households = o.households.map((h) => ({ ...h, members: h.members.slice() }));
   world.campers = o.campers.map((c) => ({ ...c }));
   world.nextId = o.nextId;

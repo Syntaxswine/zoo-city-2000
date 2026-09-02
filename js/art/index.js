@@ -1,7 +1,7 @@
 // index.js — the registry the renderer calls. SPEC §16.
 //
-//   art.building(zone, tier, variant)   zone 1|2|3 or 'R'|'C'|'I', tier 1..3
-//   art.civic(kind)                     'park' | 'zoo' | 'fire' | 'police'
+//   art.building(zone, tier, variant)   zone 1|2|3|4 or 'R'|'C'|'I'|'M', tier 1..3
+//   art.civic(kind)                     'park' | 'zoo' | 'fire' | 'police' | 'centre'
 //   art.road(mask, busy)                4-bit mask N=1 E=2 S=4 W=8
 //   art.bridge(mask)
 //   art.ground(kind, variant)           'grass' 0..2 | 'water' | 'rubble'
@@ -46,7 +46,7 @@ export function ground(kind, variant = 0) {
 }
 
 export function chalk(zone, high = false) {
-  const z = typeof zone === "string" ? { R: 1, C: 2, I: 3 }[zone] : zone;
+  const z = typeof zone === "string" ? { R: 1, C: 2, I: 3, M: 4 }[zone] : zone;
   const list = CHALK[z];
   if (!list) throw new Error(`art.chalk: unknown zone '${zone}'`);
   return list[high ? 1 : 0];

@@ -46,9 +46,26 @@ function residentsNear(world, i, r = 5) {
   return sum;
 }
 
+/** Carnivores housed within Chebyshev r (a meat hall's customers). */
+function carnivoresNear(world, i, r = 5) {
+  const { w } = world;
+  const tx = i % w;
+  const ty = (i / w) | 0;
+  let sum = 0;
+  for (let dy = -r; dy <= r; dy++) {
+    for (let dx = -r; dx <= r; dx++) {
+      const xx = tx + dx;
+      const yy = ty + dy;
+      if (!inBounds(world, xx, yy)) continue;
+      sum += world.carnAt[yy * w + xx];
+    }
+  }
+  return sum;
+}
+
 export function maxTierByLV(world, i) {
   const z = world.zone[i];
-  if (z === ZONE.I) return 3;
+  if (z === ZONE.I || z === ZONE.M) return 3; // a hall floors its own LV; an LV ladder would cap it at a stall
   const lv = world.lv[i];
   const byLV = lv < KNOBS.LV_TIER[0] ? 1 : lv < KNOBS.LV_TIER[1] ? 2 : 3;
   return byLV;
@@ -68,7 +85,7 @@ export function lotScore(world, i) {
   if (world.flooded[i]) { out.reason = REASON.FLOODED; return out; }
   const access = hasAccess(world, i);
   out.access = access;
-  const valve = world.valves[z === ZONE.R ? "R" : z === ZONE.C ? "C" : "I"];
+  const valve = world.valves[z === ZONE.R ? "R" : z === ZONE.C ? "C" : z === ZONE.M ? "M" : "I"];
   const lv = world.lv[i];
   const pol = world.pol[i];
   let local;
@@ -79,6 +96,9 @@ export function lotScore(world, i) {
   } else if (z === ZONE.C) {
     local = 0.6 * clamp(residentsNear(world, i) / 80 - 0.5, -KNOBS.LOCAL_CLAMP, KNOBS.LOCAL_CLAMP) + 0.4 * ((lv - 50) / KNOBS.LOCAL_SCALE);
     if (world.crime[i] > KNOBS.CRIME_HIGH) local -= KNOBS.CRIME_C_PENALTY; // shops need safe streets
+  } else if (z === ZONE.M) {
+    // A hall wants carnivores near and cheap ground; a grey market minds no crime.
+    local = 0.6 * clamp(carnivoresNear(world, i) / KNOBS.M_CUSTOMERS_DIV - 0.5, -KNOBS.LOCAL_CLAMP, KNOBS.LOCAL_CLAMP) + 0.4 * ((50 - lv) / KNOBS.LOCAL_SCALE);
   } else {
     local = 0.4 * ((50 - lv) / KNOBS.LOCAL_SCALE);
   }
@@ -163,6 +183,7 @@ export function lotReport(world, i) {
     civic: world.civic[i],
     lv: world.lv[i],
     pol: world.pol[i],
+    dread: world.dread[i],
     roadDist: world.roadDist[i],
     traffic: world.traffic[i],
     crime: world.crime[i],

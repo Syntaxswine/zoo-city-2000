@@ -24,14 +24,21 @@ export function yearlyFigures(world) {
   }
   let fc = 0;
   let fi = 0;
+  let fm = 0;
   for (const c of citizens) {
     if (c.job < 0) continue;
-    if (world.zone[c.job] === ZONE.I) fi++;
+    const z = world.zone[c.job];
+    if (z === ZONE.I) fi++;
+    else if (z === ZONE.M) fm++;
     else fc++;
   }
   // Bear winter: bears out of the workforce still counted as filled jobs? No —
   // a bear on leave holds no job for those months (citizens.js clears it).
-  const incomeYr = rates.R * baseR * KNOBS.TAX_R_PER_CITIZEN + rates.C * fc * KNOBS.TAX_C_PER_JOB + rates.I * fi * KNOBS.TAX_I_PER_JOB;
+  // Meat halls: grey means untaxed — an unlicensed hall pays the mayor a flat
+  // cut per filled job (ledger "cut"); the licence puts the jobs on the books.
+  const licence = !!world.events.licence;
+  const incomeYr = rates.R * baseR * KNOBS.TAX_R_PER_CITIZEN + rates.C * fc * KNOBS.TAX_C_PER_JOB + rates.I * fi * KNOBS.TAX_I_PER_JOB + (licence ? rates.C * fm * KNOBS.TAX_C_PER_JOB : 0);
+  const cutYr = licence ? 0 : KNOBS.CUT_PER_JOB * fm;
 
   let roads = 0;
   let bridges = 0;
@@ -40,26 +47,31 @@ export function yearlyFigures(world) {
   let zoos = 0;
   let fireStations = 0;
   let policeStations = 0;
+  let centres = 0;
+  let markets = 0;
   const n = world.w * world.h;
   for (let i = 0; i < n; i++) {
     if (world.road[i] === ROAD.ROAD) roads++;
     else if (world.road[i] === ROAD.BRIDGE) bridges++;
     tiers += world.tier[i];
+    if (world.zone[i] === ZONE.M && world.tier[i] > 0) markets++;
     if (world.civic[i] === CIVIC.PARK) parks++;
     else if (world.civic[i] === CIVIC.ZOO) zoos++;
     else if (world.civic[i] === CIVIC.FIRE) fireStations++;
     else if (world.civic[i] === CIVIC.POLICE) policeStations++;
+    else if (world.civic[i] === CIVIC.CENTRE) centres++;
   }
-  let upkeepYr = KNOBS.UPKEEP_CITIZEN * citizens.length + KNOBS.UPKEEP_ROAD * roads + KNOBS.UPKEEP_BRIDGE * bridges + KNOBS.UPKEEP_TIER * tiers + KNOBS.UPKEEP_PARK * parks + KNOBS.UPKEEP_ZOO * zoos + KNOBS.UPKEEP_STATION * (fireStations + policeStations);
+  let upkeepYr = KNOBS.UPKEEP_CITIZEN * citizens.length + KNOBS.UPKEEP_ROAD * roads + KNOBS.UPKEEP_BRIDGE * bridges + KNOBS.UPKEEP_TIER * tiers + KNOBS.UPKEEP_PARK * parks + KNOBS.UPKEEP_ZOO * zoos + KNOBS.UPKEEP_STATION * (fireStations + policeStations) + KNOBS.UPKEEP_CENTRE * centres + (licence ? KNOBS.UPKEEP_LICENCE * markets : 0);
   const winter = world.events.active.find((e) => e.id === "bearWinter");
   if (winter) upkeepYr *= 0.8;
-  return { incomeYr: Math.round(incomeYr), upkeepYr: Math.round(upkeepYr), fc, fi, roads, bridges, parks, zoos, fireStations, policeStations };
+  return { incomeYr: Math.round(incomeYr), upkeepYr: Math.round(upkeepYr), cutYr: Math.round(cutYr), fc, fi, fm, roads, bridges, parks, zoos, fireStations, policeStations, centres, markets, licence };
 }
 
 /** The monthly slice: post tax and upkeep, apply receivership rules. */
 export function budgetTick(world) {
   const fig = yearlyFigures(world);
   post(world, "tax", fig.incomeYr / 12);
+  if (fig.cutYr) post(world, "cut", fig.cutYr / 12);
   post(world, "upkeep", -fig.upkeepYr / 12);
   const notices = [];
   if (!world.flags.receivership && world.cash < KNOBS.RECEIVERSHIP) {

@@ -9,10 +9,13 @@ import { KNOBS } from "./rules.js";
 
 export const TERRAIN = Object.freeze({ GRASS: 0, WATER: 1, TREE: 2 });
 export const ROAD = Object.freeze({ NONE: 0, ROAD: 1, BRIDGE: 2 });
-export const ZONE = Object.freeze({ NONE: 0, R: 1, C: 2, I: 3 });
-export const CIVIC = Object.freeze({ NONE: 0, PARK: 1, ZOO: 2, ZOO_PART: 3, FIRE: 4, POLICE: 5 });
-export const isStation = (c) => c === CIVIC.FIRE || c === CIVIC.POLICE;
-export const ZONE_NAME = ["none", "R", "C", "I"];
+export const ZONE = Object.freeze({ NONE: 0, R: 1, C: 2, I: 3, M: 4 });
+export const CIVIC = Object.freeze({ NONE: 0, PARK: 1, ZOO: 2, ZOO_PART: 3, FIRE: 4, POLICE: 5, CENTRE: 6 });
+export const isStation = (c) => c === CIVIC.FIRE || c === CIVIC.POLICE; // coverage
+export const isCivicEmployer = (c) => isStation(c) || c === CIVIC.CENTRE; // jobs
+export const ZONE_NAME = ["none", "R", "C", "I", "M"];
+/** In custody (the cells or the centre): not a worker, not at home for the flight rule, not on the street. */
+export const absent = (world, c) => (c.held || 0) > world.tick;
 
 export const idx = (w, tx, ty) => ty * w.w + tx;
 export const inBounds = (w, tx, ty) => tx >= 0 && ty >= 0 && tx < w.w && ty < w.h;
@@ -48,18 +51,20 @@ export function createWorld({ seed = "zoo", w = 64, h = 64 } = {}) {
     crime: new Uint8Array(n),
     fireCov: new Uint8Array(n),
     policeCov: new Uint8Array(n),
+    dread: new Uint8Array(n),
+    carnAt: new Uint8Array(n),
     occupants: new Uint8Array(n),
     staff: new Uint8Array(n),
     roadsDirty: true,
     // sim
-    valves: { R: 0, C: 0, I: 0 },
+    valves: { R: 0, C: 0, I: 0, M: 0 },
     festivalBonus: 0,
     citizens: [],
     households: [],
     campers: [],
     nextId: 1,
     nextHouseholdId: 1,
-    events: { active: [], cooldown: 0, log: [], lastGrant: -100000, lastFestival: -100000, choice: null, noDisasters: false, scrubbers: false, revoltArmed: 0, centenaries: [] },
+    events: { active: [], cooldown: 0, log: [], lastGrant: -100000, lastFestival: -100000, choice: null, noDisasters: false, scrubbers: false, revoltArmed: 0, centenaries: [], files: [], licence: false, lastLicenceOffer: -100000, lastRaid: -100000, killings: 0, arrests: [], justice: { takenIn: 0, cells: 0, wrongful: 0, exonerated: 0, cold: 0, sold: 0, pacified: 0 } },
     ledger: {},
     history: [],
     log: [],
@@ -264,25 +269,29 @@ export function capacityOf(world, i) {
   if (z === ZONE.R) return KNOBS.R_CAP[t];
   if (z === ZONE.C) return KNOBS.C_JOBS[t];
   if (z === ZONE.I) return KNOBS.I_JOBS[t];
+  if (z === ZONE.M) return KNOBS.M_JOBS[t];
   if (world.civic[i] === CIVIC.ZOO) return KNOBS.ZOO_JOBS;
+  if (world.civic[i] === CIVIC.CENTRE) return KNOBS.CENTRE_JOBS;
   if (isStation(world.civic[i])) return KNOBS.STATION_JOBS;
   return 0;
 }
 
-/** Jobs offered by a tile (C, I, a zoo anchor, a fire or police station). */
+/** Jobs offered by a tile (C, I, M, a zoo anchor, a fire or police station, the centre). */
 export function jobsOf(world, i) {
   const z = world.zone[i];
   if (z === ZONE.C) return KNOBS.C_JOBS[world.tier[i]];
   if (z === ZONE.I) return KNOBS.I_JOBS[world.tier[i]];
+  if (z === ZONE.M) return KNOBS.M_JOBS[world.tier[i]];
   if (world.civic[i] === CIVIC.ZOO) return KNOBS.ZOO_JOBS;
-  if (isStation(world.civic[i])) return KNOBS.STATION_JOBS;
+  if (isCivicEmployer(world.civic[i])) return world.civic[i] === CIVIC.CENTRE ? KNOBS.CENTRE_JOBS : KNOBS.STATION_JOBS;
   return 0;
 }
 
-/** Is this tile a job site counted as C (zoo and station jobs count as C)? */
+/** Which demand a job site counts toward: C (zoo, stations and the centre count as C), I, or M (the meat halls — their own valve). */
 export function jobZone(world, i) {
-  if (world.zone[i] === ZONE.C || world.civic[i] === CIVIC.ZOO || isStation(world.civic[i])) return ZONE.C;
+  if (world.zone[i] === ZONE.C || world.civic[i] === CIVIC.ZOO || isCivicEmployer(world.civic[i])) return ZONE.C;
   if (world.zone[i] === ZONE.I) return ZONE.I;
+  if (world.zone[i] === ZONE.M) return ZONE.M;
   return ZONE.NONE;
 }
 

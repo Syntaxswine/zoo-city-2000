@@ -3,7 +3,7 @@
 //
 //   node tools/playtest.mjs [--seed 7] [--years 30] [--layout balanced|dormitory|millbelt]
 //                           [--rates 8,8,8] [--schedule 15:13,22:7] [--recession 20]
-//                           [--parks 2] [--zoo 12] [--csv] [--quiet]
+//                           [--parks 2] [--zoo 12] [--markets 1] [--pacify] [--stations] [--csv] [--quiet]
 //
 // The mayor: pre-plans a grid of 6×6 blocks ringed by roads around the start
 // road, opens the next block of the type demand asks for (valve > 0.2 and
@@ -31,6 +31,8 @@ const schedule = (arg("--schedule", "") || "").split(",").filter(Boolean).map((s
 const recessionYear = arg("--recession", null);
 const parksWanted = Number(arg("--parks", 0));
 const zooYear = arg("--zoo", null);
+const marketsWanted = Number(arg("--markets", 0)); // M blocks the mayor opens from year 2
+const pacify = flag("--pacify");                   // a pacification centre beside the start at year 3
 const csv = flag("--csv");
 const quiet = flag("--quiet");
 
@@ -85,7 +87,7 @@ function nextBlock() {
   return null;
 }
 const wantTypes = {
-  balanced: (v) => [["R", ZONE.R, v.R], ["C", ZONE.C, v.C], ["I", ZONE.I, v.I]],
+  balanced: (v) => [["R", ZONE.R, v.R], ["C", ZONE.C, v.C], ["I", ZONE.I, v.I], ...(marketsWanted ? [["M", ZONE.M, v.M]] : [])],
   dormitory: (v) => [["R", ZONE.R, v.R]],
   millbelt: (v) => [["R", ZONE.R, v.R], ["I", ZONE.I, v.I + 0.3], ["I2", ZONE.I, v.I + 0.2], ["C", ZONE.C, v.C - 0.2]],
 };
@@ -113,6 +115,15 @@ for (let t = 0; t < totalTicks; t++) {
       if (r.ok) break outer;
     }
   }
+  // --markets N: the mayor opens N meat-hall blocks from year 2, one a year.
+  if (marketsWanted && month === 0 && year >= 2 && year < 2 + marketsWanted) { const b = nextBlock(); if (b) openBlock(b[0], b[1], ZONE.M); }
+  // --pacify: a pacification centre beside the start at year 3.
+  if (pacify && t === 36) {
+    outer4: for (let dy = -6; dy <= 6; dy++) for (let dx = -6; dx <= 6; dx++) {
+      const r = apply(world, { kind: "centre", tx: sx + dx, ty: sy + dy });
+      if (r.ok) break outer4;
+    }
+  }
   // --stations: one fire and one police station beside the start road at year 2.
   if (flag("--stations") && t === 24) {
     for (const kind of ["fire", "police"]) {
@@ -133,7 +144,7 @@ for (let t = 0; t < totalTicks; t++) {
   if (t > 0 && month % 3 === 0 && world.cash > 600) {
     const v = world.valves;
     const wants = wantTypes[layout](v).sort((a, b) => b[2] - a[2]);
-    const empty = { [ZONE.R]: 0, [ZONE.C]: 0, [ZONE.I]: 0 };
+    const empty = { [ZONE.R]: 0, [ZONE.C]: 0, [ZONE.I]: 0, [ZONE.M]: 0 };
     for (let i = 0; i < world.w * world.h; i++) if (world.zone[i] && world.tier[i] === 0 && !world.rubble[i]) empty[world.zone[i]]++;
     for (const [name, zone, val] of wants) {
       if (val < 0.05) break;
@@ -164,15 +175,16 @@ for (let t = 0; t < totalTicks; t++) {
   lastP.push(cen.P);
   if (lastP.length > 3) lastP.shift();
   if (month === 11) {
-    rows.push({ year: year + 1, P: cen.P, W: cen.W, J: cen.J, U: cen.U, VR: world.valves.R, VC: world.valves.C, VI: world.valves.I, cash: world.cash, inc: world.last.budget.incomeYr, up: world.last.budget.upkeepYr, appr: Math.round(cen.approval), H: cen.H, pol: cen.meanPol, lv: cen.meanLV, shares: cen.shares, n: world.last.demand.n, cap: world.last.demand.cap, lots: cen.lots, noRoad: cen.lotsNoRoad, fr: cen.friendships, crime: cen.meanCrime, maxCrime: cen.maxCrime, stations: cen.fireStations + cen.policeStations });
+    rows.push({ year: year + 1, P: cen.P, W: cen.W, J: cen.J, U: cen.U, VR: world.valves.R, VC: world.valves.C, VI: world.valves.I, cash: world.cash, inc: world.last.budget.incomeYr, up: world.last.budget.upkeepYr, appr: Math.round(cen.approval), H: cen.H, pol: cen.meanPol, lv: cen.meanLV, shares: cen.shares, n: world.last.demand.n, cap: world.last.demand.cap, lots: cen.lots, noRoad: cen.lotsNoRoad, fr: cen.friendships, crime: cen.meanCrime, maxCrime: cen.maxCrime, stations: cen.fireStations + cen.policeStations,
+      markets: cen.markets, Jm: cen.Jm, herbNear: cen.herbNear, killings: world.events.killings, arrests: world.events.justice.takenIn + world.events.justice.cells + world.events.justice.sold, wrongful: world.events.justice.wrongful, fixed: cen.fixed, sold: world.events.justice.sold, held: cen.held, births: world.last.births, deaths: world.last.deaths, VM: world.valves.M, hKnife: cen.hKnife });
   }
 }
 
 // ---- report -----------------------------------------------------------------
 const f = (v, d = 2) => (typeof v === "number" ? v.toFixed(d) : v);
 if (csv) {
-  console.log("year,P,W,J,U,VR,VC,VI,cash,income,upkeep,approval,H,meanPol,meanLV,n,cap,lots");
-  for (const r of rows) console.log([r.year, r.P, r.W, r.J, r.U, f(r.VR), f(r.VC), f(r.VI), r.cash, r.inc, r.up, r.appr, f(r.H), f(r.pol, 1), f(r.lv, 1), f(r.n, 1), Math.round(r.cap), r.lots].join(","));
+  console.log("year,P,W,J,U,VR,VC,VI,cash,income,upkeep,approval,H,meanPol,meanLV,n,cap,lots,markets,Jm,VM,herbNear,killings,arrests,wrongful,fixed,sold,held,hKnife,crime");
+  for (const r of rows) console.log([r.year, r.P, r.W, r.J, r.U, f(r.VR), f(r.VC), f(r.VI), r.cash, r.inc, r.up, r.appr, f(r.H), f(r.pol, 1), f(r.lv, 1), f(r.n, 1), Math.round(r.cap), r.lots, r.markets, r.Jm, f(r.VM), r.herbNear, r.killings, r.arrests, r.wrongful, r.fixed, r.sold, r.held, f(r.hKnife, 3), f(r.crime, 1)].join(","));
 } else {
   console.log(`playtest seed=${seed} layout=${layout} rates=${rates.join("/")} years=${years}`);
   console.log(`local-term census at year 1: ${firstLocalReport.forbid}/${firstLocalReport.zoned} accessible zoned lots forbidden at V=+0.1 (${(firstLocalReport.frac * 100).toFixed(0)}%) — target < 30%`);
@@ -181,7 +193,9 @@ if (csv) {
     const top = Object.entries(r.shares).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([k, v]) => `${k} ${(v * 100).toFixed(0)}%`).join(" ");
     console.log(`${String(r.year).padStart(3)} ${String(r.P).padStart(5)} ${String(r.W).padStart(5)} ${String(r.J).padStart(5)} ${String(r.U).padStart(5)} ${f(r.VR).padStart(6)} ${f(r.VC).padStart(5)} ${f(r.VI).padStart(5)} ${String(r.cash).padStart(8)} ${String(r.inc).padStart(8)} ${String(r.up).padStart(6)} ${String(r.appr).padStart(4)} ${f(r.H).padStart(4)} ${String(r.fr).padStart(4)} ${f(r.pol, 0).padStart(4)} ${f(r.lv, 0).padStart(4)} ${f(r.crime, 0).padStart(3)}/${String(r.maxCrime).padEnd(3)} ${f(r.n, 1).padStart(3)} ${String(Math.round(r.cap)).padStart(5)} ${String(r.lots).padStart(4)}  ${top}`);
   }
+  const last = rows[rows.length - 1];
+  console.log(`crime and punishment: halls ${last.markets} (${last.Jm} jobs, V_M ${f(last.VM)}) · herbivores within the smell ${last.herbNear} · killings ${last.killings} · arrests ${last.arrests} (wrongful ${last.wrongful}) · fixed ${last.fixed} · sold ${last.sold} · held ${last.held} · H by pacification ${f(last.hKnife, 3)}`);
   console.log(`ledger: ${Object.entries(world.ledger).map(([k, v]) => `${k} ${v}`).join(" · ")}`);
-  const last = tickMs.slice(-12);
-  console.log(`hash ${stateHash(world)} · ${world.citizens.length} citizens · ${world.households.length} households · ${world.events.log.length} events · last-year tick ${(last.reduce((a, b) => a + b, 0) / last.length).toFixed(2)} ms (max ${Math.max(...last).toFixed(1)})`);
+  const lastMs = tickMs.slice(-12);
+  console.log(`hash ${stateHash(world)} · ${world.citizens.length} citizens · ${world.households.length} households · ${world.events.log.length} events · last-year tick ${(lastMs.reduce((a, b) => a + b, 0) / lastMs.length).toFixed(2)} ms (max ${Math.max(...lastMs).toFixed(1)})`);
 }

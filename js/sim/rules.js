@@ -125,7 +125,91 @@ export const KNOBS = {
   UPKEEP_PARK: 300,
   UPKEEP_ZOO: 1500,
   UPKEEP_STATION: 400,
-  COST: { zoneR: 5, zoneC: 8, zoneI: 8, road: 10, bridge: 40, bulldoze: 2, bulldozeTree: 4, tree: 4, park: 150, zoo: 2500, pond: 40, fire: 500, police: 500 },
+  COST: { zoneR: 5, zoneC: 8, zoneI: 8, zoneM: 12, road: 10, bridge: 40, bulldoze: 2, bulldozeTree: 4, tree: 4, park: 150, zoo: 2500, pond: 40, fire: 500, police: 500, centre: 1500 },
+  // ---- crime and punishment (the owner, 2026-09-02; docs/PROPOSAL-CRIME-AND-PUNISHMENT.md) ----
+  // Zone M — the grey-market meat hall: stall / meat hall / cold store.
+  M_JOBS: [0, 3, 8, 16],
+  MEAT_PER_CARN: 0.06,      // rM = (0.06·carnivores + 10 − Jm)/max(Jm, 20): a 1,600 town wants two halls
+  MEAT_SEED: 10,
+  M_CUSTOMERS_DIV: 40,      // local_M reads carnivores housed within 5 (shops use residents/80)
+  JOB_M: { carn: 0.9, omni: 0.5, herb: 0.1 },   // job preference by diet (jobC/jobI are per species)
+  // Dread — what a hall does to the street: exactly twice a works' LV shadow at every ring.
+  DREAD: [0, 40, 70, 105],
+  DREAD_RADIUS: [0, 2, 3, 4],
+  LV_DREAD: 0.8,
+  DREAD_MOOD_HERB: 0.25,    // herbivore mood −0.25·dread at home, capped, halved with a carnivore friend
+  DREAD_MOOD_CAP: 25,
+  DREAD_HOME_HERB: 1.0,     // herbivore home score −dread
+  DREAD_HOME_CARN: 0.8,     // carnivore home score +0.8·dread — net 0 against the LV term: they do not mind
+  DREAD_CARN_MOOD: 5,       // a carnivore inside the smell
+  MARKET_PUSH: 0.3,         // herbivore arrival weight ×(1 − 0.3·min(1, halls/3))
+  MARKET_PULL: 0.3,         // carnivore arrival weight +0.3·min(1, Jm/40)
+  REHOME_DREAD: 40,         // a herbivore household at this much dread may move along the road
+  REHOME_DREAD_P: 0.03,     // per month
+  // A hall is part of crime.
+  CRIME_M: [0, 10, 18, 25],
+  CRIME_M_RADIUS: [0, 1, 2, 3],
+  CRIME_UNEMP_LOCAL: 3,     // per unemployed adult in the 3×3 ("no jobs means hungry wolves")
+  CRIME_UNEMP_HUNTER: 2,    // ×2 if the unemployed adult is a carnivore
+  FILE_CRIME: 15,           // an incident's file stains the crime field this much …
+  FILE_RADIUS: 2,           // … over this radius …
+  FILE_MONTHS: 24,          // … for this long; the INVESTIGATION lasts CASE_MONTHS of it
+  // The killing — any adult may kill a neighbour; weights, never gates.
+  KILL_P: 0.00005,          // expected killings/month = KILL_P × Σ weights (≈ 0.3/yr in a fed, market-less town)
+  KILL_DIET: { carn: 1, omni: 0.1, herb: 0.03 },
+  KILL_HUNGRY: 20,          // an unemployed adult ("no jobs means hungry wolves")
+  KILL_MARKET: 3,           // a meat hall within the smell of home — a buyer
+  KILL_MARKET_LICENSED: 1.5,
+  KILL_STAFF: 2,            // a hall's own staff has the knives
+  KILL_RADIUS: 3,           // victims live within Chebyshev 3 of the killer
+  KILL_OTHER: 0.1,          // a victim that is not the killer's prey
+  KILL_BRIDGE: 0.1,         // a victim who is the killer's friend, or has a friend of the killer's kind
+  FEAR_MOOD: 15,            // the victim's species, city-wide, for FEAR_MONTHS
+  FEAR_MONTHS: 6,
+  INQUEST: 200,             // the city pays for every inquest
+  MEAT_PRICE: 50,           // what the hall pays the mayor's cut for a body
+  // The file, the arrest, the wrongful 5%.
+  CASE_MONTHS: 6,
+  ARREST_BASE: 0.02,        // p/month = base + cover·policeCov/60 + prior·record → 11% / 50% / 74% over six months at cover 0 / 30 / 60
+  ARREST_COVER: 0.18,
+  ARREST_PRIOR: 0.05,
+  WRONGFUL_P: 0.05,         // the owner's 5%: the wrong animal, random by proximity
+  WRONGFUL_RADIUS: 4,
+  // Custody and the sentence.
+  CELLS_MONTHS: 3,
+  PACIFY_MONTHS: 6,
+  CENTRE_BEDS: 6,
+  CENTRE_JOBS: 4,
+  RECORD_WEIGHT: 2,         // ×2 per conviction in the thief pool
+  FIXED_MOOD: 5,            // a fixed animal, for life
+  HELD_MOOD: 15,            // the cells or the centre, while held
+  FIXED_AFFINITY: 0.7,      // a fixed predator's friendship rolls with its prey (0.4 wary otherwise); counted ONCE in H
+  RETURN_MOOD: 10,          // the household of an animal home from the centre, for RETURN_MONTHS
+  RETURN_MONTHS: 12,
+  SOLD_PRICE: 100,          // the hall's price for a convict
+  COMPENSATION: 500,        // paid when the wrong animal is named
+  NAMED_MOOD: 5,            // the town, for NAMED_MONTHS, when an exoneration prints
+  NAMED_MONTHS: 6,
+  // Burglary — where crime is high and there is a station to file it.
+  BURGLARY_P: 0.006,        // p/month = min(BURGLARY_MAX, 0.006 × hot lots) — a big town's 7–17 hot lots ≈ 1/yr (0.02 gave a 150-animal town six a year)
+  BURGLARY_MAX: 0.3,
+  BURGLARY_RADIUS: 4,
+  BURGLARY_LOSS: 20,        // × tier
+  THIEF_UNEMP: 3,
+  THIEF_HOME_CRIME: 2,
+  THIEF_SPECIES: { fox: 2, raccoon: 2, cat: 2 },
+  // The cut, the licence, the raid, the van.
+  CUT_PER_JOB: 25,          // an unlicensed hall pays the mayor §25 per filled job per year, untaxed
+  LICENCE_COST: 2000,
+  UPKEEP_LICENCE: 400,      // per hall per year while licensed
+  LICENCE_CRIME_MULT: 0.5,
+  RAID_CRIME: 50,
+  RAID_FINE: 200,           // × tier
+  UPKEEP_CENTRE: 900,
+  LV_VAN: 6,                // land value near the centre
+  LV_VAN_RADIUS: 2,
+  VAN_MOOD: 5,              // carnivores within VAN_RADIUS of a centre
+  VAN_RADIUS: 4,
   START_CASH: 20000,
   RECEIVERSHIP: -10000,
   // events
@@ -230,17 +314,17 @@ export const RULES = Object.freeze([
   },
   {
     id: "C3", title: "Live and grow together",
-    formula: "friendships form at work, next door and in parks (p = 0.05·affinity; predator–prey pairs 0.4) ; H = cross-species share, a predator–prey friendship counts twice ; a funeral befriends the mourners",
+    formula: "friendships form at work, next door and in parks (p = 0.05·affinity; predator–prey pairs 0.4, 0.7 if the predator is fixed) ; H = cross-species share, a predator–prey friendship counts twice — ONCE if the predator is fixed (the knife buys quiet, not the index) ; a funeral befriends the mourners",
     live: (w) => `${w.last.census.friendships} friendships · ${w.last.census.predPrey} predator–prey · Zoo City index ${f2(w.last.census.H)} · approval ${Math.round(w.last.census.approval)}`,
   },
   {
     id: "C4", title: "Prey flight",
-    formula: "a rabbit, mouse, pig or cow loses 10 mood per predator species living next door — unless someone in the household is friends with that species",
-    live: () => "the bridge is a friendship, never a wall",
+    formula: "a rabbit, mouse, pig or cow loses 10 mood per predator species living next door, × the unfixed share of that species in the 3×3 — unless someone in the household is friends with that species",
+    live: (w) => `${w.last.census.fixed} fixed animals in town · the bridge is a friendship, never a wall`,
   },
   {
     id: "S1", title: "Crime",
-    formula: "crime = 40 − 0.5·LV + 0.4·animals in the 3×3 + 40·unemployed share − police ; above 60: LV −10, shops −0.2, a shop above 70 can be robbed ; mood −0.3 per point above 40 at home",
+    formula: "crime = 40 − 0.5·LV + 0.4·animals in the 3×3 + 3·unemployed adults in the 3×3 (carnivores ×2) + 40·unemployed share + a meat hall's 10/18/25 over 1/2/3 + 15 within 2 of an open file − police ; above 60: LV −10, shops −0.2, a shop above 70 can be robbed ; mood −0.3 per point above 40 at home",
     live: (w) => `mean crime on built lots ${f1(w.last.census.meanCrime)} · max ${w.last.census.maxCrime} · unemployed share ${f2(w.last.census.W ? w.last.census.U / w.last.census.W : 0)}`,
   },
   {
@@ -252,6 +336,41 @@ export const RULES = Object.freeze([
     id: "S3", title: "Fire cover",
     formula: "a fire station (§500, §400/yr, 4 jobs) covers 6 tiles: a fire starts there one-sixth as often, burns one month instead of two, and spreads at 0.1 instead of 0.3 — unlikely, never impossible",
     live: (w) => `${w.last.census.fireStations} fire station${w.last.census.fireStations === 1 ? "" : "s"} · ${w.last.census.burning} burning`,
+  },
+  {
+    id: "M1", title: "A meat hall is grey commerce",
+    formula: "zone M grows on its own valve rM = (0.06·carnivores + 10 − Jm)/max(Jm, 20) ; 3/8/16 jobs ; staffed by diet (carnivores 0.9, omnivores 0.5, herbivores 0.1) ; unlicensed it pays a cut of §25 per filled job, untaxed",
+    live: (w) => `${w.last.census.markets} halls · ${w.last.census.Jm} jobs · V_M ${f2(w.valves.M)} · cut §${w.last.budget.cutYr}/yr${w.events.licence ? " · LICENSED (taxed at the C rate, §400/yr each)" : ""}`,
+  },
+  {
+    id: "M2", title: "Dread — herbivores smell it four tiles off",
+    formula: "a hall spreads 40/70/105 over 2/3/4 tiles ; LV −0.8·dread (twice a works) ; herbivores −0.25·dread mood (halved with a carnivore friend), −dread on the home score, and a household at dread ≥ 40 moves along the road at 3%/month ; carnivores +5 inside the smell and do not mind",
+    live: (w) => `max dread ${w.last.census.maxDread} · ${w.last.census.herbNear} herbivores within the smell`,
+  },
+  {
+    id: "M3", title: "The licence, the raid",
+    formula: "the Butchers' Guild offers a licence when the first hall reaches tier 2: §2,000 + §400/yr per hall, the jobs go on the books at the C rate, crime and the buyer's pull halve ; an unlicensed hall under police cover with crime > 50 can be raided: a storey shut, §200·tier in fines",
+    live: (w) => (w.events.licence ? "licensed" : "unlicensed"),
+  },
+  {
+    id: "K1", title: "The killing — no jobs means hungry wolves",
+    formula: "killings/month = 0.00005 × Σ over adults of: carnivore 1, omnivore 0.1, herbivore 0.03 ; ×20 unemployed ; ×3 within a hall's smell (×1.5 licensed) ; ×2 hall staff ; ×(0.5 + crime at home/100) ; fixed 0 ; victims live within 3: prey ×1, anyone else ×0.1, a friendship ×0.1 ; adults only ; the wake befriends the mourners",
+    live: (w) => `${w.events.killings} killings since founding · ${w.last.census.U} unemployed · ${w.events.files.filter((f) => !f.closed).length} open files`,
+  },
+  {
+    id: "P1", title: "The file and the arrest",
+    formula: "every incident opens a file for 6 months ; each month p = 0.02 + 0.18·police cover/60 + 0.05·record → 11% / 50% / 74% over the file at cover 0 / 30 / 60 ; 5% of arrests take the wrong animal, random by proximity ; a file also stains crime +15 within 2 for 24 months",
+    live: (w) => `taken in ${w.events.justice.takenIn} · cells ${w.events.justice.cells} · wrongful ${w.events.justice.wrongful} · exonerated ${w.events.justice.exonerated} · cold ${w.events.justice.cold}`,
+  },
+  {
+    id: "P2", title: "The sentence",
+    formula: "a predator's first conviction: the Pacification Centre (§1,500, §900/yr, 4 jobs, 6 beds; six months, home FIXED) ; a prey animal, or anyone already fixed: the meat hall (sold; §100 to the cut) ; no centre with a bed, no hall: three months in the cells and a record",
+    live: (w) => `${w.last.census.centres} centre${w.last.census.centres === 1 ? "" : "s"} · ${w.last.census.held} held · pacified ${w.events.justice.pacified} · sold ${w.events.justice.sold}`,
+  },
+  {
+    id: "P3", title: "Fixed",
+    formula: "no litter (a pair needs two unfixed fertile adults) ; never a killer ; prey next door fear only the unfixed share ; prey friendships at 0.7, counted once in H ; mood −5 for life ; may keep any job, the counter included ; permanent",
+    live: (w) => `${w.last.census.fixed} fixed (${w.last.census.wrongful} wrongful) · litters lost last tick ${w.last.littersLost || 0}`,
   },
   {
     id: "X1", title: "Traffic is a readout, not a gate",

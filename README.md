@@ -48,7 +48,8 @@ them on the real map):
 | the cap | `Cap = (1200 + 150·parks + 500·zoos + festival) · (1 + 0.5·H)` |
 | a lot grows | road within 3 tiles, `score = V + (LV − Pol − 40)/200 > 0.05`, 70% full, land value permits the storey |
 | pollution | every source spreads linearly over its radius; a lone works stinks next door, pigs and skunks dirty their lot, parks are sinks; no wind |
-| crime | `40 − 0.5·LV + 0.4·density + 40·unemployed share − police`; above 60 it costs land value and shops |
+| crime | `40 − 0.5·LV + 0.4·density + 3·jobless in the 3×3 + 40·unemployed share + a hall's hill + open files − police`; above 60 it costs land value and shops; it is also the killing's hazard |
+| dread | a meat hall spreads 40/70/105 over 2/3/4 tiles; LV −0.8·dread (twice a works); herbivores mind it, carnivores do not |
 
 The hover card's **WHY NOT** line is computed by the same function that
 decides growth — it can only ever say what the rule did.
@@ -79,6 +80,19 @@ six tiles against a crime field (base minus land value plus density plus
 unemployment): high crime drags land value and mood, keeps shops from
 growing, and lets a named fox, raccoon or cat rob a store. The `O` overlay
 shows crime in red and police cover in blue.
+
+**Crime and punishment.** Any adult may kill a neighbour — carnivores
+likely, the unemployed twenty times likelier ("no jobs means hungry
+wolves"), prey rarely — and a grey-market **meat hall** (zone `M`) is the
+buyer: it pays the mayor an untaxed cut, casts a dread over four tiles that
+takes twice the land value a works does, and herbivores move away from it.
+Every incident opens a six-month file; police cover is the monthly chance of
+an arrest, and one arrest in twenty takes the wrong animal, chosen by
+proximity. A convicted predator goes to the **pacification centre** (`V`)
+and comes home fixed: no litters, never a killer, prey next door stop
+fearing it; a convicted prey animal, or anyone already fixed, is sold at the
+hall. The Butchers' Guild will sell you a licence. Nothing in it is a gate,
+and the ticker names everyone.
 
 **Predators and prey.** Rabbits fear foxes, wolves and hawks; mice fear
 foxes, owls, cats and hawks; pigs and cows fear wolves. A prey household

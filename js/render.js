@@ -231,6 +231,7 @@ export function createRenderer(canvas, initialWorld, art) {
         if (mode === "lv") fill = `rgba(96,132,84,${(world.lv[i] / 100) * 0.65})`;
         else if (mode === "pol") fill = world.pol[i] > 2 ? `rgba(128,72,40,${(world.pol[i] / 100) * 0.75})` : null;
         else if (mode === "crime") fill = world.crime[i] > 5 ? `rgba(150,50,70,${(world.crime[i] / 100) * 0.75})` : world.policeCov[i] ? "rgba(60,110,138,0.18)" : null;
+        else if (mode === "dread") fill = world.dread[i] > 2 ? `rgba(110,40,70,${(world.dread[i] / 100) * 0.7})` : null;
         else if (mode === "score" && world.zone[i] !== ZONE.NONE) {
           const s = lotScore(world, i).score;
           fill = s >= 0 ? `rgba(80,110,150,${Math.min(1, s * 2) * 0.6 + 0.08})` : `rgba(170,70,60,${Math.min(1, -s * 2) * 0.6 + 0.08})`;
@@ -240,6 +241,20 @@ export function createRenderer(canvas, initialWorld, art) {
         ctx.fillStyle = fill;
         diamond(sx, sy);
         ctx.fill();
+      }
+    }
+    // An open file is a ring, not a brighter red — signal by shape, so it reads on a hot tenement row too.
+    if (mode === "crime" && world.events && world.events.files) {
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = "rgba(255,240,220,0.9)";
+      for (const f of world.events.files) {
+        if (f.until <= world.tick) continue;
+        const tx = f.tile % world.w;
+        const ty = (f.tile / world.w) | 0;
+        if (tx < range.x0 || tx > range.x1 || ty < range.y0 || ty > range.y1) continue;
+        const [sx, sy] = toScreen(tx, ty);
+        diamond(sx, sy);
+        ctx.stroke();
       }
     }
   }
@@ -289,6 +304,7 @@ export function createRenderer(canvas, initialWorld, art) {
         else if (world.civic[i] === CIVIC.ZOO) standing = art.civic("zoo");
         else if (world.civic[i] === CIVIC.FIRE) standing = art.civic("fire");
         else if (world.civic[i] === CIVIC.POLICE) standing = art.civic("police");
+        else if (world.civic[i] === CIVIC.CENTRE) standing = art.civic("centre");
         if (standing) items.push({ sprite: standing, tx, ty, kind: "building" });
         if (world.burning[i]) items.push({ sprite: fire, tx, ty, kind: "building", z: Z_BUILDING + 1, dy: -6 });
         if (i === plazaTile) items.push({ sprite: art.overlay("plaza"), tx, ty, kind: "ground", z: 3, dy: -2 });

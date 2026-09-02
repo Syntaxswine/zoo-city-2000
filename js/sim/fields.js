@@ -5,8 +5,8 @@
 // radius²)); 4,096 tiles is microseconds.
 
 import { KNOBS } from "./rules.js";
-import { TERRAIN, ROAD, ZONE, CIVIC, idx, inBounds, N4, isStation } from "./world.js";
-import { SPECIES_BY_ID } from "./species.js";
+import { TERRAIN, ROAD, ZONE, CIVIC, idx, inBounds, N4, isStation, absent } from "./world.js";
+import { SPECIES_BY_ID, DIET_OF } from "./species.js";
 
 const NO_ROAD = 255;
 
@@ -110,6 +110,25 @@ export function computePollution(world) {
   }
 }
 
+/**
+ * Dread: what a meat hall does to the street. The same linear spread as
+ * pollution, its own field (pollution pulls raccoons and pigs and refuses R
+ * growth — the owner's rule is herbivore-specific): LV reads it for everyone,
+ * herbivores read it in mood and home choice, carnivores do not mind.
+ * DERIVED — rebuilt every tick, never saved.
+ */
+export function computeDread(world) {
+  const { w, h } = world;
+  const n = w * h;
+  const e = world._dreadEmit || (world._dreadEmit = new Float32Array(n));
+  e.fill(0);
+  for (let i = 0; i < n; i++) {
+    const t = world.tier[i];
+    if (world.zone[i] === ZONE.M && t > 0) spread(e, w, h, i % w, (i / w) | 0, KNOBS.DREAD[t], KNOBS.DREAD_RADIUS[t]);
+  }
+  for (let i = 0; i < n; i++) world.dread[i] = Math.max(0, Math.min(100, Math.round(e[i])));
+}
+
 /** Centroid of built lots (tier > 0); falls back to zoned lots, then the start tile. */
 export function computeCentroid(world) {
   const { w, h } = world;
@@ -146,13 +165,15 @@ export function computeLandValue(world) {
   // Park / zoo proximity masks.
   const nearPark = world._nearPark || (world._nearPark = new Uint8Array(n));
   const nearZoo = world._nearZoo || (world._nearZoo = new Uint8Array(n));
+  const nearVan = world._nearVan || (world._nearVan = new Uint8Array(n));
   nearPark.fill(0);
   nearZoo.fill(0);
+  nearVan.fill(0);
   for (let i = 0; i < n; i++) {
     const c = world.civic[i];
-    if (c !== CIVIC.PARK && c !== CIVIC.ZOO) continue;
-    const r = c === CIVIC.PARK ? KNOBS.LV_PARK_RADIUS : KNOBS.LV_ZOO_RADIUS;
-    const mask = c === CIVIC.PARK ? nearPark : nearZoo;
+    if (c !== CIVIC.PARK && c !== CIVIC.ZOO && c !== CIVIC.CENTRE) continue;
+    const r = c === CIVIC.PARK ? KNOBS.LV_PARK_RADIUS : c === CIVIC.ZOO ? KNOBS.LV_ZOO_RADIUS : KNOBS.LV_VAN_RADIUS;
+    const mask = c === CIVIC.PARK ? nearPark : c === CIVIC.ZOO ? nearZoo : nearVan;
     const tx = i % w;
     const ty = (i / w) | 0;
     for (let dy = -r; dy <= r; dy++) {
@@ -183,6 +204,8 @@ export function computeLandValue(world) {
     if (nearPark[i]) v += KNOBS.LV_PARK;
     if (nearZoo[i]) v += KNOBS.LV_ZOO;
     v -= KNOBS.LV_POL * world.pol[i];
+    v -= KNOBS.LV_DREAD * world.dread[i]; // a meat hall: twice a works' shadow
+    if (nearVan[i]) v -= KNOBS.LV_VAN; // the pacification centre's van
     for (const c of cent) {
       const ctx = c.tile % w;
       const cty = (c.tile / w) | 0;
@@ -231,25 +254,56 @@ export function computeCrime(world) {
   const n = w * h;
   let W = 0;
   let U = 0;
+  // Unemployment, global (the Micropolis line) and LOCAL — "no jobs means
+  // hungry wolves" (the owner): every unemployed adult in the 3×3 adds to the
+  // tile, a carnivore double. Counted here from live state, never from the
+  // previous census (the save/load hash law).
+  const unempAt = world._unempAt || (world._unempAt = new Float32Array(n));
+  unempAt.fill(0);
   for (const c of world.citizens) {
     if (c.dead) continue;
     const y = Math.floor((world.tick - c.born) / 12);
-    if (y < KNOBS.ADULT_AGE || y >= SPECIES_BY_ID[c.species].retire || c.onLeave) continue;
+    if (y < KNOBS.ADULT_AGE || y >= SPECIES_BY_ID[c.species].retire || c.onLeave || absent(world, c)) continue;
     W++;
-    if (c.job < 0) U++;
+    if (c.job < 0) {
+      U++;
+      if (c.home >= 0) unempAt[c.home] += DIET_OF[c.species] === "carn" ? KNOBS.CRIME_UNEMP_HUNTER : 1;
+    }
   }
   const unemp = W ? U / W : 0;
+  world._crimeW = W;
+  world._crimeU = U;
+  // A meat hall is part of crime: its own hill, halved under licence; and
+  // every open file (an incident's memory) stains its street.
+  const near = world._cnear || (world._cnear = new Float32Array(n));
+  near.fill(0);
+  const mult = world.events.licence ? KNOBS.LICENCE_CRIME_MULT : 1;
+  for (let i = 0; i < n; i++) {
+    const t = world.tier[i];
+    if (world.zone[i] === ZONE.M && t > 0) spread(near, w, h, i % w, (i / w) | 0, KNOBS.CRIME_M[t] * mult, KNOBS.CRIME_M_RADIUS[t]);
+  }
+  for (const f of world.events.files) {
+    if (f.until <= world.tick) continue;
+    const tx = f.tile % w;
+    const ty = (f.tile / w) | 0;
+    for (let dy = -f.radius; dy <= f.radius; dy++) for (let dx = -f.radius; dx <= f.radius; dx++) {
+      const xx = tx + dx;
+      const yy = ty + dy;
+      if (inBounds(world, xx, yy)) near[yy * w + xx] += f.crime;
+    }
+  }
   for (let i = 0; i < n; i++) {
     const tx = i % w;
     const ty = (i / w) | 0;
     let dens = 0;
+    let jobless = 0;
     for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
       const xx = tx + dx;
       const yy = ty + dy;
-      if (inBounds(world, xx, yy)) dens += world.occupants[yy * w + xx];
+      if (inBounds(world, xx, yy)) { dens += world.occupants[yy * w + xx]; jobless += unempAt[yy * w + xx]; }
     }
-    if (!dens && world.zone[i] === ZONE.NONE) { world.crime[i] = 0; continue; }
-    const v = KNOBS.CRIME_BASE - KNOBS.CRIME_LV * world.lv[i] + KNOBS.CRIME_DENSITY * dens + KNOBS.CRIME_UNEMP * unemp - world.policeCov[i];
+    if (!dens && world.zone[i] === ZONE.NONE && !near[i]) { world.crime[i] = 0; continue; }
+    const v = KNOBS.CRIME_BASE - KNOBS.CRIME_LV * world.lv[i] + KNOBS.CRIME_DENSITY * dens + KNOBS.CRIME_UNEMP_LOCAL * jobless + KNOBS.CRIME_UNEMP * unemp + near[i] - world.policeCov[i];
     world.crime[i] = Math.max(0, Math.min(100, Math.round(v)));
   }
   // High crime destroys land value (SC2000 manual; Micropolis −20 above 190).
@@ -262,6 +316,7 @@ export function computeFields(world) {
   computeCoverage(world);
   computeTraffic(world);
   computePollution(world);
+  computeDread(world);
   computeLandValue(world);
   computeCrime(world);
 }
@@ -270,8 +325,9 @@ export function computeFields(world) {
 export function recountRosters(world) {
   world.occupants.fill(0);
   world.staff.fill(0);
+  world.carnAt.fill(0);
   for (const c of world.citizens) {
-    if (c.home >= 0) world.occupants[c.home]++;
+    if (c.home >= 0) { world.occupants[c.home]++; if (DIET_OF[c.species] === "carn") world.carnAt[c.home]++; }
     if (c.job >= 0) world.staff[c.job]++;
   }
 }

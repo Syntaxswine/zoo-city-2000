@@ -7,8 +7,8 @@
 // occupant and staff counts. check.mjs recounts all of it.
 
 import { KNOBS } from "./rules.js";
-import { SPECIES, SPECIES_BY_ID, NAME_PARTS, affinity, ARRIVING, PREY_OF } from "./species.js";
-import { ZONE, CIVIC, TERRAIN, ROAD, idx, inBounds, capacityOf, jobsOf, jobZone } from "./world.js";
+import { SPECIES, SPECIES_BY_ID, NAME_PARTS, affinity, ARRIVING, PREY_OF, DIET_OF, isPredatorOf } from "./species.js";
+import { ZONE, CIVIC, TERRAIN, ROAD, idx, inBounds, capacityOf, jobsOf, jobZone, absent } from "./world.js";
 import { roadPath, doorOf, edgeRoads, hasAccess } from "./fields.js";
 import { ageYears, ageMonths, isWorker } from "./census.js";
 
@@ -67,6 +67,9 @@ function newCitizen(world, species, ageMonthsNow, household, surnameStr, native)
     native: !!native,
     onLeave: false,
     hired: -1,
+    // crime and punishment (justice.js): custody clock, the record, the knife
+    held: 0, heldAt: -1, fixed: false, record: 0, wrongful: false, wrongedBy: 0, exonerated: false,
+    moodPenalty: 0, moodPenaltyUntil: 0,
   };
   return c;
 }
@@ -100,6 +103,15 @@ export function placeHousehold(world, hh, lot) {
     // (Found by the save/load hash: a rehomed family's stale path fed traffic.)
     if (c.job >= 0) { c.path = null; c.stale = true; }
   }
+}
+
+/** Release a citizen's job in ONE place — retirement, a lot's decay, a bulldoze, custody. */
+export function releaseJob(world, c) {
+  if (c.job < 0) return;
+  world.staff[c.job]--;
+  c.job = -1;
+  c.path = null;
+  c.hired = -1;
 }
 
 // ---------------------------------------------------------------------------
@@ -195,6 +207,10 @@ function homeScore(world, species, i, strict) {
   const lv = world.lv[i];
   const pol = world.pol[i];
   let s = lv - pol * (1 - sp.polTol / 100);
+  // The meat hall's dread: herbivores steer away from it; carnivores do not mind (the LV term already took 0.8·dread off).
+  const diet = DIET_OF[species];
+  if (diet === "herb") s -= KNOBS.DREAD_HOME_HERB * world.dread[i];
+  else if (diet === "carn") s += KNOBS.DREAD_HOME_CARN * world.dread[i];
   switch (sp.homePref) {
     case "high": if (world.maxTier[i] === 3 && world.tier[i] >= 2) s += 15; break;
     case "low": if (world.maxTier[i] === 1 || world.tier[i] === 1) s += 15; else if (strict) return -Infinity; break;
@@ -299,10 +315,7 @@ export function fireFromLot(world, i, newCap) {
   ws.sort((a, b) => b.hired - a.hired || b.id - a.id);
   for (const c of ws) {
     if (world.staff[i] <= newCap) break;
-    c.job = -1;
-    c.path = null;
-    c.hired = -1;
-    world.staff[i]--;
+    releaseJob(world, c);
   }
 }
 
@@ -320,14 +333,7 @@ export function clearLot(world, i) {
     if (to >= 0) placeHousehold(world, h, to);
     else removeHousehold(world, h, "bulldozed");
   }
-  for (const c of world.citizens) {
-    if (c.job === i && !c.dead) {
-      c.job = -1;
-      c.path = null;
-      c.hired = -1;
-      world.staff[i]--;
-    }
-  }
+  for (const c of world.citizens) if (c.job === i && !c.dead) releaseJob(world, c);
 }
 
 /** Any road edit: every commute is stale. */
@@ -380,6 +386,13 @@ export function arrivalWeights(world, cen) {
     hawk: 1 + 2 * Math.min(1, vacHigh / vacTotal),
   };
   for (const s of SPECIES) if (!ARRIVING.has(s.id)) w[s.id] = 0;
+  // Meat halls: herbivores bend away from a town that has them, carnivores toward one that staffs them.
+  const halls = cen.markets || 0;
+  const jm = cen.Jm || 0;
+  for (const s of SPECIES) {
+    if (s.diet === "herb") w[s.id] *= 1 - KNOBS.MARKET_PUSH * Math.min(1, halls / 3);
+    else if (s.diet === "carn") w[s.id] += KNOBS.MARKET_PULL * Math.min(1, jm / 40);
+  }
   return w;
 }
 
@@ -409,7 +422,7 @@ function pickSpecies(world, weights) {
 // ---------------------------------------------------------------------------
 
 export function citizensTick(world, cen, dem) {
-  const out = { arrived: 0, left: 0, births: 0, deaths: 0, notices: [], meetings: [], funerals: 0 };
+  const out = { arrived: 0, left: 0, births: 0, deaths: 0, notices: [], meetings: [], funerals: 0, littersLost: 0, rehomed: 0 };
   const rng = world.rng;
   const tick = world.tick;
   world.meetings = out.meetings;
@@ -453,11 +466,7 @@ export function citizensTick(world, cen, dem) {
         }
       }
     }
-    if (y === sp.retire && c.job >= 0) {
-      world.staff[c.job]--;
-      c.job = -1;
-      c.path = null;
-    }
+    if (y === sp.retire) releaseJob(world, c);
   }
 
   // 2. Deaths, with the funeral rule.
@@ -467,21 +476,7 @@ export function citizensTick(world, cen, dem) {
     const mourners = c.friends.slice();
     removeCitizen(world, c, "died");
     out.deaths++;
-    if (mourners.length >= 3) {
-      out.funerals++;
-      for (let a = 0; a < mourners.length; a++) {
-        for (let b = a + 1; b < mourners.length; b++) {
-          const x = world.byId.get(mourners[a]);
-          const y = world.byId.get(mourners[b]);
-          if (!x || !y || x.friends.includes(y.id)) continue;
-          if (rng.chance(KNOBS.FUNERAL_P)) befriend(world, x, y, out);
-        }
-      }
-    }
-    for (const f of mourners) {
-      const o = world.byId.get(f);
-      if (o) o.grief = tick + 12;
-    }
+    holdFuneral(world, mourners, out);
   }
 
   // 3. Births: two fertile adults, headroom in the lot.
@@ -493,17 +488,20 @@ export function citizensTick(world, cen, dem) {
     let fertile = 0;
     let litter = 0;
     let parentSpecies = null;
+    let fertileAge = 0;
     for (const id of hh.members) {
       const c = world.byId.get(id);
       const sp = SPECIES_BY_ID[c.species];
       const y = ageYears(world, c);
       if (y >= sp.fertile[0] && y <= sp.fertile[1]) {
+        fertileAge++;
+        if (c.fixed || absent(world, c)) continue; // fixed animals cannot have offspring (the owner); the held are away
         fertile++;
         litter += sp.litter;
         if (!parentSpecies || rng.chance(0.5)) parentSpecies = c.species;
       }
     }
-    if (fertile < 2) continue;
+    if (fertile < 2) { if (fertileAge >= 2) out.littersLost++; continue; }
     const p = ((litter / fertile) / KNOBS.BIRTH_DIV) * birthMult;
     if (rng.chance(p)) {
       const cub = newCitizen(world, parentSpecies, 0, hh.id, hh.surname, true);
@@ -514,6 +512,24 @@ export function citizensTick(world, cen, dem) {
       world.byId.set(cub.id, cub);
       out.births++;
     }
+  }
+
+  // 3b. The smell: a herbivore household inside a meat hall's dread may move
+  //     along the road (LEAVE never fires at V_R > 0 — measured 0/360 ticks —
+  //     so without this the owner's "herbivores do not like living near meat
+  //     markets" would be a mood number only). Draws only where dread ≥ 40.
+  for (const hh of world.households) {
+    if (hh.gone || hh.home < 0 || DIET_OF[hh.species] !== "herb") continue;
+    if (world.dread[hh.home] < KNOBS.REHOME_DREAD) continue;
+    if (!rng.chance(KNOBS.REHOME_DREAD_P)) continue;
+    const from = hh.home;
+    const allowed = lotsWithinRoad(world, from, KNOBS.REHOME_RADIUS);
+    allowed.delete(from);
+    for (const id of hh.members) { const c = world.byId.get(id); c.home = -1; world.occupants[from]--; }
+    hh.home = -1;
+    const to = bestHome(world, hh.species, hh.members.length, false, allowed);
+    if (to >= 0 && world.dread[to] < world.dread[from]) { placeHousehold(world, hh, to); out.rehomed++; }
+    else placeHousehold(world, hh, from);
   }
 
   // 4. Job search (≤ 64 per tick, id order, rotating start). Stale paths first.
@@ -604,6 +620,36 @@ export function citizensTick(world, cen, dem) {
 
 // ---------------------------------------------------------------------------
 
+/**
+ * The funeral rule, in one place (deaths, killings): ≥ 3 mourners befriend
+ * pairwise at FUNERAL_P — "they met at the wake" — and every mourner grieves
+ * a year. `out` may be null (a killing has no tick summary to count into).
+ */
+export function holdFuneral(world, mourners, out) {
+  const rng = world.rng;
+  if (mourners.length >= 3) {
+    if (out) out.funerals++;
+    for (let a = 0; a < mourners.length; a++) {
+      for (let b = a + 1; b < mourners.length; b++) {
+        const x = world.byId.get(mourners[a]);
+        const y = world.byId.get(mourners[b]);
+        if (!x || !y || x.friends.includes(y.id)) continue;
+        if (rng.chance(KNOBS.FUNERAL_P)) befriend(world, x, y, out);
+      }
+    }
+  }
+  for (const f of mourners) {
+    const o = world.byId.get(f);
+    if (o) o.grief = world.tick + 12;
+  }
+}
+
+/** Affinity for a pair: a fixed predator is no longer wary company for its prey (0.7, not 0.4). */
+function pairAffinity(a, b) {
+  if ((isPredatorOf(a.species, b.species) && a.fixed) || (isPredatorOf(b.species, a.species) && b.fixed)) return KNOBS.FIXED_AFFINITY;
+  return affinity(a.species, b.species);
+}
+
 function befriend(world, a, b, out) {
   if (a.friends.includes(b.id)) return;
   a.friends.push(b.id);
@@ -679,7 +725,7 @@ function friendships(world, out) {
     }
     if (!cand || cand === c || cand.dead || cand.friends.length >= KNOBS.FRIEND_MAX || c.friends.includes(cand.id)) continue;
     const boost = world.events.active.reduce((m, e) => m * (e.friendMult || 1), 1);
-    if (rng.chance(KNOBS.FRIEND_P * affinity(c.species, cand.species) * parkBonus * boost)) befriend(world, c, cand, out);
+    if (rng.chance(KNOBS.FRIEND_P * pairAffinity(c, cand) * parkBonus * boost)) befriend(world, c, cand, out);
   }
   world._friendCursor = (start + samples) % N;
 }
@@ -687,18 +733,26 @@ function friendships(world, out) {
 function moods(world) {
   const { w } = world;
   const moodBoost = world.events.active.reduce((m, e) => m + (e.moodBoost || 0), 0);
-  // Which species live on each lot (for the prey-flight rule).
+  // Who lives on each lot, per species: [all, threat]. threat = not fixed, not
+  // held. PREY FLIGHT is proportional to the unfixed share of a predator
+  // species in the 3×3 (measured: 5.2 adults of the feared kind beside every
+  // afraid household — a per-species Set would let one fixed wolf out of a
+  // pack change nothing).
   const lotSpecies = new Map();
   for (const c of world.citizens) {
     if (c.dead || c.home < 0) continue;
-    let set = lotSpecies.get(c.home);
-    if (!set) lotSpecies.set(c.home, (set = new Set()));
-    set.add(c.species);
+    let m = lotSpecies.get(c.home);
+    if (!m) lotSpecies.set(c.home, (m = new Map()));
+    let e = m.get(c.species);
+    if (!e) m.set(c.species, (e = [0, 0]));
+    e[0]++;
+    if (!c.fixed && !absent(world, c)) e[1]++;
   }
   const wolfMoon = world.events.active.some((e) => e.id === "wolfMoon");
   for (const c of world.citizens) {
     if (c.dead) continue;
     const sp = SPECIES_BY_ID[c.species];
+    const diet = DIET_OF[c.species];
     // PREY FLIGHT: a predator of my kind next door (Chebyshev 1) costs mood,
     // unless I have a friend of that species — the bridge. Weights, never gates.
     let flight = 0;
@@ -706,18 +760,27 @@ function moods(world) {
     if (preds && c.home >= 0) {
       const tx = c.home % w;
       const ty = (c.home / w) | 0;
-      const near = new Set();
+      const near = new Map();
       for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
         const xx = tx + dx;
         const yy = ty + dy;
         if (!inBounds(world, xx, yy)) continue;
-        const set = lotSpecies.get(yy * w + xx);
-        if (set) for (const p of preds) if (set.has(p)) near.add(p);
+        const m = lotSpecies.get(yy * w + xx);
+        if (!m) continue;
+        for (const p of preds) {
+          const e = m.get(p);
+          if (!e) continue;
+          let s = near.get(p);
+          if (!s) near.set(p, (s = [0, 0]));
+          s[0] += e[0];
+          s[1] += e[1];
+        }
       }
-      for (const p of near) {
+      for (const [p, s] of near) {
+        if (!s[1]) continue;
         let bridged = false;
         for (const f of c.friends) { const o = world.byId.get(f); if (o && o.species === p) { bridged = true; break; } }
-        if (!bridged) flight += KNOBS.PREY_FLIGHT;
+        if (!bridged) flight += KNOBS.PREY_FLIGHT * (s[1] / s[0]);
       }
       if (wolfMoon && preds.includes("wolf")) flight += KNOBS.PREY_FLIGHT;
     }
@@ -731,12 +794,26 @@ function moods(world) {
       const tx = c.home % w;
       const ty = (c.home / w) | 0;
       let park = false;
-      for (let dy = -4; dy <= 4 && !park; dy++) for (let dx = -4; dx <= 4; dx++) {
+      let van = false;
+      for (let dy = -4; dy <= 4; dy++) for (let dx = -4; dx <= 4; dx++) {
         const xx = tx + dx;
         const yy = ty + dy;
-        if (inBounds(world, xx, yy) && world.civic[yy * w + xx] === CIVIC.PARK) { park = true; break; }
+        if (!inBounds(world, xx, yy)) continue;
+        const civ = world.civic[yy * w + xx];
+        if (civ === CIVIC.PARK) park = true;
+        else if (civ === CIVIC.CENTRE) van = true;
       }
       if (park) m += 10;
+      // The meat hall's dread: herbivores mind it (halved with a carnivore friend); carnivores like the smell.
+      const dread = world.dread[c.home];
+      if (dread > 0) {
+        if (diet === "herb") {
+          let carnFriend = false;
+          for (const f of c.friends) { const o = world.byId.get(f); if (o && DIET_OF[o.species] === "carn") { carnFriend = true; break; } }
+          m -= Math.min(KNOBS.DREAD_MOOD_CAP, KNOBS.DREAD_MOOD_HERB * dread) * (carnFriend ? 0.5 : 1);
+        } else if (diet === "carn") m += KNOBS.DREAD_CARN_MOOD;
+      }
+      if (van && diet === "carn") m -= KNOBS.VAN_MOOD; // the pacification centre's van
     }
     m += 5 * c.friends.length;
     m -= Math.min(20, flight);
@@ -745,6 +822,8 @@ function moods(world) {
     if (c.path && c.path.length - 1 <= sp.commute) m += 10;
     if (c.grief && c.grief > world.tick) m -= 10;
     if (c.moodPenalty && c.moodPenaltyUntil > world.tick) m += c.moodPenalty;
+    if (c.fixed) m -= KNOBS.FIXED_MOOD;
+    if (absent(world, c)) m -= KNOBS.HELD_MOOD;
     m += moodBoost;
     c.mood = Math.max(0, Math.min(100, Math.round(m)));
     if (!adult) c.mood = Math.max(c.mood, 50);
@@ -838,7 +917,8 @@ function searchJob(world, door, sp, openByDoor, rng) {
     const lots = openByDoor.get(i);
     if (lots) {
       for (const lot of lots) {
-        const pref = jobZone(world, lot) === ZONE.C ? sp.jobC : sp.jobI;
+            // A meat hall hires by diet (carnivores 0.9, omnivores 0.5, herbivores 0.1 — a weight: a rabbit takes the job when nothing else is open).
+        const pref = world.zone[lot] === ZONE.M ? KNOBS.JOB_M[DIET_OF[sp.id]] : jobZone(world, lot) === ZONE.C ? sp.jobC : sp.jobI;
         const s = pref * (1 / (1 + d / sp.commute)) * (0.8 + 0.4 * rng.next());
         if (s > bestS) { bestS = s; best = { lot, door: i, d }; }
       }

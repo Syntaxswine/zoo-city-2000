@@ -7,24 +7,24 @@
 
 export const SPECIES = Object.freeze([
   //  id        life litter fertile   retire  jobC jobI  polTol homePref   commute  surname      fur       affinity notes
-  { id: "rabbit",   life: 40,  litter: 3, fertile: [16, 30], retire: 35,  jobC: 0.5, jobI: 0.5, polTol: 40, homePref: "any",   commute: 24, surname: "Burrowes",   fur: "furWarm", furShift: 1 },
-  { id: "mouse",    life: 30,  litter: 4, fertile: [16, 24], retire: 26,  jobC: 0.4, jobI: 0.6, polTol: 60, homePref: "high",  commute: 16, surname: "Whiskerton", fur: "furCool", furShift: 1 },
-  { id: "fox",      life: 60,  litter: 2, fertile: [18, 40], retire: 50,  jobC: 0.8, jobI: 0.2, polTol: 30, homePref: "lv50",  commute: 32, surname: "Slyfield",   fur: "furWarm", furShift: 0 },
-  { id: "beaver",   life: 55,  litter: 2, fertile: [18, 40], retire: 48,  jobC: 0.2, jobI: 0.8, polTol: 70, homePref: "water", commute: 28, surname: "Gnawley",    fur: "furWarm", furShift: -1 },
-  { id: "owl",      life: 70,  litter: 1, fertile: [20, 45], retire: 60,  jobC: 0.6, jobI: 0.4, polTol: 40, homePref: "trees", commute: 30, surname: "Hootsworth", fur: "furCool", furShift: 0 },
-  { id: "bear",     life: 80,  litter: 1, fertile: [20, 45], retire: 65,  jobC: 0.4, jobI: 0.6, polTol: 50, homePref: "low",   commute: 40, surname: "Ursin",      fur: "furWarm", furShift: -1 },
-  { id: "tortoise", life: 150, litter: 1, fertile: [25, 80], retire: 120, jobC: 0.5, jobI: 0.5, polTol: 50, homePref: "any",   commute: 8,  surname: "Shelby",     fur: "olive",   furShift: 0 },
-  { id: "raccoon",  life: 35,  litter: 3, fertile: [16, 28], retire: 30,  jobC: 0.6, jobI: 0.4, polTol: 80, homePref: "dirt",  commute: 20, surname: "Binsworth",  fur: "furCool", furShift: -1 },
+  { id: "rabbit", diet: "herb",   life: 40,  litter: 3, fertile: [16, 30], retire: 35,  jobC: 0.5, jobI: 0.5, polTol: 40, homePref: "any",   commute: 24, surname: "Burrowes",   fur: "furWarm", furShift: 1 },
+  { id: "mouse", diet: "herb",    life: 30,  litter: 4, fertile: [16, 24], retire: 26,  jobC: 0.4, jobI: 0.6, polTol: 60, homePref: "high",  commute: 16, surname: "Whiskerton", fur: "furCool", furShift: 1 },
+  { id: "fox", diet: "carn",      life: 60,  litter: 2, fertile: [18, 40], retire: 50,  jobC: 0.8, jobI: 0.2, polTol: 30, homePref: "lv50",  commute: 32, surname: "Slyfield",   fur: "furWarm", furShift: 0 },
+  { id: "beaver", diet: "herb",   life: 55,  litter: 2, fertile: [18, 40], retire: 48,  jobC: 0.2, jobI: 0.8, polTol: 70, homePref: "water", commute: 28, surname: "Gnawley",    fur: "furWarm", furShift: -1 },
+  { id: "owl", diet: "carn",      life: 70,  litter: 1, fertile: [20, 45], retire: 60,  jobC: 0.6, jobI: 0.4, polTol: 40, homePref: "trees", commute: 30, surname: "Hootsworth", fur: "furCool", furShift: 0 },
+  { id: "bear", diet: "omni",     life: 80,  litter: 1, fertile: [20, 45], retire: 65,  jobC: 0.4, jobI: 0.6, polTol: 50, homePref: "low",   commute: 40, surname: "Ursin",      fur: "furWarm", furShift: -1 },
+  { id: "tortoise", diet: "herb", life: 150, litter: 1, fertile: [25, 80], retire: 120, jobC: 0.5, jobI: 0.5, polTol: 50, homePref: "any",   commute: 8,  surname: "Shelby",     fur: "olive",   furShift: 0 },
+  { id: "raccoon", diet: "omni",  life: 35,  litter: 3, fertile: [16, 28], retire: 30,  jobC: 0.6, jobI: 0.4, polTol: 80, homePref: "dirt",  commute: 20, surname: "Binsworth",  fur: "furCool", furShift: -1 },
   // Livestock (the owner's ask) — the industrial workforce and the pastoral tax base.
-  { id: "pig",      life: 30,  litter: 5, fertile: [14, 24], retire: 26,  jobC: 0.2, jobI: 0.8, polTol: 90, homePref: "water", commute: 16, surname: "Trotter",    fur: "furWarm", furShift: 1,  pack: [2, 4] },
-  { id: "cow",      life: 45,  litter: 1, fertile: [18, 35], retire: 40,  jobC: 0.4, jobI: 0.6, polTol: 60, homePref: "pasture", commute: 20, surname: "Cudworth",  fur: "furCool", furShift: 1,  pack: [2, 4] },
+  { id: "pig", diet: "herb",      life: 30,  litter: 5, fertile: [14, 24], retire: 26,  jobC: 0.2, jobI: 0.8, polTol: 90, homePref: "water", commute: 16, surname: "Trotter",    fur: "furWarm", furShift: 1,  pack: [2, 4] },
+  { id: "cow", diet: "herb",      life: 45,  litter: 1, fertile: [18, 35], retire: 40,  jobC: 0.4, jobI: 0.6, polTol: 60, homePref: "pasture", commute: 20, surname: "Cudworth",  fur: "furCool", furShift: 1,  pack: [2, 4] },
   // Predators — wary of their prey, and the proudest friendships in town.
-  { id: "wolf",     life: 50,  litter: 3, fertile: [18, 40], retire: 45,  jobC: 0.5, jobI: 0.5, polTol: 50, homePref: "trees", commute: 40, surname: "Greyback",   fur: "furCool", furShift: -1, pack: [4, 6], predator: true },
-  { id: "cat",      life: 35,  litter: 3, fertile: [14, 28], retire: 30,  jobC: 0.8, jobI: 0.2, polTol: 40, homePref: "flats", commute: 24, surname: "Purrington", fur: "furWarm", furShift: 0,  pack: [2, 4], predator: true },
-  { id: "hawk",     life: 40,  litter: 2, fertile: [16, 35], retire: 35,  jobC: 0.6, jobI: 0.4, polTol: 30, homePref: "high",  commute: 64, surname: "Talonby",    fur: "earth",   furShift: 0,  pack: [2, 3], predator: true },
+  { id: "wolf", diet: "carn",     life: 50,  litter: 3, fertile: [18, 40], retire: 45,  jobC: 0.5, jobI: 0.5, polTol: 50, homePref: "trees", commute: 40, surname: "Greyback",   fur: "furCool", furShift: -1, pack: [4, 6], predator: true },
+  { id: "cat", diet: "carn",      life: 35,  litter: 3, fertile: [14, 28], retire: 30,  jobC: 0.8, jobI: 0.2, polTol: 40, homePref: "flats", commute: 24, surname: "Purrington", fur: "furWarm", furShift: 0,  pack: [2, 4], predator: true },
+  { id: "hawk", diet: "carn",     life: 40,  litter: 2, fertile: [16, 35], retire: 35,  jobC: 0.6, jobI: 0.4, polTol: 30, homePref: "high",  commute: 64, surname: "Talonby",    fur: "earth",   furShift: 0,  pack: [2, 3], predator: true },
   // The skunk: nobody's prey, everybody's neighbour problem. Emits a stink like the pig's mess;
   // pigs and raccoons are allied with it; every other species is wary (affinity 0.5).
-  { id: "skunk",    life: 30,  litter: 4, fertile: [14, 26], retire: 27,  jobC: 0.4, jobI: 0.6, polTol: 95, homePref: "trees", commute: 20, surname: "Stripely",   fur: "furCool", furShift: -1, pack: [2, 4], stink: true },
+  { id: "skunk", diet: "omni",    life: 30,  litter: 4, fertile: [14, 26], retire: 27,  jobC: 0.4, jobI: 0.6, polTol: 95, homePref: "trees", commute: 20, surname: "Stripely",   fur: "furCool", furShift: -1, pack: [2, 4], stink: true },
 ]);
 
 /**
@@ -51,6 +51,16 @@ export const ARRIVING = new Set(SPECIES.map((s) => s.id));
 
 export const SPECIES_BY_ID = Object.freeze(Object.fromEntries(SPECIES.map((s) => [s.id, s])));
 export const SPECIES_INDEX = Object.freeze(Object.fromEntries(SPECIES.map((s, i) => [s.id, i])));
+
+/**
+ * Diet — the crime-and-punishment axis (the owner, 2026-09-02). herb: rabbit,
+ * mouse, beaver, tortoise, pig, cow. omni: bear, raccoon, skunk. carn: fox,
+ * owl, wolf, cat, hawk (fox and owl hunt without the `predator` flag, which
+ * is the skunk-incident gate). Weights, never gates: a herbivore can kill and
+ * can staff a meat hall; both are just unlikely.
+ */
+export const DIET_OF = Object.freeze(Object.fromEntries(SPECIES.map((s) => [s.id, s.diet])));
+export const HUNTERS = new Set(SPECIES.filter((s) => s.diet === "carn").map((s) => s.id));
 
 // Affinity for friendship rolls: 1.0 same or allied, 0.7 neutral, 0.4 wary.
 // Raccoon 1.2 with everyone — the glue species (SPEC §7.5).

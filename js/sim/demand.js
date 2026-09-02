@@ -37,37 +37,41 @@ export function capacityLaw(world, c) {
 
 /** The breakdown for the current state WITHOUT advancing the valves (a loaded city, a rate change while paused). */
 export function peekDemand(world, c) {
-  const { P, W, J, Jc, Lab } = c;
+  const { P, W, J, Jc, Jm, Lab, carnivores } = c;
   const n = neutralRate(P);
   const ext = externalMarket(world, c);
   const r = {
     R: clamp((J + KNOBS.JOB_SEED - W) / Math.max(W, KNOBS.JOB_SEED), -1, 1),
     C: clamp((KNOBS.C_PER_CITIZEN * P + KNOBS.C_SEED - Jc) / Math.max(Jc, 40) + 0.5 * Math.min(0, (J ? W / J : 1) - 1), -1, 1),
     I: clamp((ext * KNOBS.I_EXT_GAIN * Lab - 1) * 2, -1, 1),
+    // The meat halls want carnivores to staff and feed them — not shops' customers (Jm ∉ Jc: no crowd-out).
+    M: clamp((KNOBS.MEAT_PER_CARN * carnivores + KNOBS.MEAT_SEED - Jm) / Math.max(Jm, 20), -1, 1),
   };
-  const T = { R: taxTerm(world.rates.R, n), C: taxTerm(world.rates.C, n), I: taxTerm(world.rates.I, n) };
+  const T = { R: taxTerm(world.rates.R, n), C: taxTerm(world.rates.C, n), I: taxTerm(world.rates.I, n), M: taxTerm(world.rates.C, n) };
   const cap = capacityLaw(world, c);
-  return { n, ext, r, T, cap, capped: world.valves.R >= 1 - P / cap - 1e-9, boost: { R: 0, C: 0, I: 0 } };
+  return { n, ext, r, T, cap, capped: world.valves.R >= 1 - P / cap - 1e-9, boost: { R: 0, C: 0, I: 0, M: 0 } };
 }
 
 /** Compute the demand breakdown and advance the valves in place. */
 export function updateDemand(world, c) {
-  const { P, W, J, Jc, Lab } = c;
+  const { P, W, J, Jc, Jm, Lab, carnivores } = c;
   const n = neutralRate(P);
   const ext = externalMarket(world, c);
   const r = {
     R: clamp((J + KNOBS.JOB_SEED - W) / Math.max(W, KNOBS.JOB_SEED), -1, 1),
     C: clamp((KNOBS.C_PER_CITIZEN * P + KNOBS.C_SEED - Jc) / Math.max(Jc, 40) + 0.5 * Math.min(0, (J ? W / J : 1) - 1), -1, 1),
     I: clamp((ext * KNOBS.I_EXT_GAIN * Lab - 1) * 2, -1, 1),
+    // The meat halls want carnivores to staff and feed them — not shops' customers (Jm ∉ Jc: no crowd-out).
+    M: clamp((KNOBS.MEAT_PER_CARN * carnivores + KNOBS.MEAT_SEED - Jm) / Math.max(Jm, 20), -1, 1),
   };
-  const T = { R: taxTerm(world.rates.R, n), C: taxTerm(world.rates.C, n), I: taxTerm(world.rates.I, n) };
-  let boost = { R: 0, C: 0, I: 0 };
+  const T = { R: taxTerm(world.rates.R, n), C: taxTerm(world.rates.C, n), I: taxTerm(world.rates.I, n), M: taxTerm(world.rates.C, n) };
+  let boost = { R: 0, C: 0, I: 0, M: 0 };
   for (const e of world.events.active) {
     if (e.valveBoost) for (const z of Object.keys(e.valveBoost)) boost[z] += e.valveBoost[z];
   }
   const v = world.valves;
-  for (const z of ["R", "C", "I"]) {
-    const target = clamp(r[z] + T[z] + boost[z], -1, 1);
+  for (const z of ["R", "C", "I", "M"]) {
+    const target = clamp(r[z] + T[z] + (boost[z] || 0), -1, 1);
     v[z] += KNOBS.VALVE_LAG * (target - v[z]);
     v[z] = clamp(v[z], -1, 1);
   }

@@ -8,7 +8,7 @@
 import { KNOBS } from "./rules.js";
 import { TERRAIN, ROAD, ZONE, CIVIC, idx, inBounds } from "./world.js";
 import { post, canSpend } from "./budget.js";
-import { clearLot, invalidatePaths } from "./citizens.js";
+import { clearLot, invalidatePaths, releaseJob } from "./citizens.js";
 import { resolveChoice } from "./events.js";
 import { refreshLast } from "./tick.js";
 
@@ -35,7 +35,7 @@ export function costOf(world, op) {
   const add = (i, c, what) => { tiles.push({ i, cost: c, what }); cost += c; };
   switch (op.kind) {
     case "zone": {
-      const zc = op.zone === ZONE.R ? C.zoneR : op.zone === ZONE.C ? C.zoneC : C.zoneI;
+      const zc = op.zone === ZONE.R ? C.zoneR : op.zone === ZONE.C ? C.zoneC : op.zone === ZONE.M ? C.zoneM : C.zoneI;
       for (const i of rect(world, op)) {
         if (world.terrain[i] === TERRAIN.WATER || world.road[i] || world.civic[i]) continue;
         if (isBuilt(world, i)) continue;
@@ -61,7 +61,12 @@ export function costOf(world, op) {
       for (const i of rect(world, op)) {
         if (world.terrain[i] === TERRAIN.WATER && !world.road[i]) continue;
         if (world.road[i]) { add(i, C.bulldoze, "road"); continue; }
-        if (world.civic[i]) { add(i, C.bulldoze, "civic"); continue; }
+        if (world.civic[i]) {
+          add(i, C.bulldoze, "civic");
+          // A centre with animals in its beds: releasing them is not undoable (tiles, never people).
+          if (world.civic[i] === CIVIC.CENTRE) for (const cz of world.citizens) if (cz.heldAt === i && !cz.dead) evicts++;
+          continue;
+        }
         if (isBuilt(world, i)) { add(i, C.bulldoze, "building"); if (world.occupants[i] || world.staff[i]) evicts++; continue; }
         if (world.zone[i]) { add(i, 0, "unzone"); continue; }
         if (world.terrain[i] === TERRAIN.TREE) { add(i, C.bulldozeTree, "tree"); continue; }
@@ -75,7 +80,7 @@ export function costOf(world, op) {
       }
       break;
     }
-    case "park": case "fire": case "police": {
+    case "park": case "fire": case "police": case "centre": {
       const i = idx(world, op.tx, op.ty);
       if (!inBounds(world, op.tx, op.ty) || world.terrain[i] === TERRAIN.WATER || world.road[i] || world.zone[i] || world.civic[i]) return { cost: 0, tiles, reason: "blocked" };
       add(i, C[op.kind] + (world.terrain[i] === TERRAIN.TREE ? C.bulldozeTree : 0), op.kind);
@@ -181,6 +186,10 @@ export function apply(world, op, { log = true } = {}) {
         world.terrain[i] = TERRAIN.GRASS;
         world.civic[i] = CIVIC.POLICE;
         break;
+      case "centre":
+        world.terrain[i] = TERRAIN.GRASS;
+        world.civic[i] = CIVIC.CENTRE;
+        break;
       case "zoo":
         world.terrain[i] = TERRAIN.GRASS;
         world.civic[i] = what === "zoo" ? CIVIC.ZOO : CIVIC.ZOO_PART;
@@ -199,9 +208,11 @@ export function apply(world, op, { log = true } = {}) {
 function removeCivic(world, i) {
   const c = world.civic[i];
   if (c === CIVIC.PARK) { world.civic[i] = CIVIC.NONE; return; }
-  if (c === CIVIC.FIRE || c === CIVIC.POLICE) {
-    for (const cz of world.citizens) if (cz.job === i) { cz.job = -1; cz.path = null; cz.hired = -1; }
+  if (c === CIVIC.FIRE || c === CIVIC.POLICE || c === CIVIC.CENTRE) {
+    for (const cz of world.citizens) if (cz.job === i) releaseJob(world, cz);
     world.staff[i] = 0;
+    // Bulldozing the centre sends its inmates home early, unfixed.
+    if (c === CIVIC.CENTRE) for (const cz of world.citizens) if (cz.heldAt === i) { cz.held = 0; cz.heldAt = -1; }
     world.civic[i] = CIVIC.NONE;
     return;
   }
