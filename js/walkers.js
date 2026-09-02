@@ -18,7 +18,11 @@
 // shop → home), cub (home → park → home), arrival (edge road → home),
 // departure (home → edge road), camper (stands by the edge road with a
 // tent), scout (random-walks the roads for a month), meeting (two friends
-// walk to the road between their homes and stand together ~4 s).
+// walk to the road between their homes and stand together ~4 s), predation
+// (the month's killer walks to the neighbour's door, a sack falls over the
+// neighbour and is tied, and the killer walks home with it over a shoulder —
+// cued by `world.predations`, which justice.kill publishes before the victim
+// is scrubbed; the figure in the sack is a record, not a citizen).
 
 import { ROAD, CIVIC, ZONE, TERRAIN, inBounds } from "./sim/world.js";
 import { ageYears } from "./sim/census.js";
@@ -33,6 +37,10 @@ const MEET_STAND = 4; // seconds
 const JOB_STAND = 1.5;
 const HOME_STAND = 1.0;
 const STROLL_STAND = 3.0;
+const BAG_STAND = 2.4; // seconds at the neighbour's door: the sack falls, then it is tied
+export const BAG_FALL = 0.45; // the fraction of that stand the sack is in the air (the renderer reads it)
+const PREY_STEP = 0.32; // tiles past the door the neighbour stands, along the killer's last step
+const CARRY_SPEED = 0.8; // a full sack is heavy
 const ADULT = KNOBS.ADULT_AGE;
 
 const N4 = [[0, -1], [1, 0], [0, 1], [-1, 0]]; // N E S W — the same fixed order as fields.doorOf
@@ -44,6 +52,7 @@ export function createWalkers(initialWorld) {
   let cursor = 0; // round-robin over world.citizens
   let lastTick = -1;
   let nextFake = -1; // ids for departure walkers (negative: never a citizen)
+  let pending = []; // predations not yet on the map (the killer's other walker is released first); each carries `until`, a tick
 
   // ---- BFS scratch, local to this module -----------------------------------
   let n = world.w * world.h;
@@ -204,6 +213,10 @@ export function createWalkers(initialWorld) {
       frame: 0,
       release: false,
       riding: false, // on a rail segment: ×RIDE_SPEED and drawn up on the train
+      prey: null, // predation: { species, age, name, tx, ty, facing } — the neighbour at the door
+      bag: null, // predation: 0..1 through the stand at the door (null when not standing there)
+      carry: null, // 'sack' once the killer turns for home
+      preyName: "", // predation: who is in the sack (the card)
       glyph: opts.glyph || null,
       tent: !!opts.tent,
       tile: opts.tile ?? -1,
@@ -283,6 +296,57 @@ export function createWalkers(initialWorld) {
     if (!pa || !pb) return;
     add(make("meeting", a, [{ path: pa, stand: MEET_STAND }], { glyph: "meeting" }));
     add(make("meeting", b, [{ path: pb, stand: MEET_STAND }], { glyph: null }));
+  }
+
+  /**
+   * The killing, as the street sees it: the killer walks from its own door
+   * to the neighbour's, stands there BAG_STAND seconds while the sack falls
+   * and is tied, then walks home with it. The neighbour stands PREY_STEP past
+   * the door along the killer's last step, facing the killer. Returns "ok",
+   * "wait" (the killer already has a walker — it is released, and this is
+   * retried every frame for up to two months), or "drop".
+   */
+  function spawnPredation(rec) {
+    const c = world.byId.get(rec.killer);
+    if (!c || c.dead || c.home < 0) return "drop";
+    if (activeIds.has(rec.killer)) return "wait";
+    const dv = door(rec.victimHome);
+    let dk = door(c.home);
+    if (dv < 0 || dk < 0) return "drop";
+    if (dk === dv) {
+      // The same door: the killer comes in from the next road tile along.
+      const step1 = roadSearch(dv, (j) => j !== dv, 3);
+      dk = step1 && step1.length >= 2 ? step1[step1.length - 1] : -1;
+      if (dk < 0) return "drop";
+    }
+    const there = roadPath(dk, dv);
+    if (!there || there.length < 2) return "drop";
+    const w = make("predation", c, [{ path: there, stand: BAG_STAND }, { path: there.slice().reverse(), stand: HOME_STAND }]);
+    const [ax, ay] = centre(there[there.length - 2]);
+    const [bx, by] = centre(there[there.length - 1]);
+    const dx = Math.sign(bx - ax);
+    const dy = Math.sign(by - ay);
+    const v = rec.victim;
+    const age = v.age < ADULT ? "cub" : v.age >= SPECIES_BY_ID[v.species].retire ? "elder" : "adult";
+    // The neighbour faces the killer: the opposite of the facing the last step gives the killer.
+    const facing = dx > 0 ? "nw" : dx < 0 ? "se" : dy > 0 ? "ne" : "sw";
+    w.prey = { species: v.species, age, name: v.name, tx: bx + dx * PREY_STEP, ty: by + dy * PREY_STEP, facing };
+    w.preyName = v.name; // outlives w.prey: the card names who is in the sack all the way home
+    return add(w) ? "ok" : "drop";
+  }
+
+  /** Put this month's predations on the map as their killers' walkers free up. */
+  function flushPending() {
+    if (!pending.length) return;
+    const keep = [];
+    for (const rec of pending) {
+      if (active.length >= MAX_WALKERS) { keep.push(rec); continue; }
+      if (spawnPredation(rec) === "wait") {
+        for (const w of active) if (w.citizen === rec.killer) w.release = true;
+        keep.push(rec);
+      }
+    }
+    pending = keep;
   }
 
   /** A grass tile beside the k-th road tile in from the edge — where a tent goes. */
@@ -394,6 +458,13 @@ export function createWalkers(initialWorld) {
           if (spawnDeparture(dep, k)) budget--;
         }
       }
+      // The month's killings: the sack. The list is per-tick (justice.kill);
+      // a record waits for its killer's walker to free up for at most two
+      // months (a month is 1.5 s at ×1; a walker is released at its NEXT
+      // tile centre), then is dropped.
+      pending = pending.filter((r) => r.until > world.tick);
+      for (const rec of world.predations || []) pending.push({ ...rec, until: world.tick + 2 });
+      flushPending();
       budget = 6;
       for (const [ia, ib] of world.meetings || []) {
         if (budget-- <= 0 || active.length + 2 >= MAX_WALKERS) break;
@@ -455,6 +526,7 @@ export function createWalkers(initialWorld) {
     if (w.standUntil > 0) {
       w.standUntil -= dt;
       w.frame = 0;
+      if (w.kind === "predation" && w.leg === 0) w.bag = Math.min(1, Math.max(0, 1 - w.standUntil / BAG_STAND));
       if (w.standUntil > 0) return;
       // Stand over: next leg, or done.
       if (w.release) { w.done = true; return; }
@@ -467,6 +539,13 @@ export function createWalkers(initialWorld) {
       w.leg++;
       w.seg = 0;
       w.t = 0;
+      if (w.kind === "predation" && w.leg === 1) {
+        // The sack is tied: it goes over the shoulder, the neighbour is not drawn again.
+        w.bag = null;
+        w.prey = null;
+        w.carry = "sack";
+        w.speed *= CARRY_SPEED;
+      }
       if (w.leg >= w.legs.length) w.done = true;
       return;
     }
@@ -516,6 +595,7 @@ export function createWalkers(initialWorld) {
       step(w, dt);
     }
     for (let k = active.length - 1; k >= 0; k--) if (active[k].done) remove(k);
+    flushPending(); // before the sampler, so a freed killer is the sack's and not a commuter's
     if (dt > 0) sample(vp);
   }
 
@@ -527,6 +607,7 @@ export function createWalkers(initialWorld) {
     world = nw;
     active = [];
     activeIds.clear();
+    pending = [];
     cursor = 0;
     lastTick = -1;
     resize();

@@ -36,7 +36,7 @@ measurement and SPEC gets edited — never the reverse.
   <270513546+StonePhilosopher@users.noreply.github.com>`; every commit ends
   with the Co-Authored-By line; commit messages are field notes and part of
   the archive. `.gitignore` = `Thumbs.db .DS_Store out/ node_modules/`.
-- **Before touching a file:** `node tools/check.mjs` — 132 checks, exits 1.
+- **Before touching a file:** `node tools/check.mjs` — 139 checks, exits 1.
   Green at the commit this file lands in. If it is red when you arrive, that
   is the first job; `git log -p` on the file it names is the fastest route.
 - **Run:**
@@ -830,10 +830,81 @@ not mistake my confidence for coverage.
   If a future session's news work reaches into the sim, that argument dies
   and the curves must be re-measured.
 
+## 14. Session 7 — the predation animation (2026-09-02, night; SPEC §14)
+
+The owner: *"i would like an animation for predation, perhaps one citizen
+puts a bag/sack over another citizen and then walks away with a bag over
+their shoulder."* Built as said, on the walker layer, in one commit.
+
+**What shipped.**
+- `justice.kill` publishes `world.predations` — `{ killer, killerHome,
+  victimHome, victim: { id, species, age, name } }` — BEFORE
+  `removeCitizen`; `tick.js` resets it with `arrivals` / `departures`.
+  Per-tick, never saved (`toPlain` does not carry it — a check says so),
+  never hashed. The sim change is those two lines; the playtest hash cannot
+  move and did not.
+- `walkers.js` kind `predation`: leg 0 = the killer's door → the neighbour's
+  door (`roadPath`; the same door → in from the next road tile), a 2.4 s
+  stand (`BAG_STAND`) with `w.bag` 0→1; leg 1 = home at ×0.8 with
+  `w.carry = "sack"`. `w.prey` = the neighbour, a FIGURE from the record
+  (the citizen is gone), 0.32 tiles past the door along the killer's last
+  step, facing the killer. A record whose killer already walks is queued
+  (`pending`), that walker is released at its next tile centre, and the
+  queue is flushed every `update()` — before the sampler, so the freed
+  killer is the sack's. `until = tick + 2` (two months) then dropped.
+- `render.js`: while `w.bag < BAG_FALL` (0.45) the neighbour is drawn and
+  the OPEN sack falls onto it (`dy = −22·(1 − u²)`, z 999 so it paints over
+  the figure); after, the TIED sack stands there and alternates with the
+  wriggle every 1/8 of the stand. The killer takes `art.citizen(…, { carry:
+  w.carry })`; the card says `calling on NAME` and then `walking home with
+  a heavy sack — NAME did not come home` (`w.preyName` outlives `w.prey`).
+- `art/citizens.js`: `SACKS` = open / tied / wriggle, 12×20 on the feet
+  (`art.overlay("sack", 0..2)`); `SACK_SHOULDER` 9×11 stamped in an
+  **18-px grid, the figure 3 px in** (symmetric, so `mirrorLit` lands the
+  figure on itself for SW/NW), BEHIND the figure for SE (we see the face),
+  OVER its back for NE; it hangs from row 7 — the row above the shoulder —
+  never from the head's top, so the body rows of a carrying sprite are the
+  plain sprite's. Anchor `[9, h−1]`. Cache key gains `c`. `allCitizens`
+  adds wolf + fox × 4 × 3 carrying, the elder tortoise with hat and sack,
+  and the three sacks — the audit walks them.
+- `tools/shots.mjs` → `docs/shots/sheet-predation.png`; `tools/check.mjs`
+  132 → 139: the record (count, killer alive, victim scrubbed and named,
+  not in `toPlain`); carry art (body rows equal, anchor on the feet, ≥ 24 px
+  of sack on every facing and frame of six species, the three sacks on the
+  feet, wriggle ≠ tied); Part D now FORCES a killing at year 2.5 on both
+  worlds and follows the walker frame by frame — the fall, the tied sack
+  at 0.32 tiles, the carry with `prey` cleared, the walker's end — and the
+  on/off hash check runs across that whole run.
+
+**Traps (keyed by what you see).**
+| you see | it was |
+|---|---|
+| the check "body rows are the plain sprite's" fails for every sprite | the check said `w === 16`; the grid is `12 + 2·3 = 18`. Two more failures hid under that one until it was fixed — fix the loudest first, then re-read |
+| only the tortoise fails that check | its 1-px outline is clipped by the 12-px grid and not by the 18-px one — a REAL pixel the plain sprite never had. The check compares the tortoise without the outline key |
+| the sack floats above the head like a balloon (first sheet) | it was placed from the HEAD's top row (species-dependent) and 5 px up; now from the SHOULDER row, 3 px up, 9 wide — a lump beside the head |
+| a killing with no sack, ever, in a crowded town | the killer already had a walker; the record was dropped at the next tick (1.5 s at ×1) before the release landed. Now `until = tick + 2` |
+| `zoo.walkers.list()` shows a predation walker while PAUSED, before any frame moved | `update()` flushes `pending` at dt 0 (the frame loop runs with wdt 0 when paused) — the spawn is instant; only the WALK waits. Verifying by hand: find the walker BEFORE advancing time, or the fall is missed (I missed it once) |
+| the killer walks 23 tiles to a neighbour 3 tiles away | `KILL_RADIUS` is Chebyshev on HOMES; the walk is the road path between DOORS, round the block. The suite's ring city has one ring. Not a bug; a long approach |
+
+**Measured (browser, seed 7 scripted ring, year 8, P 279–280, ×2 zoom,
+paused, time stepped by hand through `walkers.update`).** Run 1: wolf 283
+→ wolf "Fenpa Howell", approach 23 tiles, at the door bag 0.08 → 0.31 (the
+open sack in the air, the neighbour under it) → 0.60 (tied, on the road)
+→ leg 1 carry, facing se, the lump above-left of the head, plainly
+readable among ~150 walkers. Run 2: fox "Ashset Russet" → cat "Purtens
+Whiskers", approach 2 tiles; the carry photographed at 30.98, 31.34, 32.06,
+32.50. Console: no messages. The suite's Part D: fall / tied / door /
+carry / gone all true in 139/139.
+
+**Left (BACKLOG).** The victim's own walker, if it had one, is released at
+its next centre while the figure at the door already stands — two of the
+same animal for under a second. The sack goes HOME; a hall's staff could
+carry it to the hall. No sound, no flash at the second of the drop.
+
 ## 9. Verification recipe (what "done" looks like here)
 
 ```
-node tools/check.mjs                                   # 132 checks, 0 failures — the gate
+node tools/check.mjs                                   # 139 checks, 0 failures — the gate
 node tools/playtest.mjs --years 30 --quiet             # the §4 curves (disasters off)
 node tools/playtest.mjs --years 30 --parks 2 --zoo 12 --quiet
 node tools/playtest.mjs --disasters --stations --years 40 --seed 5

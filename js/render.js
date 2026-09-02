@@ -30,6 +30,7 @@ import { DECK_TOP } from "./art/roads.js";
 import { lotScore, REASON } from "./sim/lots.js";
 import { tunnelAxis } from "./sim/reach.js";
 import { isWorker } from "./sim/census.js";
+import { BAG_FALL } from "./walkers.js";
 
 const MARGIN = 256; // projection px around the viewport kept in the static layer
 const REACH_UP = 120; // tallest sprite above its tile's north vertex
@@ -357,8 +358,21 @@ export function createRenderer(canvas, initialWorld, art) {
       // On a bridge the deck sits DECK_TOP px above the water plane (roads.js);
       // shots.mjs lifted its walkers, the renderer did not — they stood in the river.
       const onBridge = world.road[Math.floor(w.ty) * world.w + Math.floor(w.tx)] === ROAD.BRIDGE;
-      items.push({ sprite: art.citizen(w.species, w.facing, w.frame, w.age, { hat: w.hat }), tx: w.tx, ty: w.ty, kind: "walker", walker: w, dy: onBridge ? -DECK_TOP : w.riding ? -3 : 0 }); // a rider sits up on the train
+      items.push({ sprite: art.citizen(w.species, w.facing, w.frame, w.age, { hat: w.hat, carry: w.carry }), tx: w.tx, ty: w.ty, kind: "walker", walker: w, dy: onBridge ? -DECK_TOP : w.riding ? -3 : 0 }); // a rider sits up on the train
       if (w.glyph === "meeting" && w.standUntil > 0) items.push({ sprite: meet, tx: w.tx, ty: w.ty, kind: "walker", z: 1000, dy: -24 });
+      if (w.kind === "predation" && w.bag != null && w.prey) {
+        // The neighbour at the door. First the open sack falls over it (a
+        // quadratic drop from 22 px up); then the tied sack stands where it
+        // stood, wriggling, until the killer turns for home.
+        const p = w.prey;
+        if (w.bag < BAG_FALL) {
+          const u = w.bag / BAG_FALL;
+          items.push({ sprite: art.citizen(p.species, p.facing, 0, p.age), tx: p.tx, ty: p.ty, kind: "walker" });
+          items.push({ sprite: art.overlay("sack", 0), tx: p.tx, ty: p.ty, kind: "walker", z: 999, dy: -Math.round(22 * (1 - u * u)) });
+        } else {
+          items.push({ sprite: art.overlay("sack", 1 + (Math.floor(w.bag * 8) & 1)), tx: p.tx, ty: p.ty, kind: "walker" });
+        }
+      }
     }
     paintScene(items, (sprite, sx, sy, item) => {
       if (item.alpha != null) ctx.globalAlpha = item.alpha;
@@ -383,7 +397,7 @@ export function createRenderer(canvas, initialWorld, art) {
     let bd = Infinity;
     for (const w of list || []) {
       if (w.tent) continue;
-      const sp = art.citizen(w.species, w.facing, w.frame, w.age, { hat: w.hat });
+      const sp = art.citizen(w.species, w.facing, w.frame, w.age, { hat: w.hat, carry: w.carry });
       const [nx, ny] = toScreen(w.tx, w.ty);
       const fx = nx, fy = ny + HALF_H; // feet on the ground centre
       const left = fx - sp.anchor[0], top = fy - sp.anchor[1];

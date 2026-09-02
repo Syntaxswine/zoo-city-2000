@@ -24,6 +24,7 @@ export function tick(world) {
   const notices = [];
   world.departures = [];
   world.arrivals = [];
+  world.predations = []; // this month's killings, for the walker layer (justice.kill)
   if (!world.byId) {
     // First tick of a fresh world.
     world.byId = new Map();

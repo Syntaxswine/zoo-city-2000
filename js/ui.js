@@ -446,7 +446,9 @@ export function createUI(app) {
       if (x.e) lines.push(el("div", "warn", `trespass: ${x.e} forbidden tile${x.e === 1 ? "" : "s"} on the commute — ${x.p ? `${Math.round(x.p * 100)}% a month under this cover` : "no police cover, no stop"}`));
       const friends = c.friends.map((f) => w.byId.get(f)).filter(Boolean);
       lines.push(el("div", "dim", friends.length ? `friends: ${friends.map((f) => `${f.name} ${f.surname} (${f.species})`).join(", ")}` : "no friends yet"));
-      const doing = wk.riding ? "on the train" : { commuter: "commuting", stroller: "out for a stroll", cub: "off to the park", arrival: "just arrived — walking home", meeting: "meeting a new friend" }[wk.kind] || wk.kind;
+      const doing = wk.riding ? "on the train"
+        : wk.kind === "predation" ? (wk.carry ? `walking home with a heavy sack — ${wk.preyName} did not come home` : `calling on ${wk.preyName}`)
+        : { commuter: "commuting", stroller: "out for a stroll", cub: "off to the park", arrival: "just arrived — walking home", meeting: "meeting a new friend" }[wk.kind] || wk.kind;
       lines.push(el("div", "dim", doing + (c.centenary ? " · wears the centenary hat" : "")));
     } else {
       head.append(el("b", "", wk.name || cap(wk.species)), el("span", "dim", `  ${wk.species}`));

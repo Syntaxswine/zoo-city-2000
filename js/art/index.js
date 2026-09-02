@@ -13,9 +13,10 @@
 //                                       | 'kerb' side 0..3 (N E S W)
 //   art.chalk(zone, high)               the same, spelled out
 //   art.tree(kind)                      'round' | 'tall' | 'willow' or 0..2
-//   art.citizen(species, facing, frame, age, opts)
+//   art.citizen(species, facing, frame, age, opts)   opts.hat, opts.carry 'sack'
 //   art.overlay(kind, frame)            'scaffold' | 'fire' 0..1 | 'flood' | 'rubble'
 //                                       | 'tent' | 'hat' | 'meeting' | 'plaza' | 'cursor' | 'ghost'
+//                                       | 'sack' 0 open (falling) | 1 tied | 2 tied, wriggling
 //   art.zot(kind)                       'noroad' | 'smog' | 'nojob' | 'nodemand'
 //   art.waterTint(frame)                key map for the water cycle, frame mod WATER_FRAMES (4)
 //   allSprites()                        [{ name, sprite }] for the audit
@@ -28,7 +29,7 @@ import { roadSprite, bridgeSprite, allRoads } from "./roads.js";
 import { wallSprite, tunnelSprite, allWalls } from "./walls.js";
 import { railSprite, stationSprite, allRail } from "./rail.js";
 import { GRASS, CHALK, RUBBLE, WATER_TILE, KERB, TREES, TREE_LIST, ZOTS, PLAZA, CURSOR, GHOST, waterTint, WATER_FRAMES, allTerrain } from "./terrain.js";
-import { citizenSprite, TENT, HAT, MEETING, allCitizens } from "./citizens.js";
+import { citizenSprite, TENT, HAT, MEETING, SACKS, allCitizens } from "./citizens.js";
 
 const EXTRA = { tent: TENT, hat: HAT, meeting: MEETING, plaza: PLAZA, cursor: CURSOR, ghost: GHOST };
 
@@ -66,6 +67,7 @@ export function tree(kind = "round") {
 }
 
 export function overlay(kind, frame = 0) {
+  if (kind === "sack") return SACKS[((frame % 3) + 3) % 3];
   if (EXTRA[kind]) return EXTRA[kind];
   return overlaySprite(kind, frame);
 }

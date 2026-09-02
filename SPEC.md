@@ -838,6 +838,22 @@ projected footprint + height.
 - Special movers: arrivals from the edge road, departures to it (tax revolt =
   a column), campers with tents, the scout, bears vanish in winter, meeting
   pairs, centenary hat.
+- **Predation (the owner: *"one citizen puts a bag/sack over another citizen
+  and then walks away with a bag over their shoulder"*).** `justice.kill`
+  publishes the month's killings to `world.predations` — `{ killer,
+  killerHome, victimHome, victim: { id, species, age, name } }`, recorded
+  BEFORE the victim is scrubbed, per-tick like `world.meetings`, never saved
+  or hashed. The walker layer plays each one: the killer walks from its own
+  door to the neighbour's; the neighbour stands 0.32 tiles past the door
+  facing it (a figure from the record — the citizen is already gone); over a
+  2.4 s stand the OPEN sack falls over the neighbour (a quadratic drop from
+  22 px, the first 45%), then the TIED sack stands where it stood and
+  wriggles; then the killer walks home at ×0.8 with the sack over its
+  screen-back shoulder (`art.citizen(…, { carry: "sack" })` — an 18-px grid,
+  the figure 3 px in, the same feet). If the killer already has a walker it
+  is released at its next tile centre and the sack waits for it (retried
+  every frame for up to two months, then dropped).
+  The card names who is in the sack all the way home.
 - **The boundary law:** walkers read the sim, never write it. A walker whose
   citizen's home/job/alive changed this tick is released at the next tile
   centre (no pop). The sampler never draws a citizen whose state changed

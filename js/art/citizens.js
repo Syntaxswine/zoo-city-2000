@@ -725,7 +725,7 @@ const CUB_MARK = {
 };
 
 // =========================================================================
-// Extras: the tent, the centenary hat, the meeting glyph.
+// Extras: the tent, the centenary hat, the meeting glyph, the sack.
 // =========================================================================
 
 export const TENT = defineSprite({
@@ -771,6 +771,90 @@ export const MEETING = defineSprite({
     "...(.....",
   ]),
 });
+
+// THE SACK (SPEC §14, predation). Burlap in the EARTH ramp — lit upper-left
+// like everything else: 'u' the highlight, 't' the cloth, 's' the shade,
+// 'r' the dark right edge, 'q' the cord and the open mouth. Three ground
+// sprites the size of an adult (12×20, anchor at the feet), so a sack drawn
+// where an animal stood hides all of it:
+//   0  OPEN   — falling: the closed round end up, the mouth a dark row below
+//   1  TIED   — on the ground, gathered at the neck under a cord
+//   2  TIED, wriggling — the neck a pixel over, the right side a pixel out
+// and one PART for the shoulder: a lump that rides above and behind the
+// head, gathered to a cord and a hand at the shoulder (composeAdult, carry).
+const SACK_OPEN = defineSprite({
+  name: "sack-open",
+  anchor: [6, 19],
+  tags: ["extra", "sack"],
+  rows: part([
+    "....uuuu....",
+    "..uuuuttt...",
+    ".uuuuutttss.",
+    ".uuuuttttss.",
+    "uuuuutttssss",
+    "uuuutttttsss",
+    "uuuuttttssss",
+    "uuutttttsssr",
+    "uuuttttsssrr",
+    "uuuttttssrrr",
+    "uutttttssrrr",
+    "uutttssssrrr",
+    "uuttttsssrrr",
+    "uutttttssrrr",
+    "uuttttsssrrr",
+    "uuttttssrrrr",
+    "uutttsssrrrr",
+    "uuttttssrrrr",
+    "urrrrrrrrrrq",
+    "qqqqqqqqqqqq",
+  ]),
+});
+const SACK_TIED_ROWS = part([
+  ".....tt.....",
+  "....utts....",
+  "....qqqq....",
+  "...uutts....",
+  "..uuuttss...",
+  ".uuuutttss..",
+  ".uuuuttttss.",
+  "uuuuutttssss",
+  "uuuutttttsss",
+  "uuuuttttssss",
+  "uuutttttsssr",
+  "uuuttttsssrr",
+  "uuuttttssrrr",
+  "uutttttssrrr",
+  "uutttssssrrr",
+  "uuttttsssrrr",
+  ".uttttssrrr.",
+  ".uttssssrrr.",
+  "..tssssrrr..",
+  "...qqqqqq...",
+]);
+const SACK_TIED = defineSprite({ name: "sack-tied", anchor: [6, 19], tags: ["extra", "sack"], rows: SACK_TIED_ROWS });
+/** The wriggle: the neck and the shoulders (rows 0–6) lean a pixel to the right. */
+const SACK_WRIGGLE = defineSprite({
+  name: "sack-wriggle",
+  anchor: [6, 19],
+  tags: ["extra", "sack"],
+  rows: SACK_TIED_ROWS.map((r, y) => (y <= 6 ? "." + r.slice(0, 11) : r)),
+});
+export const SACKS = Object.freeze([SACK_OPEN, SACK_TIED, SACK_WRIGGLE]);
+const SACK_SHOULDER = part([
+  "..uuuuu..",
+  ".uuuuutt.",
+  "uuuuuttts",
+  "uuuutttss",
+  "uuutttsss",
+  ".uutttssr",
+  ".uuttssr.",
+  "..uttss..",
+  "...tts...",
+  "...qq....",
+  "....y....",
+]);
+const CARRY_OX = 3; // the carrying grid is 18 wide; the figure sits 3 px in — SYMMETRIC, so the mirrored facings land the figure on itself — the sack over its screen-left shoulder
+const CARRY_LIFT = 3; // the sack's top rides 3 px above the frame's top row — its bulk BESIDE the head, not over it; the cord and the hand end on row 7, the row above the shoulder (body row 8)
 
 // =========================================================================
 // Composition.
@@ -833,8 +917,9 @@ function elderMarkKey(species) {
  * the eye row is the first head row with an eye '+' (or an eye-white '('
  * — the raccoon's eyes sit in its mask).
  */
-function stampElderMarks(g, head, facing, key, lift) {
-  const at = (x, y) => {
+function stampElderMarks(g, head, facing, key, lift, ox = 0) {
+  const at = (x0, y) => {
+    const x = x0 + ox;
     if (y + lift < 0 || y + lift >= g.length || x < 0 || x >= g[0].length) return;
     if (g[y + lift][x] !== T) g[y + lift][x] = key;
   };
@@ -944,13 +1029,20 @@ function normAge(species, age) {
   return age;
 }
 
-function composeAdult(species, facing, frame, elder, hat) {
-  const lift = hat ? 4 : 0;
+function composeAdult(species, facing, frame, elder, hat, carry = false) {
+  const lift = (hat ? 4 : 0) + (carry ? CARRY_LIFT : 0);
+  const ox = carry ? CARRY_OX : 0;
   const H = 20 + lift;
-  const g = blank(12, H);
+  const g = blank(12 + 2 * ox, H);
   const body = BODY[BUILD[species]][facing][frame];
   const tail = TAIL[species] && TAIL[species][facing];
-  const put = (rows, x, y) => stamp(g, rows, x, y + lift);
+  const put = (rows, x, y) => stamp(g, rows, x + ox, y + lift);
+  // The sack over the shoulder: BEHIND the figure when we see its face (SE),
+  // over its back when we see its back (NE). It hangs from the SHOULDER — a
+  // fixed row (the body starts at row 8) — never from the head's top, so the
+  // body rows of a carrying sprite are the plain sprite's, 3 px in (check.mjs).
+  const sackAt = () => stamp(g, SACK_SHOULDER, 0, lift - CARRY_LIFT);
+  if (carry && facing === "se") sackAt();
   if (tail && tail[3]) put(tail[0], tail[1], tail[2]);
   const shellBehind = species === "tortoise" && facing === "se";
   if (shellBehind) put(SHELL.se[0], SHELL.se[1], SHELL.se[2]);
@@ -968,12 +1060,13 @@ function composeAdult(species, facing, frame, elder, hat) {
   } else {
     put(head, 0, 0);
   }
-  if (elder) stampElderMarks(g, head, facing, elderMarkKey(species), lift);
+  if (elder) stampElderMarks(g, head, facing, elderMarkKey(species), lift, ox);
   if (hat) {
     let top = 0;
     while (top < 9 && head[top].split("").every((c) => c === ".")) top++;
-    stamp(g, HAT_ROWS, 3, top + lift - 4);
+    stamp(g, HAT_ROWS, 3 + ox, top + lift - 4);
   }
+  if (carry && facing === "ne") sackAt();
   return toRows(g); // AUTHORED keys — mirrored and remapped by citizenSprite
 }
 
@@ -991,7 +1084,10 @@ const CACHE = new Map();
 /**
  * The composed, cached citizen sprite. `facing` 'se'|'ne'|'sw'|'nw' (or an
  * index into FACINGS), `frame` 0..2 (or 'stand'|'stepA'|'stepB'), `age`
- * 'adult'|'elder'|'cub' (or years). `opts.hat` adds the centenary hat.
+ * 'adult'|'elder'|'cub' (or years). `opts.hat` adds the centenary hat;
+ * `opts.carry === "sack"` puts a sack over the shoulder (adults and elders
+ * only — the killing is an adult's; the grid widens to 16 and the anchor
+ * follows the feet, so the figure stays on its tile).
  */
 export function citizenSprite(species, facing = "se", frame = 0, age = "adult", opts = {}) {
   if (!(species in HEAD_SPECIES)) throw new Error(`citizens: no kit for species '${species}' — author its HEAD/BUILD/CUB_MARK here and add it to HEAD_SPECIES (check.mjs asserts every species.js row has kit art)`);
@@ -999,17 +1095,18 @@ export function citizenSprite(species, facing = "se", frame = 0, age = "adult", 
   const fr = normFrame(frame);
   const ag = normAge(species, age);
   const hat = !!opts.hat && ag !== "cub";
-  const key = `${species}|${f}|${fr}|${ag}|${hat ? "h" : ""}`;
+  const carry = opts.carry === "sack" && ag !== "cub";
+  const key = `${species}|${f}|${fr}|${ag}|${hat ? "h" : ""}${carry ? "c" : ""}`;
   let s = CACHE.get(key);
   if (s) return s;
   const authored = f === "sw" ? "se" : f === "nw" ? "ne" : f;
-  let rows = ag === "cub" ? composeCub(species, authored, fr) : composeAdult(species, authored, fr, ag === "elder", hat);
+  let rows = ag === "cub" ? composeCub(species, authored, fr) : composeAdult(species, authored, fr, ag === "elder", hat, carry);
   // Mirror the AUTHORED grid (so the light stays upper-left), THEN skin it.
   if (f === "sw" || f === "nw") rows = mirrorLit(rows);
   rows = remap(rows, furMap(species, ag === "elder"));
   if (species === "tortoise") rows = outline(rows, "+");
   const h = rows.length;
-  const anchor = ag === "cub" ? [4, 11] : [6, h - 1];
+  const anchor = ag === "cub" ? [4, 11] : [6 + (carry ? CARRY_OX : 0), h - 1];
   s = defineSprite({ name: `citizen-${key}`, rows, anchor, tags: ["citizen", species, ag] });
   CACHE.set(key, s);
   return s;
@@ -1027,6 +1124,16 @@ export function allCitizens() {
         }
   const hat = citizenSprite("tortoise", "se", 0, "elder", { hat: true });
   out.push({ name: hat.name, sprite: hat });
+  // The carry, both builds, every facing and frame — the audit walks every stamped part.
+  for (const species of ["wolf", "fox"])
+    for (const facing of FACINGS)
+      for (let frame = 0; frame < 3; frame++) {
+        const c = citizenSprite(species, facing, frame, "adult", { carry: "sack" });
+        out.push({ name: c.name, sprite: c });
+      }
+  const hc = citizenSprite("tortoise", "se", 0, "elder", { hat: true, carry: "sack" });
+  out.push({ name: hc.name, sprite: hc });
   out.push({ name: TENT.name, sprite: TENT }, { name: HAT.name, sprite: HAT }, { name: MEETING.name, sprite: MEETING });
+  for (const sk of SACKS) out.push({ name: sk.name, sprite: sk });
   return out;
 }

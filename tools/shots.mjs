@@ -26,7 +26,7 @@ import { WALLS, TUNNELS } from "../js/art/walls.js";
 import { RAILS, STATIONS } from "../js/art/rail.js";
 import { GRASS, CHALK, CHALK_KEYS, RUBBLE, WATER_TILE, KERB, TREE_LIST, ZOTS, PLAZA, CURSOR, GHOST, waterTint, WATER_FRAMES } from "../js/art/terrain.js";
 import { ink } from "../js/art/format.js";
-import { citizenSprite, SPECIES_IDS, FACINGS, TENT, HAT, MEETING } from "../js/art/citizens.js";
+import { citizenSprite, SPECIES_IDS, FACINGS, TENT, HAT, MEETING, SACKS } from "../js/art/citizens.js";
 import { paintScene, Z_BUILDING } from "../js/iso/painter.js";
 import { toScreen, HALF_H } from "../js/iso/iso.js";
 
@@ -300,6 +300,43 @@ function sheets(z) {
     });
     console.log("sheet-citizens-close: row 0 adult se | ne on grass; row 1 elder se | adult sw on road; row 2 cub se | cub sw on grass");
     out.push(save("sheet-citizens-close.png", canvas, Math.max(z, 6)));
+  }
+  // Predation (SPEC §14): the carry on both builds, four facings, three
+  // frames; the fall over the neighbour at four heights, the tied sack and
+  // its wriggle, the elder tortoise with hat and sack; and the two moments at
+  // the door on a road tile — the sack tied 0.32 tiles past the killer, and
+  // the walk home.
+  {
+    const canvas = createCanvas(24 * 16 + 16, 3 * 44 + 8);
+    const ctx = background(canvas, "#4d5a30");
+    let col = 0;
+    for (const species of ["wolf", "fox"])
+      for (const facing of FACINGS)
+        for (let frame = 0; frame < 3; frame++) {
+          blitAt(ctx, citizenSprite(species, facing, frame, "adult", { carry: "sack" }), 12 + col * 16, 40);
+          col++;
+        }
+    const y2 = 84;
+    [22, 12, 4, 0].forEach((d, i) => {
+      blitAt(ctx, citizenSprite("rabbit", "nw", 0, "adult"), 12 + i * 24, y2);
+      blitAt(ctx, SACKS[0], 12 + i * 24, y2 - d);
+    });
+    blitAt(ctx, SACKS[1], 12 + 4 * 24, y2);
+    blitAt(ctx, SACKS[2], 12 + 5 * 24, y2);
+    blitAt(ctx, citizenSprite("tortoise", "se", 0, "elder", { hat: true, carry: "sack" }), 12 + 6 * 24, y2);
+    blitAt(ctx, citizenSprite("bear", "ne", 1, "adult", { carry: "sack" }), 12 + 7 * 24, y2);
+    blitAt(ctx, citizenSprite("cow", "sw", 2, "elder", { carry: "sack" }), 12 + 8 * 24, y2);
+    blitAt(ctx, ROADS[0][E | W], 60, 128);
+    blitAt(ctx, citizenSprite("wolf", "se", 0, "adult"), 60, 128);
+    blitAt(ctx, SACKS[2], 60 + 10, 128 + 5);
+    blitAt(ctx, ROADS[0][E | W], 140, 128);
+    blitAt(ctx, citizenSprite("wolf", "nw", 1, "adult", { carry: "sack" }), 140, 128);
+    blitAt(ctx, ROADS[0][N | S], 220, 128);
+    blitAt(ctx, citizenSprite("fox", "sw", 0, "adult"), 220, 128);
+    blitAt(ctx, citizenSprite("mouse", "ne", 0, "adult"), 220 - 10, 128 + 5);
+    blitAt(ctx, SACKS[0], 220 - 10, 128 + 5 - 12);
+    console.log("sheet-predation: row 0 wolf|fox carrying × se,ne,sw,nw × 3 frames; row 1 the fall at 22/12/4/0 px, tied, wriggle, elder tortoise + hat, bear ne, elder cow sw; row 2 at the door (0.32 tiles = 10 px, 5 down): wolf + tied sack, wolf walking home, fox + mouse under the falling sack");
+    out.push(save("sheet-predation.png", canvas, Math.max(z, 4)));
   }
   return out;
 }

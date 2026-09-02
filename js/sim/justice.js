@@ -121,6 +121,10 @@ function kill(world, killer, victim, notices) {
   const mourners = victim.friends.slice();
   const hh = world.hhById.get(victim.household);
   const family = hh ? hh.members.filter((id) => id !== victim.id) : [];
+  // The walker layer's cue (SPEC §14): this month's killings, published BEFORE
+  // the victim is scrubbed — the sack has to know who is in it. Per-tick like
+  // world.meetings; never saved, never hashed, read-only to the reader.
+  (world.predations || (world.predations = [])).push({ killer: killer.id, killerHome: killer.home, victimHome, victim: { id: victim.id, species: victim.species, age: ageYears(world, victim), name: nameOf(victim) } });
   removeCitizen(world, victim, "killed");
   holdFuneral(world, mourners, null);
   for (const id of family) { const o = world.byId.get(id); if (o) o.grief = tick + 12; }

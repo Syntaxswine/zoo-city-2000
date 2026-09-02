@@ -14,6 +14,13 @@ could ship whole.
   arrest volume (police cover, `ARREST_COVER`).
 - **Customer walkers** to the hall (walkers.js `isShop` could include M);
   the meat hall's staff skinned by species; a "sold" departure walker.
+- **The predation animation SHIPPED 2026-09-02** (SPEC §14: the sack falls,
+  is tied, goes home over the shoulder). Left: the victim's OWN walker, if
+  it had one, is released at its next tile centre while the figure at the
+  door already stands — two of the same animal for under a second; the
+  sack could be carried INTO the meat hall when the killer works there
+  (today it goes home); no sound, no ticker flash at the moment of the
+  drop (the KILLING line is the month's, not the second's).
 - **Supply from funerals** as the hall's local term (Beastars: the market
   buys the dead) — the honest grey economy, v2.
 - **The abattoir** — a 3×3 M landmark on the landmarks proposal's merge rule.

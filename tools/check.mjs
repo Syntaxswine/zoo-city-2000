@@ -216,10 +216,15 @@ function auditIds(w) {
   const F = load(A.saved);
   const { killTotal } = await import("../js/sim/justice.js");
   const saveP = KNOBS.KILL_P;
+  const killings0 = F.events.killings;
   KNOBS.KILL_P = 1 / killTotal(F); // exactly one killing this month (k = floor(1 + r))
   tick(F);
   KNOBS.KILL_P = saveP;
   check("a forced month kills", F.events.killings > 0 && F.events.files.some((f) => f.cause === "killing"), `${F.events.killings}`);
+  // The walker layer's cue: one record per killing, the killer alive, the victim gone, named.
+  const recs = F.predations || [];
+  check("a killing publishes a predation record: the killer alive, the neighbour scrubbed and named", recs.length === F.events.killings - killings0 && recs.every((r) => F.byId.has(r.killer) && !F.byId.has(r.victim.id) && r.victimHome >= 0 && r.killerHome >= 0 && typeof r.victim.name === "string" && r.victim.name.length > 0 && typeof r.victim.species === "string"), `${recs.length} records for ${F.events.killings - killings0} killings`);
+  check("the record is per-tick and never saved", !("predations" in toPlain(F)), "toPlain carries predations");
   check("the killed are gone (dangling-id law)", auditIds(F) === 0, `${auditIds(F)}`);
   // A police station and a centre, then force the arrest and the wrongful branch.
   const ci = (sy + 5) * F.w + (sx - 5);
@@ -771,6 +776,28 @@ if (existsSync(artIndex)) {
     for (const ty of [4, 4.1, 4.2, 4.5, 5, 5.9]) if (!(keyOf(walker(2, ty)) > keyOf(zoo))) band = false;
     for (const tx of [0, 1, 1.9]) if (!(keyOf(walker(tx, 6)) > keyOf(zoo))) band = false;
     check("painter: a walker on the road beside a 2×2 paints over it", band);
+    // The sack over the shoulder: the figure is the plain figure, 3 px in, on the same feet.
+    {
+      const { ink } = await import("../js/art/format.js");
+      let feet = true, sack = true, throws = "";
+      for (const species of ["wolf", "fox", "rabbit", "bear", "tortoise", "hawk"])
+        for (const facing of ["se", "ne", "sw", "nw"])
+          for (let frame = 0; frame < 3; frame++) {
+            try {
+              const plain = art.citizen(species, facing, frame, "adult");
+              const carry = art.citizen(species, facing, frame, "adult", { carry: "sack" });
+              // The tortoise's 1-px outline is clipped by the 12-px grid and not by the 18-px one: compare it without the outline key.
+              const bare = (r) => (species === "tortoise" ? r.replace(/\+/g, ".") : r);
+              for (let k = 1; k <= 12; k++) if (bare(carry.rows[carry.rows.length - k]) !== "..." + bare(plain.rows[plain.rows.length - k]) + "...") feet = false;
+              if (!(carry.anchor[0] === plain.anchor[0] + 3 && carry.anchor[1] === carry.rows.length - 1 && carry.w === 18)) feet = false;
+              if (ink(carry.rows) - ink(plain.rows) < 24) sack = false;
+            } catch (e) { throws = `${species} ${facing} ${frame}: ${e.message}`; }
+          }
+      check("carry: the body rows are the plain sprite's, 3 px in, and the anchor is the feet", feet && !throws, throws);
+      check("carry: the sack adds at least 24 px of ink on every facing and frame", sack, "");
+      const sacks = [0, 1, 2].map((f) => art.overlay("sack", f));
+      check("the three sacks stand on the feet of an adult", sacks.every((sk) => sk.w === 12 && sk.h === 20 && sk.anchor[0] === 6 && sk.anchor[1] === 19) && sacks[1].rows.join() !== sacks[2].rows.join(), "");
+    }
     let behind = true;
     for (const [tx, ty] of [[0, 3.9], [1, 3.5], [2, 3.5], [-1, 4.5], [-1, 5.5], [1.5, 3.9]]) if (!(keyOf(walker(tx, ty)) < keyOf(zoo))) behind = false;
     for (const [tx, ty] of [[0, 4], [1, 4], [0, 5], [1, 5]]) if (!(keyOf(ground(tx, ty)) < keyOf(zoo))) behind = false;
@@ -822,12 +849,39 @@ if (existsSync(walkersPath)) {
   }
   const walkers = createWalkers(w2);
   const viewport = { x0: 0, y0: 0, x1: w2.w, y1: w2.h };
+  // From year 2.5 a killing is forced (on BOTH worlds — the hash check below
+  // now covers the predation walker's whole run) until one lands; then the
+  // walker is followed frame by frame: the fall, the tied sack, the carry home, the end.
+  const { killTotal: killTotalD } = await import("../js/sim/justice.js");
+  const savePD = KNOBS.KILL_P;
+  let rec = null, pred = null, sawFall = false, sawTied = false, sawCarry = false, gone = false, stoodAtDoor = false;
   for (let t = 0; t < 60; t++) {
+    const force = t >= 30 && !rec;
+    if (force) KNOBS.KILL_P = 1 / Math.max(1e-9, killTotalD(w1));
     tick(w1);
     tick(w2);
+    if (force) KNOBS.KILL_P = savePD;
+    if (!rec && w2.predations && w2.predations.length) rec = w2.predations[0];
     walkers.notify();
-    for (let k = 0; k < 20; k++) walkers.update(0.1, viewport);
+    for (let k = 0; k < 20; k++) {
+      walkers.update(0.1, viewport);
+      const p = walkers.list().find((x) => x.kind === "predation");
+      if (p) {
+        pred = p;
+        if (p.bag != null && p.prey && p.bag < 0.45) sawFall = true;
+        if (p.bag != null && p.bag >= 0.45) {
+          sawTied = true;
+          // The killer stands at the door's centre; the neighbour 0.32 tiles past it.
+          const dd = Math.abs(p.prey.tx - p.tx) + Math.abs(p.prey.ty - p.ty);
+          if (Math.abs(dd - 0.32) < 1e-6) stoodAtDoor = true;
+        }
+        if (p.carry === "sack" && p.leg === 1 && !p.prey) sawCarry = true;
+      } else if (pred) gone = true;
+    }
   }
+  KNOBS.KILL_P = savePD;
+  check("a forced killing publishes a record and the walker layer takes it: the killer's own walker, the neighbour named in the sack", !!rec && !!pred && pred.citizen === rec.killer && pred.preyName === rec.victim.name, rec ? (pred ? `${pred.citizen} vs ${rec.killer}` : "no predation walker") : "no killing landed in 30 forced months");
+  check("the sack falls, is tied at the door, goes home over the shoulder, and the walker finishes", sawFall && sawTied && stoodAtDoor && sawCarry && gone, `fall ${sawFall} tied ${sawTied} door ${stoodAtDoor} carry ${sawCarry} gone ${gone}`);
   check("walkers never write the sim: hash equal with the walker layer on and off", stateHash(w1) === stateHash(w2), `${stateHash(w1)} vs ${stateHash(w2)}`);
   const list = walkers.list();
   check("walkers carry real citizen ids", list.every((x) => x.citizen == null || w2.byId.has(x.citizen) || x.kind !== "commuter"), `${list.length} walkers`);

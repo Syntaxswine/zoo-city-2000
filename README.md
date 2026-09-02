@@ -130,7 +130,9 @@ buyer: it pays the mayor an untaxed cut, casts a dread over four tiles that
 takes twice the land value a works does, and herbivores move away from it.
 Every incident opens a six-month file; police cover is the monthly chance of
 an arrest, and one arrest in twenty takes the wrong animal, chosen by
-proximity. A convicted predator goes to the **pacification centre** (`V`)
+proximity. The street sees it: the killer walks to the neighbour's door, a
+sack falls over the neighbour and is tied, and the killer walks home with
+it over a shoulder (click it — the card says who is in the sack). A convicted predator goes to the **pacification centre** (`V`)
 and comes home fixed: no litters, never a killer, prey next door stop
 fearing it; a convicted prey animal, or anyone already fixed, is sold at the
 hall. The Butchers' Guild will sell you a licence. Nothing in it is a gate,
@@ -152,7 +154,7 @@ mill-town with a fox problem").
 
 - `tools/playtest.mjs --layout balanced|dormitory|millbelt --schedule 15:13,22:7`
   — a scripted mayor on the real map; the SPEC's acceptance targets.
-- `tools/check.mjs` — 132 checks: ledger conservation to the §, valves
+- `tools/check.mjs` — 139 checks: ledger conservation to the §, valves
   bounded, no NaN, the dangling-id law, rosters and capacities, commutes on
   roads, determinism, save → load → continue hash-equal, input-log replay,
   the crime-and-punishment invariants, the walls (the flood reproduces the
