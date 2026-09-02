@@ -86,6 +86,8 @@ export function census(world) {
   let maxTraffic = 0;
   let lots = 0;
   let roads = 0;
+  let walls = 0;
+  let tunnels = 0;
   let fireStations = 0;
   let policeStations = 0;
   let burning = 0;
@@ -116,6 +118,7 @@ export function census(world) {
       if (world.zone[i] === ZONE.R) rCap += KNOBS.R_CAP[world.tier[i]];
     }
     if (world.road[i] !== ROAD.NONE) roads++;
+    if (world.wall[i]) { walls++; if (world.road[i] !== ROAD.NONE) tunnels++; }
     lvSum += world.lv[i];
     polSum += world.pol[i];
     if (world.pol[i] > maxPol) maxPol = world.pol[i];
@@ -141,7 +144,7 @@ export function census(world) {
     fixed, wrongful, exonerated, held, herbNear, maxDread, markets, centres,
     approval: P ? moodSum / P : 50,
     native: P ? native / P : 0,
-    parks, zoos, lots, roads, lotsNoRoad,
+    parks, zoos, lots, roads, walls, tunnels, lotsNoRoad,
     fireStations, policeStations, burning,
     meanCrime: crimeN ? crimeSum / crimeN : 0, maxCrime,
     edgeRoads: Math.min(KNOBS.EDGE_ROAD_MAX, edgeRoads(world).length),

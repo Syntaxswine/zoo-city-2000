@@ -4,6 +4,8 @@
 //   art.civic(kind)                     'park' | 'zoo' | 'fire' | 'police' | 'centre'
 //   art.road(mask, busy)                4-bit mask N=1 E=2 S=4 W=8
 //   art.bridge(mask)
+//   art.wall(mask)                      the same mask; a standing sprite (walls.js)
+//   art.tunnel(axis)                    'ns' | 'ew' — the road's axis through the wall
 //   art.ground(kind, variant)           'grass' 0..2 | 'water' | 'rubble'
 //                                       | 'chalk' variant = zone*2 + (high?1:0)
 //                                       | 'kerb' side 0..3 (N E S W)
@@ -21,6 +23,7 @@
 
 import { buildingSprite, civicSprite, overlaySprite, allBuildings } from "./buildings.js";
 import { roadSprite, bridgeSprite, allRoads } from "./roads.js";
+import { wallSprite, tunnelSprite, allWalls } from "./walls.js";
 import { GRASS, CHALK, RUBBLE, WATER_TILE, KERB, TREES, TREE_LIST, ZOTS, PLAZA, CURSOR, GHOST, waterTint, WATER_FRAMES, allTerrain } from "./terrain.js";
 import { citizenSprite, TENT, HAT, MEETING, allCitizens } from "./citizens.js";
 
@@ -75,6 +78,8 @@ export const art = Object.freeze({
   civic: civicSprite,
   road: roadSprite,
   bridge: bridgeSprite,
+  wall: wallSprite,
+  tunnel: tunnelSprite,
   ground,
   chalk,
   tree,
@@ -87,7 +92,7 @@ export const art = Object.freeze({
 
 /** Every sprite the registry can hand out, named — the check.mjs audit walks this. */
 export function allSprites() {
-  const out = [...allBuildings(), ...allRoads(), ...allTerrain(), ...allCitizens()];
+  const out = [...allBuildings(), ...allRoads(), ...allWalls(), ...allTerrain(), ...allCitizens()];
   const seen = new Set();
   return out.filter(({ name }) => (seen.has(name) ? false : (seen.add(name), true)));
 }

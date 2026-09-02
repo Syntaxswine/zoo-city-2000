@@ -28,7 +28,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { createWorld, ZONE, ROAD, capacityOf, jobsOf } from "../js/sim/world.js";
 import { tick } from "../js/sim/tick.js";
-import { apply, replay } from "../js/sim/ops.js";
+import { apply, replay, undo } from "../js/sim/ops.js";
 import { save, load, stateHash, toPlain } from "../js/sim/save.js";
 import { KNOBS } from "../js/sim/rules.js";
 import { post } from "../js/sim/budget.js";
@@ -278,6 +278,7 @@ function auditIds(w) {
   const plainOld = JSON.parse(save(world));
   for (const c of plainOld.citizens) { delete c.held; delete c.heldAt; delete c.fixed; delete c.record; delete c.wrongful; delete c.wrongedBy; delete c.exonerated; delete c.moodPenalty; delete c.moodPenaltyUntil; }
   delete plainOld.valves.M;
+  delete plainOld.wall;
   delete plainOld.events.files; delete plainOld.events.justice; delete plainOld.events.arrests; delete plainOld.events.killings;
   let oldOk = true;
   try { const O = load(JSON.stringify(plainOld)); tick(O); tick(O); } catch (e) { oldOk = false; }
@@ -354,6 +355,65 @@ check("determinism: same seed + same inputs ⇒ same hash", stateHash(A.world) =
     tick(w2);
   }
   check("input-log replay hash-equals the run", stateHash(w2) === stateHash(A.world), `${stateHash(w2)} vs ${stateHash(A.world)}`);
+}
+
+// ---- walls (docs/PROPOSAL-ZONING-RAIL-WALLS.md §1; SPEC §6b) ----------------------
+// The flood must reproduce the square before it is allowed to differ from it.
+{
+  const { computeOcclusion, reachFrom } = await import("../js/sim/reach.js");
+  const { roadPath } = await import("../js/sim/fields.js");
+  const FIELDS = ["pol", "dread", "lv", "crime", "fireCov", "policeCov", "roadDist"];
+  const snap = (w) => FIELDS.map((k) => Array.from(w[k]));
+  const differing = (a, b) => FIELDS.filter((k, i) => a[i].length !== b[i].length || a[i].some((v, j) => v !== b[i][j]));
+  const w = load(save(A.world));
+  computeFields(w);
+  const square = snap(w);
+  computeOcclusion(w);
+  w.wallCount = 1; // force the flood on a city with no walls: it must be the square, byte for byte
+  computeFields(w);
+  const flood = snap(w);
+  const diff = differing(square, flood);
+  check("walls: the flood reproduces the square on a wall-less city (every field byte-equal)", diff.length === 0, diff.join(", "));
+  // A works walled off: an 11×5 patch of open grass on a fresh map; the works in the middle of the top row,
+  // a wall across the third row, the probe under it. Then a road through the wall — a tunnel — and the leak.
+  const F = createWorld({ seed: SEED });
+  let px = -1, py = -1;
+  outer: for (let y = 4; y < F.h - 9; y++) for (let x = 4; x < F.w - 15; x++) {
+    let ok = true;
+    for (let yy = y; yy < y + 5 && ok; yy++) for (let xx = x; xx < x + 11; xx++) { const i = yy * F.w + xx; if (F.terrain[i] !== 0 || F.road[i] || F.zone[i] || F.civic[i]) { ok = false; break; } }
+    if (ok) { px = x; py = y; break outer; }
+  }
+  check("walls: a grass patch for the fixture", px >= 0, "none found");
+  const at = (x, y) => y * F.w + x;
+  const works = at(px + 5, py), probe = at(px + 5, py + 3), beside = at(px + 6, py + 3);
+  F.zone[works] = ZONE.I; F.tier[works] = 3;
+  F.roadsDirty = true;
+  computeFields(F);
+  const open = F.pol[probe];
+  const wallTiles = []; for (let x = px; x < px + 11; x++) wallTiles.push(at(x, py + 2));
+  const rw = apply(F, { kind: "wall", tiles: wallTiles });
+  computeFields(F);
+  const walled = F.pol[probe];
+  check("walls: a wall row cuts the works' smell to zero behind it (the flood goes round, and round is too far)", rw.ok && rw.cost === KNOBS.COST.wall * 11 && open > 20 && walled === 0, `open ${open} · walled ${walled} · cost ${rw.cost}`);
+  check("walls: a killer's reach stops at the wall", reachFrom(F, works, KNOBS.KILL_RADIUS)(probe) < 0, "");
+  const rr = apply(F, { kind: "road", tiles: [at(px + 5, py + 1), at(px + 5, py + 2), at(px + 5, py + 3)] });
+  computeFields(F);
+  const tunnel = F.wall[at(px + 5, py + 2)] === 1 && F.road[at(px + 5, py + 2)] !== 0;
+  const path = roadPath(F, at(px + 5, py + 1), at(px + 5, py + 3));
+  check("walls: a road across the wall is a tunnel the commute passes", rr.ok && tunnel && !!path && path.length === 3, `ok ${rr.ok} · tunnel ${tunnel} · path ${path ? path.length : null}`);
+  const leak = F.pol[probe], side = F.pol[beside];
+  check("walls: the smell leaks through the tunnel along the road and weaker beside it", leak >= 20 && side > 0 && side < leak, `through ${leak} · beside ${side} · open ${open}`);
+  check("walls: a wall on water is nothing to do", (() => { let wi = -1; for (let i = 0; i < F.w * F.h; i++) if (F.terrain[i] === 1) { wi = i; break; } return wi < 0 || apply(F, { kind: "wall", tiles: [wi] }).ok === false; })(), "");
+  const ti = at(px + 5, py + 2);
+  const rb = apply(F, { kind: "bulldoze", x0: px + 5, y0: py + 2, x1: px + 5, y1: py + 2 });
+  check("walls: bulldozing a tunnel takes the wall first and keeps the road", rb.ok && F.wall[ti] === 0 && F.road[ti] !== 0, `wall ${F.wall[ti]} · road ${F.road[ti]}`);
+  const ru = undo(F);
+  check("walls: undo puts the wall back", ru.ok && F.wall[ti] === 1, `${ru.reason || ""}`);
+  // Save → load → 24 ticks with walls in the city hash-equals; replay from the seed too.
+  const G = load(save(F));
+  for (let t = 0; t < 24; t++) { tick(F); tick(G); }
+  check("walls: save → load → 24 ticks with walls hash-equals", stateHash(F) === stateHash(G), `${stateHash(F)} vs ${stateHash(G)}`);
+  check("walls: the census counts them", F.last.census.walls === 11 && F.last.census.tunnels === 1, `walls ${F.last.census.walls} · tunnels ${F.last.census.tunnels}`);
 }
 
 // ---- Part B: the code ----------------------------------------------------------

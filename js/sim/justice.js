@@ -29,6 +29,7 @@ import { post } from "./budget.js";
 import { removeCitizen, holdFuneral, releaseJob } from "./citizens.js";
 import { ageYears, isWorker } from "./census.js";
 import { hasAccess } from "./fields.js";
+import { reachFrom, forEachWithin } from "./reach.js";
 
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 const monthName = (tick) => MONTHS[((tick % 12) + 12) % 12];
@@ -57,20 +58,25 @@ function weightedPick(world, items, weights) {
   return null;
 }
 
+/** Adults whose home is within reach of `tile` — the flood, so a walled compound is out of a killer's reach; with their distances. */
 function adultsWithin(world, tile, radius, skip = null) {
-  const out = [];
+  const reach = reachFrom(world, tile, radius);
+  const cands = [];
+  const dists = [];
   for (const c of world.citizens) {
     if (c.dead || c.home < 0 || c === skip || absent(world, c)) continue;
     if (ageYears(world, c) < KNOBS.ADULT_AGE) continue;
-    if (cheb(world, c.home, tile) > radius) continue;
-    out.push(c);
+    const d = reach(c.home);
+    if (d < 0) continue;
+    cands.push(c);
+    dists.push(d);
   }
-  return out;
+  return { cands, dists };
 }
 
 /** The thief for a heist or a burglary at `lot`: any adult within reach, weighted — never a species gate. */
 export function thiefPool(world, lot) {
-  const cands = adultsWithin(world, lot, KNOBS.BURGLARY_RADIUS);
+  const { cands } = adultsWithin(world, lot, KNOBS.BURGLARY_RADIUS);
   const weights = cands.map((c) => {
     if (c.fixed) return 0;
     let w = 1;
@@ -99,20 +105,12 @@ function killWeight(world, c) {
 
 /** The nearest built meat hall within `r` of `tile`, or −1. */
 function hallNear(world, tile, r) {
-  const { w } = world;
-  const tx = tile % w;
-  const ty = (tile / w) | 0;
   let best = -1;
   let bestD = r + 1;
-  for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) {
-    const xx = tx + dx;
-    const yy = ty + dy;
-    if (!inBounds(world, xx, yy)) continue;
-    const j = yy * w + xx;
-    if (world.zone[j] !== ZONE.M || world.tier[j] === 0) continue;
-    const d = Math.max(Math.abs(dx), Math.abs(dy));
-    if (d < bestD) { bestD = d; best = j; }
-  }
+  forEachWithin(world, tile, r, (j, d) => {
+    if (world.zone[j] !== ZONE.M || world.tier[j] === 0) return;
+    if (d < bestD || (d === bestD && j < best)) { bestD = d; best = j; }
+  });
   return best;
 }
 
@@ -163,10 +161,11 @@ export function killingTick(world, cen, notices) {
     if (!killer || killer.dead) continue;
     const cands = [];
     const vw = [];
+    const reach = reachFrom(world, killer.home, KNOBS.KILL_RADIUS); // a wall between them is out of reach
     for (const v of cs) {
       if (v.dead || v.home < 0 || v === killer || v.household === killer.household || absent(world, v)) continue;
       if (ageYears(world, v) < KNOBS.ADULT_AGE) continue;
-      if (cheb(world, v.home, killer.home) > KNOBS.KILL_RADIUS) continue;
+      if (reach(v.home) < 0) continue;
       let wt = isPredatorOf(killer.species, v.species) ? 1 : KNOBS.KILL_OTHER;
       let bridged = v.friends.includes(killer.id);
       if (!bridged) for (const f of v.friends) { const o = world.byId.get(f); if (o && o.species === killer.species) { bridged = true; break; } }
@@ -212,8 +211,8 @@ export function burglaryTick(world, cen, notices) {
 
 /** The wrong animal: any adult within WRONGFUL_RADIUS of the file, weighted by closeness — no species weight at all. */
 function pickWrongful(world, f, culprit) {
-  const cands = adultsWithin(world, f.tile, KNOBS.WRONGFUL_RADIUS, culprit);
-  const weights = cands.map((c) => 1 / (1 + cheb(world, c.home, f.tile)));
+  const { cands, dists } = adultsWithin(world, f.tile, KNOBS.WRONGFUL_RADIUS, culprit);
+  const weights = dists.map((d) => 1 / (1 + d));
   return weightedPick(world, cands, weights);
 }
 

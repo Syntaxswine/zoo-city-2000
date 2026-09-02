@@ -71,7 +71,8 @@ so tuning changes one file.
   `terrain` (0 grass, 1 water, 2 tree), `road` (0 none, 1 road, 2 bridge),
   `zone` (0 none, 1 R, 2 C, 3 I), `maxTier` (1 or 3; default 3), `tier`
   (0..3), `civic` (0 none, 1 park, 2 zoo anchor, 3 zoo part), `burning`
-  (ticks left), `rubble` (0/1), `variant` (art seed byte).
+  (ticks left), `rubble` (0/1), `variant` (art seed byte), `wall` (0/1 —
+  with a road or rail on the tile, a tunnel; §6b).
 - Seeded generation: one river 2–3 tiles wide as a biased random walk from one
   edge to the opposite edge (never straight); 1–2 ponds; tree clumps by seeded
   blue-noise clusters covering ~18% of land; the rest grass.
@@ -199,6 +200,36 @@ tick from the stored `pathLen`/`path` of employed citizens? No — v1 stores
 each employed citizen's path as a Uint16Array of tile indices (≤ 40) and
 traffic is the per-tick sum; any road edit invalidates every path (all
 employed citizens re-search next tick, in id order).
+
+### 6b. Walls — the reach law (`js/sim/reach.js`; Glades of Arcadia's, adopted whole)
+
+Every area effect above radiates by **flood fill**, not by a square: from
+each source over the passable tiles, decaying by the length of the path it
+actually took — `1 − d/(R+1)` with `d` the flood distance. The flood is
+8-connected with unit diagonals, so on open ground `d` IS the Chebyshev
+distance and a city with no walls gets byte-identical fields (the suite
+proves it against the square before anything else; a wall-less city keeps
+the square loop). A **wall tile** (`wall[i]`, key `B`, §8 a tile, §1 a year;
+an L-drag like a road, Shift = straight; never on water, chalk, a civic or a
+building) is impassable and receives nothing. A road or rail across a wall
+tile is a **tunnel**: open along its road's axis only, so a compound with one
+gate leaks along the road through the gate and nowhere else — "walls help
+*decrease*", not eliminate. No corner-cutting: a diagonal step is refused
+when both orthogonal neighbours are walls. Bulldozing a tunnel takes the
+wall first and keeps the road.
+
+What honours the wall: pollution (every source, parks as sinks), dread, the
+hall's crime hill and every file's stain, the park / zoo / van land-value
+masks and a plaque's bonus, fire and police cover, and every radius query in
+justice — the killing's victims, the wrongful pool, the thief pool,
+`hallNear` — so a walled prey compound is out of a killer's reach. Road
+reach (`roadDist`, `doorOf`) stops at a bare wall too: a lot walled off on
+every side has no road and the card says so. Not affected, on purpose: the
+centroid term of LV (not a source) and `nature8` (the eight neighbours).
+`occl[i]` is the derived per-tile mask of the eight directions influence may
+cross (0xFF open, 0x00 a wall, the two bits of its axis for a tunnel — a
+crossing a → b needs a's bit and b's opposite, so a gate never has to know
+which side you came from).
 
 ---
 
@@ -508,7 +539,7 @@ and never moves; read killings, arrests, fixed, littersLost, herbNear.
 ## 11. Zoning UX (`js/input.js`, `js/ui.js`)
 
 Tool strip (field-guide chrome: one monospace row, no icons above 16 px):
-`1 R · 2 C · 3 I · M Meat · 4 Road · 5 Tree · 6 Park · 7 Zoo · F Fire station · P Police · V Pacify ·
+`1 R · 2 C · 3 I · M Meat · 4 Road · B Wall · 5 Tree · 6 Park · 7 Zoo · F Fire station · P Police · V Pacify ·
 8 Bulldoze · 9 Inspect · D density Low/High · Space pause · , . speed · Z undo · S save · L load · Esc menu`.
 The `O` overlay cycle is off → LV → pollution → crime (an open file is a ring) → dread → score.
 
@@ -612,6 +643,17 @@ strip on top. Ground: grass ×3 variants, zone chalk 3 × {Low, High}, rubble.
 Water: 1 cycled tile; land/water edge gets a 1-px darker kerb (no shore
 autotile in v1). Trees: 3 hand-authored (round, tall, willow near water).
 Zots 4, tent 1, plaza glyph 1, cursor/ghost 2.
+
+### 12.4b Walls and tunnels (`js/art/walls.js`)
+
+After Glades' DRYSTONE_WALL and its gateway: two solid bars (N–S and E–W)
+clipped to the arms the road mask sets, 4 units thick and 9 high, in the
+concrete ramp with a mortar course every third unit, the coping one step
+lighter and the cut end one step darker than the near face (shaded alike a
+bend reads as folded paper); a run is one tile long so two neighbours never
+cover each other; a lone tile draws the straight E|W run. The tunnel is two
+piers either side of the road's 10-unit width and a lintel across, a
+STANDING sprite over the road tile so the road stays the road.
 
 ### 12.5 Instruments
 `tools/shots.mjs --sheet` renders every family to a contact sheet PNG;

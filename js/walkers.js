@@ -301,7 +301,7 @@ export function createWalkers(initialWorld) {
       const ny = ty + dy;
       if (!inBounds(world, nx, ny)) continue;
       const j = ny * w + nx;
-      if (world.road[j] === ROAD.NONE && world.terrain[j] !== TERRAIN.WATER && !world.zone[j] && !world.civic[j]) return j;
+      if (world.road[j] === ROAD.NONE && world.terrain[j] !== TERRAIN.WATER && !world.zone[j] && !world.civic[j] && !world.wall[j]) return j;
     }
     return r;
   }

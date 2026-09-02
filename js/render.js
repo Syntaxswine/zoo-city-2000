@@ -28,6 +28,7 @@ import { rasterize } from "./art/format.js";
 import { ZONE, CIVIC, TERRAIN, ROAD } from "./sim/world.js";
 import { DECK_TOP } from "./art/roads.js";
 import { lotScore, REASON } from "./sim/lots.js";
+import { tunnelAxis } from "./sim/reach.js";
 import { isWorker } from "./sim/census.js";
 
 const MARGIN = 256; // projection px around the viewport kept in the static layer
@@ -125,6 +126,8 @@ export function createRenderer(canvas, initialWorld, art) {
   const road = (tx, ty) => tx >= 0 && ty >= 0 && tx < world.w && ty < world.h && world.road[ty * world.w + tx] !== ROAD.NONE;
   const waterAt = (tx, ty) => tx >= 0 && ty >= 0 && tx < world.w && ty < world.h && world.terrain[ty * world.w + tx] === TERRAIN.WATER;
   const roadMask = (tx, ty) => (road(tx, ty - 1) ? 1 : 0) | (road(tx + 1, ty) ? 2 : 0) | (road(tx, ty + 1) ? 4 : 0) | (road(tx - 1, ty) ? 8 : 0);
+  const wallAt = (tx, ty) => tx >= 0 && ty >= 0 && tx < world.w && ty < world.h && world.wall[ty * world.w + tx] === 1;
+  const wallMask = (tx, ty) => (wallAt(tx, ty - 1) ? 1 : 0) | (wallAt(tx + 1, ty) ? 2 : 0) | (wallAt(tx, ty + 1) ? 4 : 0) | (wallAt(tx - 1, ty) ? 8 : 0);
 
   // ---- the static ground layer ---------------------------------------------------------
   function rebuildGround() {
@@ -305,6 +308,7 @@ export function createRenderer(canvas, initialWorld, art) {
         else if (world.civic[i] === CIVIC.FIRE) standing = art.civic("fire");
         else if (world.civic[i] === CIVIC.POLICE) standing = art.civic("police");
         else if (world.civic[i] === CIVIC.CENTRE) standing = art.civic("centre");
+        else if (world.wall[i]) standing = world.road[i] !== ROAD.NONE ? art.tunnel(tunnelAxis(world, i)) : art.wall(wallMask(tx, ty)); // a wall stands; a tunnel stands over its road
         if (standing) items.push({ sprite: standing, tx, ty, kind: "building" });
         if (world.burning[i]) items.push({ sprite: fire, tx, ty, kind: "building", z: Z_BUILDING + 1, dy: -6 });
         if (i === plazaTile) items.push({ sprite: art.overlay("plaza"), tx, ty, kind: "ground", z: 3, dy: -2 });

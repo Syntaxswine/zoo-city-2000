@@ -12,7 +12,7 @@ import { computeFields, recountRosters, roadPath, doorOf } from "./fields.js";
 import { rebuildMaps } from "./citizens.js";
 import { refreshLast } from "./tick.js";
 
-const TILE_ARRAYS = ["terrain", "road", "zone", "maxTier", "tier", "civic", "burning", "rubble", "variant", "flooded"];
+const TILE_ARRAYS = ["terrain", "road", "zone", "maxTier", "tier", "civic", "burning", "rubble", "variant", "flooded", "wall"];
 
 function plainCitizen(c) {
   return {
@@ -60,7 +60,7 @@ export function fromPlain(o) {
   world.start = o.start;
   world.valves = { ...world.valves, ...o.valves }; // an old save without M keeps the default 0
   world.festivalBonus = o.festivalBonus;
-  for (const k of TILE_ARRAYS) world[k].set(o[k]);
+  for (const k of TILE_ARRAYS) if (o[k]) world[k].set(o[k]); // an old save without walls keeps its zeros
   world.citizens = o.citizens.map((c) => ({
     ...c, friends: c.friends.slice(), path: null, stale: false,
     held: c.held || 0, heldAt: c.heldAt ?? -1, fixed: !!c.fixed, record: c.record || 0, wrongful: !!c.wrongful, wrongedBy: c.wrongedBy || 0, exonerated: !!c.exonerated,
@@ -91,6 +91,7 @@ export function load(json) {
 export function rebuildDerived(world) {
   rebuildMaps(world);
   world.roadsDirty = true;
+  world.wallsDirty = true;
   recountRosters(world);
   // Paths first (deterministic), then fields (traffic reads paths).
   computeFields(world); // computes roadDist so doorOf works

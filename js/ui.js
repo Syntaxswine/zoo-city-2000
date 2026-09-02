@@ -85,6 +85,7 @@ export function createUI(app) {
       ["buildings", KNOBS.UPKEEP_TIER * tiers], ["parks", KNOBS.UPKEEP_PARK * fig.parks], ["zoos", KNOBS.UPKEEP_ZOO * fig.zoos],
       ["fire stations", KNOBS.UPKEEP_STATION * (fig.fireStations || 0)], ["police stations", KNOBS.UPKEEP_STATION * (fig.policeStations || 0)],
       ["pacification centres", KNOBS.UPKEEP_CENTRE * (fig.centres || 0)], ["licence inspectors", fig.licence ? KNOBS.UPKEEP_LICENCE * (fig.markets || 0) : 0],
+      ["walls", KNOBS.UPKEEP_WALL * (fig.walls || 0)],
     ];
     const lines = raw.filter(([, v]) => v > 0).map(([name, v]) => [name, Math.round(v * k)]);
     const sum = lines.reduce((s, l) => s + l[1], 0);
@@ -262,7 +263,8 @@ export function createUI(app) {
     const lines = [];
     const head = el("div", "head");
     let what;
-    if (w.road[i] === ROAD.BRIDGE) what = "Bridge";
+    if (w.wall[i]) what = w.road[i] !== ROAD.NONE ? "Tunnel" : "Wall";
+    else if (w.road[i] === ROAD.BRIDGE) what = "Bridge";
     else if (w.road[i] === ROAD.ROAD) what = "Road";
     else if (rep.civic === CIVIC.PARK) what = "Park";
     else if (rep.civic === CIVIC.ZOO || rep.civic === CIVIC.ZOO_PART) what = "Zoo";
@@ -309,6 +311,7 @@ export function createUI(app) {
     env.textContent = `LV ${rep.lv}  Pol ${rep.pol}  crime ${rep.crime}  road ${rep.roadDist > KNOBS.ROAD_REACH ? "—" : rep.roadDist}` + (w.road[i] ? `  traffic ${rep.traffic}` : "")
       + (rep.dread ? `  dread ${rep.dread}` : "") + (rep.fireCov ? "  · fire cover" : "") + (rep.policeCov ? `  · police cover −${rep.policeCov}` : "");
     lines.push(env);
+    if (w.wall[i]) lines.push(el("div", "dim", w.road[i] !== ROAD.NONE ? "a tunnel: the road runs through the wall; smells, dread and cover pass along it and nowhere else" : "a wall: smells, dread, cover and land-value halos go round it, and a killer's reach stops at it; a road through it is a tunnel"));
     if (rep.dread) lines.push(el("div", "dim", `dread ${rep.dread}: herbivores −${Math.min(KNOBS.DREAD_MOOD_CAP, Math.round(KNOBS.DREAD_MOOD_HERB * rep.dread))} mood and −${Math.round(KNOBS.DREAD_HOME_HERB * rep.dread)} on the home score; LV −${Math.round(KNOBS.LV_DREAD * rep.dread)}; carnivores do not mind`));
     for (const f of w.events.files) {
       if (f.tile !== i || f.until <= w.tick) continue;
@@ -506,6 +509,7 @@ export function createUI(app) {
     tr("friendships", `${c.friendships}`);
     tr("crime (built lots, mean / max)", `${Math.round(c.meanCrime)} / ${c.maxCrime}`);
     tr("stations", `${c.fireStations} fire · ${c.policeStations} police${c.centres ? ` · ${c.centres} pacification` : ""}`);
+    if (c.walls) tr("walls · tunnels", `${c.walls} · ${c.tunnels}`);
     if (c.markets) tr("meat halls", `${c.markets} (${c.Jm} jobs) · ${c.herbNear} herbivores within the smell`);
     { const j = w.events.justice || {}; const open = (w.events.files || []).filter((f) => !f.closed).length;
       if (w.events.killings || j.takenIn || j.cells || j.sold) {

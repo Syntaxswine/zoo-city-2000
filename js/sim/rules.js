@@ -125,7 +125,7 @@ export const KNOBS = {
   UPKEEP_PARK: 300,
   UPKEEP_ZOO: 1500,
   UPKEEP_STATION: 400,
-  COST: { zoneR: 5, zoneC: 8, zoneI: 8, zoneM: 12, road: 10, bridge: 40, bulldoze: 2, bulldozeTree: 4, tree: 4, park: 150, zoo: 2500, pond: 40, fire: 500, police: 500, centre: 1500 },
+  COST: { zoneR: 5, zoneC: 8, zoneI: 8, zoneM: 12, road: 10, bridge: 40, bulldoze: 2, bulldozeTree: 4, tree: 4, park: 150, zoo: 2500, pond: 40, fire: 500, police: 500, centre: 1500, wall: 8 },
   // ---- crime and punishment (the owner, 2026-09-02; docs/PROPOSAL-CRIME-AND-PUNISHMENT.md) ----
   // Zone M — the grey-market meat hall: stall / meat hall / cold store.
   M_JOBS: [0, 3, 8, 16],
@@ -206,6 +206,7 @@ export const KNOBS = {
   RAID_CRIME: 50,
   RAID_FINE: 200,           // × tier
   UPKEEP_CENTRE: 900,
+  UPKEEP_WALL: 1,           // a tile a year — masonry needs pointing
   LV_VAN: 6,                // land value near the centre
   LV_VAN_RADIUS: 2,
   VAN_MOOD: 5,              // carnivores within VAN_RADIUS of a centre
@@ -258,6 +259,11 @@ export const RULES = Object.freeze([
     id: "D4", title: "Demand is a leaky integrator",
     formula: "V ← V + 0.15·(clamp(r + T, −1, 1) − V)",
     live: (w) => `V_R ${f2(w.valves.R)} · V_C ${f2(w.valves.C)} · V_I ${f2(w.valves.I)}`,
+  },
+  {
+    id: "W1", title: "Walls: a field spreads by flood fill, not by a square",
+    formula: "Σ amount·(1 − d/(R+1)), d = the shortest walk round the walls (8-connected, unit diagonals = the old square where none intervene); a wall blocks and receives nothing; a tunnel is open along its road — pollution, dread, crime, cover, land-value halos and a killer's reach all go round",
+    live: (w) => `${w.wallCount || 0} wall tile${w.wallCount === 1 ? "" : "s"}${w.last.census.tunnels ? ` · ${w.last.census.tunnels} tunnel${w.last.census.tunnels === 1 ? "" : "s"}` : ""}`,
   },
   {
     id: "D5", title: "The cap: a city can only hold so many until it mixes",

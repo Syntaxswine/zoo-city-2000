@@ -7,6 +7,7 @@
 import { KNOBS } from "./rules.js";
 import { TERRAIN, ROAD, ZONE, CIVIC, idx, inBounds, N4, isStation, absent } from "./world.js";
 import { SPECIES_BY_ID, DIET_OF } from "./species.js";
+import { forEachWithin, computeOcclusion, isBarrier } from "./reach.js";
 
 const NO_ROAD = 255;
 
@@ -35,7 +36,7 @@ export function computeRoadDist(world) {
       const ny = ty + dy;
       if (!inBounds(world, nx, ny)) continue;
       const j = ny * w + nx;
-      if (roadDist[j] !== NO_ROAD) continue;
+      if (roadDist[j] !== NO_ROAD || isBarrier(world, j)) continue; // reach stops at a bare wall (a tunnel is a road)
       roadDist[j] = d + 1;
       queue[tail++] = j;
     }
@@ -63,18 +64,11 @@ export function computeTraffic(world) {
  * gives 52 next door, 35 two tiles out, 17 three out; a block interior
  * saturates. No wind (stated in the Rules tab).
  */
-function spread(e, w, h, tx, ty, amount, radius) {
-  if (radius <= 0) { e[ty * w + tx] += amount; return; }
-  for (let dy = -radius; dy <= radius; dy++) {
-    const yy = ty + dy;
-    if (yy < 0 || yy >= h) continue;
-    for (let dx = -radius; dx <= radius; dx++) {
-      const xx = tx + dx;
-      if (xx < 0 || xx >= w) continue;
-      const d = Math.max(Math.abs(dx), Math.abs(dy));
-      e[yy * w + xx] += amount * (1 - d / (radius + 1));
-    }
-  }
+function spread(world, e, i, amount, radius) {
+  if (radius <= 0) { e[i] += amount; return; }
+  // reach.js (SPEC §6b): the Chebyshev square where the city has no walls,
+  // the flood round them where it does — the same numbers wherever no wall intervenes.
+  forEachWithin(world, i, radius, (j, d) => { e[j] += amount * (1 - d / (radius + 1)); });
 }
 
 export function computePollution(world) {
@@ -97,13 +91,13 @@ export function computePollution(world) {
     const tx = i % w;
     const ty = (i / w) | 0;
     const t = world.tier[i];
-    if (mess[i]) spread(e, w, h, tx, ty, mess[i], KNOBS.MESS_RADIUS);
-    if (world.zone[i] === ZONE.I && t > 0) spread(e, w, h, tx, ty, KNOBS.EMIT_I[t] * scrub, KNOBS.EMIT_I_RADIUS[t]);
-    else if (world.zone[i] === ZONE.C && KNOBS.EMIT_C[t] > 0) spread(e, w, h, tx, ty, KNOBS.EMIT_C[t], KNOBS.EMIT_C_RADIUS[t]);
-    if (world.road[i] !== ROAD.NONE) spread(e, w, h, tx, ty, KNOBS.EMIT_ROAD + Math.min(KNOBS.EMIT_TRAFFIC_MAX, world.traffic[i] / KNOBS.EMIT_TRAFFIC_DIV), KNOBS.EMIT_ROAD_RADIUS);
+    if (mess[i]) spread(world, e, i, mess[i], KNOBS.MESS_RADIUS);
+    if (world.zone[i] === ZONE.I && t > 0) spread(world, e, i, KNOBS.EMIT_I[t] * scrub, KNOBS.EMIT_I_RADIUS[t]);
+    else if (world.zone[i] === ZONE.C && KNOBS.EMIT_C[t] > 0) spread(world, e, i, KNOBS.EMIT_C[t], KNOBS.EMIT_C_RADIUS[t]);
+    if (world.road[i] !== ROAD.NONE) spread(world, e, i, KNOBS.EMIT_ROAD + Math.min(KNOBS.EMIT_TRAFFIC_MAX, world.traffic[i] / KNOBS.EMIT_TRAFFIC_DIV), KNOBS.EMIT_ROAD_RADIUS);
     if (world.terrain[i] === TERRAIN.TREE) e[i] += KNOBS.EMIT_TREE;
-    if (world.burning[i]) spread(e, w, h, tx, ty, KNOBS.EMIT_FIRE, KNOBS.EMIT_FIRE_RADIUS);
-    if (world.civic[i] === CIVIC.PARK) spread(e, w, h, tx, ty, KNOBS.EMIT_PARK, KNOBS.EMIT_PARK_RADIUS);
+    if (world.burning[i]) spread(world, e, i, KNOBS.EMIT_FIRE, KNOBS.EMIT_FIRE_RADIUS);
+    if (world.civic[i] === CIVIC.PARK) spread(world, e, i, KNOBS.EMIT_PARK, KNOBS.EMIT_PARK_RADIUS);
   }
   for (let i = 0; i < n; i++) {
     world.pol[i] = Math.max(0, Math.min(100, Math.round(e[i] + smog)));
@@ -124,7 +118,7 @@ export function computeDread(world) {
   e.fill(0);
   for (let i = 0; i < n; i++) {
     const t = world.tier[i];
-    if (world.zone[i] === ZONE.M && t > 0) spread(e, w, h, i % w, (i / w) | 0, KNOBS.DREAD[t], KNOBS.DREAD_RADIUS[t]);
+    if (world.zone[i] === ZONE.M && t > 0) spread(world, e, i, KNOBS.DREAD[t], KNOBS.DREAD_RADIUS[t]);
   }
   for (let i = 0; i < n; i++) world.dread[i] = Math.max(0, Math.min(100, Math.round(e[i])));
 }
@@ -174,17 +168,12 @@ export function computeLandValue(world) {
     if (c !== CIVIC.PARK && c !== CIVIC.ZOO && c !== CIVIC.CENTRE) continue;
     const r = c === CIVIC.PARK ? KNOBS.LV_PARK_RADIUS : c === CIVIC.ZOO ? KNOBS.LV_ZOO_RADIUS : KNOBS.LV_VAN_RADIUS;
     const mask = c === CIVIC.PARK ? nearPark : c === CIVIC.ZOO ? nearZoo : nearVan;
-    const tx = i % w;
-    const ty = (i / w) | 0;
-    for (let dy = -r; dy <= r; dy++) {
-      for (let dx = -r; dx <= r; dx++) {
-        const xx = tx + dx;
-        const yy = ty + dy;
-        if (inBounds(world, xx, yy)) mask[yy * w + xx] = 1;
-      }
-    }
+    forEachWithin(world, i, r, (j) => { mask[j] = 1; }); // round a wall, not through it
   }
   const cent = world.events.centenaries; // [{tile, radius, bonus}]
+  const plaque = world._plaque || (world._plaque = new Float32Array(n));
+  plaque.fill(0);
+  for (const c of cent) forEachWithin(world, c.tile, c.radius, (j) => { plaque[j] += c.bonus; });
   for (let i = 0; i < n; i++) {
     const tx = i % w;
     const ty = (i / w) | 0;
@@ -206,11 +195,7 @@ export function computeLandValue(world) {
     v -= KNOBS.LV_POL * world.pol[i];
     v -= KNOBS.LV_DREAD * world.dread[i]; // a meat hall: twice a works' shadow
     if (nearVan[i]) v -= KNOBS.LV_VAN; // the pacification centre's van
-    for (const c of cent) {
-      const ctx = c.tile % w;
-      const cty = (c.tile / w) | 0;
-      if (Math.max(Math.abs(tx - ctx), Math.abs(ty - cty)) <= c.radius) v += c.bonus;
-    }
+    v += plaque[i];
     world.lv[i] = Math.max(0, Math.min(100, Math.round(v)));
   }
 }
@@ -224,23 +209,14 @@ export function computeCoverage(world) {
   for (let i = 0; i < n; i++) {
     const c = world.civic[i];
     if (!isStation(c) || world.roadDist[i] > KNOBS.ROAD_REACH) continue;
-    const tx = i % w;
-    const ty = (i / w) | 0;
     const R = c === CIVIC.FIRE ? KNOBS.FIRE_RADIUS : KNOBS.POLICE_RADIUS;
-    for (let dy = -R; dy <= R; dy++) {
-      for (let dx = -R; dx <= R; dx++) {
-        const xx = tx + dx;
-        const yy = ty + dy;
-        if (!inBounds(world, xx, yy)) continue;
-        const j = yy * w + xx;
-        const d = Math.max(Math.abs(dx), Math.abs(dy));
-        if (c === CIVIC.FIRE) world.fireCov[j] = 1;
-        else {
-          const eff = d <= KNOBS.POLICE_NEAR ? KNOBS.POLICE_EFFECT : KNOBS.POLICE_EFFECT / 2;
-          if (eff > world.policeCov[j]) world.policeCov[j] = eff;
-        }
+    forEachWithin(world, i, R, (j, d) => { // a patrol goes round a wall and through a tunnel
+      if (c === CIVIC.FIRE) world.fireCov[j] = 1;
+      else {
+        const eff = d <= KNOBS.POLICE_NEAR ? KNOBS.POLICE_EFFECT : KNOBS.POLICE_EFFECT / 2;
+        if (eff > world.policeCov[j]) world.policeCov[j] = eff;
       }
-    }
+    });
   }
 }
 
@@ -280,17 +256,11 @@ export function computeCrime(world) {
   const mult = world.events.licence ? KNOBS.LICENCE_CRIME_MULT : 1;
   for (let i = 0; i < n; i++) {
     const t = world.tier[i];
-    if (world.zone[i] === ZONE.M && t > 0) spread(near, w, h, i % w, (i / w) | 0, KNOBS.CRIME_M[t] * mult, KNOBS.CRIME_M_RADIUS[t]);
+    if (world.zone[i] === ZONE.M && t > 0) spread(world, near, i, KNOBS.CRIME_M[t] * mult, KNOBS.CRIME_M_RADIUS[t]);
   }
   for (const f of world.events.files) {
     if (f.until <= world.tick) continue;
-    const tx = f.tile % w;
-    const ty = (f.tile / w) | 0;
-    for (let dy = -f.radius; dy <= f.radius; dy++) for (let dx = -f.radius; dx <= f.radius; dx++) {
-      const xx = tx + dx;
-      const yy = ty + dy;
-      if (inBounds(world, xx, yy)) near[yy * w + xx] += f.crime;
-    }
+    forEachWithin(world, f.tile, f.radius, (j) => { near[j] += f.crime; });
   }
   for (let i = 0; i < n; i++) {
     const tx = i % w;
@@ -312,6 +282,7 @@ export function computeCrime(world) {
 
 /** Everything derived from tiles + citizens, in order. */
 export function computeFields(world) {
+  if (world.wallsDirty) computeOcclusion(world);
   if (world.roadsDirty) computeRoadDist(world);
   computeCoverage(world);
   computeTraffic(world);
@@ -394,7 +365,7 @@ export function doorOf(world, i) {
         const ny = ty + dy;
         if (!inBounds(world, nx, ny)) continue;
         const j = ny * w + nx;
-        if (seen[j]) continue;
+        if (seen[j] || isBarrier(world, j)) continue; // a bare wall is not a way to a road
         seen[j] = 1;
         if (world.road[j] !== ROAD.NONE) return j;
         next.push(j);

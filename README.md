@@ -62,6 +62,7 @@ them on the real map):
 | pollution | every source spreads linearly over its radius; a lone works stinks next door, pigs and skunks dirty their lot, parks are sinks; no wind |
 | crime | `40 − 0.5·LV + 0.4·density + 3·jobless in the 3×3 + 40·unemployed share + a hall's hill + open files − police`; above 60 it costs land value and shops; it is also the killing's hazard |
 | dread | a meat hall spreads 40/70/105 over 2/3/4 tiles; LV −0.8·dread (twice a works); herbivores mind it, carnivores do not |
+| walls | every area effect radiates by flood fill; a wall blocks it and receives nothing; a road through it is a tunnel, open along the road; a killer's reach stops at a wall (Glades of Arcadia's law) |
 
 The hover card's **WHY NOT** line is computed by the same function that
 decides growth — it can only ever say what the rule did.
@@ -93,6 +94,13 @@ unemployment): high crime drags land value and mood, keeps shops from
 growing, and lets a named fox, raccoon or cat rob a store. The `O` overlay
 shows crime in red and police cover in blue.
 
+**Walls.** `B` lays a wall like a road (§8 a tile). Smells, dread, the
+crime a hall casts, fire and police cover and the land value a park lends
+all go *round* a wall instead of through it, and so does a killer's reach —
+a walled prey compound is safe from the wolf next door. Lay a road across
+the wall and it is a tunnel: the traffic passes, and so does the smell,
+along the road and nowhere else.
+
 **Crime and punishment.** Any adult may kill a neighbour — carnivores
 likely, the unemployed twenty times likelier ("no jobs means hungry
 wolves"), prey rarely — and a grey-market **meat hall** (zone `M`) is the
@@ -122,10 +130,12 @@ mill-town with a fox problem").
 
 - `tools/playtest.mjs --layout balanced|dormitory|millbelt --schedule 15:13,22:7`
   — a scripted mayor on the real map; the SPEC's acceptance targets.
-- `tools/check.mjs` — 80 checks: ledger conservation to the §, valves
+- `tools/check.mjs` — 91 checks: ledger conservation to the §, valves
   bounded, no NaN, the dangling-id law, rosters and capacities, commutes on
   roads, determinism, save → load → continue hash-equal, input-log replay,
-  the crime-and-punishment invariants, the cheat op (booked under `cheat`,
+  the crime-and-punishment invariants, the walls (the flood reproduces the
+  square byte-for-byte on a wall-less city, then cuts a works' smell behind
+  a wall and leaks it through a tunnel), the cheat op (booked under `cheat`,
   logged, replayed, clamped, never undone, lifts a receivership at once),
   `budget.post` as the only cash mutator, relative imports, no
   `Math.random`, the sim blind to browser preferences, the title screen

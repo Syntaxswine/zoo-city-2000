@@ -43,6 +43,7 @@ export function createWorld({ seed = "zoo", w = 64, h = 64 } = {}) {
     rubble: new Uint8Array(n),
     variant: new Uint8Array(n),
     flooded: new Uint8Array(n),
+    wall: new Uint8Array(n), // a wall tile; with a road or rail on it, a tunnel (SPEC §6b, sim/reach.js)
     // derived
     roadDist: new Uint8Array(n),
     pol: new Uint8Array(n),
@@ -55,7 +56,10 @@ export function createWorld({ seed = "zoo", w = 64, h = 64 } = {}) {
     carnAt: new Uint8Array(n),
     occupants: new Uint8Array(n),
     staff: new Uint8Array(n),
+    occl: new Uint8Array(n), // reach.js: the eight directions influence may cross a tile (derived)
     roadsDirty: true,
+    wallsDirty: true,
+    wallCount: 0,
     // sim
     valves: { R: 0, C: 0, I: 0, M: 0 },
     festivalBonus: 0,

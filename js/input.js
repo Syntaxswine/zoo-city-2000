@@ -1,6 +1,6 @@
 // input.js — mouse and keyboard → ops. SPEC §11.
 //
-//   1 R · 2 C · 3 I · 4 Road · 5 Tree · 6 Park · 7 Zoo · 8 Bulldoze · 9 Inspect
+//   1 R · 2 C · 3 I · 4 Road · B Wall · 5 Tree · 6 Park · 7 Zoo · 8 Bulldoze · 9 Inspect
 //   D density · Space pause · , . speed · Z undo · S save · L load · O overlays
 //   +/- zoom · WASD / arrows / drag-pan (middle or right button, or left with Inspect)
 //   Esc: clears a drag or a pinned card; on a clean map, the title menu (title.js)
@@ -21,6 +21,7 @@ export const TOOLS = [
   { id: "I", key: "3", label: "I", hint: "zone industrial (drag)" },
   { id: "M", key: "M", label: "Meat", hint: "zone meat market (drag) §12 — grey, off the books; carnivores staff it, herbivores smell it four tiles off" },
   { id: "road", key: "4", label: "Road", hint: "L-drag; Shift = straight; over water = bridge §40" },
+  { id: "wall", key: "B", label: "Wall", hint: "L-drag §8; Shift = straight; across a road = a tunnel; smells, dread, cover and a killer's reach go round a wall" },
   { id: "tree", key: "5", label: "Tree", hint: "plant trees (drag) §4" },
   { id: "park", key: "6", label: "Park", hint: "1×1, §150 — click" },
   { id: "zoo", key: "7", label: "Zoo", hint: "2×2, §2,500 — click" },
@@ -78,6 +79,8 @@ export function createInput(canvas, app) {
         return { kind: "bulldoze", x0: d.ax, y0: d.ay, x1: d.bx, y1: d.by };
       case "road":
         return { kind: "road", tiles: roadL(w, d.ax, d.ay, d.bx, d.by, d.shift) };
+      case "wall":
+        return { kind: "wall", tiles: roadL(w, d.ax, d.ay, d.bx, d.by, d.shift) };
       default:
         return null;
     }
@@ -96,11 +99,12 @@ export function createInput(canvas, app) {
 
   function costLabel(op, plan) {
     const n = plan.tiles.length;
-    const name = { zone: op.zone === ZONE.R ? "R" : op.zone === ZONE.C ? "C" : op.zone === ZONE.M ? "Meat" : "I", road: "Road", tree: "Tree", bulldoze: "Bulldoze", park: "Park", zoo: "Zoo", fire: "Fire station", police: "Police station", centre: "Pacification centre" }[op.kind];
+    const name = { zone: op.zone === ZONE.R ? "R" : op.zone === ZONE.C ? "C" : op.zone === ZONE.M ? "Meat" : "I", road: "Road", wall: "Wall", tree: "Tree", bulldoze: "Bulldoze", park: "Park", zoo: "Zoo", fire: "Fire station", police: "Police station", centre: "Pacification centre" }[op.kind];
     if (plan.reason) return `${name}: blocked`;
     if (!n) return `${name}: nothing to do`;
     const bridges = plan.tiles.filter((t) => t.what === "bridge").length;
-    const extra = bridges ? ` (${bridges} bridge)` : "";
+    const tunnels = plan.tiles.filter((t) => t.what === "tunnel").length;
+    const extra = bridges ? ` (${bridges} bridge)` : tunnels ? ` (${tunnels} tunnel${tunnels === 1 ? "" : "s"})` : "";
     // costOf() counts the empty zoned lots a road paves over (`replaced`, no
     // refund) and the built lots a bulldoze empties of animals (`evicts`, not undoable).
     const repl = plan.replaced ? ` · replaces ${plan.replaced} zoned lot${plan.replaced === 1 ? "" : "s"}` : "";

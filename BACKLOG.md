@@ -25,6 +25,12 @@ could ship whole.
   in a scripted town without two adjacent halls; P is cap-pinned, so the arc
   never shows in P — read killings, arrests, fixed, sold, littersLost, herbNear.
 
+## Zoning, rail and walls — IN PROGRESS 2026-09-02 (`docs/PROPOSAL-ZONING-RAIL-WALLS.md`)
+- Phase A walls SHIPPED (SPEC §6b): the reach law, the tunnel, the art.
+  Left: a walls sheet in `tools/shots.mjs`; a wall's own ambient sound of
+  nothing (a walled block is quiet — the mood does not know yet).
+- Phase B use-zoning + trespass, Phase C rail: the proposal's §2 and §3.
+
 ## The title screen — SHIPPED 2026-09-02 (`js/title.js`; the owner's painting at `img/titlescreen.png`)
 - Built: NEW GAME · CONTINUE · LOAD · SAVE · OPTIONS on the painting; `Esc`
   as the pause menu; OPTIONS = the cheat switch (a GIVE ME CASH button,

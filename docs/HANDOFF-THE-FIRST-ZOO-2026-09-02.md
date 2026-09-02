@@ -31,7 +31,7 @@ measurement and SPEC gets edited — never the reverse.
   <270513546+StonePhilosopher@users.noreply.github.com>`; every commit ends
   with the Co-Authored-By line; commit messages are field notes and part of
   the archive. `.gitignore` = `Thumbs.db .DS_Store out/ node_modules/`.
-- **Before touching a file:** `node tools/check.mjs` — 80 checks, exits 1.
+- **Before touching a file:** `node tools/check.mjs` — 91 checks, exits 1.
   Green at the commit this file lands in. If it is red when you arrive, that
   is the first job; `git log -p` on the file it names is the fastest route.
 - **Run:**
@@ -527,6 +527,56 @@ and the `+§100,000` button appears beside cash; a press books it (cash
 §120,000, ledger `cheat +§100,000`, the Budget tab's note); SAVE writes the
 checkpoint and LOAD lists it; a reload stands the title over the resumed
 city and CONTINUE flashes "paused; Space resumes". Console empty.
+
+## 12. Session 5 — zoning, rail and walls (2026-09-02, night); Phase A: WALLS shipped
+
+The owner's tranche and the pointer to Glades are verbatim in
+`docs/PROPOSAL-ZONING-RAIL-WALLS.md` (§0), with the census, the mechanics,
+the numbers and the build's rulings (§5). Three phases, three commits.
+
+**Phase A — walls (SPEC §6b, §12.4b; `js/sim/reach.js`, `js/art/walls.js`).**
+- **The reach law is Glades'.** `forEachWithin(world, i, R, fn)` is the one
+  primitive every area effect and every radius query goes through: the
+  Chebyshev square when the city has no walls, the 8-connected flood round
+  them when it does. The suite's first wall check forces the flood on the
+  wall-less scripted city and requires every field byte-equal to the square
+  — prove the frame first; the frame held on the first run.
+- **A tunnel is a connector.** `occl[i]` is Glades' direction mask; a road
+  across a wall opens the road's axis and nothing else. Measured on the
+  fixture (a tier-3 works, a wall row two tiles off, the probe behind it):
+  open 28 → walled 0 → through the tunnel 28+ on the road, weaker beside it.
+- **Road reach stops at a bare wall** (`computeRoadDist`, `doorOf`): a lot
+  walled off has no door. Tunnels are roads and pass.
+- **Justice reads the flood**: `adultsWithin` returns `{ cands, dists }`;
+  the killing, the wrongful pool, the thief pool and `hallNear` cannot cross
+  a wall. `cheb` survives only in `hallWithAccess` (nearest hall in town —
+  not an area effect).
+- **Ops.** `wall` is an L-drag op (tiles list, like `road`); never on
+  water / chalk / civic / built; a road op across a wall tile threads it
+  (no refusal). Bulldoze takes a tunnel's wall first. Walls and roads share
+  the dirty flags (`roadsDirty`, `wallsDirty`) and both invalidate paths;
+  undo restores `wall`.
+- **Art.** Two clipped bars per mask (no arm boxes: a bar's end is a real
+  cut end), coping lighter, end darker; the tunnel is two piers and a lintel
+  drawn STANDING over the road tile.
+
+**Traps (keyed by what you see):**
+- *A field check fails only with the flood forced* — a diagonal rule or the
+  source tile differs from the square. The square calls fn(source, 0); the
+  flood must too, and unit diagonals are the whole reason it matches.
+- *The smell gets through a wall corner* — two walls meeting only at a
+  corner: the no-corner-cutting rule needs BOTH orthogonal neighbours to be
+  walls; an L drawn by `roadL` is 4-connected and never leaks.
+- *A lot beside a new wall says "no road"* — by design: `roadDist` stops at
+  a bare wall. A tunnel is the way.
+- *`adultsWithin` returns an object now* — `{ cands, dists }`; the old
+  array callers were the thief pool and the wrongful pool.
+- *Wall sprites missing from a sheet* — `allSprites()` has them
+  (`allWalls()`), but `tools/shots.mjs` has no walls sheet yet (BACKLOG).
+
+Suite 80 → 91. Phases B (use-zoning + trespass) and C (rail) follow in
+their own commits; until they land, §2 and §3 of the proposal are the
+design and nothing of theirs is in the code.
 
 ## 9. Verification recipe (what "done" looks like here)
 
