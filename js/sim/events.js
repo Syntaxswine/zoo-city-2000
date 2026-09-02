@@ -82,10 +82,17 @@ export const ROSTER = [
     id: "tornado", kind: DISASTER, weight: () => 1,
     gate: () => true,
     fire: (w) => {
+      // The path runs through a random BUILT lot (a tornado over empty
+      // grass is a nothing-event; measured: 0 buildings hit in 3 of 3 runs).
       const { w: W, h } = w;
       const vertical = w.rng.chance(0.5);
-      const line = w.rng.int(vertical ? W : h);
-      const start = w.rng.int((vertical ? h : W) - 12);
+      const lots = builtLots(w);
+      const at = lots.length ? w.rng.pick(lots) : w.rng.int(W * h);
+      const atX = at % W;
+      const atY = (at / W) | 0;
+      const line = vertical ? atX : atY;
+      const along = vertical ? atY : atX;
+      const start = Math.max(0, Math.min((vertical ? h : W) - 12, along - w.rng.int(12)));
       let hit = 0;
       for (let k = 0; k < 12; k++) {
         const tx = vertical ? line : start + k;
@@ -99,7 +106,8 @@ export const ROSTER = [
   },
   {
     id: "beaverDam", kind: BOON, weight: () => 2,
-    gate: (w, c) => c.shares.beaver >= 0.12 && anyWater(w),
+    // At most one dam a decade: four in forty years ate the riverside.
+    gate: (w, c) => c.shares.beaver >= 0.12 && anyWater(w) && w.tick - (w.events.lastDam ?? -100000) >= 120,
     fire: (w) => {
       // A 2×2 pond beside water on dry, unbuilt land.
       const { w: W, h } = w;
@@ -132,6 +140,7 @@ export const ROSTER = [
         const j = yy * W + xx;
         if (w.tier[j] > 0) lowerTier(w, j);
       }
+      w.events.lastDam = w.tick;
       return `The Gnawleys built a DAM — a new pond at (${ax},${ay}). Lakeside land value forever; the neighbours lost a storey.`;
     },
   },

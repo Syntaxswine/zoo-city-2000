@@ -247,6 +247,35 @@ if (existsSync(artIndex)) {
   console.log("art: js/art/index.js not present yet — Part C skipped");
 }
 
+// ---- Part D: the walker layer never writes the sim (SPEC §14) ---------------------
+const walkersPath = path.join(ROOT, "js", "walkers.js");
+if (existsSync(walkersPath)) {
+  const { createWalkers } = await import("../js/walkers.js");
+  const w1 = createWorld({ seed: SEED });
+  const w2 = createWorld({ seed: SEED });
+  const sx = w1.start.tx;
+  const sy = w1.start.ty;
+  for (const w of [w1, w2]) {
+    apply(w, { kind: "zone", zone: ZONE.R, x0: sx - 3, y0: sy - 3, x1: sx, y1: sy + 3, density: 3 });
+    apply(w, { kind: "zone", zone: ZONE.I, x0: sx + 1, y0: sy, x1: sx + 3, y1: sy + 3, density: 3 });
+    apply(w, { kind: "zone", zone: ZONE.C, x0: sx + 1, y0: sy - 3, x1: sx + 3, y1: sy - 1, density: 3 });
+  }
+  const walkers = createWalkers(w2);
+  const viewport = { x0: 0, y0: 0, x1: w2.w, y1: w2.h };
+  for (let t = 0; t < 60; t++) {
+    tick(w1);
+    tick(w2);
+    walkers.notify();
+    for (let k = 0; k < 20; k++) walkers.update(0.1, viewport);
+  }
+  check("walkers never write the sim: hash equal with the walker layer on and off", stateHash(w1) === stateHash(w2), `${stateHash(w1)} vs ${stateHash(w2)}`);
+  const list = walkers.list();
+  check("walkers carry real citizen ids", list.every((x) => x.citizen == null || w2.byId.has(x.citizen) || x.kind !== "commuter"), `${list.length} walkers`);
+  console.log(`walkers: ${list.length} active after 60 ticks`);
+} else {
+  console.log("walkers: js/walkers.js not present yet — Part D skipped");
+}
+
 // ---- verdict ----------------------------------------------------------------------
 console.log(`${checks} checks, ${failures.length} failures`);
 for (const f of failures) console.log(`  FAIL ${f}`);
