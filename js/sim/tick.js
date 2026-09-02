@@ -101,8 +101,9 @@ export function characterLine(cen) {
   const [a, b] = sorted;
   const nouns = { rabbit: "warren", mouse: "tenement", fox: "market town", beaver: "mill-town", owl: "college town", bear: "hamlet", tortoise: "retirement river", raccoon: "junkyard", pig: "works town", cow: "dairy parish", wolf: "pack territory", cat: "high street", hawk: "eyrie" };
   const problems = { rabbit: "rabbit problem", mouse: "mouse problem", fox: "fox problem", beaver: "beaver habit", owl: "night shift", bear: "bear winter", tortoise: "slow lane", raccoon: "bin situation", pig: "mud problem", cow: "cud habit", wolf: "howling problem", cat: "cat problem", hawk: "hawk overhead" };
-  if (b[1] < 0.15) return `a ${a[0]} ${nouns[a[0]]}`;
-  return `a ${a[0]} ${nouns[a[0]]} with a ${problems[b[0]]}`;
+  const art = (word) => (/^[aeiou]/.test(word) ? "an" : "a");
+  if (b[1] < 0.15) return `${art(a[0])} ${a[0]} ${nouns[a[0]]}`;
+  return `${art(a[0])} ${a[0]} ${nouns[a[0]]} with ${art(problems[b[0]])} ${problems[b[0]]}`;
 }
 
 function advisor(world, cen, dem, fig) {
@@ -118,7 +119,8 @@ function advisor(world, cen, dem, fig) {
     else if (world.zone[i] === ZONE.I) lotsI++;
   }
   const lots = lotsR + lotsC + lotsI;
-  out.push(`REPORT ${year}: ${cen.P} animals · approval ${Math.round(cen.approval)} · unemployed ${cen.U} · net §${fig.incomeYr - fig.upkeepYr}/yr · Zoo City index ${(cen.H * 100).toFixed(0)}% · ${characterLine(cen)}.`);
+  const net = fig.incomeYr - fig.upkeepYr;
+  out.push(`REPORT ${year}: ${cen.P} animals · approval ${Math.round(cen.approval)} · unemployed ${cen.U} · net ${net < 0 ? "−" : "+"}§${Math.abs(net).toLocaleString("en-US")}/yr · Zoo City index ${(cen.H * 100).toFixed(0)}% · ${characterLine(cen)}.`);
   if (cen.P === 0 && lots === 0) out.push("ADVISOR: zone R, C and I within 3 tiles of a road. Animals arrive when there are jobs.");
   if (world.valves.R > 0.3 && cen.vacantR < 10) out.push("ADVISOR: the animals want more housing.");
   if (world.valves.C > 0.3 && lotsC < lotsR / 4) out.push("ADVISOR: the town wants shops.");

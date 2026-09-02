@@ -408,6 +408,19 @@ export function citizensTick(world, cen, dem) {
   const tick = world.tick;
   world.meetings = out.meetings;
 
+  // 0. No ghosts: a household whose home is no longer a standing R lot is
+  //    rehomed or leaves (rubble, a road, a bulldoze that missed a step).
+  for (const hh of world.households) {
+    if (hh.gone || hh.home < 0) continue;
+    const i = hh.home;
+    if (world.zone[i] === ZONE.R && world.tier[i] > 0 && !world.rubble[i]) continue;
+    for (const id of hh.members) { const c = world.byId.get(id); c.home = -1; world.occupants[i]--; }
+    hh.home = -1;
+    const to = bestHome(world, hh.species, hh.members.length, false);
+    if (to >= 0) placeHousehold(world, hh, to);
+    else removeHousehold(world, hh, "homeless");
+  }
+
   // 1. Birthdays: adulthood (move out), retirement (release the job).
   for (const c of world.citizens) {
     if (c.dead) continue;

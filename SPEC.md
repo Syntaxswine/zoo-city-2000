@@ -396,8 +396,10 @@ D density Low/High · Space pause · , . speed · Z undo · S save · L load`.
 - **Zones, trees, bulldoze:** rectangle drag; live cost in the strip
   ("R ×36 = §180"); an unaffordable drag draws the refused hatch and does
   nothing on release; water, roads and civics skipped; trees inside a zone
-  drag are felled at §4 each (LV warning in the card). **One undo step**
-  (`Z`) restores the last op's tiles and refunds it.
+  drag are felled at §4 each (LV warning in the card). **One undo step** (`Z`) restores the last op's tiles and
+  refunds it — tiles, never people: a bulldoze that turned animals out is
+  not undoable (the strip warns before you release), and a road laid over
+  empty chalk says how many lots it replaced.
 - **Road:** L-drag, horizontal leg then vertical; Shift = straight; over
   water = bridge §40. Auto-join by the 4-bit N/E/S/W mask into 16 tiles;
   busy variant when traffic > 40.

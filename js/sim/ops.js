@@ -156,7 +156,13 @@ export function apply(world, op, { log = true } = {}) {
       case "bulldoze":
         if (what === "road") { world.road[i] = ROAD.NONE; roads = true; }
         else if (what === "civic") removeCivic(world, i);
-        else if (what === "building") { clearLot(world, i); world.tier[i] = 0; world.zone[i] = ZONE.NONE; world.rubble[i] = 0; world.burning[i] = 0; world.maxTier[i] = 3; }
+        else if (what === "building") {
+          // Unzone FIRST: clearLot rehomes the family by bestHome(), which
+          // would otherwise see this very lot as a freshly vacated R lot and
+          // move them straight back in (the play-tester's ghost residents).
+          world.tier[i] = 0; world.zone[i] = ZONE.NONE; world.rubble[i] = 0; world.burning[i] = 0; world.maxTier[i] = 3;
+          clearLot(world, i);
+        }
         else if (what === "unzone") { world.zone[i] = ZONE.NONE; world.maxTier[i] = 3; }
         else if (what === "tree") world.terrain[i] = TERRAIN.GRASS;
         break;

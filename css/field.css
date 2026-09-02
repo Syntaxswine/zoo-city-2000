@@ -1,0 +1,181 @@
+/* field.css — the field-guide chrome. Parchment, ink, one monospace, 1 px
+   borders, uppercase letter-spaced headings, no glow, no big buttons, no
+   animation in the chrome. The map canvas fills the window; a 300 px panel
+   on the right; the tool strip along the top; demand bars top-left. */
+
+:root {
+  --bg: #edeade;
+  --panel: #f6f4ec;
+  --border: #c8c2ae;
+  --ink: #3b382e;
+  --dim: #8a8474;
+  --accent: #6f8c5c;
+  --bad: #a4453c;
+  --warn: #8a6a2e;
+  --map: #d6d1bf;
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font: 12px/1.5 ui-monospace, "Cascadia Mono", Consolas, monospace;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* ---- strip ---- */
+#strip {
+  display: flex; align-items: center; gap: 10px;
+  padding: 5px 12px;
+  border-bottom: 1px solid var(--border);
+  background: var(--panel);
+  flex: none;
+  flex-wrap: wrap;
+  row-gap: 3px;
+  white-space: nowrap;
+}
+h1 { font-size: 13px; margin: 0 6px 0 0; letter-spacing: 3px; font-weight: 600; }
+h2 { font-size: 11px; margin: 10px 0 6px; font-weight: 600; letter-spacing: 2px; text-transform: uppercase; color: var(--dim); }
+h3 { font-size: 11px; margin: 8px 0 4px; font-weight: 600; letter-spacing: 2px; text-transform: uppercase; color: var(--dim); }
+#tools { display: flex; align-items: center; gap: 3px; }
+#tools .sep { color: var(--dim); padding: 0 3px; }
+button {
+  font: inherit; color: var(--ink);
+  background: #fffdf6; border: 1px solid var(--border); padding: 1px 6px;
+  cursor: pointer; line-height: 1.4;
+}
+button:hover { border-color: var(--accent); }
+button:disabled { color: var(--dim); cursor: default; border-color: var(--border); }
+button.primary { background: var(--accent); color: #fffdf6; border-color: var(--accent); letter-spacing: 1px; }
+button.tool .key { color: var(--dim); }
+button.tool.on { background: var(--ink); color: #fffdf6; border-color: var(--ink); }
+button.tool.on .key { color: #c8c2ae; }
+#cost { margin-left: 6px; min-width: 120px; color: var(--ink); }
+#cost.refused { color: var(--bad); }
+#clock { margin-left: auto; color: var(--dim); }
+
+/* ---- layout ---- */
+main { flex: 1; display: flex; min-height: 0; }
+#stage { flex: 1; position: relative; min-width: 0; background: var(--map); }
+#map { display: block; width: 100%; height: 100%; image-rendering: pixelated; outline: none; cursor: crosshair; }
+#panel {
+  width: 300px; flex: none; display: flex; flex-direction: column;
+  border-left: 1px solid var(--border); background: var(--panel);
+  min-height: 0;
+}
+#panel section { padding: 8px 10px; border-bottom: 1px solid var(--border); }
+#panel footer { padding: 6px 10px; color: var(--dim); font-size: 10px; line-height: 1.4; border-top: 1px solid var(--border); }
+
+/* ---- stats ---- */
+#stats { display: flex; flex-wrap: wrap; gap: 4px 12px; padding: 8px 10px; border-bottom: 1px solid var(--border); }
+#stats .stat b { font-weight: 600; }
+#stats .stat i { font-style: normal; color: var(--dim); }
+#stats .stat.bad b { color: var(--bad); }
+
+/* ---- demand bars over the map ---- */
+#bars {
+  position: absolute; left: 10px; top: 10px;
+  display: flex; gap: 6px; padding: 5px 6px 3px;
+  background: rgba(246, 244, 236, 0.9); border: 1px solid var(--border);
+}
+#bars .bar { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+#bars .track { position: relative; width: 12px; height: 64px; background: #e4e0d0; border: 1px solid var(--border); }
+#bars .zero { position: absolute; left: 0; right: 0; top: 50%; height: 1px; background: var(--dim); }
+#bars .fill { position: absolute; left: 2px; right: 2px; background: var(--accent); }
+#bars .fill.neg { background: var(--bad); }
+#bars .tax { position: absolute; left: -2px; right: -2px; height: 1px; background: var(--ink); border-top: 1px dotted #fffdf6; }
+#bars .cap { position: absolute; left: -3px; width: 4px; height: 3px; background: var(--warn); }
+#bars .lab { color: var(--dim); font-size: 10px; line-height: 1; }
+
+/* ---- flash and banner ---- */
+#flash {
+  position: absolute; left: 50%; top: 10px; transform: translateX(-50%);
+  max-width: 70%; padding: 3px 10px;
+  background: rgba(246, 244, 236, 0.95); border: 1px solid var(--border);
+  color: var(--ink); visibility: hidden;
+}
+#flash.on { visibility: visible; }
+#banner {
+  position: absolute; left: 0; right: 0; bottom: 0; padding: 4px 10px;
+  background: #b8b4a6; color: #3b382e; border-top: 1px solid var(--border);
+  display: none; letter-spacing: 1px;
+}
+#banner.on { display: block; }
+
+/* ---- hover card ---- */
+#card { min-height: 96px; max-height: 190px; overflow: auto; flex: none; }
+#card .head b { font-weight: 600; }
+#card .dim { color: var(--dim); }
+#card .warn { color: var(--warn); }
+#card .why b { font-weight: 600; letter-spacing: 1px; }
+#card .pin { color: var(--accent); }
+
+/* ---- tabs ---- */
+#tabs { display: flex; gap: 0; border-bottom: 1px solid var(--border); flex: none; }
+#tabs .tab {
+  flex: 1; border: none; border-right: 1px solid var(--border); background: transparent;
+  padding: 4px 0; letter-spacing: 2px; text-transform: uppercase; font-size: 10px; color: var(--dim);
+}
+#tabs .tab:last-child { border-right: none; }
+#tabs .tab.on { color: var(--ink); background: #fffdf6; }
+#tabBody { flex: 1; overflow: auto; min-height: 0; }
+#tabBody .note { color: var(--dim); margin: 4px 0; }
+#tabBody .dim { color: var(--dim); }
+#tabBody ol.rules { margin: 0; padding-left: 18px; }
+#tabBody ol.rules li { margin: 0 0 6px; }
+#tabBody ol.rules b { font-weight: 600; }
+#tabBody .formula { color: var(--dim); }
+#tabBody .live { color: var(--accent); }
+#tabBody table.ledger { border-collapse: collapse; width: 100%; margin: 6px 0; }
+#tabBody table.ledger td { padding: 1px 4px 1px 0; vertical-align: top; }
+#tabBody table.ledger td.num { text-align: right; white-space: nowrap; }
+#tabBody table.ledger tr.h td { border-top: 1px solid var(--border); font-weight: 600; padding-top: 3px; }
+#tabBody table.ledger tr.bad td { color: var(--bad); }
+#tabBody table.small td { font-size: 11px; }
+#tabBody .rates .rate { display: flex; align-items: center; gap: 6px; margin: 2px 0; }
+#tabBody .rates .lab { width: 44px; color: var(--dim); }
+#tabBody .rates .val { width: 36px; text-align: right; }
+#tabBody .rates button { padding: 0 6px; }
+#tabBody .hist .hrow { display: flex; align-items: center; gap: 6px; margin: 1px 0; }
+#tabBody .hist .lab { width: 64px; color: var(--dim); }
+#tabBody .hist .hbar { flex: 1; height: 8px; background: #e4e0d0; border: 1px solid var(--border); }
+#tabBody .hist .hfill { height: 100%; background: var(--accent); }
+#tabBody .hist .hfill.furCool { background: #6e7380; }
+#tabBody .hist .hfill.olive { background: #62663a; }
+#tabBody .hist .hfill.furWarm { background: #8a5a34; }
+#tabBody .hist .num { width: 34px; text-align: right; }
+#tabBody ul.log { list-style: none; margin: 0; padding: 0; }
+#tabBody ul.log li { margin: 0 0 3px; border-bottom: 1px dotted var(--border); padding-bottom: 2px; }
+#tabBody ul.log li.bad { color: var(--bad); }
+#tabBody ul.log li.good { color: var(--accent); }
+#tabBody .line { margin-bottom: 4px; }
+
+/* ---- modals ---- */
+.modal {
+  position: fixed; inset: 0; background: rgba(59, 56, 46, 0.35);
+  display: flex; align-items: center; justify-content: center; z-index: 10;
+}
+.modal[hidden] { display: none; }
+.modalbox {
+  width: 360px; max-width: 92vw; max-height: 90vh; overflow: auto;
+  background: var(--panel); border: 1px solid var(--border); padding: 12px 14px;
+}
+.modalbox.wide { width: 460px; }
+.modalbox h2 { margin-top: 0; }
+.modalbox h2 + h2, .modalbox .saves + h2, .modalbox .btnrow + h2 { margin-top: 14px; }
+.modalbox p { margin: 6px 0; }
+.modalbox .row { display: flex; align-items: center; gap: 6px; margin: 4px 0; }
+.modalbox .row label { color: var(--dim); }
+.modalbox input[type=text], .modalbox textarea {
+  font: inherit; color: var(--ink); background: #fffdf6; border: 1px solid var(--border); padding: 2px 6px;
+  flex: 1; min-width: 0; width: 100%;
+}
+.modalbox textarea { resize: vertical; margin: 4px 0; }
+.modalbox input[type=checkbox] { accent-color: var(--accent); margin: 0; }
+.btnrow { display: flex; gap: 6px; margin: 8px 0 0; }
+.saves .save { display: flex; align-items: center; gap: 6px; margin: 2px 0; }
+.saves .save b { font-weight: 600; }
+.saves .save .dim { flex: 1; color: var(--dim); }

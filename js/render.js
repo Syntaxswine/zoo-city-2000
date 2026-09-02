@@ -1,0 +1,375 @@
+// render.js — THE ONLY MODULE THAT TOUCHES A CANVAS. SPEC §13.
+//
+//   createRenderer(canvas, world, art) →
+//     { draw(camera, hover, walkers, overlays), invalidate(), pick(sx, sy), pickWalker(sx, sy, list), resize(), setWorld(world), viewportTiles() }
+//
+// Two layers, one draw order:
+//
+//   STATIC  the ground (grass, chalk, roads, bridges, kerbs, rubble, flood)
+//           painted back-to-front through painter.js into an offscreen canvas
+//           covering the viewport plus a margin; redrawn on invalidate() or
+//           when the camera leaves the margin. Water tiles are left
+//           TRANSPARENT here and painted every frame beneath it, so the
+//           palette cycle (4 frames/s) never forces a ground rebuild.
+//   DYNAMIC everything that stands or moves, every frame, through the SAME
+//           paintScene: buildings, trees, civics, walkers, fire, tents,
+//           glyphs, zots, cursor, ghosts. Rebuilding the visible window's
+//           standing things each frame is the simplest CORRECT way to get a
+//           walker under the tower in front of it (SPEC §13); ~1,000 blits
+//           a frame is nothing, and there is no second sort anywhere.
+//
+// Camera = { x, y, zoom }: the projection-space point under the canvas
+// centre and an integer zoom (1 or 2). Sprites are rasterised once from
+// their text rows (format.rasterize) and cached per (sprite, tint).
+
+import { toScreen, toWorld, pickTile, HALF_H, HALF_W, TILE_W, TILE_H } from "./iso/iso.js";
+import { paintScene, Z_BUILDING } from "./iso/painter.js";
+import { rasterize } from "./art/format.js";
+import { ZONE, CIVIC, TERRAIN, ROAD } from "./sim/world.js";
+import { lotScore, REASON } from "./sim/lots.js";
+import { isWorker } from "./sim/census.js";
+
+const MARGIN = 256; // projection px around the viewport kept in the static layer
+const REACH_UP = 120; // tallest sprite above its tile's north vertex
+const REACH_SIDE = 40;
+const BUSY = 40;
+const BG = "#d6d1bf"; // beyond the map: the plate's ground, as in the sibling field guides
+const RED_TINT = { "=": "0", "(": "0" };
+// R chalk (terrain.js chalkKey) is drawn in grass keys because the R accent
+// '5' sits two luminance points off the grass mid: a 1-px 'p' (≈156) / 1-px
+// 'm' (≈68) staircase. At ×1 a 4-tile R strip still vanished into grass-0 in
+// the round-3 screenshot. Grass variant 0 never uses 'm', so remapping just
+// that key in the R chalk sprite darkens ONLY the line's shade half and the
+// border's inner edge — 'q' (earth dark, ≈46) is a drawn-in-soil line, not
+// ink. The bedrock fix is a paler '5' in palette.js; this is the renderer's
+// tint table doing what it is for until then.
+const R_CHALK_TINT = { m: "q" };
+
+export function createRenderer(canvas, initialWorld, art) {
+  let world = initialWorld;
+  const ctx = canvas.getContext("2d", { alpha: false });
+  const ground = document.createElement("canvas");
+  const gctx = ground.getContext("2d");
+  let G = null; // { left, top, w, h } of the static layer in projection space
+  let dirty = true;
+  let water = []; // [[sx, sy] ...] north vertices of water tiles inside G
+  let zots = new Map(); // tile → zot kind, computed on rebuild
+  let plazaTile = -1;
+  let clock = 0;
+  let view = { left: 0, top: 0, w: 1, h: 1, zoom: 1 };
+  const waterTints = [0, 1, 2, 3, 4, 5].map((f) => art.waterTint(f)); // reused objects: one cache entry each
+
+  // ---- sprite cache -----------------------------------------------------------
+  const cache = new Map(); // sprite → Map(tintKey → canvas)
+  const tintKeys = new Map(); // tint object → its key string (tints are reused objects or tiny)
+  function raster(sprite, tint = null) {
+    let slot = cache.get(sprite);
+    if (!slot) { slot = new Map(); cache.set(sprite, slot); }
+    let key = "";
+    if (tint) {
+      key = tintKeys.get(tint);
+      if (key == null) { key = Object.entries(tint).map(([k, v]) => k + v).join(""); tintKeys.set(tint, key); }
+    }
+    let c = slot.get(key);
+    if (c) return c;
+    const img = rasterize(sprite.rows, tint);
+    c = document.createElement("canvas");
+    c.width = img.w;
+    c.height = img.h;
+    c.getContext("2d").putImageData(new ImageData(img.data, img.w, img.h), 0, 0);
+    slot.set(key, c);
+    return c;
+  }
+
+  // ---- geometry -------------------------------------------------------------------
+  function resize() {
+    const w = Math.max(1, canvas.clientWidth | 0);
+    const h = Math.max(1, canvas.clientHeight | 0);
+    if (canvas.width !== w || canvas.height !== h) {
+      canvas.width = w;
+      canvas.height = h;
+    }
+    dirty = true;
+  }
+
+  function computeView(camera) {
+    const z = camera.zoom || 1;
+    const w = canvas.width / z;
+    const h = canvas.height / z;
+    view = { left: camera.x - w / 2, top: camera.y - h / 2, w, h, zoom: z };
+    return view;
+  }
+
+  /** Integer tile ranges whose north vertex could put pixels inside a projection rect. */
+  function tileRange(rect) {
+    const l = rect.left - REACH_SIDE;
+    const r = rect.left + rect.w + REACH_SIDE;
+    const t = rect.top - REACH_UP;
+    const b = rect.top + rect.h + REACH_UP;
+    const cs = [toWorld(l, t), toWorld(r, t), toWorld(l, b), toWorld(r, b)];
+    let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
+    for (const [x, y] of cs) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); }
+    return {
+      x0: Math.max(0, Math.floor(x0) - 2), x1: Math.min(world.w - 1, Math.ceil(x1) + 2),
+      y0: Math.max(0, Math.floor(y0) - 2), y1: Math.min(world.h - 1, Math.ceil(y1) + 2),
+      inside: (sx, sy) => sx >= l - TILE_W && sx <= r + TILE_W && sy >= t - TILE_H && sy <= b + TILE_H,
+    };
+  }
+
+  function viewportTiles() {
+    const r = tileRange(view);
+    return { x0: r.x0, y0: r.y0, x1: r.x1, y1: r.y1 };
+  }
+
+  const road = (tx, ty) => tx >= 0 && ty >= 0 && tx < world.w && ty < world.h && world.road[ty * world.w + tx] !== ROAD.NONE;
+  const waterAt = (tx, ty) => tx >= 0 && ty >= 0 && tx < world.w && ty < world.h && world.terrain[ty * world.w + tx] === TERRAIN.WATER;
+  const roadMask = (tx, ty) => (road(tx, ty - 1) ? 1 : 0) | (road(tx + 1, ty) ? 2 : 0) | (road(tx, ty + 1) ? 4 : 0) | (road(tx - 1, ty) ? 8 : 0);
+
+  // ---- the static ground layer ---------------------------------------------------------
+  function rebuildGround() {
+    const left = Math.floor(view.left - MARGIN);
+    const top = Math.floor(view.top - MARGIN);
+    const w = Math.ceil(view.w + 2 * MARGIN);
+    const h = Math.ceil(view.h + 2 * MARGIN);
+    if (ground.width !== w || ground.height !== h) { ground.width = w; ground.height = h; }
+    G = { left, top, w, h };
+    gctx.setTransform(1, 0, 0, 1, 0, 0);
+    gctx.clearRect(0, 0, w, h);
+    gctx.imageSmoothingEnabled = false;
+    water = [];
+    const range = tileRange(G);
+    const items = [];
+    const flood = art.overlay("flood");
+    for (let ty = range.y0; ty <= range.y1; ty++) {
+      for (let tx = range.x0; tx <= range.x1; tx++) {
+        const [sx, sy] = toScreen(tx, ty);
+        if (!range.inside(sx, sy)) continue;
+        const i = ty * world.w + tx;
+        const isWater = world.terrain[i] === TERRAIN.WATER;
+        const hasRoad = world.road[i] !== ROAD.NONE;
+        if (isWater) {
+          water.push([sx, sy]);
+          if (hasRoad) items.push({ sprite: art.bridge(roadMask(tx, ty)), tx, ty, kind: "ground", z: 1 });
+        } else {
+          let sprite;
+          let tint = null;
+          if (hasRoad) sprite = art.road(roadMask(tx, ty), world.traffic[i] > BUSY);
+          else if (world.rubble[i] && world.tier[i] === 0) sprite = art.ground("rubble");
+          else if (world.zone[i] !== ZONE.NONE && world.tier[i] === 0) {
+            sprite = art.chalk(world.zone[i], world.maxTier[i] === 3);
+            if (world.zone[i] === ZONE.R) tint = R_CHALK_TINT;
+          } else sprite = art.ground("grass", world.variant[i] % 3);
+          items.push({ sprite, tx, ty, kind: "ground", tint });
+          if (waterAt(tx, ty - 1)) items.push({ sprite: art.ground("kerb", 0), tx, ty, kind: "ground", z: 1 });
+          if (waterAt(tx + 1, ty)) items.push({ sprite: art.ground("kerb", 1), tx, ty, kind: "ground", z: 1 });
+          if (waterAt(tx, ty + 1)) items.push({ sprite: art.ground("kerb", 2), tx, ty, kind: "ground", z: 1 });
+          if (waterAt(tx - 1, ty)) items.push({ sprite: art.ground("kerb", 3), tx, ty, kind: "ground", z: 1 });
+        }
+        if (world.flooded[i]) items.push({ sprite: flood, tx, ty, kind: "ground", z: 2 });
+      }
+    }
+    paintScene(items, (sprite, sx, sy, item) => gctx.drawImage(raster(sprite, item.tint || null), sx - left, sy - top));
+    computeZots(range);
+    computePlaza();
+    dirty = false;
+  }
+
+  /** Zots: lots that want to grow and cannot — no road, smog, no demand — and homes with a jobless worker. */
+  function computeZots(range) {
+    zots = new Map();
+    for (let ty = range.y0; ty <= range.y1; ty++) {
+      for (let tx = range.x0; tx <= range.x1; tx++) {
+        const i = ty * world.w + tx;
+        if (world.zone[i] === ZONE.NONE) continue;
+        const s = lotScore(world, i);
+        if (s.reason === REASON.NO_ROAD) zots.set(i, "noroad");
+        else if (s.reason === REASON.SMOG) zots.set(i, "smog");
+        else if (s.reason === REASON.NO_DEMAND) zots.set(i, "nodemand");
+      }
+    }
+    if (world.tick > 0) {
+      for (const c of world.citizens) {
+        if (c.home < 0 || c.job >= 0 || c.dead) continue;
+        if (c.jobless >= 3 && isWorker(world, c) && !zots.has(c.home)) zots.set(c.home, "nojob");
+      }
+    }
+  }
+
+  function computePlaza() {
+    plazaTile = -1;
+    if (!world.festivalBonus) return;
+    const c = world.centroid || { cx: world.start.tx, cy: world.start.ty };
+    let bd = Infinity;
+    for (let i = 0; i < world.w * world.h; i++) {
+      if (world.civic[i] !== CIVIC.PARK) continue;
+      const d = Math.max(Math.abs((i % world.w) - c.cx), Math.abs(((i / world.w) | 0) - c.cy));
+      if (d < bd) { bd = d; plazaTile = i; }
+    }
+  }
+
+  const needsRebuild = () =>
+    dirty || !G ||
+    view.left < G.left + 8 || view.top < G.top + 8 ||
+    view.left + view.w > G.left + G.w - 8 || view.top + view.h > G.top + G.h - 8;
+
+  // ---- overlays (key O) -----------------------------------------------------------------
+  function diamond(sx, sy) {
+    ctx.beginPath();
+    ctx.moveTo(sx, sy);
+    ctx.lineTo(sx + HALF_W, sy + HALF_H);
+    ctx.lineTo(sx, sy + TILE_H);
+    ctx.lineTo(sx - HALF_W, sy + HALF_H);
+    ctx.closePath();
+  }
+  function drawOverlay(mode, range) {
+    for (let ty = range.y0; ty <= range.y1; ty++) {
+      for (let tx = range.x0; tx <= range.x1; tx++) {
+        const i = ty * world.w + tx;
+        if (world.terrain[i] === TERRAIN.WATER) continue;
+        let fill = null;
+        if (mode === "lv") fill = `rgba(96,132,84,${(world.lv[i] / 100) * 0.65})`;
+        else if (mode === "pol") fill = world.pol[i] > 2 ? `rgba(128,72,40,${(world.pol[i] / 100) * 0.75})` : null;
+        else if (mode === "score" && world.zone[i] !== ZONE.NONE) {
+          const s = lotScore(world, i).score;
+          fill = s >= 0 ? `rgba(80,110,150,${Math.min(1, s * 2) * 0.6 + 0.08})` : `rgba(170,70,60,${Math.min(1, -s * 2) * 0.6 + 0.08})`;
+        }
+        if (!fill) continue;
+        const [sx, sy] = toScreen(tx, ty);
+        ctx.fillStyle = fill;
+        diamond(sx, sy);
+        ctx.fill();
+      }
+    }
+  }
+
+  // ---- the frame ---------------------------------------------------------------------------
+  function draw(camera, hover, walkers, overlays, dt = 1 / 60) {
+    clock += dt;
+    if (canvas.width !== canvas.clientWidth || canvas.height !== canvas.clientHeight) resize();
+    computeView(camera);
+    if (needsRebuild()) rebuildGround();
+    const z = view.zoom;
+
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.fillStyle = BG;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.imageSmoothingEnabled = false;
+    // Projection space → device: scale by zoom, translate by the view's top-left.
+    ctx.setTransform(z, 0, 0, z, -Math.round(view.left * z), -Math.round(view.top * z));
+
+    // Water, cycling, under the transparent holes in the ground layer.
+    const wf = raster(art.ground("water"), waterTints[Math.floor(clock * 4) % 6]);
+    const vl = view.left - TILE_W, vt = view.top - TILE_H, vr = view.left + view.w + TILE_W, vb = view.top + view.h + TILE_H;
+    for (const [sx, sy] of water) if (sx > vl && sx < vr && sy > vt && sy < vb) ctx.drawImage(wf, sx - HALF_W, sy);
+    ctx.drawImage(ground, G.left, G.top);
+
+    const range = tileRange(view);
+    if (overlays && overlays !== "off") drawOverlay(overlays, range);
+
+    // Everything that stands or moves, in the one order.
+    const items = [];
+    const fireFrame = Math.floor(clock * 4) & 1;
+    const fire = art.overlay("fire", fireFrame);
+    const blink = Math.floor(clock * 1.5) & 1;
+    for (let ty = range.y0; ty <= range.y1; ty++) {
+      for (let tx = range.x0; tx <= range.x1; tx++) {
+        const [sx, sy] = toScreen(tx, ty);
+        if (!range.inside(sx, sy)) continue;
+        const i = ty * world.w + tx;
+        let standing = null;
+        if (world.terrain[i] === TERRAIN.TREE) {
+          const v = world.variant[i];
+          const nearWater = waterAt(tx + 1, ty) || waterAt(tx - 1, ty) || waterAt(tx, ty + 1) || waterAt(tx, ty - 1);
+          standing = art.tree(nearWater && v & 1 ? "willow" : v % 3 === 2 ? "tall" : "round");
+        } else if (world.tier[i] > 0 && world.zone[i] !== ZONE.NONE) {
+          standing = art.building(world.zone[i], world.tier[i], world.variant[i] & 1);
+        } else if (world.civic[i] === CIVIC.PARK) standing = art.civic("park");
+        else if (world.civic[i] === CIVIC.ZOO) standing = art.civic("zoo");
+        if (standing) items.push({ sprite: standing, tx, ty, kind: "building" });
+        if (world.burning[i]) items.push({ sprite: fire, tx, ty, kind: "building", z: Z_BUILDING + 1, dy: -6 });
+        if (i === plazaTile) items.push({ sprite: art.overlay("plaza"), tx, ty, kind: "ground", z: 3, dy: -2 });
+        const zk = zots.get(i);
+        if (zk && blink) items.push({ sprite: art.zot(zk), tx, ty, kind: "building", z: Z_BUILDING + 2, dy: -(standing ? standing.h - standing.anchor[1] + 14 : 18) });
+      }
+    }
+    // Cursor, drag ghosts, placement ghost.
+    if (hover) {
+      if (hover.drag && hover.drag.tiles) {
+        const g = art.overlay("ghost");
+        const tint = hover.drag.refused ? RED_TINT : null;
+        for (const i of hover.drag.tiles) items.push({ sprite: g, tx: i % world.w, ty: (i / world.w) | 0, kind: "ground", z: 3, tint });
+      }
+      if (hover.ghost) {
+        const gh = hover.ghost;
+        const g = art.overlay("ghost");
+        const tint = gh.ok ? null : RED_TINT;
+        for (let dy = 0; dy < gh.h; dy++) for (let dx = 0; dx < gh.w; dx++) items.push({ sprite: g, tx: gh.tx + dx, ty: gh.ty + dy, kind: "ground", z: 3, tint });
+        if (gh.sprite) items.push({ sprite: gh.sprite, tx: gh.tx, ty: gh.ty, kind: "building", z: Z_BUILDING + 3, alpha: gh.ok ? 0.55 : 0.3 });
+      }
+      if (hover.tx != null && hover.tx >= 0 && hover.tx < world.w && hover.ty >= 0 && hover.ty < world.h) {
+        items.push({ sprite: art.overlay("cursor"), tx: hover.tx, ty: hover.ty, kind: "ground", z: 4, tint: hover.pinned ? RED_TINT : null });
+      }
+    }
+    // Walkers, tents, meeting glyphs.
+    const winter = world.events.active.some((e) => e.id === "bearWinter");
+    const list = walkers ? walkers.list() : [];
+    const tent = art.overlay("tent");
+    const meet = art.overlay("meeting");
+    for (const w of list) {
+      if (winter && w.species === "bear") continue;
+      if (w.tx < range.x0 - 1 || w.tx > range.x1 + 1 || w.ty < range.y0 - 1 || w.ty > range.y1 + 1) continue;
+      if (w.tent) {
+        const ttx = Math.floor(w.tx), tty = Math.floor(w.ty);
+        items.push({ sprite: tent, tx: ttx, ty: tty, kind: "building" });
+        items.push({ sprite: art.citizen(w.species, w.facing, 0, w.age), tx: ttx + 0.82, ty: tty + 0.55, kind: "walker" });
+        continue;
+      }
+      items.push({ sprite: art.citizen(w.species, w.facing, w.frame, w.age, { hat: w.hat }), tx: w.tx, ty: w.ty, kind: "walker", walker: w });
+      if (w.glyph === "meeting" && w.standUntil > 0) items.push({ sprite: meet, tx: w.tx, ty: w.ty, kind: "walker", z: 1000, dy: -24 });
+    }
+    paintScene(items, (sprite, sx, sy, item) => {
+      if (item.alpha != null) ctx.globalAlpha = item.alpha;
+      ctx.drawImage(raster(sprite, item.tint || null), sx, sy + (item.dy || 0));
+      if (item.alpha != null) ctx.globalAlpha = 1;
+    });
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+  }
+
+  // ---- picking ---------------------------------------------------------------------------------
+  function toProjection(sx, sy) {
+    return [sx / view.zoom + view.left, sy / view.zoom + view.top];
+  }
+  function pick(sx, sy) {
+    const [px, py] = toProjection(sx, sy);
+    return pickTile(px, py, world.w, world.h);
+  }
+  /** The walker under a screen point (its sprite's box), nearest feet first; null if none. */
+  function pickWalker(sx, sy, list) {
+    const [px, py] = toProjection(sx, sy);
+    let best = null;
+    let bd = Infinity;
+    for (const w of list || []) {
+      if (w.tent) continue;
+      const sp = art.citizen(w.species, w.facing, w.frame, w.age, { hat: w.hat });
+      const [nx, ny] = toScreen(w.tx, w.ty);
+      const fx = nx, fy = ny + HALF_H; // feet on the ground centre
+      const left = fx - sp.anchor[0], top = fy - sp.anchor[1];
+      if (px < left - 2 || px > left + sp.w + 2 || py < top - 2 || py > top + sp.h + 2) continue;
+      const d = Math.abs(px - fx) + Math.abs(py - fy);
+      if (d < bd) { bd = d; best = w; }
+    }
+    return best;
+  }
+
+  /** Screen point of a tile's ground centre, for the UI to anchor things. */
+  function tileToScreen(tx, ty) {
+    const [nx, ny] = toScreen(tx, ty);
+    return [(nx - view.left) * view.zoom, (ny + HALF_H - view.top) * view.zoom];
+  }
+
+  function invalidate() { dirty = true; }
+  function setWorld(nw) { world = nw; dirty = true; G = null; }
+
+  resize();
+  return { draw, invalidate, pick, pickWalker, resize, setWorld, viewportTiles, tileToScreen, get view() { return view; } };
+}

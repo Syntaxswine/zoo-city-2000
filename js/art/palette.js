@@ -27,7 +27,7 @@ export const RAMPS = {
 };
 
 export const ACCENT = {
-  "5": "#5E8A3C", // zone chalk R
+  "5": "#B8C860", // zone chalk R — pale green-yellow, ~60 luminance above grass mid (the first value was a hair off grass and vanished at 1x)
   "6": "#3C6E8A", // zone chalk C
   "7": "#A88A2E", // zone chalk I
   "8": "#E8742A", // fire

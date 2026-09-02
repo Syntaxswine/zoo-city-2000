@@ -129,7 +129,11 @@ export const ROSTER = [
         }
       }
       if (!cands.length) return null;
-      const [ax, ay] = w.rng.pick(cands);
+      // Beavers build where the town is: prefer sites within 8 tiles of a
+      // built lot (the play-tester's pond landed 20 tiles from anything).
+      const lotsNow = builtLots(w);
+      const near = cands.filter(([ax, ay]) => lotsNow.some((l) => Math.max(Math.abs(l % W - ax), Math.abs(((l / W) | 0) - ay)) <= 8));
+      const [ax, ay] = w.rng.pick(near.length ? near : cands);
       for (let yy = ay; yy <= ay + 1; yy++) for (let xx = ax; xx <= ax + 1; xx++) {
         const j = yy * W + xx;
         w.terrain[j] = TERRAIN.WATER;
@@ -250,6 +254,16 @@ function countI(w) {
   for (let i = 0; i < w.w * w.h; i++) if (w.zone[i] === ZONE.I && w.tier[i] > 0) n++;
   return n;
 }
+
+/** Human titles for event ids (timed effects included), for the panel. */
+export const EVENT_TITLES = Object.freeze({
+  fire: "Fire", flood: "Flood", tornado: "Tornado", beaverDam: "Beaver dam", smogBank: "Smog bank",
+  mouseBoom: "Mouse boom", taxRevolt: "Tax revolt", revoltMood: "Tax revolt (the mood)", boom: "Boom",
+  recession: "Recession", foxFair: "Fox market fair", rabbitWarren: "Rabbit warren", founders: "Founders' festival",
+  festivalMood: "Founders' festival (the mood)", grant: "County grant", scrubbers: "Scrubbers", truffles: "Truffle season",
+  dairyFair: "Dairy fair", wolfMoon: "Wolf moon", bearWinter: "Bear winter", notice: "Notice",
+});
+export const eventTitle = (id) => EVENT_TITLES[id] || id;
 
 /** Resolve the choice card. */
 export function resolveChoice(world, accept) {
