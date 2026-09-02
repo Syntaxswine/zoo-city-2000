@@ -641,7 +641,7 @@ trespass (B), rail (C) — three commits on the proposal.
 ## 9. Verification recipe (what "done" looks like here)
 
 ```
-node tools/check.mjs                                   # 47 checks, 0 failures — the gate
+node tools/check.mjs                                   # 113 checks, 0 failures — the gate
 node tools/playtest.mjs --years 30 --quiet             # the §4 curves (disasters off)
 node tools/playtest.mjs --years 30 --parks 2 --zoo 12 --quiet
 node tools/playtest.mjs --disasters --stations --years 40 --seed 5
@@ -654,3 +654,42 @@ git push origin main                                   # Pages builds in ~1–2 
 `render.js`, never judges balance, and never watches the clock — those are
 `shots.mjs`, `playtest.mjs`, and your eyes in the browser. A green suite
 with an ugly sheet is not done.
+
+---
+
+## Maker's mark
+
+I am Claude Fable 5.1, and I built sessions 3, 4 and 5 of this game on
+2026-09-02 — crime and punishment, the title screen and the cheat, and the
+walls / use-zoning / rail tranche — in one long day with the owner, who
+asked for this mark. The commits carry the owner's git name and my
+Co-Authored-By line; the words in SPEC §6b, §7.8, §7.9, §9c, §9d, and in
+§10–§12 of this file, are mine unless quoted.
+
+What I stood on, so nobody mistakes a day's speed for a day's work: the
+first session's sim and its suite, which made every one of my changes
+checkable before it was visible; Glades of Arcadia's flood-fill law and
+its drystone wall, which the owner pointed me to and which I adopted
+whole rather than reinvent; the crime arc's single `arrest()` door, which
+let trespass be a cause and not a subsystem; and the owner's habit of
+saying exactly what they want in one paragraph and then ruling in one
+line. The hard parts of this day were never the code. They were the three
+times a check passed that I had not made able to fail — a fixture that
+could not pay, a sentence that ended a tick sooner than I read it, a
+tunnel that opened sideways — and each time the suite, not I, said so. If
+you take one habit from me, take that one: before you trust a green
+check, break the thing it claims to guard and watch it go red.
+
+How this codebase wants to be worked, in my experience of it: prove the
+frame first (a new generator reproduces the old output byte for byte on
+the old inputs, then it may differ); the numbers are KNOBS and the
+reasons are in the comments beside them, argue with the reason; the
+owner's words are the spec and my rulings are listed so they can be
+overruled in one line, never buried; and the ticker names every animal
+and uses no pronoun, because the sim has no sex and the city has names.
+
+To whoever builds next: the BACKLOG is honest, the traps in §3, §10, §11
+and §12 are keyed by what the screen looks like, and the painting on the
+title screen is the owner's. Leave it byte-exact.
+
+— Claude Fable 5.1 (claude-fable-5-1), 2026-09-02, after commit 12168a9.
