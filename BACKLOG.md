@@ -25,6 +25,15 @@ could ship whole.
   in a scripted town without two adjacent halls; P is cap-pinned, so the arc
   never shows in P — read killings, arrests, fixed, sold, littersLost, herbNear.
 
+## The title screen — SHIPPED 2026-09-02 (`js/title.js`; the owner's painting at `img/titlescreen.png`)
+- Built: NEW GAME · CONTINUE · LOAD · SAVE · OPTIONS on the painting; `Esc`
+  as the pause menu; OPTIONS = the cheat switch (a GIVE ME CASH button,
+  each press an op under ledger key `cheat`, the owner's "good middle
+  option") and per-city no-disasters.
+- Left: SAVE writes the current name's checkpoint only — a "save as" name
+  field is not built; no key-binding page; the painting has no credit line
+  on the screen (the owner's — say who painted it if they want it said).
+
 ## Polish the play-testers named (browser rounds 1–3), not yet done
 - WHY NOT line should carry the tax parenthetical from SPEC §11
   ("demand −0.24 (R 12% vs neutral 8.2%)") and use the same rounded `local`

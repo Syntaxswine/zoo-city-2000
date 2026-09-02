@@ -31,7 +31,7 @@ measurement and SPEC gets edited — never the reverse.
   <270513546+StonePhilosopher@users.noreply.github.com>`; every commit ends
   with the Co-Authored-By line; commit messages are field notes and part of
   the archive. `.gitignore` = `Thumbs.db .DS_Store out/ node_modules/`.
-- **Before touching a file:** `node tools/check.mjs` — 47 checks, exits 1.
+- **Before touching a file:** `node tools/check.mjs` — 80 checks, exits 1.
   Green at the commit this file lands in. If it is red when you arrive, that
   is the first job; `git log -p` on the file it names is the fastest route.
 - **Run:**
@@ -55,7 +55,9 @@ measurement and SPEC gets edited — never the reverse.
   `newCity({seed, noDisasters})`. `advance` autosaves every 12 ticks and
   boot resumes the NEWER of checkpoint/autosave — press `N` for a fresh
   city before a load test or you are testing yesterday's town. A loaded
-  city opens PAUSED.
+  city opens PAUSED. Since session 4 (§11) boot stands the TITLE SCREEN over
+  the resumed city: CONTINUE (or `window.zoo.title.close()`) drops it;
+  `advance(n)` works under it; the clock does not.
 - **Saves and clock (`js/main.js`):** localStorage `zoo.city:<name>` (the
   `S` checkpoint; `L` reads only this), `zoo.auto:<name>` (every 12 ticks,
   on `pagehide`, on hidden), `zoo.meta:<name>` (`{speed, paused, at}`),
@@ -453,6 +455,78 @@ the thing to argue with, not the number; the number is a KNOB.
 
 **Where to go next** is the top of `BACKLOG.md` (hunger visibility, the
 5%'s visibility, customer walkers, supply from funerals, the abattoir).
+
+## 11. Session 4 — the title screen and the cheat (2026-09-02, evening)
+
+The owner left a painting at the repo root ("some title art to make a home
+screen") and asked for the title text, five buttons (new game, save, load,
+continue, options) and a cheat in options — unlimited cash for folks who
+want freedom to build — then, on the design question, ruled: *"if you want
+it to unlock a 'give me cash button' thats a good middle option."* Built
+as ruled.
+
+**What shipped.** `js/title.js` (one overlay: the painting under the name,
+the bar of five, one card for the panels); `img/titlescreen.png` (the
+owner's file, byte-exact, moved from the root); the `cheat` op in
+`ops.js`; `exitReceivership()` in `budget.js`; `KNOBS.CHEAT_CASH` /
+`CHEAT_MAX`; the Esc handling in `input.js`; `zoo.pref`, `app.entered`
+and `app.cheat()` in `main.js`; the three dialog builders in `ui.js`
+(`foundForm`, `savesList`, `portBox`) the title mounts; the strip's
+`menu` button and the `+§100,000` button beside cash; thirteen new checks
+(80 total). SPEC §8, §11, §15; README; BACKLOG.
+
+**Laws added (the suite holds them):**
+- **The cheat is an op.** `budget.post` is still the only cash path; a
+  press posts under ledger key `cheat`, goes into the input log, replays
+  to the same hash, is clamped to `CHEAT_MAX`, and never touches the undo
+  stack. If it clears a receivership the books come back at once, through
+  the same `exitReceivership()` the budget tick uses — one function.
+- **The sim never reads a preference.** `zoo.pref` (the cheat switch) is
+  the browser's; a city carries only the ops. The suite greps `js/sim` for
+  `zoo.pref|localStorage`.
+- **The title is a modal.** `ui.modalOpen()` counts it, so the clock stops
+  under it and the keys are its own; `main.js` skips the draw while it
+  stands. Boot no longer opens the new-city dialog — the title stands over
+  whatever boot found.
+- **`app.entered` is the one "a city is in play" bit.** `adopt()` sets it;
+  boot clears it for the fresh default map. CONTINUE, SAVE, the Options
+  button and the autosave-on-hide all read it — an untouched default map is
+  never autosaved over a real city's `zoo.last`.
+
+**Traps (keyed by what you see):**
+- *A flash you sent never appeared* — the painting covers `#flash`.
+  `ui.flash()` routes to the title's note line while it stands, and
+  `close()` re-flashes the last routed line on the map (a resumed city's
+  "paused; Space resumes" line wins if nothing changed).
+- *"budget.post is the only cash mutator" fails on a UI file* — the grep is
+  `\bcash\s*(\+=|-=|=)`, so `const cash = w.cash` in any `js/` file trips
+  it. Read `w.cash` inline.
+- *Two checkboxes toggle together* — the N dialog and the title's NEW GAME
+  panel can both be in the DOM; the found form's checkbox id is per
+  instance (`noDisasters<n>`).
+- *Esc does nothing* — it is two-step on the map: a drag or a pinned card
+  is cleared first, the next Esc opens the menu. On the title, Esc backs out
+  of a panel first, then closes (only when a city is in play).
+- *CONTINUE is greyed after boot* — no slot was readable; the default map is
+  not in play. NEW GAME founds one; LOAD reopens or imports.
+- *The choice card is under the painting* — an event offer pending at boot
+  shows the moment CONTINUE drops the title (`adopt()` showed it already).
+- *The working tree is CRLF* (`core.autocrlf=true`): a patch script that
+  matches LF anchors finds nothing. Normalise on read, write back in kind.
+- *The page scrolls sideways after a click* — `#tools` is 1,600 px of
+  buttons; unwrapped, it widened the document past a 1280 px viewport and
+  any focus scrolled it (scrollX 331). It wraps now (`flex-wrap`); the
+  title's focus calls pass `preventScroll`.
+
+**Verified.** Suite 80/0. Browser on a fresh origin: the painting, the name
+over the dark sky, the five buttons; OPTIONS with the switch off hides the
+button; NEW GAME → FOUND THE CITY drops the title and the "one road in"
+flash fires on the map; Esc reopens with CONTINUE primary and the city
+line; the switch on shows GIVE ME §100,000 (off with no city, on with one)
+and the `+§100,000` button appears beside cash; a press books it (cash
+§120,000, ledger `cheat +§100,000`, the Budget tab's note); SAVE writes the
+checkpoint and LOAD lists it; a reload stands the title over the resumed
+city and CONTINUE flashes "paused; Space resumes". Console empty.
 
 ## 9. Verification recipe (what "done" looks like here)
 

@@ -40,7 +40,10 @@ body {
 h1 { font-size: 13px; margin: 0 6px 0 0; letter-spacing: 3px; font-weight: 600; }
 h2 { font-size: 11px; margin: 10px 0 6px; font-weight: 600; letter-spacing: 2px; text-transform: uppercase; color: var(--dim); }
 h3 { font-size: 11px; margin: 8px 0 4px; font-weight: 600; letter-spacing: 2px; text-transform: uppercase; color: var(--dim); }
-#tools { display: flex; align-items: center; gap: 3px; }
+/* The row wraps: at 1280 px the 22 buttons are 1,600 px wide, and an
+   unwrapped row made the DOCUMENT scroll sideways the moment anything in
+   it was focused (measured: scrollX 331 with the title's menu button). */
+#tools { display: flex; align-items: center; gap: 3px; flex-wrap: wrap; row-gap: 3px; }
 #tools .sep { color: var(--dim); padding: 0 3px; }
 button {
   font: inherit; color: var(--ink);
@@ -179,3 +182,30 @@ main { flex: 1; display: flex; min-height: 0; }
 .saves .save { display: flex; align-items: center; gap: 6px; margin: 2px 0; }
 .saves .save b { font-weight: 600; }
 .saves .save .dim { flex: 1; color: var(--dim); }
+
+/* ---- the title screen (js/title.js): the owner's painting under the name,
+   the menu on a parchment bar along the bottom, one card for the panels.
+   The painting is 1424×848; "center top / cover" keeps the skyline and the
+   faces in view at any aspect and crops the coats first. ---- */
+[hidden] { display: none !important; }
+#title {
+  position: fixed; inset: 0; z-index: 20;
+  background: #2b2723 url("../img/titlescreen.png") center top / cover no-repeat;
+  display: flex; flex-direction: column; align-items: center;
+}
+#title .mast { margin-top: 4vh; text-align: center; color: #f6f4ec; text-shadow: 0 2px 0 #1a1714, 0 0 18px rgba(18, 14, 10, 0.8); }
+#title h1 { font-size: clamp(30px, 5.4vw, 72px); letter-spacing: 0.3em; margin: 0 0 0 0.3em; font-weight: 600; line-height: 1.1; }
+#title .tag { font-size: 11px; letter-spacing: 3px; text-transform: uppercase; color: #ece5d3; margin-top: 10px; }
+#title .tcard { margin-top: 3vh; max-height: 60vh; background: rgba(246, 244, 236, 0.97); box-shadow: 0 6px 24px rgba(18, 14, 10, 0.35); }
+#title .tbar {
+  position: absolute; left: 0; right: 0; bottom: 0;
+  display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px;
+  padding: 10px 16px;
+  background: rgba(246, 244, 236, 0.94); border-top: 1px solid var(--border);
+}
+#title .tmenu { display: flex; flex-wrap: wrap; gap: 6px; }
+#title .tmenu button { padding: 5px 14px; font-size: 12px; letter-spacing: 2px; text-transform: uppercase; }
+#title .tnote { flex: 1 1 240px; color: var(--dim); }
+#title .tfoot { color: var(--dim); font-size: 10px; letter-spacing: 1px; }
+.modalbox .note { color: var(--dim); }
+#stats button.cheat { padding: 0 6px; }

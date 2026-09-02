@@ -29,6 +29,18 @@ No dependencies, no build. Everything under `js/sim/`, `js/art/` and
 `js/iso/` imports in Node; only `render.js`, `ui.js`, `input.js` and
 `main.js` touch the DOM.
 
+## The title screen
+
+The game opens on a painting: NEW GAME, CONTINUE (the newer of a city's
+checkpoint and autosave), LOAD (every saved city, with import and export),
+SAVE, OPTIONS. `Esc` brings it back mid-game as the pause menu. OPTIONS
+holds one cheat: a switch that unlocks a **GIVE ME CASH** button beside
+the treasury — §100,000 a press, booked in the ledger under `cheat` and
+written to the city's input log like any other op, so the Budget tab
+always says how much of the treasury came that way. The switch is a
+preference of the browser; the city only carries the ops. The same panel
+toggles disasters for the current city.
+
 ## The rules are the game
 
 Every equation the sim runs is printed live in the **Rules** tab with the
@@ -110,12 +122,15 @@ mill-town with a fox problem").
 
 - `tools/playtest.mjs --layout balanced|dormitory|millbelt --schedule 15:13,22:7`
   — a scripted mayor on the real map; the SPEC's acceptance targets.
-- `tools/check.mjs` — 47 checks: ledger conservation to the §, valves
+- `tools/check.mjs` — 80 checks: ledger conservation to the §, valves
   bounded, no NaN, the dangling-id law, rosters and capacities, commutes on
   roads, determinism, save → load → continue hash-equal, input-log replay,
+  the crime-and-punishment invariants, the cheat op (booked under `cheat`,
+  logged, replayed, clamped, never undone, lifts a receivership at once),
   `budget.post` as the only cash mutator, relative imports, no
-  `Math.random`, every sprite pixel a palette key, every anchor inside its
-  sprite, 16/16 road masks, the painter key.
+  `Math.random`, the sim blind to browser preferences, the title screen
+  mounted over the owner's art, every sprite pixel a palette key, every
+  anchor inside its sprite, 16/16 road masks, the painter key.
 - `tools/shots.mjs --scene` — the depth-sort proof: a 12×12 block with every
   building family and twenty walkers at fractional positions, including one
   on a tile seam and one in front of the tallest tower.

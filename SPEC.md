@@ -338,6 +338,17 @@ over. The Rules tab prints net/yr so greed is visible: 13% nets more cash
 while the city shrinks — the Tax Revolt carries a cash cost so the treasury
 argues back.
 
+**The cheat.** OPTIONS on the title screen (§11) unlocks a GIVE ME CASH
+button, beside the treasury and on the panel. Each press is an op,
+`{ kind: "cheat", amount }`: `budget.post` books it under the ledger key
+`cheat` (still the only cash path), the input log records it, the suite
+replays it to the same hash, it never touches the undo stack, and the
+amount is clamped to `CHEAT_MAX`. A press that brings cash back to ≥ 0
+lifts a receivership at once, through the same `exitReceivership()` the
+budget tick uses. The switch is a browser preference (`zoo.pref`, §15),
+never a field of the city: the sim never reads it; a city carries only the
+ops, and the Budget tab's ledger says how much of the treasury came that way.
+
 ---
 
 ## 9. Events (`js/sim/events.js`)
@@ -498,7 +509,7 @@ and never moves; read killings, arrests, fixed, littersLost, herbNear.
 
 Tool strip (field-guide chrome: one monospace row, no icons above 16 px):
 `1 R · 2 C · 3 I · M Meat · 4 Road · 5 Tree · 6 Park · 7 Zoo · F Fire station · P Police · V Pacify ·
-8 Bulldoze · 9 Inspect · D density Low/High · Space pause · , . speed · Z undo · S save · L load`.
+8 Bulldoze · 9 Inspect · D density Low/High · Space pause · , . speed · Z undo · S save · L load · Esc menu`.
 The `O` overlay cycle is off → LV → pollution → crime (an open file is a ring) → dread → score.
 
 - **Zones, trees, bulldoze:** rectangle drag; live cost in the strip
@@ -530,6 +541,22 @@ The `O` overlay cycle is off → LV → pollution → crime (an open file is a r
   H, approval, milestones), Log (ticker of events and advisor lines).
 - **Zots** above a lot that wants to grow but cannot: no road, smog, no job,
   no demand.
+- **The title screen** (`js/title.js`): the owner's painting
+  (`img/titlescreen.png`, 1424×848, "center top / cover") under the name in
+  letter-spaced type, five buttons on a parchment bar (NEW GAME · CONTINUE ·
+  LOAD · SAVE · OPTIONS) and one card for the panels, which are the
+  new-city dialog's own builders (`foundForm`, `savesList`, `portBox` in
+  `ui.js`) so `N` and the title never drift apart. It stands at boot over
+  whatever boot resumed — CONTINUE names the slot, and the "paused; Space
+  resumes" flash fires when the map is actually seen — and returns on `Esc`
+  (a drag or a pinned card is cleared first) or the strip's `menu`. Under
+  it the clock is stopped (`modalOpen()` counts it) and the map is not
+  drawn; a flash sent while it stands lands on its note line and is
+  re-flashed on the map when it closes. A fresh default map behind it is
+  not in play until NEW GAME founds one (`app.entered`): CONTINUE and SAVE
+  stay off and no autosave of an untouched map can shadow a real city.
+  OPTIONS: the cheat switch (§8) and the per-city no-disasters toggle (the
+  same `toggle` op the found form uses).
 - **Screen layout:** the map viewport fills the window; a 300 px field-guide
   panel on the right; the tool strip along the top; bars top-left over the
   map. Integer zoom ×1 / ×2. Minimap is L1.
@@ -639,6 +666,8 @@ projected footprint + height.
   `check.mjs` replays the log from the seed and requires the same hash; save
   at year 10 → load → 10 more years must hash-equal the straight run.
 - localStorage slot per city name + export/import textarea.
+- `zoo.pref` — this browser's preferences (the cheat switch, §8): not a
+  city, not saved with one, never read by the sim (the suite greps for it).
 
 ## 16. Module contracts (what parallel builders code against)
 

@@ -2,7 +2,9 @@
 //
 // `post(world, kind, amount)` rounds to whole §, adds to cash and to the
 // per-kind ledger. `check.mjs` asserts cash === START_CASH + Σ ledger and
-// greps js/ for any other `cash +=` / `cash -=` / `cash =`.
+// greps js/ for any other `cash +=` / `cash -=` / `cash =`. The Options
+// cheat is no exception: its GIVE ME CASH button is an op (ops.js) that
+// posts under "cheat", so the ledger always says how much came that way.
 
 import { KNOBS } from "./rules.js";
 import { ZONE, CIVIC, ROAD, isStation } from "./world.js";
@@ -85,16 +87,22 @@ export function budgetTick(world) {
     world.rates.R = Math.max(world.rates.R, forced);
     world.rates.C = Math.max(world.rates.C, forced);
     world.rates.I = Math.max(world.rates.I, forced);
-    if (world.cash >= 0) {
-      world.flags.receivership = false;
-      // Hand the books back with the mayor's own rates, so the exit is an
-      // exit and not a permanent over-tax (measured: a scripted mayor left at
-      // n+2 lost 28% of the town over the next eight years).
-      if (world.flags.ownRates) { world.rates = { ...world.flags.ownRates }; delete world.flags.ownRates; }
-      notices.push("The county hands the books back at your old rates. You may build again.");
-    }
+    if (world.cash >= 0) notices.push(exitReceivership(world));
   }
   return { fig, notices };
+}
+
+/**
+ * Hand the books back with the mayor's own rates, so the exit is an exit and
+ * not a permanent over-tax (measured: a scripted mayor left at n+2 lost 28%
+ * of the town over the next eight years). The budget tick calls it at
+ * cash ≥ 0; so does a cheat op that clears the debt, so the freeze lifts
+ * the moment the money lands rather than at the month's end.
+ */
+export function exitReceivership(world) {
+  world.flags.receivership = false;
+  if (world.flags.ownRates) { world.rates = { ...world.flags.ownRates }; delete world.flags.ownRates; }
+  return "The county hands the books back at your old rates. You may build again.";
 }
 
 /** Can the treasury pay for this? Receivership freezes building. */

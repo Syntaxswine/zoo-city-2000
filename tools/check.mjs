@@ -11,9 +11,13 @@
 //   household, occupant/staff counts equal recounts, no lot over capacity,
 //   every job path lies on roads and ends at the job's door), the road gate
 //   (no tier > 0 lot without roadDist ≤ 3 unless it decayed there this tick —
-//   checked as: every lot that GREW this run had access), tick cost.
+//   checked as: every lot that GREW this run had access), tick cost; the
+//   cheat op (booked under "cheat", logged, replayed, clamped, never undone,
+//   lifts a receivership at once).
 // Part B — the code: budget.post is the only cash mutator; every import is
-//   relative (Pages serves under /zoo-city-2000/); no Math.random under js/.
+//   relative (Pages serves under /zoo-city-2000/); no Math.random under js/;
+//   the title screen is mounted, paints the owner's art, and the sim never
+//   reads a browser preference.
 // Part C — the art (when js/art/index.js exists): every pixel a palette key,
 //   every anchor inside its sprite, 16/16 road masks, no solid pixel outside
 //   its footprint prism, every stamped part inside its grid, the painter key
@@ -27,6 +31,7 @@ import { tick } from "../js/sim/tick.js";
 import { apply, replay } from "../js/sim/ops.js";
 import { save, load, stateHash, toPlain } from "../js/sim/save.js";
 import { KNOBS } from "../js/sim/rules.js";
+import { post } from "../js/sim/budget.js";
 import { doorOf, hasAccess, computeFields } from "../js/sim/fields.js";
 import { census } from "../js/sim/census.js";
 import { CIVIC } from "../js/sim/world.js";
@@ -283,6 +288,43 @@ function auditIds(w) {
 const B = buildCity(SEED, YEARS);
 check("determinism: same seed + same inputs ⇒ same hash", stateHash(A.world) === stateHash(B.world), `${stateHash(A.world)} vs ${stateHash(B.world)}`);
 
+// the cheat (SPEC §8, §11): an op like any other — booked under "cheat" by
+// budget.post, in the input log, replayed to the same hash, never undoable,
+// clamped, and it lifts a receivership the moment the debt is cleared.
+{
+  const w = B.world; // hash-equal to A.world (just checked); the cheats go on this twin
+  const cash0 = w.cash;
+  const n0 = w.log.length;
+  const undo0 = (w.undoStack || []).length;
+  const r = apply(w, { kind: "cheat", amount: KNOBS.CHEAT_CASH });
+  check("cheat: posts CHEAT_CASH under 'cheat'", r.ok && r.amount === KNOBS.CHEAT_CASH && w.cash === cash0 + KNOBS.CHEAT_CASH && w.ledger.cheat === KNOBS.CHEAT_CASH, `cash +${w.cash - cash0}, ledger.cheat ${w.ledger.cheat}`);
+  let s2 = 0;
+  for (const v of Object.values(w.ledger)) s2 += v;
+  check("cheat: ledger conservation holds", w.cash === KNOBS.START_CASH + s2, `cash ${w.cash} vs ${KNOBS.START_CASH + s2}`);
+  check("cheat: written to the input log", w.log.length === n0 + 1 && w.log[n0].op.kind === "cheat" && w.log[n0].op.amount === KNOBS.CHEAT_CASH && w.log[n0].t === w.tick);
+  check("cheat: never undoable", (w.undoStack || []).length === undo0);
+  const big = apply(w, { kind: "cheat", amount: 1e12 });
+  check("cheat: clamped at CHEAT_MAX", big.ok && big.amount === KNOBS.CHEAT_MAX && w.ledger.cheat === KNOBS.CHEAT_CASH + KNOBS.CHEAT_MAX, `${big.amount}`);
+  check("cheat: a bad amount posts the default", apply(w, { kind: "cheat", amount: "lots" }).amount === KNOBS.CHEAT_CASH);
+  // replay the twin's log, cheats and all, from the seed
+  const w3 = createWorld({ seed: SEED });
+  let k = 0;
+  for (let t = 0; t < YEARS * 12; t++) {
+    while (k < w.log.length && w.log[k].t === t) { replay(w3, w.log[k]); k++; }
+    tick(w3);
+  }
+  while (k < w.log.length) { replay(w3, w.log[k]); k++; }
+  check("cheat: input-log replay with the cheats hash-equals", stateHash(w3) === stateHash(w), `${stateHash(w3)} vs ${stateHash(w)}`);
+  // receivership: dig the treasury under the line, tick into it, cheat out at once
+  const w4 = load(save(A.world));
+  post(w4, "test", -(w4.cash + 20000));
+  tick(w4);
+  const inIt = w4.flags.receivership;
+  const rc = apply(w4, { kind: "cheat", amount: KNOBS.CHEAT_CASH });
+  check("cheat: lifts receivership the moment cash ≥ 0", inIt && rc.ok && !w4.flags.receivership && w4.cash >= 0 && typeof rc.notice === "string", `in ${inIt}, after ${w4.flags.receivership}, cash ${w4.cash}`);
+  check("cheat: the mayor's own rates come back with the books", w4.rates.R === A.world.rates.R && w4.rates.C === A.world.rates.C && w4.rates.I === A.world.rates.I, `${w4.rates.R}/${w4.rates.C}/${w4.rates.I} vs ${A.world.rates.R}/${A.world.rates.C}/${A.world.rates.I}`);
+}
+
 // save → load → continue
 {
   const mid = Math.floor((YEARS * 12) / 2);
@@ -339,6 +381,20 @@ for (const f of files) {
 check("budget.post is the only cash mutator", cashMut.length === 0, cashMut.join(", "));
 check("every import is relative", absImports.length === 0, absImports.join(", "));
 check("no Math.random under js/", mathRandom.length === 0, mathRandom.join(", "));
+
+// the title screen (SPEC §11): the module, the mount, the owner's art — and
+// the sim never reads a browser preference (the cheat reaches it as an op).
+{
+  const titlePath = path.join(ROOT, "js", "title.js");
+  const titleSrc = existsSync(titlePath) ? readFileSync(titlePath, "utf8") : "";
+  check("title: js/title.js exports createTitle", /export function createTitle\b/.test(titleSrc));
+  const html = readFileSync(path.join(ROOT, "index.html"), "utf8");
+  const css = readFileSync(path.join(ROOT, "css", "field.css"), "utf8");
+  check("title: index.html mounts #title", /id="title"/.test(html));
+  check("title: the stylesheet paints img/titlescreen.png and the file exists", /img\/titlescreen\.png/.test(css) && existsSync(path.join(ROOT, "img", "titlescreen.png")));
+  const simReadsPref = files.filter((f) => /[\\/]sim[\\/]/.test(f) && /zoo\.pref|localStorage/.test(readFileSync(f, "utf8"))).map((f) => path.relative(ROOT, f));
+  check("title: the sim never reads a preference (the cheat is an op)", simReadsPref.length === 0, simReadsPref.join(", "));
+}
 
 // ---- Part C: the art (if present) ------------------------------------------------
 const artIndex = path.join(ROOT, "js", "art", "index.js");

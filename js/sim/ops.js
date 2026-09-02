@@ -3,11 +3,12 @@
 // The renderer/input layer builds an op; `apply` validates it, charges the
 // treasury through budget.post (the only cash path), records it in
 // world.log with the tick (the input log check.mjs replays), and keeps a
-// one-step snapshot for `undo`.
+// one-step snapshot for `undo`. The Options cheat is an op too ("cheat"):
+// a lump posted under its own ledger key, logged, replayed, never undone.
 
 import { KNOBS } from "./rules.js";
 import { TERRAIN, ROAD, ZONE, CIVIC, idx, inBounds } from "./world.js";
-import { post, canSpend } from "./budget.js";
+import { post, canSpend, exitReceivership } from "./budget.js";
 import { clearLot, invalidatePaths, releaseJob } from "./citizens.js";
 import { resolveChoice } from "./events.js";
 import { refreshLast } from "./tick.js";
@@ -129,6 +130,20 @@ export function apply(world, op, { log = true } = {}) {
     world.events[op.key] = !!op.value;
     if (log) world.log.push({ t: world.tick, op: { kind: "toggle", key: op.key, value: !!op.value } });
     return { ok: true, cost: 0 };
+  }
+  if (op.kind === "cheat") {
+    // The Options cheat: a lump of cash. budget.post books it under "cheat"
+    // (still the only cash path), the log records it like a zoning drag, and
+    // it is never undoable. If it clears a receivership the books come back
+    // at once (SPEC §8). The amount is clamped: a hand-edited log cannot
+    // post Infinity.
+    const a = Math.round(Math.max(0, Math.min(KNOBS.CHEAT_MAX, Number(op.amount) || KNOBS.CHEAT_CASH)));
+    if (!a) return { ok: false, cost: 0, reason: "nothing to do" };
+    post(world, "cheat", a);
+    const notice = world.flags.receivership && world.cash >= 0 ? exitReceivership(world) : null;
+    if (log) world.log.push({ t: world.tick, op: { kind: "cheat", amount: a } });
+    if (world.last) refreshLast(world); // the strip's net/yr and the Budget tab read the treasury at once
+    return { ok: true, cost: 0, amount: a, notice };
   }
   if (op.kind === "choice") {
     const line = resolveChoice(world, !!op.accept);

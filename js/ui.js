@@ -2,7 +2,10 @@
 //
 // Everything here is DOM: the tool strip, the three demand bars over the map,
 // the date/cash/population/approval strip, the hover card, the four tabs
-// (Rules · Budget · Census · Log), the CHOICE card and the new-city dialog.
+// (Rules · Budget · Census · Log), the CHOICE card and the new-city dialog —
+// whose three builders (foundForm, savesList, portBox) the title screen
+// (title.js) mounts on its own card. The cheat's button beside the treasury
+// lives here too; the Options switch that unlocks it is title.js's.
 // The card's WHY NOT line is `lotReport().score.reason` — the same
 // `lotScore()` that decides growth, never a second implementation (§0.6).
 //
@@ -131,6 +134,7 @@ export function createUI(app) {
     mk("btnZoom", "+", "zoom", "+ / −: zoom ×1 / ×2", () => app.zoomAt(app.camera.zoom === 1 ? 1 : -1));
     sep();
     mk("btnNew", "N", "new city", "N: found a new city / load a saved one", () => openNewCity());
+    mk("btnMenu", "Esc", "menu", "Esc: the title screen — new game, continue, load, save, options", () => app.title.open());
   }
 
   function setTool(id, density) {
@@ -145,6 +149,7 @@ export function createUI(app) {
   }
 
   function flash(msg) {
+    if (app.title && app.title.isOpen()) { app.title.say(msg); return; } // the painting covers #flash; the title re-flashes it on close
     dom.flash.textContent = msg;
     dom.flash.classList.add("on");
     clearTimeout(flashTimer);
@@ -212,7 +217,14 @@ export function createUI(app) {
     const net = liveBudget(w).net;
     dom.stats.innerHTML = "";
     const add = (k, v, cls, title) => { const s = el("span", "stat" + (cls ? " " + cls : "")); s.append(el("b", "", v), " ", el("i", "", k)); if (title) s.title = title; dom.stats.append(s); };
-    add("cash", money(w.cash), w.cash < 0 ? "bad" : "");
+    add("cash", money(w.cash), w.cash < 0 ? "bad" : "", w.ledger.cheat ? `${money(w.ledger.cheat)} of it is cheat money (Options)` : "");
+    if (app.prefs && app.prefs.get().cheat) {
+      // The cheat's button: unlocked by the Options switch; each press an op (SPEC §8).
+      const b = el("button", "cheat", `+${money(KNOBS.CHEAT_CASH)}`);
+      b.title = `cheat: GIVE ME CASH — books ${money(KNOBS.CHEAT_CASH)} under "cheat" in the ledger and in the input log (Options turns the button off)`;
+      b.addEventListener("click", () => app.cheat());
+      dom.stats.append(b);
+    }
     add("net/yr", (net >= 0 ? "+" : "−") + money(Math.abs(net)).slice(1), net < 0 ? "bad" : "", "income − upkeep per year at the current rates");
     add("animals", P.toLocaleString(), "", "this month's census");
     add("approval", `${appr}`, "", "mean mood");
@@ -476,6 +488,7 @@ export function createUI(app) {
     const hr = el("tr", "h"); hr.append(el("td", "", "LEDGER since founding"), el("td", "num", money(w.cash))); led.append(hr);
     for (const [k, v] of Object.entries(w.ledger)) lr(k, (v < 0 ? "−" : "+") + money(Math.abs(v)).slice(1));
     body.append(led);
+    if (w.ledger.cheat) body.append(el("div", "dim", `cheat: ${money(w.ledger.cheat)} of the treasury came from the GIVE ME CASH button (Options); every press is in the input log.`));
     body.append(el("p", "note", "Cash below −§10,000 is receivership: rates forced to n+2 and building frozen until the treasury is back above zero. Never a game over."));
   }
 
@@ -607,10 +620,14 @@ export function createUI(app) {
     return `${a}-${b}-${(Date.now() % 997).toString(36)}`;
   }
 
-  function openNewCity() {
-    dom.newcity.innerHTML = "";
-    const box = el("div", "modalbox wide");
-    box.append(el("h2", "", "A new city"));
+  // The three pieces of the dialog are builders the title screen (title.js)
+  // mounts on its own card: the found form, the saved-cities list, the port
+  // box. Checkbox ids are per instance — the N dialog and the title can both
+  // be in the DOM.
+  let uid = 0;
+
+  /** Seed, dice, no-disasters, FOUND THE CITY. Returns the seed input (for focus); `done()` runs after founding. */
+  function foundForm(box, done) {
     const row = el("div", "row");
     row.append(el("label", "", "seed"));
     const seed = el("input");
@@ -625,22 +642,25 @@ export function createUI(app) {
     const row2 = el("div", "row");
     const nd = el("input");
     nd.type = "checkbox";
-    nd.id = "noDisasters";
+    nd.id = `noDisasters${++uid}`;
     const ndl = el("label", "", " No disasters (masks fire, flood, tornado, smog, revolt, recession)");
-    ndl.htmlFor = "noDisasters";
+    ndl.htmlFor = nd.id;
     row2.append(nd, ndl);
     box.append(row2);
     const go = el("button", "primary", "FOUND THE CITY");
-    go.addEventListener("click", () => { app.newCity({ seed: seed.value.trim() || "zoo", noDisasters: nd.checked }); closeModals(); });
+    go.addEventListener("click", () => { app.newCity({ seed: seed.value.trim() || "zoo", noDisasters: nd.checked }); done(); });
+    seed.addEventListener("keydown", (e) => { if (e.key === "Enter") go.click(); });
     const goRow = el("div", "btnrow");
     goRow.append(go);
     box.append(goRow);
+    return seed;
+  }
 
-    box.append(el("h2", "", "Saved cities"));
+  /** Two slots a city: the S checkpoint ("load") and the autosave ("resume"). `done()` after a load; `again()` rebuilds after a delete. */
+  function savesList(box, done, again) {
     const list = el("div", "saves");
     const saves = app.savedCities();
     if (!saves.length) list.append(el("div", "dim", "none yet — S saves the current city"));
-    // Two slots a city: the S checkpoint ("load") and the autosave ("resume").
     for (const s of saves) {
       const r = el("div", "save");
       const bits = [];
@@ -651,22 +671,25 @@ export function createUI(app) {
       const load = el("button", "", "load");
       load.title = s.saved ? "the S checkpoint" : "no checkpoint — S saves one";
       load.disabled = !s.saved;
-      load.addEventListener("click", () => { app.load(s.name); closeModals(); });
+      load.addEventListener("click", () => { if (app.load(s.name)) done(); });
       r.append(load);
       if (s.auto) {
         const res = el("button", "", "resume");
         res.title = "the autosave (every 12 months and on leaving the page)";
-        res.addEventListener("click", () => { app.resumeAuto(s.name); closeModals(); });
+        res.addEventListener("click", () => { if (app.resumeAuto(s.name)) done(); });
         r.append(res);
       }
       const del = el("button", "", "delete");
-      del.addEventListener("click", () => { if (confirm(`Delete "${s.name}" (checkpoint and autosave)?`)) { app.deleteCity(s.name); openNewCity(); } });
+      del.addEventListener("click", () => { if (confirm(`Delete "${s.name}" (checkpoint and autosave)?`)) { app.deleteCity(s.name); again(); } });
       r.append(del);
       list.append(r);
     }
     box.append(list);
+    return list;
+  }
 
-    box.append(el("h2", "", "Export / import"));
+  /** Export the current city as text / import one. `done()` after an import. */
+  function portBox(box, done) {
     const ta = el("textarea");
     ta.rows = 4;
     ta.spellcheck = false;
@@ -675,9 +698,21 @@ export function createUI(app) {
     const ex = el("button", "", "EXPORT current");
     ex.addEventListener("click", () => { ta.value = app.exportText(); ta.select(); });
     const im = el("button", "", "IMPORT");
-    im.addEventListener("click", () => { try { app.importText(ta.value); closeModals(); } catch (e) { flash(`Import failed: ${e.message}`); } });
+    im.addEventListener("click", () => { try { app.importText(ta.value); done(); } catch (e) { flash(`Import failed: ${e.message}`); } });
     br.append(ex, im);
     box.append(ta, br);
+    return ta;
+  }
+
+  function openNewCity() {
+    dom.newcity.innerHTML = "";
+    const box = el("div", "modalbox wide");
+    box.append(el("h2", "", "A new city"));
+    const seed = foundForm(box, closeModals);
+    box.append(el("h2", "", "Saved cities"));
+    savesList(box, closeModals, openNewCity);
+    box.append(el("h2", "", "Export / import"));
+    portBox(box, closeModals);
     const close = el("button", "", "close");
     close.addEventListener("click", closeModals);
     const closeRow = el("div", "btnrow");
@@ -689,7 +724,8 @@ export function createUI(app) {
     seed.select();
   }
   function closeModals() { dom.newcity.hidden = true; }
-  const modalOpen = () => !dom.newcity.hidden || !dom.choice.hidden;
+  // The title screen counts: the clock stops under it (main.js) and Esc is its own (input.js).
+  const modalOpen = () => !dom.newcity.hidden || !dom.choice.hidden || !!(app.title && app.title.isOpen());
 
   function setWorld() {
     // A loaded city brings its event log and yearly reports back into the ticker.
@@ -715,5 +751,5 @@ export function createUI(app) {
   hideChoice();
   closeModals();
 
-  return { refresh, onTick, setTool, setCost, flash, updateHover, showChoice, hideChoice, openNewCity, closeModals, modalOpen, setWorld, get tab() { return tab; } };
+  return { refresh, onTick, setTool, setCost, flash, updateHover, showChoice, hideChoice, openNewCity, closeModals, modalOpen, setWorld, foundForm, savesList, portBox, get tab() { return tab; } };
 }

@@ -212,6 +212,8 @@ export const KNOBS = {
   VAN_RADIUS: 4,
   START_CASH: 20000,
   RECEIVERSHIP: -10000,
+  CHEAT_CASH: 100000,       // one press of the Options cheat's GIVE ME CASH button — an op, booked under "cheat", in the input log
+  CHEAT_MAX: 10000000,      // the most one cheat op may post (a hand-edited log cannot post Infinity)
   // events
   EVENT_P: 1 / 30,
   DISASTER_COOLDOWN: 12,

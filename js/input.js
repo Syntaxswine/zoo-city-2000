@@ -3,6 +3,7 @@
 //   1 R · 2 C · 3 I · 4 Road · 5 Tree · 6 Park · 7 Zoo · 8 Bulldoze · 9 Inspect
 //   D density · Space pause · , . speed · Z undo · S save · L load · O overlays
 //   +/- zoom · WASD / arrows / drag-pan (middle or right button, or left with Inspect)
+//   Esc: clears a drag or a pinned card; on a clean map, the title menu (title.js)
 //
 // Zones, trees and bulldoze are a rectangle drag; roads are an L-drag
 // (horizontal leg then vertical, Shift = straight); park and zoo are a
@@ -249,7 +250,9 @@ export function createInput(canvas, app) {
       case "-": case "_": app.zoomAt(-1); break;
       case "n": case "N": app.ui.openNewCity(); break;
       case "Escape":
-        state.drag = null; state.pinned = null; state.pinnedWalker = null; state.cost = null; app.ui.setCost("");
+        // Two-step: a drag or a pinned card is cleared first; a clean map opens the title menu.
+        if (state.drag || state.pinned != null || state.pinnedWalker) { state.drag = null; state.pinned = null; state.pinnedWalker = null; state.cost = null; app.ui.setCost(""); }
+        else app.title.open();
         break;
       default:
         break;
@@ -257,7 +260,11 @@ export function createInput(canvas, app) {
   }
 
   function onKey(e) {
-    if (e.key === "Escape" && app.ui.modalOpen()) { app.ui.closeModals(); e.preventDefault(); return; }
+    if (e.key === "Escape") {
+      // The title menu first (a panel goes back, the menu closes), then the new-city dialog.
+      if (app.title && app.title.isOpen()) { app.title.back(); e.preventDefault(); return; }
+      if (app.ui.modalOpen()) { app.ui.closeModals(); e.preventDefault(); return; }
+    }
     if (typing(e)) return;
     if (e.ctrlKey || e.metaKey || e.altKey) return;
     if (app.ui.modalOpen()) return;

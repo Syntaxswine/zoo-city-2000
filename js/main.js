@@ -10,6 +10,10 @@
 // `zoo.last` remembers which city to reopen; boot resumes the newer of the
 // two. A loaded or resumed city opens PAUSED (its speed kept in
 // zoo.meta:<name>) so a month cannot pass before the panel is read.
+// The title screen (title.js) stands over whatever boot found — CONTINUE
+// drops it; NEW GAME / LOAD / SAVE / OPTIONS are its buttons — and comes
+// back on Esc. `zoo.pref` is this browser's preferences (the cheat switch),
+// never part of a city: the cheat's button posts an op the city records.
 
 import { createWorld } from "./sim/world.js";
 import { tick, dateOf } from "./sim/tick.js";
@@ -22,6 +26,8 @@ import { createRenderer } from "./render.js";
 import { createWalkers } from "./walkers.js";
 import { createInput } from "./input.js";
 import { createUI } from "./ui.js";
+import { createTitle } from "./title.js";
+import { KNOBS } from "./sim/rules.js";
 
 const TICK_SECONDS = 1.5;
 const SPEEDS = [1, 3, 10];
@@ -32,6 +38,7 @@ const KEY = (name) => `zoo.city:${name}`;
 const AUTO = (name) => `zoo.auto:${name}`;
 const META = (name) => `zoo.meta:${name}`;
 const LAST = "zoo.last";
+const PREF = "zoo.pref"; // UI preferences (the cheat switch) — this browser's, never the city's
 
 const canvas = document.getElementById("map");
 const app = {
@@ -46,6 +53,8 @@ const app = {
   walkers: null,
   input: null,
   ui: null,
+  title: null,
+  entered: false, // a city is in play behind the title (founded, loaded or resumed): CONTINUE, SAVE and the autosave need one
   acc: 0,
   sinceSave: 0,
 };
@@ -58,6 +67,20 @@ const store = {
   keys() { try { return Object.keys(localStorage); } catch { return []; } },
 };
 
+// ---- preferences and the cheat ---------------------------------------------------
+// zoo.pref is the browser's, not the city's: the cheat switch unlocks a
+// button; each press is an op the city records (SPEC §8, §11).
+app.prefs = {
+  get() { try { return JSON.parse(store.get(PREF) || "{}") || {}; } catch { return {}; } },
+  set(patch) { const p = { ...app.prefs.get(), ...patch }; store.set(PREF, JSON.stringify(p)); return p; },
+};
+app.cheat = () => {
+  if (!app.prefs.get().cheat) { app.ui.flash("Cheats are off — Options (Esc) turns them on."); return { ok: false }; }
+  const res = app.doOp({ kind: "cheat", amount: KNOBS.CHEAT_CASH });
+  if (res.ok) app.ui.flash(`§${res.amount.toLocaleString()} of cheat money booked — the ledger says so.${res.notice ? ` ${res.notice}` : ""}`);
+  return res;
+};
+
 // ---- world lifecycle -------------------------------------------------------------
 function centreOn(tx, ty) {
   const [sx, sy] = toScreen(tx, ty);
@@ -68,6 +91,7 @@ function centreOn(tx, ty) {
 function adopt(world, name, { paused = false } = {}) {
   app.world = world;
   app.cityName = name;
+  app.entered = true;
   app.acc = 0;
   app.sinceSave = 0;
   app.paused = paused;
@@ -261,10 +285,12 @@ function frame(now) {
   }
   app.input.update(dt);
   clampCamera();
-  const wdt = app.paused ? 0 : dt * Math.min(app.speed, 3);
-  app.walkers.update(wdt, app.renderer.viewportTiles());
-  app.renderer.draw(app.camera, app.input.hover(), app.walkers, app.overlays, dt);
-  if (now - hoverAt > 90) { hoverAt = now; app.ui.updateHover(app.input.hoverInfo()); }
+  if (!app.title.isOpen()) { // the painting covers the map; nothing to draw under it
+    const wdt = app.paused ? 0 : dt * Math.min(app.speed, 3);
+    app.walkers.update(wdt, app.renderer.viewportTiles());
+    app.renderer.draw(app.camera, app.input.hover(), app.walkers, app.overlays, dt);
+    if (now - hoverAt > 90) { hoverAt = now; app.ui.updateHover(app.input.hoverInfo()); }
+  }
   requestAnimationFrame(frame);
 }
 
@@ -274,16 +300,17 @@ function boot() {
   // Resume the newer of the two slots (the autosave is usually ahead of the
   // checkpoint; a fresh S save after a resume is the newer one).
   let slot = null;
-  let what = "";
+  let what = null; // "autosave" | "checkpoint": the slot the title's CONTINUE names
   if (lastName) {
     const saved = readSlot(KEY(lastName));
     const auto = readSlot(AUTO(lastName));
-    if (auto && (!saved || auto.tick > saved.tick)) { slot = auto; what = "Resumed the autosave of"; }
-    else if (saved) { slot = saved; what = "Loaded"; }
+    if (auto && (!saved || auto.tick > saved.tick)) { slot = auto; what = "autosave"; }
+    else if (saved) { slot = saved; what = "checkpoint"; }
   }
   let world = null;
   let name = lastName || "zoo";
-  if (slot) { try { world = load(slot.json); } catch { world = null; } }
+  let resumed = false;
+  if (slot) { try { world = load(slot.json); resumed = true; } catch { world = null; } }
   if (!world) { name = "zoo"; world = createWorld({ seed: name }); }
   app.world = world;
   app.cityName = name;
@@ -291,18 +318,25 @@ function boot() {
   app.walkers = createWalkers(world);
   app.ui = createUI(app);
   app.input = createInput(canvas, app);
-  if (world.tick > 0 || slot) {
+  app.title = createTitle(app);
+  if (resumed) {
     const meta = (() => { try { return JSON.parse(store.get(META(name)) || "null"); } catch { return null; } })();
     if (meta && SPEEDS.includes(meta.speed)) app.speed = meta.speed;
     adopt(world, name, { paused: true });
-    if (!world.events.choice) app.ui.flash(`${what} "${name}" — ${dateOf(world).label}, paused; Space resumes.`);
   } else {
+    // A fresh default map behind the title, not in play until NEW GAME founds
+    // one: CONTINUE and SAVE stay off, and no autosave of an untouched map
+    // can shadow a real city.
     adopt(world, name);
-    app.ui.openNewCity();
+    app.entered = false;
   }
+  // The title stands over whatever boot found; its CONTINUE names the slot
+  // and flashes the "paused; Space resumes" line when the map is actually seen.
+  app.title.open({ boot: true, slot: what });
+  const autosave = () => { if (app.entered) app.save(app.cityName, true, true); };
   window.addEventListener("resize", () => app.renderer.resize());
-  window.addEventListener("pagehide", () => app.save(app.cityName, true, true));
-  document.addEventListener("visibilitychange", () => { if (document.hidden) app.save(app.cityName, true, true); });
+  window.addEventListener("pagehide", autosave);
+  document.addEventListener("visibilitychange", () => { if (document.hidden) autosave(); });
   requestAnimationFrame((t) => { last = t; frame(t); });
 }
 
