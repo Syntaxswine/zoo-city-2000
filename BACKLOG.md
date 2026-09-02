@@ -16,13 +16,15 @@ could ship whole.
 - A park placed up-left of a tower is hidden behind it (correct iso order);
   a hover-only cue is thin — consider a park glyph in the overlay or a
   minimap.
-- The opening camera shows the map edge (the start road is an edge road by
-  design); centre the view so the void is not half the screen.
 - A zoo costs §1,500/yr — warn on placement in a small town (net/yr goes
   negative at once).
 - A loaded city always opens paused; players who reload a running ×3 game
   must press Space.
 - Hover-card parts do not sum to the printed total (rounding).
+- A walker on a bridge stands in the water: `roads.js` DECK_TOP (3 px) is
+  applied by shots.mjs but not by render.js.
+- `render.js` R_CHALK_TINT (m→q) and the repainted accent 5 (#B8C860) are
+  two fixes for one fault; the R line uses grass keys, so one is redundant.
 
 ## L1 — cheap, visible, next
 - **Road rot** (cash < 0 for 6 ticks → 5% of roads/tick to rubble) — the
@@ -39,9 +41,10 @@ could ship whole.
 - **Pond removal** for a beaver dam (§40, beavers' mood −20 for a year) — the
   op exists in KNOBS.COST.pond but not in ops.js.
 - (fire and police stations shipped 2026-09-02: `F` and `P` tools, crime field, heist)
-- **Money tuning after real play**: the scripted mayor nets +§8k/yr at 1,800
-  citizens; a real player with parks and a zoo spends more. Re-measure with
-  the input log of an actual session before touching UPKEEP_*.
+- **Money tuning after real play**: the scripted mayor nets +§3.7k/yr at
+  1,643 (balanced, no civics) and ~§0 at 1,850 with two parks and a zoo;
+  a real player spends differently. Re-measure with the input log of an
+  actual session before touching UPKEEP_*.
 
 ## L2 — bigger arcs
 - **Elevation** — Glades of Arcadia's level machinery (`LEVEL_H`, cliffs,

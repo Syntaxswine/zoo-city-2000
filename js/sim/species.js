@@ -1,6 +1,7 @@
 // species.js — the roster. SPEC §7.6. Every trait is a WEIGHT, never a gate,
-// except the two soft home preferences (fox: LV >= 50; bear: Low lots), both
-// of which fall back after 3 failed months.
+// except the two soft home preferences (fox: LV >= 50; bear: Low lots): an
+// arriving household searches strictly first and, finding nothing, leniently
+// in the SAME pass (citizens.js arrivals) — there is no waiting period.
 //
 // Ages are in YEARS here; the sim keeps age in months (tick − born).
 
@@ -45,7 +46,7 @@ export function isPredatorOf(pred, prey) {
 }
 export const isPredPrey = (a, b) => isPredatorOf(a, b) || isPredatorOf(b, a);
 
-/** Species that can ARRIVE: all thirteen (every one has kit sprites in js/art/citizens.js). */
+/** Species that can ARRIVE: every row. A row without kit art in js/art/citizens.js throws in the browser; check.mjs asserts parity. */
 export const ARRIVING = new Set(SPECIES.map((s) => s.id));
 
 export const SPECIES_BY_ID = Object.freeze(Object.fromEntries(SPECIES.map((s) => [s.id, s])));

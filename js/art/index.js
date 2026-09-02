@@ -1,7 +1,7 @@
 // index.js — the registry the renderer calls. SPEC §16.
 //
 //   art.building(zone, tier, variant)   zone 1|2|3 or 'R'|'C'|'I', tier 1..3
-//   art.civic(kind)                     'park' | 'zoo'
+//   art.civic(kind)                     'park' | 'zoo' | 'fire' | 'police'
 //   art.road(mask, busy)                4-bit mask N=1 E=2 S=4 W=8
 //   art.bridge(mask)
 //   art.ground(kind, variant)           'grass' 0..2 | 'water' | 'rubble'

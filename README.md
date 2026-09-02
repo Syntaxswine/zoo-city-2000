@@ -96,7 +96,7 @@ mill-town with a fox problem").
 
 - `tools/playtest.mjs --layout balanced|dormitory|millbelt --schedule 15:13,22:7`
   — a scripted mayor on the real map; the SPEC's acceptance targets.
-- `tools/check.mjs` — 36 checks: ledger conservation to the §, valves
+- `tools/check.mjs` — 47 checks: ledger conservation to the §, valves
   bounded, no NaN, the dangling-id law, rosters and capacities, commutes on
   roads, determinism, save → load → continue hash-equal, input-log replay,
   `budget.post` as the only cash mutator, relative imports, no

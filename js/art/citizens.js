@@ -65,7 +65,7 @@ export const AGES = Object.freeze(["adult", "elder", "cub"]);
 /**
  * The species the KIT covers — those with a head overlay below — not every
  * row of the sim's species table. The table can grow ahead of the art; the
- * sim's `ARRIVING` set keeps a species off the map until its sprites
+ * sim spawns every roster row (`ARRIVING` is everyone), so a species without sprites here throws in the browser; check.mjs asserts kit-vs-roster parity. Sprites
  * exist, and `citizenSprite` throws for one, by name, rather than drawing
  * a headless body. All fourteen rows of the table are drawn today.
  */
@@ -994,7 +994,7 @@ const CACHE = new Map();
  * 'adult'|'elder'|'cub' (or years). `opts.hat` adds the centenary hat.
  */
 export function citizenSprite(species, facing = "se", frame = 0, age = "adult", opts = {}) {
-  if (!(species in HEAD_SPECIES)) throw new Error(`citizens: no kit for species '${species}' — author its HEAD/BUILD/CUB_MARK here and add it to HEAD_SPECIES, then to species.js ARRIVING`);
+  if (!(species in HEAD_SPECIES)) throw new Error(`citizens: no kit for species '${species}' — author its HEAD/BUILD/CUB_MARK here and add it to HEAD_SPECIES (check.mjs asserts every species.js row has kit art)`);
   const f = normFacing(facing);
   const fr = normFrame(frame);
   const ag = normAge(species, age);

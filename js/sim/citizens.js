@@ -64,7 +64,6 @@ function newCitizen(world, species, ageMonthsNow, household, surnameStr, native)
     mood: 50,
     jobless: 0,
     path: null,
-    prefFails: 0,
     native: !!native,
     onLeave: false,
     hired: -1,
@@ -392,11 +391,14 @@ function preyShare(cen, pred) {
 }
 
 function pickSpecies(world, weights) {
+  // A species with no weight entry counts as 0 (never NaN: a NaN total made
+  // every arrival the last species in the table, silently). check.mjs
+  // asserts every species has a weight.
   let total = 0;
-  for (const s of SPECIES) total += weights[s.id];
+  for (const s of SPECIES) total += weights[s.id] || 0;
   let r = world.rng.next() * total;
   for (const s of SPECIES) {
-    r -= weights[s.id];
+    r -= weights[s.id] || 0;
     if (r <= 0) return s.id;
   }
   return SPECIES[SPECIES.length - 1].id;

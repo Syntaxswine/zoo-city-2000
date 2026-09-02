@@ -296,7 +296,27 @@ if (existsSync(artIndex)) {
     check("painter: everything behind or under a 2×2 paints before it", behind);
     check("painter: keyOf agrees with sortKey for a 1×1", keyOf({ sprite: art.building(1, 1, 0), tx: 3, ty: 4, kind: "building" }) === sortKey(3, 4, Z_BUILDING));
   }
-  console.log(`art: ${list.length} sprites audited`);
+  // Species parity: every roster row has kit art, an arrival weight and a
+  // character-line noun. A missing weight once made every arrival the last
+  // species silently; a missing noun printed "a skunk undefined".
+  const { SPECIES } = await import("../js/sim/species.js");
+  const { arrivalWeights } = await import("../js/sim/citizens.js");
+  const { census } = await import("../js/sim/census.js");
+  const { characterLine } = await import("../js/sim/tick.js");
+  const wts = arrivalWeights(world, census(world));
+  let noArt = [];
+  for (const sp of SPECIES) {
+    try { art.citizen(sp.id, "se", 0, 20); art.citizen(sp.id, "ne", 1, 5); } catch (e) { noArt.push(sp.id); }
+  }
+  check("species: every roster row has kit art", noArt.length === 0, noArt.join(", "));
+  const noWeight = SPECIES.filter((sp) => !(typeof wts[sp.id] === "number" && Number.isFinite(wts[sp.id]))).map((sp) => sp.id);
+  check("species: every roster row has an arrival weight", noWeight.length === 0, noWeight.join(", "));
+  const badLine = SPECIES.filter((sp) => {
+    const shares = Object.fromEntries(SPECIES.map((o) => [o.id, o.id === sp.id ? 0.6 : 0.2]));
+    return /undefined/.test(characterLine({ P: 100, shares }));
+  }).map((sp) => sp.id);
+  check("species: every roster row has a character-line noun", badLine.length === 0, badLine.join(", "));
+  console.log(`art: ${list.length} sprites audited · ${SPECIES.length} species checked`);
 } else {
   console.log("art: js/art/index.js not present yet — Part C skipped");
 }

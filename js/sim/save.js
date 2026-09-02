@@ -18,7 +18,7 @@ function plainCitizen(c) {
   return {
     id: c.id, name: c.name, surname: c.surname, species: c.species, born: c.born, deathAge: c.deathAge,
     home: c.home, job: c.job, household: c.household, friends: c.friends.slice(), mood: c.mood,
-    jobless: c.jobless, prefFails: c.prefFails, native: c.native, onLeave: c.onLeave, hired: c.hired,
+    jobless: c.jobless, native: c.native, onLeave: c.onLeave, hired: c.hired,
     grief: c.grief || 0, centenary: !!c.centenary,
   };
 }

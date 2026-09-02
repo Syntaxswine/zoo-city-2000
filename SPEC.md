@@ -29,7 +29,7 @@ so tuning changes one file.
 3. **Money is integer §.** Every cash change goes through `budget.post(world,
    kind, amount)`; every line is rounded to whole § before posting; the ledger
    re-sums to `cash` exactly. `check.mjs` greps for any other `cash +=`.
-4. **Projection.** 64×32 tiles, `toScreen` returns the NORTH vertex, +tx
+4. **Projection.** 64×32-pixel tiles on a 64×64-tile map, `toScreen` returns the NORTH vertex, +tx
    down-right, +ty down-left, light upper-left, painter back-to-front by
    (tx+ty), bottom-up within a cell, movers fractional. (`js/iso/iso.js`)
 5. **Art is text.** Every sprite is rows of palette keys; built things are box
@@ -143,7 +143,9 @@ market (breaks the R-waits-for-jobs / C-waits-for-R deadlock — measured in the
 lumped run).
 
 **Measured in the lumped run (300 R / 120 C / 120 I lots, seed 1) — the
-acceptance targets for `playtest.mjs`:** flat 8% → ~1,100 by year 10; 8% + 2
+panel's pre-code targets. The live game's numbers are in the handoff §4
+(`docs/HANDOFF-THE-FIRST-ZOO-2026-09-02.md`); where they differ, the code
+is the measurement:** flat 8% → ~1,100 by year 10; 8% + 2
 parks + zoo → ~1,600 plateau; established city 9→13% at y15 → −43% by y21,
 cut to 7% at y22 → recovers to ~1,100 by y31; recession (ext 0.6, 24
 months) → −36% I jobs, −10% P, no ringing.
@@ -180,10 +182,12 @@ from full factories.
 ## 6. Fields (`js/sim/fields.js`), per tile, 0..100
 
 ```
-E(i)   = I tier [0,15,30,50] | C tier [0,2,4,8] | road 2 + min(28, traffic/4) | tree −4 | park −10 (tile + radius 2) | burning +40
-Pol    = clamp(blur3(blur3(E)), 0, 100)                                    two 3×3 means (Micropolis DoSmooth ×2)
+Pol    = Σ over sources of amount·(1 − d/(radius+1)) within Chebyshev radius, clamped 0..100 (SC4's linear falloff; no wind)
+         I tier 25/45/70 over 2/3/4 tiles · C tier 3: 10 over 2 · road 2 + min(28, traffic/4) over 1 · fire 50 over 3
+         pigs 1.5 and skunks 1.0 per animal at home over 1 (MESS) · parks −12 over 2 · trees −4 on the tile
+         (the first version was two 3×3 blurs of a per-tile emission; it diluted a lone works to ~2 and was replaced — see the handoff)
 dC     = Chebyshev distance to the centroid of built lots (all lots if none built)
-LV     = clamp(20 + 40·max(0, 1 − dC/24) + 3·nature8 + 12·[park within 4] + 6·[zoo within 5] − 0.6·Pol, 0, 100)
+LV     = clamp(35 + 40·max(0, 1 − dC/24) + 3·nature8 + 12·[park within 4] + 6·[zoo within 5] − 0.6·Pol, 0, 100)  −10 where crime > 60
          nature8 = water or tree tiles among the 8 neighbours
 traffic(road tile) = number of commuter paths through it (readout only)
 ```
@@ -271,15 +275,15 @@ FRICTION: 0.4% of FRIENDLESS adults' households per month wander off regardless
   tolerance) + 5·friends + 10·[commute ≤ pref] + 10·[park within 4], clamped.
   Approval = mean mood.
 
-### 7.6 The roster (weights, never gates; two soft home preferences with fallbacks)
+### 7.6 The roster (weights, never gates; two soft home preferences that fall back in the same arrival pass)
 | species | life (y) | litter | fertile | retire | job pref C:I | Pol tol | home pref | commute | arrival weight reads… | signature event |
 |---|---|---|---|---|---|---|---|---|---|---|
 | Rabbit | 40 | 3 | 16–30 | 35 | 0.5:0.5 | 40 | any | 24 | parks, trees | Rabbit warren |
 | Mouse | 30 | 4 | 16–24 | 26 | 0.4:0.6 | 60 | High lots | 16 | tier-3 R vacancies | Mouse boom |
-| Fox | 60 | 2 | 18–40 | 50 | 0.8:0.2 | 30 | LV ≥ 50 (falls back after 3 months) | 32 | high-LV vacancies | Fox market fair |
+| Fox | 60 | 2 | 18–40 | 50 | 0.8:0.2 | 30 | LV ≥ 50 (strict search, then lenient, same pass) | 32 | high-LV vacancies | Fox market fair |
 | Beaver | 55 | 2 | 18–40 | 48 | 0.2:0.8 | 70 | water within 6 | 28 | I jobs, water | Beaver dam |
 | Owl | 70 | 1 | 20–45 | 60 | 0.6:0.4 | 40 | trees within 3 | 30 | trees, zoo | Owl academy (L1) |
-| Bear | 80 | 1 | 20–45 | 65 | 0.4:0.6 | 50 | Low lots (falls back) | 40 | low-density R, trees | Bear winter |
+| Bear | 80 | 1 | 20–45 | 65 | 0.4:0.6 | 50 | Low lots (strict search, then lenient, same pass) | 40 | low-density R, trees | Bear winter |
 | Tortoise | 150 | 1 | 25–80 | 120 | 0.5:0.5 | 50 | any | 8 | base | Centenary |
 | Raccoon | 35 | 3 | 16–28 | 30 | 0.6:0.4 | 80 | any | 20 | mean pollution | the smog readout with a face |
 | Pig | 30 | 5 | 14–24 | 26 | 0.2:0.8 | 90 | water within 6 (mud) | 16 | I jobs, dirt | Truffle season (+§2,000) |
@@ -289,7 +293,7 @@ FRICTION: 0.4% of FRIENDLESS adults' households per month wander off regardless
 | Hawk | 40 | 2 | 16–35 | 35 | 0.6:0.4 | 30 | High lots (towers) | 64 | tier-3 vacancies | sees the whole city |
 | Skunk | 30 | 4 | 14–26 | 27 | 0.4:0.6 | 95 | trees within 3 | 20 | woods, dirt | nobody's prey; stinks (mess 1.0); only pigs and raccoons will sit next to one (affinity 0.5 for everyone else); the Skunk incident |
 
-**Predators and prey (the owner's note: "a notable absence of predator species").**
+**Predators and prey (the owner: "there is also a notable absence of predator species.").**
 `PREY_OF`: rabbit ← fox, wolf, hawk; mouse ← fox, owl, cat, hawk; pig ← wolf;
 cow ← wolf. Three rules, all weights and mood terms, never gates:
 - a predator–prey pair is *wary* (affinity 0.4) — such friendships form slowly;
@@ -323,7 +327,7 @@ friendship samples. Target ≤ 3 ms per tick in Node.
 
 ```
 income/yr  = rate_R · Σ_citizens (0.5 + LV_home/100) · 1.0  +  rate_C · Fc · 1.5  +  rate_I · Fi · 2.0
-upkeep/yr  = 10·P + 4·roads + 12·bridges + 2·Σ lot tiers + 300·parks + 1500·zoos
+upkeep/yr  = 12·P + 5·roads + 12·bridges + 4·Σ lot tiers + 300·parks + 1500·zoos + 400·stations   (rules.js is the measurement; this line follows it)
 monthly: post('tax', round(income/12)); post('upkeep', −round(upkeep/12))
 ```
 Costs: zone R §5 / C §8 / I §8 per tile; road §10; bridge §40; bulldoze §2
@@ -344,7 +348,7 @@ kinds. Timed effects are `{id, until, params}` structs saved with the city.
 
 | # | event | kind | gate / weight | effect | dig-out |
 |---|---|---|---|---|---|
-| 1 | Fire | disaster | w3; ×2 Jun–Aug with a tree within 2 of an I lot | starts on a built lot; burns 2 ticks; each tick spreads to 4-neighbour built lots p 0.3 (never across road, water, park); burnt → rubble, zoning kept; households displaced | bulldoze rubble §2; tree belts off industry |
+| 1 | Fire | disaster | w3; ×2 Jun–Aug | starts on a built lot (covered lots at 1/6 weight); burns 2 ticks (1 if covered); each tick spreads to 4-neighbour built lots p 0.3 (0.1 if covered; never across road, water, park); burnt → rubble, zoning kept; households displaced | bulldoze rubble §2; a fire station |
 | 2 | Flood | disaster | w2, needs water | tiles within Manhattan 3 of water flood 4 ticks; lots there −1 tier; parks immune | the floodplain has the best LV: that is the tension |
 | 3 | Tornado | disaster | w1 | 12-tile straight path; lots → rubble, trees felled, roads survive | rebuild |
 | 4 | Beaver dam | mixed | beavers ≥ 12% and water; w2 | a 2×2 pond appears beside the river; adjacent lots −1 tier once; permanent nature (+LV) | rezone around it or bulldoze §40 (beavers' mood −20 for a year) |
@@ -356,7 +360,7 @@ kinds. Timed effects are `{id, until, params}` structs saved with the city.
 | 10 | Recession | disaster | w2 | ext ×0.6 for 18–30 ticks | cut rates 2–3 points for the duration |
 | 11 | Fox market fair | boon | foxes ≥ 10% and any C tier ≥ 2; w2 | V_C +0.4 for 6 ticks; +§1,500 once | zone C near R |
 | 12 | Rabbit warren | boon | rabbits ≥ 25% and parks ≥ 2; w2 | births ×2 for 12 ticks | zone R ahead |
-| 13 | Founders' festival | boon | ≥ 5 species each ≥ 5% AND H ≥ 0.25; once per 10 years; w6 armed | Cap +200 PERMANENTLY; mood +15 for 12 ticks; plaza glyph on the central park | the only permanent cap relief money cannot buy |
+| 13 | Founders' festival | boon | ≥ 5 species each ≥ 5% AND H ≥ 0.5 AND friendships ≥ P/4; once per 10 years; w6 armed | Cap +200 PERMANENTLY; mood +15 for 12 ticks; plaza glyph on the central park | the only permanent cap relief money cannot buy |
 | 14 | County grant | boon | cash < 2,000 and approval ≥ 50, none in 10 years; w3 | +§5,000 | rewards a liked but poor mayor |
 | 15 | Tortoise centenary | boon | a tortoise reaches 100 | LV +8 within 3 of its home, permanent; hat on the walker; plaque in the card | none — the city's memory |
 | 16 | Scrubbers offer | CHOICE | I lots ≥ 15; w2 | card pauses the sim: pay §1,500 → all I emissions ×0.7 permanently, or decline | the one event that asks a question |
@@ -566,7 +570,7 @@ idx(world, tx, ty) → i ;  inBounds(world, tx, ty)
 // js/sim/tick.js
 tick(world) → { notices: [string], events: [eventRecord] }   // one month
 // js/sim/ops.js
-apply(world, op) → { ok, cost, reason }   // op.kind ∈ zone|road|bulldoze|tree|park|zoo|density|rate|toggle ; logs to world.log; deducts cash
+apply(world, op) → { ok, cost, reason, replaced, evicts, undoable }   // op.kind ∈ zone (with density)|road|bulldoze|tree|park|zoo|fire|police|rate|toggle|choice ; logs to world.log; deducts cash
 undo(world) → { ok }
 costOf(world, op) → { cost, tiles }        // for the live strip
 // js/sim/lots.js
@@ -604,5 +608,5 @@ art.citizen(species, facing, frame, age) / art.overlay(kind, frame)   // each �
 5. README, commit, push, Pages.
 
 Later layers, labelled in BACKLOG.md: L1 road rot, owl academy, wedding,
-species building skins, minimap, school, fire station; L2 elevation (Glades'
+species building skins, minimap, school; L2 elevation (Glades'
 level machinery), shore autotile, 128×128; L3 power; L4 sound; L5 scenarios.

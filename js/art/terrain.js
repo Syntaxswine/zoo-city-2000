@@ -108,7 +108,7 @@ export const GRASS = [0, 1, 2].map((v) =>
  * painted diamond, not chalk. Measured now (tools/shots.mjs prints it):
  * Low ≈ 23%, High ≈ 28% accent, the rest real grass.
  *
- * THE R CHALK DOES NOT USE ITS ACCENT. ACCENT['5'] (#5E8A3C) has luminance
+ * THE R CHALK DOES NOT USE ITS ACCENT. ACCENT['5'] (#B8C860 (repainted; the R line still does not use it)) has luminance
  * ≈123 against grass mid 'o' ≈125 — two points apart, same hue — and at 1×
  * an R tile could not be told from grass-0 (round 2 critics, blocking).
  * The palette is a shared module, so until '5' is re-keyed to something

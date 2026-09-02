@@ -17,7 +17,6 @@ import { lotScore } from "../js/sim/lots.js";
 import { KNOBS } from "../js/sim/rules.js";
 import { stateHash } from "../js/sim/save.js";
 import { hasAccess } from "../js/sim/fields.js";
-import { SPECIES, ARRIVING } from "../js/sim/species.js";
 
 const argv = process.argv.slice(2);
 const arg = (k, d) => { const i = argv.indexOf(k); return i >= 0 ? argv[i + 1] : d; };
@@ -33,8 +32,6 @@ const parksWanted = Number(arg("--parks", 0));
 const zooYear = arg("--zoo", null);
 const csv = flag("--csv");
 const quiet = flag("--quiet");
-// --all: let every species in the roster arrive (the ones without sprites yet included).
-if (flag("--all")) for (const sp of SPECIES) ARRIVING.add(sp.id);
 
 const world = createWorld({ seed });
 apply(world, { kind: "rate", zone: "R", value: rates[0] });

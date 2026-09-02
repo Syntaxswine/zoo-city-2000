@@ -26,6 +26,7 @@ import { toScreen, toWorld, pickTile, HALF_H, HALF_W, TILE_W, TILE_H } from "./i
 import { paintScene, Z_BUILDING } from "./iso/painter.js";
 import { rasterize } from "./art/format.js";
 import { ZONE, CIVIC, TERRAIN, ROAD } from "./sim/world.js";
+import { DECK_TOP } from "./art/roads.js";
 import { lotScore, REASON } from "./sim/lots.js";
 import { isWorker } from "./sim/census.js";
 
@@ -327,7 +328,10 @@ export function createRenderer(canvas, initialWorld, art) {
         items.push({ sprite: art.citizen(w.species, w.facing, 0, w.age), tx: ttx + 0.82, ty: tty + 0.55, kind: "walker" });
         continue;
       }
-      items.push({ sprite: art.citizen(w.species, w.facing, w.frame, w.age, { hat: w.hat }), tx: w.tx, ty: w.ty, kind: "walker", walker: w });
+      // On a bridge the deck sits DECK_TOP px above the water plane (roads.js);
+      // shots.mjs lifted its walkers, the renderer did not — they stood in the river.
+      const onBridge = world.road[Math.floor(w.ty) * world.w + Math.floor(w.tx)] === ROAD.BRIDGE;
+      items.push({ sprite: art.citizen(w.species, w.facing, w.frame, w.age, { hat: w.hat }), tx: w.tx, ty: w.ty, kind: "walker", walker: w, dy: onBridge ? -DECK_TOP : 0 });
       if (w.glyph === "meeting" && w.standUntil > 0) items.push({ sprite: meet, tx: w.tx, ty: w.ty, kind: "walker", z: 1000, dy: -24 });
     }
     paintScene(items, (sprite, sx, sy, item) => {

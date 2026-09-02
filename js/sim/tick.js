@@ -99,8 +99,8 @@ export function characterLine(cen) {
   const sorted = SPECIES.map((s) => [s.id, cen.shares[s.id]]).sort((a, b) => b[1] - a[1]);
   if (!cen.P) return "an empty map with a road into it";
   const [a, b] = sorted;
-  const nouns = { rabbit: "warren", mouse: "tenement", fox: "market town", beaver: "mill-town", owl: "college town", bear: "hamlet", tortoise: "retirement river", raccoon: "junkyard", pig: "works town", cow: "dairy parish", wolf: "pack territory", cat: "high street", hawk: "eyrie" };
-  const problems = { rabbit: "rabbit problem", mouse: "mouse problem", fox: "fox problem", beaver: "beaver habit", owl: "night shift", bear: "bear winter", tortoise: "slow lane", raccoon: "bin situation", pig: "mud problem", cow: "cud habit", wolf: "howling problem", cat: "cat problem", hawk: "hawk overhead" };
+  const nouns = { rabbit: "warren", mouse: "tenement", fox: "market town", beaver: "mill-town", owl: "college town", bear: "hamlet", tortoise: "retirement river", raccoon: "junkyard", pig: "works town", cow: "dairy parish", wolf: "pack territory", cat: "high street", hawk: "eyrie", skunk: "back lot" };
+  const problems = { rabbit: "rabbit problem", mouse: "mouse problem", fox: "fox problem", beaver: "beaver habit", owl: "night shift", bear: "bear winter", tortoise: "slow lane", raccoon: "bin situation", pig: "mud problem", cow: "cud habit", wolf: "howling problem", cat: "cat problem", hawk: "hawk overhead", skunk: "smell" };
   const art = (word) => (/^[aeiou]/.test(word) ? "an" : "a");
   if (b[1] < 0.15) return `${art(a[0])} ${a[0]} ${nouns[a[0]]}`;
   return `${art(a[0])} ${a[0]} ${nouns[a[0]]} with ${art(problems[b[0]])} ${problems[b[0]]}`;

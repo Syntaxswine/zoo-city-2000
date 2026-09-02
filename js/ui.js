@@ -253,6 +253,8 @@ export function createUI(app) {
     else if (w.road[i] === ROAD.ROAD) what = "Road";
     else if (rep.civic === CIVIC.PARK) what = "Park";
     else if (rep.civic === CIVIC.ZOO || rep.civic === CIVIC.ZOO_PART) what = "Zoo";
+    else if (rep.civic === CIVIC.FIRE) what = "Fire station";
+    else if (rep.civic === CIVIC.POLICE) what = "Police station";
     else if (rep.zone !== ZONE.NONE) what = `${ZONE_NAME[rep.zone]} ${rep.maxTier === 1 ? "Low" : "High"}`;
     else if (w.terrain[i] === TERRAIN.WATER) what = "Water";
     else if (w.terrain[i] === TERRAIN.TREE) what = "Trees";

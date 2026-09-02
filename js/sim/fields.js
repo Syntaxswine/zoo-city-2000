@@ -1,8 +1,8 @@
 // fields.js — roadDist, pollution, land value, traffic. SPEC §6. Pure.
 //
-// All four are DERIVED: rebuilt every tick (roadDist only when roads changed)
-// and never saved. Everything is O(tiles) with two 3×3 blurs; 4,096 tiles is
-// microseconds.
+// All of these are DERIVED: rebuilt every tick (roadDist only when roads
+// changed) and never saved. Everything is O(tiles) (pollution is O(sources ×
+// radius²)); 4,096 tiles is microseconds.
 
 import { KNOBS } from "./rules.js";
 import { TERRAIN, ROAD, ZONE, CIVIC, idx, inBounds, N4, isStation } from "./world.js";
@@ -53,26 +53,6 @@ export function computeTraffic(world) {
   for (const c of world.citizens) {
     if (!c.path) continue;
     for (let k = 0; k < c.path.length; k++) world.traffic[c.path[k]]++;
-  }
-}
-
-function blur3(src, dst, w, h) {
-  for (let y = 0; y < h; y++) {
-    for (let x = 0; x < w; x++) {
-      let sum = 0;
-      let cnt = 0;
-      for (let dy = -1; dy <= 1; dy++) {
-        const yy = y + dy;
-        if (yy < 0 || yy >= h) continue;
-        for (let dx = -1; dx <= 1; dx++) {
-          const xx = x + dx;
-          if (xx < 0 || xx >= w) continue;
-          sum += src[yy * w + xx];
-          cnt++;
-        }
-      }
-      dst[y * w + x] = sum / cnt;
-    }
   }
 }
 
