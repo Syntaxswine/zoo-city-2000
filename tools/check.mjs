@@ -32,7 +32,7 @@ import { apply, replay, undo } from "../js/sim/ops.js";
 import { save, load, stateHash, toPlain } from "../js/sim/save.js";
 import { KNOBS } from "../js/sim/rules.js";
 import { post } from "../js/sim/budget.js";
-import { doorOf, hasAccess, computeFields } from "../js/sim/fields.js";
+import { doorOf, hasAccess, computeFields, commuteTime } from "../js/sim/fields.js";
 import { census } from "../js/sim/census.js";
 import { CIVIC } from "../js/sim/world.js";
 
@@ -154,12 +154,13 @@ check("homes are R lots", homeNotR === 0, `${homeNotR}`);
 let pathBad = 0;
 for (const c of world.citizens) {
   if (!c.path) continue;
-  for (const i of c.path) if (world.road[i] === ROAD.NONE) pathBad++;
-  const end = c.path[c.path.length - 1];
+  // A walking entry lies on a road (or a platform); a riding entry (bit 15) on rail; the door is the last tile; the time is within the commute.
+  for (const p of c.path) { const i = p & 0x7fff; if (p & 0x8000 ? !world.rail[i] : world.road[i] === ROAD.NONE && world.rail[i] !== 2) pathBad++; }
+  const end = c.path[c.path.length - 1] & 0x7fff;
   if (c.job >= 0 && doorOf(world, c.job) !== end) pathBad++;
-  if (c.path.length - 1 > KNOBS.COMMUTE_MAX) pathBad++;
+  if (commuteTime(c.path) > KNOBS.COMMUTE_MAX + 1e-9) pathBad++;
 }
-check("every commute lies on roads and ends at the job's door", pathBad === 0, `${pathBad}`);
+check("every commute walks on roads, rides on rail, and ends at the job's door", pathBad === 0, `${pathBad}`);
 check("population grew", world.citizens.length > 100, `${world.citizens.length}`);
 check("every lot that grew had road access", A.grewWithAccess);
 check("history has one row per year", world.history.length === YEARS, `${world.history.length}`);
@@ -280,6 +281,7 @@ function auditIds(w) {
   delete plainOld.valves.M;
   delete plainOld.wall;
   delete plainOld.use;
+  delete plainOld.rail;
   delete plainOld.events.files; delete plainOld.events.justice; delete plainOld.events.arrests; delete plainOld.events.killings;
   let oldOk = true;
   try { const O = load(JSON.stringify(plainOld)); tick(O); tick(O); } catch (e) { oldOk = false; }
@@ -435,7 +437,7 @@ check("determinism: same seed + same inputs ⇒ same hash", stateHash(A.world) =
   let px = -1, py = -1;
   outer: for (let y = 4; y < F.h - 8; y++) for (let x = 4; x < F.w - 12; x++) {
     let ok = true;
-    for (let yy = y; yy < y + 3 && ok; yy++) for (let xx = x; xx < x + 7; xx++) { const i = yy * F.w + xx; if (F.terrain[i] === 1 || F.road[i] || F.zone[i] || F.civic[i] || F.wall[i]) { ok = false; break; } }
+    for (let yy = y; yy < y + 3 && ok; yy++) for (let xx = x; xx < x + 7; xx++) { const i = yy * F.w + xx; if (F.terrain[i] !== 0 || F.road[i] || F.zone[i] || F.civic[i] || F.wall[i]) { ok = false; break; } }
     if (ok) { px = x; py = y; break outer; }
   }
   const at = (x, y) => y * F.w + x;
@@ -500,6 +502,74 @@ check("determinism: same seed + same inputs ⇒ same hash", stateHash(A.world) =
   const H = load(save(G));
   for (let t = 0; t < 12; t++) { tick(G); tick(H); }
   check("use: save → load → 12 ticks with the line and a notice hash-equals", stateHash(G) === stateHash(H), `${stateHash(G)} vs ${stateHash(H)}`);
+}
+
+// ---- rail (docs/PROPOSAL-ZONING-RAIL-WALLS.md §3; SPEC §7.9) ------------------------------
+{
+  const { commutePath, computeTraffic, rides, roadPath } = await import("../js/sim/fields.js");
+  const { computeOcclusion, AXIS_EW } = await import("../js/sim/reach.js");
+  // A fresh map: a 14-tile road and, one row over, a 14-tile line with a station at each end beside the road's ends.
+  const F = createWorld({ seed: SEED });
+  let px = -1, py = -1;
+  outer: for (let y = 4; y < F.h - 8; y++) for (let x = 4; x < F.w - 18; x++) {
+    let ok = true;
+    for (let yy = y; yy < y + 3 && ok; yy++) for (let xx = x; xx < x + 14; xx++) { const i = yy * F.w + xx; if (F.terrain[i] !== 0 || F.road[i] || F.zone[i] || F.civic[i] || F.wall[i]) { ok = false; break; } }
+    if (ok) { px = x; py = y; break outer; }
+  }
+  const at = (x, y) => y * F.w + x;
+  const road = []; for (let x = px; x < px + 14; x++) road.push(at(x, py));
+  apply(F, { kind: "road", tiles: road });
+  const line = []; for (let x = px; x < px + 14; x++) line.push(at(x, py + 1));
+  const rr = apply(F, { kind: "rail", tiles: line });
+  const s1 = apply(F, { kind: "station", tx: px, ty: py + 1 });
+  const s2 = apply(F, { kind: "station", tx: px + 13, ty: py + 1 });
+  check("rail: a 14-tile line costs §20 a tile; a station is a click on rail, §300", rr.ok && rr.cost === 14 * KNOBS.COST.rail && s1.ok && s2.ok && s1.cost === KNOBS.COST.station && F.rail[at(px, py + 1)] === 2 && F.rail[at(px + 13, py + 1)] === 2, `${rr.cost} · ${s1.reason || s1.cost} · ${s2.reason || s2.cost}`);
+  check("rail: no crossings and no bridges in v1 — rail on a road tile and a road on a rail tile are nothing to do; a station off the rail is blocked", apply(F, { kind: "rail", tiles: [at(px + 3, py)] }).ok === false && apply(F, { kind: "road", tiles: [at(px + 3, py + 1)] }).ok === false && apply(F, { kind: "station", tx: px + 3, ty: py + 2 }).reason === "blocked");
+  computeFields(F);
+  const a = at(px, py), b = at(px + 13, py);
+  const ride = commutePath(F, "rabbit", a, b);
+  const walkOnly = 13 * 10;
+  const riding = ride ? Array.from(ride.path).filter((p) => p & 0x8000).length : 0;
+  check("rail: the commute rides — cheaper than the walk, riding on the 12 tiles between the stations and walking at them", !!ride && ride.cost === 10 + 13 * KNOBS.RAIL_COST + 10 && ride.cost < walkOnly && riding === 12 && ride.path.length === 16 && !(ride.path[1] & 0x8000) && !(ride.path[14] & 0x8000), `cost ${ride && ride.cost} vs walk ${walkOnly} · riding ${riding} · tiles ${ride && ride.path.length}`);
+  check("rail: commute time counts a ride at 0.3 of a walk", !!ride && Math.abs(commuteTime(ride.path) - (2 + 13 * KNOBS.RAIL_COST / 10)) < 1e-6, `${ride && commuteTime(ride.path)}`);
+  {
+    const keep = F.citizens;
+    F.citizens = [{ path: ride.path }];
+    computeTraffic(F);
+    let onRail = 0; for (let x = px + 1; x < px + 13; x++) onRail += F.traffic[at(x, py + 1)];
+    check("rail: traffic counts walking steps only — none on the track between the stations, one at each platform and each road end", onRail === 0 && F.traffic[a] === 1 && F.traffic[b] === 1 && F.traffic[at(px, py + 1)] === 1 && F.traffic[at(px + 13, py + 1)] === 1, `on the track ${onRail}`);
+    F.citizens = keep;
+    computeTraffic(F);
+  }
+  // A wall across the line is a tunnel: open along the track's axis, and the ride passes.
+  const wallAt = at(px + 6, py + 1);
+  const rw = apply(F, { kind: "wall", tiles: [wallAt] });
+  computeOcclusion(F);
+  const ride2 = commutePath(F, "rabbit", a, b);
+  check("rail: a wall across the line is a tunnel — open along the track, and the ride passes at the same cost", rw.ok && F.wall[wallAt] === 1 && F.rail[wallAt] === 1 && F.occl[wallAt] === AXIS_EW && !!ride2 && ride2.cost === ride.cost, `occl ${F.occl[wallAt]} · cost ${ride2 && ride2.cost}`);
+  const rb = apply(F, { kind: "bulldoze", x0: px + 13, y0: py + 1, x1: px + 13, y1: py + 1 });
+  const ride3 = commutePath(F, "rabbit", a, b);
+  check("rail: bulldozing the far station leaves the line but nobody alights — the commute walks", rb.ok && F.rail[at(px + 13, py + 1)] === 0 && !!ride3 && !rides(ride3.path) && ride3.cost === walkOnly, `cost ${ride3 && ride3.cost}`);
+  undo(F);
+  // Riders on the scripted city: a line round the ring's east and south, stations beside the ring's NE and SW.
+  const G = load(save(A.world));
+  apply(G, { kind: "cheat", amount: KNOBS.CHEAT_MAX });
+  const sx = G.start.tx, sy = G.start.ty;
+  const gat = (x, y) => y * G.w + x;
+  const col = []; for (let y = sy - 3; y <= sy + 5; y++) col.push(gat(sx + 5, y));
+  const row = []; for (let x = sx - 4; x <= sx + 4; x++) row.push(gat(x, sy + 5));
+  const l1 = apply(G, { kind: "rail", tiles: col }), l2 = apply(G, { kind: "rail", tiles: row });
+  const g1 = apply(G, { kind: "station", tx: sx + 5, ty: sy - 3 }), g2 = apply(G, { kind: "station", tx: sx - 4, ty: sy + 5 });
+  check("rail: the scripted city takes a line and two stations", l1.ok && l2.ok && g1.ok && g2.ok, [l1, l2, g1, g2].map((r) => r.reason || r.cost).join(", "));
+  let trafficBefore = 0; for (let i = 0; i < G.w * G.h; i++) trafficBefore += G.traffic[i];
+  tick(G); // the rail ops invalidated every path; this tick's census runs before the job search rebuilds them
+  tick(G); // this one's census counts the riders
+  const ridersG = G.citizens.filter((c) => c.path && rides(c.path));
+  const quicker = ridersG.every((c) => { const w0 = roadPath(G, c.path[0] & 0x7fff, c.path[c.path.length - 1] & 0x7fff); return !w0 || commuteTime(c.path) <= w0.length - 1 + 1e-9; });
+  check("rail: riders on the scripted city, each no slower than the walk; the census counts them", ridersG.length > 0 && quicker && G.last.census.riders === ridersG.length && G.last.census.stations === 2, `riders ${ridersG.length} · census ${G.last.census.riders} · stations ${G.last.census.stations} · traffic ${trafficBefore} → ${(() => { let t = 0; for (let i = 0; i < G.w * G.h; i++) t += G.traffic[i]; return t; })()}`);
+  const H = load(save(G));
+  for (let t = 0; t < 12; t++) { tick(G); tick(H); }
+  check("rail: save → load → 12 ticks with rail and riders hash-equals", stateHash(G) === stateHash(H), `${stateHash(G)} vs ${stateHash(H)}`);
 }
 
 // ---- Part B: the code ----------------------------------------------------------

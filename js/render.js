@@ -128,6 +128,9 @@ export function createRenderer(canvas, initialWorld, art) {
   const roadMask = (tx, ty) => (road(tx, ty - 1) ? 1 : 0) | (road(tx + 1, ty) ? 2 : 0) | (road(tx, ty + 1) ? 4 : 0) | (road(tx - 1, ty) ? 8 : 0);
   const wallAt = (tx, ty) => tx >= 0 && ty >= 0 && tx < world.w && ty < world.h && world.wall[ty * world.w + tx] === 1;
   const wallMask = (tx, ty) => (wallAt(tx, ty - 1) ? 1 : 0) | (wallAt(tx + 1, ty) ? 2 : 0) | (wallAt(tx, ty + 1) ? 4 : 0) | (wallAt(tx - 1, ty) ? 8 : 0);
+  const railAt = (tx, ty) => tx >= 0 && ty >= 0 && tx < world.w && ty < world.h && world.rail[ty * world.w + tx] > 0;
+  const railMask = (tx, ty) => (railAt(tx, ty - 1) ? 1 : 0) | (railAt(tx + 1, ty) ? 2 : 0) | (railAt(tx, ty + 1) ? 4 : 0) | (railAt(tx - 1, ty) ? 8 : 0);
+  const railAxis = (tx, ty) => (railAt(tx, ty - 1) || railAt(tx, ty + 1) ? "ns" : "ew");
 
   // ---- the static ground layer ---------------------------------------------------------
   function rebuildGround() {
@@ -158,6 +161,7 @@ export function createRenderer(canvas, initialWorld, art) {
           let sprite;
           let tint = null;
           if (hasRoad) sprite = art.road(roadMask(tx, ty), world.traffic[i] > BUSY);
+          else if (world.rail[i]) sprite = art.rail(railMask(tx, ty));
           else if (world.rubble[i] && world.tier[i] === 0) sprite = art.ground("rubble");
           else if (world.zone[i] !== ZONE.NONE && world.tier[i] === 0) {
             sprite = art.chalk(world.zone[i], world.maxTier[i] === 3);
@@ -309,7 +313,8 @@ export function createRenderer(canvas, initialWorld, art) {
         else if (world.civic[i] === CIVIC.FIRE) standing = art.civic("fire");
         else if (world.civic[i] === CIVIC.POLICE) standing = art.civic("police");
         else if (world.civic[i] === CIVIC.CENTRE) standing = art.civic("centre");
-        else if (world.wall[i]) standing = world.road[i] !== ROAD.NONE ? art.tunnel(tunnelAxis(world, i)) : art.wall(wallMask(tx, ty)); // a wall stands; a tunnel stands over its road
+        else if (world.wall[i]) standing = world.road[i] !== ROAD.NONE || world.rail[i] ? art.tunnel(tunnelAxis(world, i)) : art.wall(wallMask(tx, ty)); // a wall stands; a tunnel stands over its road or rail
+        else if (world.rail[i] === 2) standing = art.station(railAxis(tx, ty)); // the platform and shelter stand over the track
         if (standing) items.push({ sprite: standing, tx, ty, kind: "building" });
         if (world.burning[i]) items.push({ sprite: fire, tx, ty, kind: "building", z: Z_BUILDING + 1, dy: -6 });
         if (i === plazaTile) items.push({ sprite: art.overlay("plaza"), tx, ty, kind: "ground", z: 3, dy: -2 });
@@ -352,7 +357,7 @@ export function createRenderer(canvas, initialWorld, art) {
       // On a bridge the deck sits DECK_TOP px above the water plane (roads.js);
       // shots.mjs lifted its walkers, the renderer did not — they stood in the river.
       const onBridge = world.road[Math.floor(w.ty) * world.w + Math.floor(w.tx)] === ROAD.BRIDGE;
-      items.push({ sprite: art.citizen(w.species, w.facing, w.frame, w.age, { hat: w.hat }), tx: w.tx, ty: w.ty, kind: "walker", walker: w, dy: onBridge ? -DECK_TOP : 0 });
+      items.push({ sprite: art.citizen(w.species, w.facing, w.frame, w.age, { hat: w.hat }), tx: w.tx, ty: w.ty, kind: "walker", walker: w, dy: onBridge ? -DECK_TOP : w.riding ? -3 : 0 }); // a rider sits up on the train
       if (w.glyph === "meeting" && w.standUntil > 0) items.push({ sprite: meet, tx: w.tx, ty: w.ty, kind: "walker", z: 1000, dy: -24 });
     }
     paintScene(items, (sprite, sx, sy, item) => {

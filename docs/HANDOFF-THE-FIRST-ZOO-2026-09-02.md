@@ -31,7 +31,7 @@ measurement and SPEC gets edited — never the reverse.
   <270513546+StonePhilosopher@users.noreply.github.com>`; every commit ends
   with the Co-Authored-By line; commit messages are field notes and part of
   the archive. `.gitignore` = `Thumbs.db .DS_Store out/ node_modules/`.
-- **Before touching a file:** `node tools/check.mjs` — 103 checks, exits 1.
+- **Before touching a file:** `node tools/check.mjs` — 113 checks, exits 1.
   Green at the commit this file lands in. If it is red when you arrive, that
   is the first job; `git log -p` on the file it names is the fastest route.
 - **Run:**
@@ -615,8 +615,28 @@ Suite 80 → 91.
   under police cover. The fixture paints the ring's north row and east
   column, where the C and I doors are, under the station's cover.
 
-Suite 91 → 103. Phase C (rail) follows in its own commit; until it lands,
-§3 of the proposal is the design and nothing of it is in the code.
+Suite 91 → 103.
+
+**Phase C — rail (SPEC §7.9, §12.4c; `fields.dial` two layers, `nodePath`,
+`commuteTime`, `rides`; `art/rail.js`).**
+- **Two layers, one search.** Node = tile + layer·n; walk nodes on road
+  and station tiles, ride nodes on rail; board and alight free at a
+  station. The frame held again: with no rail the search is Phase B's.
+- **The ride bit is in the path.** `c.path[k] & 0x8000`; every reader goes
+  through `tileOf / riding`: traffic, walkers, exposure, the mood's commute
+  time, the suite's path check. A station collapses to ONE walked entry.
+- **A tunnel reads the way ON its tile.** `tunnelMask` uses road neighbours
+  for a road tunnel and rail neighbours for a rail tunnel — the first draft
+  read any way next door, and a road running beside a rail tunnel opened
+  the tunnel sideways (the suite: occl 0x55 instead of 0x11).
+- **Riders are counted at the census, which runs before the job search**:
+  after a rail op (paths invalidated) the first tick's census sees no
+  paths and no riders; the second tick's does. Traffic likewise.
+- **v1 limits (BACKLOG):** no rail bridges, no level crossings, no train
+  sprite (riders sit 3 px up at ×3).
+
+Suite 103 → 113. The tranche is complete: walls (A), use-zoning and
+trespass (B), rail (C) — three commits on the proposal.
 
 ## 9. Verification recipe (what "done" looks like here)
 

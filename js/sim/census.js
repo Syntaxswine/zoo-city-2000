@@ -4,7 +4,7 @@
 import { KNOBS } from "./rules.js";
 import { SPECIES, SPECIES_BY_ID, isPredPrey, isPredatorOf, DIET_OF } from "./species.js";
 import { ZONE, CIVIC, ROAD, jobsOf, jobZone, absent } from "./world.js";
-import { hasAccess, edgeRoads } from "./fields.js";
+import { hasAccess, edgeRoads , commuteTime, rides } from "./fields.js";
 
 export const ageMonths = (world, c) => world.tick - c.born;
 export const ageYears = (world, c) => Math.floor((world.tick - c.born) / 12);
@@ -38,6 +38,9 @@ export function census(world) {
   let exonerated = 0;
   let held = 0;
   let herbNear = 0;
+  let riders = 0;
+  let commuteN = 0;
+  let commuteSum = 0;
   const byId = world._byId || (world._byId = new Map());
   byId.clear();
   for (const c of citizens) byId.set(c.id, c);
@@ -54,6 +57,7 @@ export function census(world) {
     if (c.exonerated) exonerated++;
     if (absent(world, c)) held++;
     if (c.home >= 0 && world.dread[c.home] > 0 && DIET_OF[c.species] === "herb") herbNear++;
+    if (c.path) { commuteN++; commuteSum += commuteTime(c.path); if (rides(c.path)) riders++; }
     for (const f of c.friends) {
       if (f > c.id) {
         friendships++;
@@ -90,6 +94,8 @@ export function census(world) {
   let tunnels = 0;
   let usePred = 0;
   let usePrey = 0;
+  let railTiles = 0;
+  let stations = 0;
   let fireStations = 0;
   let policeStations = 0;
   let burning = 0;
@@ -120,6 +126,8 @@ export function census(world) {
       if (world.zone[i] === ZONE.R) rCap += KNOBS.R_CAP[world.tier[i]];
     }
     if (world.road[i] !== ROAD.NONE) roads++;
+    if (world.rail[i] === 1) railTiles++;
+    else if (world.rail[i] === 2) stations++;
     if (world.wall[i]) { walls++; if (world.road[i] !== ROAD.NONE) tunnels++; }
     if (world.use[i] && (world.zone[i] !== ZONE.NONE || world.road[i] !== ROAD.NONE)) { if (world.use[i] === 1) usePred++; else usePrey++; }
     lvSum += world.lv[i];
@@ -147,7 +155,7 @@ export function census(world) {
     fixed, wrongful, exonerated, held, herbNear, maxDread, markets, centres,
     approval: P ? moodSum / P : 50,
     native: P ? native / P : 0,
-    parks, zoos, lots, roads, walls, tunnels, usePred, usePrey, lotsNoRoad,
+    parks, zoos, lots, roads, walls, tunnels, usePred, usePrey, railTiles, stations, riders, commuteN, meanCommute: commuteN ? commuteSum / commuteN : 0, lotsNoRoad,
     fireStations, policeStations, burning,
     meanCrime: crimeN ? crimeSum / crimeN : 0, maxCrime,
     edgeRoads: Math.min(KNOBS.EDGE_ROAD_MAX, edgeRoads(world).length),

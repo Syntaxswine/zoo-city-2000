@@ -12,7 +12,7 @@ import { computeFields, recountRosters, commutePath, doorOf } from "./fields.js"
 import { rebuildMaps } from "./citizens.js";
 import { refreshLast } from "./tick.js";
 
-const TILE_ARRAYS = ["terrain", "road", "zone", "maxTier", "tier", "civic", "burning", "rubble", "variant", "flooded", "wall", "use"];
+const TILE_ARRAYS = ["terrain", "road", "zone", "maxTier", "tier", "civic", "burning", "rubble", "variant", "flooded", "wall", "use", "rail"];
 
 function plainCitizen(c) {
   return {

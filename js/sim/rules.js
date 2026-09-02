@@ -125,7 +125,7 @@ export const KNOBS = {
   UPKEEP_PARK: 300,
   UPKEEP_ZOO: 1500,
   UPKEEP_STATION: 400,
-  COST: { zoneR: 5, zoneC: 8, zoneI: 8, zoneM: 12, road: 10, bridge: 40, bulldoze: 2, bulldozeTree: 4, tree: 4, park: 150, zoo: 2500, pond: 40, fire: 500, police: 500, centre: 1500, wall: 8, use: 1 },
+  COST: { zoneR: 5, zoneC: 8, zoneI: 8, zoneM: 12, road: 10, bridge: 40, bulldoze: 2, bulldozeTree: 4, tree: 4, park: 150, zoo: 2500, pond: 40, fire: 500, police: 500, centre: 1500, wall: 8, use: 1, rail: 20, station: 300 },
   // ---- crime and punishment (the owner, 2026-09-02; docs/PROPOSAL-CRIME-AND-PUNISHMENT.md) ----
   // Zone M — the grey-market meat hall: stall / meat hall / cold store.
   M_JOBS: [0, 3, 8, 16],
@@ -216,6 +216,12 @@ export const KNOBS = {
   TRESPASS_CRIME: 5,        // the stain a stop leaves (radius 1)
   RECORD_HARD: 3,           // from this record a trespasser meets the sentence table (the owner: multiple offences → the market)
   ZONED_OUT_MONTHS: 3,      // a household's notice when its lot is painted against it
+  // rail (SPEC §7.9; docs/PROPOSAL-ZONING-RAIL-WALLS.md §3)
+  UPKEEP_RAIL: 3,           // a tile a year
+  UPKEEP_STATION_RAIL: 100, // a station a year
+  RAIL_COST: 3,             // a ride step on the commute's integer scale (a walk step is fields.WALK = 10): 0.3 of a walk
+  RIDE_SPEED: 3,            // the walker's speed on a riding step
+  EMIT_RAIL: 1,             // a rail tile's pollution, flat over 1; no traffic term
   LV_VAN: 6,                // land value near the centre
   LV_VAN_RADIUS: 2,
   VAN_MOOD: 5,              // carnivores within VAN_RADIUS of a centre
@@ -283,6 +289,11 @@ export const RULES = Object.freeze([
     id: "U2", title: "Trespass",
     formula: "E = forbidden walking tiles on the commute (+4 for a forbidding home or job); p = min(0.3, 0.02·E·cover/60) a month — no police, no arrest; the cells for a month and a record; the third offence meets the sentence table",
     live: (w) => `${w.events.justice.trespass || 0} stop${w.events.justice.trespass === 1 ? "" : "s"} since founding`,
+  },
+  {
+    id: "R1", title: "Rail: a commute is the cheapest walk-and-ride",
+    formula: "walk 1 a step (×6 onto a road the line forbids), ride 0.3 a step between stations; board and alight free at a station a road touches; traffic and trespass count walking steps only — neutral travel, until you step off",
+    live: (w) => `${w.last.census.railTiles || 0} rail tiles · ${w.last.census.stations || 0} stations · ${w.last.census.riders || 0} riders · mean commute ${(w.last.census.meanCommute || 0).toFixed(1)} walk-steps`,
   },
   {
     id: "D5", title: "The cap: a city can only hold so many until it mixes",

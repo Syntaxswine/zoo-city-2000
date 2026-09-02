@@ -48,6 +48,7 @@ export function createWorld({ seed = "zoo", w = 64, h = 64 } = {}) {
     flooded: new Uint8Array(n),
     wall: new Uint8Array(n), // a wall tile; with a road or rail on it, a tunnel (SPEC §6b, sim/reach.js)
     use: new Uint8Array(n), // the player's line: 0 mixed · 1 predator-only · 2 prey-only, on lots AND roads (SPEC §7.8)
+    rail: new Uint8Array(n), // 0 none · 1 rail · 2 station (SPEC §7.9); a station is a door only beside a road
     // derived
     roadDist: new Uint8Array(n),
     pol: new Uint8Array(n),

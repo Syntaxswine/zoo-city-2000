@@ -9,7 +9,7 @@
 import { KNOBS } from "./rules.js";
 import { SPECIES, SPECIES_BY_ID, NAME_PARTS, affinity, ARRIVING, PREY_OF, DIET_OF, isPredatorOf, admits } from "./species.js";
 import { ZONE, CIVIC, TERRAIN, ROAD, idx, inBounds, capacityOf, jobsOf, jobZone, absent, USE_NAME } from "./world.js";
-import { doorOf, edgeRoads, hasAccess, commutePath, dial, WALK } from "./fields.js";
+import { doorOf, edgeRoads, hasAccess, commutePath, dial, WALK, nodePath, commuteTime } from "./fields.js";
 import { ageYears, ageMonths, isWorker } from "./census.js";
 
 const SURNAMES = {
@@ -846,7 +846,7 @@ function moods(world) {
     m -= Math.min(20, flight);
     if (c.home >= 0) m -= KNOBS.CRIME_MOOD * Math.max(0, world.crime[c.home] - KNOBS.CRIME_MOOD_FROM);
     for (const e of world.events.active) if (e.moodBySpecies && e.moodBySpecies[c.species]) m += e.moodBySpecies[c.species];
-    if (c.path && c.path.length - 1 <= sp.commute) m += 10;
+    if (c.path && commuteTime(c.path) <= sp.commute) m += 10; // a ride is 0.3 of a walk step
     if (c.grief && c.grief > world.tick) m -= 10;
     if (c.moodPenalty && c.moodPenaltyUntil > world.tick) m += c.moodPenalty;
     if (c.fixed) m -= KNOBS.FIXED_MOOD;
@@ -949,10 +949,7 @@ function searchJob(world, door, sp, openByDoor, rng) {
     return false;
   });
   if (!best) return null;
-  const steps = [];
-  for (let k = best.door; k !== -1; k = prev[k]) steps.push(k);
-  steps.reverse();
-  best.path = Uint16Array.from(steps);
+  best.path = nodePath(world, prev, best.door);
   return best;
 }
 

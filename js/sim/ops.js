@@ -39,7 +39,7 @@ export function costOf(world, op) {
     case "zone": {
       const zc = op.zone === ZONE.R ? C.zoneR : op.zone === ZONE.C ? C.zoneC : op.zone === ZONE.M ? C.zoneM : C.zoneI;
       for (const i of rect(world, op)) {
-        if (world.terrain[i] === TERRAIN.WATER || world.road[i] || world.civic[i] || world.wall[i]) continue;
+        if (world.terrain[i] === TERRAIN.WATER || world.road[i] || world.civic[i] || world.wall[i] || world.rail[i]) continue;
         if (isBuilt(world, i)) continue;
         if (world.zone[i] === op.zone && world.maxTier[i] === (op.density || 3)) continue;
         let c = zc;
@@ -51,7 +51,7 @@ export function costOf(world, op) {
     case "road": {
       for (const i of op.tiles || []) {
         if (!(i >= 0 && i < world.w * world.h)) continue;
-        if (world.road[i] || world.civic[i] || isBuilt(world, i)) continue;
+        if (world.road[i] || world.civic[i] || world.rail[i] || isBuilt(world, i)) continue; // no level crossings in v1 (BACKLOG)
         let c = world.terrain[i] === TERRAIN.WATER ? C.bridge : C.road;
         if (world.terrain[i] === TERRAIN.TREE) c += C.bulldozeTree;
         add(i, c, world.terrain[i] === TERRAIN.WATER ? "bridge" : "road");
@@ -63,6 +63,7 @@ export function costOf(world, op) {
       for (const i of rect(world, op)) {
         if (world.terrain[i] === TERRAIN.WATER && !world.road[i]) continue;
         if (world.wall[i]) { add(i, C.bulldoze, "wall"); continue; } // a tunnel's wall comes down first; the road stays
+        if (world.rail[i]) { add(i, C.bulldoze, world.rail[i] === 2 ? "station" : "rail"); continue; }
         if (world.road[i]) { add(i, C.bulldoze, "road"); continue; }
         if (world.civic[i]) {
           add(i, C.bulldoze, "civic");
@@ -78,14 +79,14 @@ export function costOf(world, op) {
     }
     case "tree": {
       for (const i of rect(world, op)) {
-        if (world.terrain[i] !== TERRAIN.GRASS || world.road[i] || world.zone[i] || world.civic[i] || world.wall[i]) continue;
+        if (world.terrain[i] !== TERRAIN.GRASS || world.road[i] || world.zone[i] || world.civic[i] || world.wall[i] || world.rail[i]) continue;
         add(i, C.tree, "tree");
       }
       break;
     }
     case "park": case "fire": case "police": case "centre": {
       const i = idx(world, op.tx, op.ty);
-      if (!inBounds(world, op.tx, op.ty) || world.terrain[i] === TERRAIN.WATER || world.road[i] || world.zone[i] || world.civic[i] || world.wall[i]) return { cost: 0, tiles, reason: "blocked" };
+      if (!inBounds(world, op.tx, op.ty) || world.terrain[i] === TERRAIN.WATER || world.road[i] || world.zone[i] || world.civic[i] || world.wall[i] || world.rail[i]) return { cost: 0, tiles, reason: "blocked" };
       add(i, C[op.kind] + (world.terrain[i] === TERRAIN.TREE ? C.bulldozeTree : 0), op.kind);
       break;
     }
@@ -95,7 +96,7 @@ export function costOf(world, op) {
         const ty = op.ty + dy;
         if (!inBounds(world, tx, ty)) return { cost: 0, tiles, reason: "blocked" };
         const i = idx(world, tx, ty);
-        if (world.terrain[i] === TERRAIN.WATER || world.road[i] || world.zone[i] || world.civic[i] || world.wall[i]) return { cost: 0, tiles, reason: "blocked" };
+        if (world.terrain[i] === TERRAIN.WATER || world.road[i] || world.zone[i] || world.civic[i] || world.wall[i] || world.rail[i]) return { cost: 0, tiles, reason: "blocked" };
         add(i, (dx || dy ? 0 : C.zoo) + (world.terrain[i] === TERRAIN.TREE ? C.bulldozeTree : 0), dx || dy ? "zooPart" : "zoo");
       }
       break;
@@ -110,6 +111,25 @@ export function costOf(world, op) {
         if (world.use[i] === v) continue;
         add(i, C.use, "use");
       }
+      break;
+    }
+    case "rail": {
+      // Rail is an L-drag like a road (SPEC §7.9): grass or trees (felled), across a wall (a tunnel);
+      // not on water, a road, chalk, a civic or a building — no bridges or crossings in v1.
+      for (const i of op.tiles || []) {
+        if (!(i >= 0 && i < world.w * world.h)) continue;
+        if (world.rail[i] || world.road[i] || world.terrain[i] === TERRAIN.WATER || world.civic[i] || world.zone[i] || isBuilt(world, i)) continue;
+        let c = C.rail;
+        if (world.terrain[i] === TERRAIN.TREE) c += C.bulldozeTree;
+        add(i, c, world.wall[i] ? "tunnel" : "rail");
+      }
+      break;
+    }
+    case "station": {
+      // A station is a click on a plain rail tile; it is a door only when a road tile touches it (the card says).
+      const i = inBounds(world, op.tx, op.ty) ? idx(world, op.tx, op.ty) : -1;
+      if (i < 0 || world.rail[i] !== 1) return { cost: 0, tiles, reason: "blocked" };
+      add(i, C.station, "station");
       break;
     }
     case "wall": {
@@ -138,7 +158,7 @@ function snapshot(world, tiles) {
   return tiles.map(({ i }) => ({
     i,
     terrain: world.terrain[i], road: world.road[i], zone: world.zone[i], maxTier: world.maxTier[i],
-    tier: world.tier[i], civic: world.civic[i], rubble: world.rubble[i], wall: world.wall[i], use: world.use[i],
+    tier: world.tier[i], civic: world.civic[i], rubble: world.rubble[i], wall: world.wall[i], use: world.use[i], rail: world.rail[i],
   }));
 }
 
@@ -187,6 +207,7 @@ export function apply(world, op, { log = true } = {}) {
   let roads = false;
   let walls = false;
   let lines = false; // a use repaint: every commute may prefer another way now
+  let rails = false;
   for (const { i, what } of plan.tiles) {
     switch (op.kind) {
       case "zone":
@@ -205,6 +226,7 @@ export function apply(world, op, { log = true } = {}) {
       case "bulldoze":
         if (what === "road") { world.road[i] = ROAD.NONE; roads = true; }
         else if (what === "wall") { world.wall[i] = 0; walls = true; }
+        else if (what === "rail" || what === "station") { world.rail[i] = 0; rails = true; }
         else if (what === "civic") removeCivic(world, i);
         else if (what === "building") {
           // Unzone FIRST: clearLot rehomes the family by bestHome(), which
@@ -248,15 +270,24 @@ export function apply(world, op, { log = true } = {}) {
         world.use[i] = Math.max(0, Math.min(2, op.use | 0));
         lines = true;
         break;
+      case "rail":
+        if (world.terrain[i] === TERRAIN.TREE) world.terrain[i] = TERRAIN.GRASS;
+        world.rail[i] = 1;
+        rails = true;
+        break;
+      case "station":
+        world.rail[i] = 2;
+        rails = true;
+        break;
       default:
         break;
     }
   }
   // A wall changes what a road can reach (doors, road distance) as much as a road does; a road across a wall makes a tunnel.
-  if (roads || walls) { world.roadsDirty = true; invalidatePaths(world); computeOcclusion(world); } // occlusion now, so wallCount reads live; roadDist at the tick
+  if (roads || walls || rails) { world.roadsDirty = true; invalidatePaths(world); computeOcclusion(world); } // occlusion now, so wallCount reads live; roadDist at the tick
   else if (lines) invalidatePaths(world); // the stale pass re-searches under the line and releases the workers it forbids
   post(world, "build", -plan.cost);
-  world.undoStack = plan.evicts ? [] : [{ op, snap, cost: plan.cost, roads: roads || walls, t: world.tick }];
+  world.undoStack = plan.evicts ? [] : [{ op, snap, cost: plan.cost, roads: roads || walls || rails, t: world.tick }];
   if (log) world.log.push({ t: world.tick, op: stripOp(op) });
   return { ok: true, cost: plan.cost, replaced: plan.replaced, evicts: plan.evicts, undoable: !plan.evicts };
 }
@@ -305,7 +336,7 @@ export function undo(world) {
   for (const s of u.snap) {
     if (world.tier[s.i] > 0 && s.tier === 0) continue; // something grew here since; leave it
     world.terrain[s.i] = s.terrain; world.road[s.i] = s.road; world.zone[s.i] = s.zone; world.maxTier[s.i] = s.maxTier;
-    world.tier[s.i] = s.tier; world.civic[s.i] = s.civic; world.rubble[s.i] = s.rubble; world.wall[s.i] = s.wall; world.use[s.i] = s.use;
+    world.tier[s.i] = s.tier; world.civic[s.i] = s.civic; world.rubble[s.i] = s.rubble; world.wall[s.i] = s.wall; world.use[s.i] = s.use; world.rail[s.i] = s.rail;
   }
   if (u.roads) { world.roadsDirty = true; invalidatePaths(world); computeOcclusion(world); }
   else if (u.op.kind === "use") invalidatePaths(world);

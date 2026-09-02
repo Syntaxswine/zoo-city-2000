@@ -203,6 +203,7 @@ export function createWalkers(initialWorld) {
       facing: "se",
       frame: 0,
       release: false,
+      riding: false, // on a rail segment: ×RIDE_SPEED and drawn up on the train
       glyph: opts.glyph || null,
       tent: !!opts.tent,
       tile: opts.tile ?? -1,
@@ -232,9 +233,12 @@ export function createWalkers(initialWorld) {
   // ---- spawners ---------------------------------------------------------------
   function spawnCommuter(c) {
     if (!c.path || c.path.length < 2) return null;
-    const out = Array.from(c.path);
+    // The path carries the ride bit (fields.RIDE) on the tiles the citizen rode onto; the walker keeps a parallel flag per tile.
+    const out = Array.from(c.path, (p) => p & 0x7fff);
+    const ride = Array.from(c.path, (p) => (p & 0x8000) !== 0);
     const back = out.slice().reverse();
-    return add(make("commuter", c, [{ path: out, stand: JOB_STAND }, { path: back, stand: HOME_STAND }]));
+    const rideBack = ride.slice().reverse();
+    return add(make("commuter", c, [{ path: out, ride, stand: JOB_STAND }, { path: back, ride: rideBack, stand: HOME_STAND }]));
   }
 
   function spawnStroll(c, kind) {
@@ -468,7 +472,9 @@ export function createWalkers(initialWorld) {
     }
     const path = leg.path;
     if (path.length < 2) { w.standUntil = leg.stand || 0.01; return; }
-    let d = w.speed * dt;
+    const rd = leg.ride;
+    const onRail = !!(rd && (rd[w.seg] || rd[w.seg + 1])); // a segment touching a ridden tile is a ride
+    let d = w.speed * dt * (onRail ? KNOBS.RIDE_SPEED : 1);
     while (d > 0) {
       const rem = 1 - w.t;
       const s = Math.min(d, rem);
@@ -490,6 +496,7 @@ export function createWalkers(initialWorld) {
     }
     const a = path[w.seg];
     const b = path[w.seg + 1];
+    w.riding = !!(rd && (rd[w.seg] || rd[w.seg + 1]));
     const [ax, ay] = centre(a);
     const [bx, by] = centre(b);
     const dx = bx - ax;

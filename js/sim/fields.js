@@ -53,7 +53,7 @@ export function computeTraffic(world) {
   world.traffic.fill(0);
   for (const c of world.citizens) {
     if (!c.path) continue;
-    for (let k = 0; k < c.path.length; k++) world.traffic[c.path[k]]++;
+    for (let k = 0; k < c.path.length; k++) { if (c.path[k] & RIDE) continue; world.traffic[c.path[k] & TILE]++; } // a ride makes no road traffic (SPEC §7.9)
   }
 }
 
@@ -96,6 +96,7 @@ export function computePollution(world) {
     else if (world.zone[i] === ZONE.C && KNOBS.EMIT_C[t] > 0) spread(world, e, i, KNOBS.EMIT_C[t], KNOBS.EMIT_C_RADIUS[t]);
     if (world.road[i] !== ROAD.NONE) spread(world, e, i, KNOBS.EMIT_ROAD + Math.min(KNOBS.EMIT_TRAFFIC_MAX, world.traffic[i] / KNOBS.EMIT_TRAFFIC_DIV), KNOBS.EMIT_ROAD_RADIUS);
     if (world.terrain[i] === TERRAIN.TREE) e[i] += KNOBS.EMIT_TREE;
+    if (world.rail[i]) spread(world, e, i, KNOBS.EMIT_RAIL, 1); // a train line, flat, no traffic term
     if (world.burning[i]) spread(world, e, i, KNOBS.EMIT_FIRE, KNOBS.EMIT_FIRE_RADIUS);
     if (world.civic[i] === CIVIC.PARK) spread(world, e, i, KNOBS.EMIT_PARK, KNOBS.EMIT_PARK_RADIUS);
   }
@@ -393,8 +394,13 @@ export function edgeRoads(world) {
 // The commute search (SPEC §7.8): Dial's buckets over the road graph
 // ---------------------------------------------------------------------------
 
-/** One road step, in integer cost units (rail will ride cheaper on the same scale). */
+/** One road step, in integer cost units; a ride step is KNOBS.RAIL_COST on the same scale. */
 export const WALK = 10;
+/** A path entry is a tile index with bit 15 set when the citizen RODE onto it (rail between stations). */
+export const RIDE = 0x8000;
+export const TILE = 0x7fff;
+export const tileOf = (p) => p & TILE;
+export const riding = (p) => (p & RIDE) !== 0;
 
 /** The cost of stepping ONTO road tile j as `species`: a legal step, or TRESPASS_STEP legal steps for a tile the player's line forbids. */
 export function stepCost(world, species, j) {
@@ -402,45 +408,66 @@ export function stepCost(world, species, j) {
 }
 
 /**
- * Dial's shortest paths from `from` over road tiles with integer step
- * costs, settling nodes in cost order — FIFO within a bucket, the same
- * neighbour order as roadPath — so where every step costs the same (a city
- * with no use-zoning) the settle order, the prev tree and the paths are the
- * BFS's exactly; the suite checks every commuter's path against roadPath.
- * `settle(i, cost)` is called once per node; return true to stop early.
- * Returns the { dist, prev } scratch (valid until the next call; dist −1 = unreached).
+ * Dial's shortest paths from road tile `from` over a TWO-LAYER graph (SPEC
+ * §7.9): layer 0 walks on road tiles and station tiles, layer 1 rides on
+ * rail tiles; the layers meet only at a station (board / alight, free).
+ * Node = tile + layer·n. Integer costs, settled in cost order — FIFO
+ * within a bucket, the same neighbour order as roadPath — so where every
+ * step costs the same and no rail exists (a city with no line and no
+ * track) the settle order, the prev tree and the paths are the BFS's
+ * exactly; the suite checks every commuter's path against roadPath.
+ * `settle(tile, cost)` is called once per WALK node; return true to stop.
+ * Returns the { dist, prev } scratch (valid until the next call; −1 = unreached).
  */
 export function dial(world, species, from, maxCost, settle) {
-  const { w, h, road } = world;
+  const { w, h, road, rail } = world;
   const n = w * h;
-  const dist = world._ddist || (world._ddist = new Int32Array(n));
-  const prev = world._dprev || (world._dprev = new Int32Array(n));
+  const dist = world._ddist && world._ddist.length === 2 * n ? world._ddist : (world._ddist = new Int32Array(2 * n));
+  const prev = world._dprev && world._dprev.length === 2 * n ? world._dprev : (world._dprev = new Int32Array(2 * n));
   dist.fill(-1);
   const buckets = world._dbuckets || (world._dbuckets = []);
   for (let c = 0; c <= maxCost; c++) { if (buckets[c]) buckets[c].length = 0; else buckets[c] = []; }
+  const relax = (node, nc, via) => {
+    if (nc > maxCost) return;
+    if (dist[node] !== -1 && dist[node] <= nc) return;
+    dist[node] = nc;
+    prev[node] = via;
+    buckets[nc].push(node);
+  };
   dist[from] = 0;
   prev[from] = -1;
   buckets[0].push(from);
+  const ride = KNOBS.RAIL_COST;
   for (let c = 0; c <= maxCost; c++) {
     const b = buckets[c];
     for (let q = 0; q < b.length; q++) {
       const i = b[q];
       if (dist[i] !== c) continue; // settled cheaper already
-      if (settle(i, c)) { b.length = 0; return { dist, prev }; }
-      const tx = i % w;
-      const ty = (i / w) | 0;
-      for (const [dx, dy] of N4) {
-        const nx = tx + dx;
-        const ny = ty + dy;
-        if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
-        const j = ny * w + nx;
-        if (road[j] === ROAD.NONE) continue;
-        const nc = c + stepCost(world, species, j);
-        if (nc > maxCost) continue;
-        if (dist[j] !== -1 && dist[j] <= nc) continue;
-        dist[j] = nc;
-        prev[j] = i;
-        buckets[nc].push(j);
+      const layer = i >= n ? 1 : 0;
+      const tile = layer ? i - n : i;
+      if (!layer && settle(tile, c)) { b.length = 0; return { dist, prev }; }
+      const tx = tile % w;
+      const ty = (tile / w) | 0;
+      if (!layer) {
+        if (rail[tile] === 2) relax(tile + n, c, i); // board
+        for (const [dx, dy] of N4) {
+          const nx = tx + dx;
+          const ny = ty + dy;
+          if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
+          const j = ny * w + nx;
+          if (road[j] === ROAD.NONE && rail[j] !== 2) continue; // a road, or a platform
+          relax(j, c + stepCost(world, species, j), i);
+        }
+      } else {
+        if (rail[tile] === 2) relax(tile, c, i); // alight
+        for (const [dx, dy] of N4) {
+          const nx = tx + dx;
+          const ny = ty + dy;
+          if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
+          const j = ny * w + nx;
+          if (!rail[j]) continue;
+          relax(j + n, c + ride, i);
+        }
       }
     }
     b.length = 0;
@@ -448,15 +475,53 @@ export function dial(world, species, from, maxCost, settle) {
   return { dist, prev };
 }
 
+/**
+ * The stored path for the prev tree's node `toNode` (a walk node): one
+ * entry per tile, in order, with RIDE set on the tiles the citizen rode
+ * onto. A station has two nodes (walk and ride) and collapses to one
+ * WALKED entry — the animal stands on the platform whether it boards or
+ * alights there — so "predators don't exit the train in a prey only zone"
+ * is the same rule as any other forbidden tile (fields.exposure).
+ */
+export function nodePath(world, prev, toNode) {
+  const n = world.w * world.h;
+  const nodes = [];
+  for (let k = toNode; k !== -1; k = prev[k]) nodes.push(k);
+  nodes.reverse();
+  const out = [];
+  let lastTile = -1;
+  let allRide = true;
+  for (const node of nodes) {
+    const tile = node >= n ? node - n : node;
+    const isRide = node >= n;
+    if (tile === lastTile) { allRide = allRide && isRide; out[out.length - 1] = tile | (allRide ? RIDE : 0); continue; }
+    lastTile = tile;
+    allRide = isRide;
+    out.push(tile | (isRide ? RIDE : 0));
+  }
+  return Uint16Array.from(out);
+}
+
 /** The commute from road tile `from` to road tile `to` as `species`: { path, cost } or null past max (in walk steps). */
 export function commutePath(world, species, from, to, max = KNOBS.COMMUTE_MAX) {
   if (from === to) return { path: new Uint16Array([from]), cost: 0 };
   const { dist, prev } = dial(world, species, from, max * WALK, (i) => i === to);
   if (dist[to] < 0) return null;
-  const steps = [];
-  for (let k = to; k !== -1; k = prev[k]) steps.push(k);
-  steps.reverse();
-  return { path: Uint16Array.from(steps), cost: dist[to] };
+  return { path: nodePath(world, prev, to), cost: dist[to] };
+}
+
+/** How long a commute feels, in walk steps: a walking segment 1, a riding segment RAIL_COST/WALK — never the trespass penalty (that is the search's preference, not time). */
+export function commuteTime(path) {
+  let t = 0;
+  for (let k = 1; k < path.length; k++) t += (path[k] & RIDE) || (path[k - 1] & RIDE) ? KNOBS.RAIL_COST / WALK : 1;
+  return t;
+}
+
+/** Does the commute ride at all? */
+export function rides(path) {
+  if (!path) return false;
+  for (let k = 0; k < path.length; k++) if (path[k] & RIDE) return true;
+  return false;
 }
 
 /**
@@ -471,8 +536,8 @@ export function exposure(world, c) {
   let tile = -1;
   if (c.path) {
     for (let k = 0; k < c.path.length; k++) {
-      if (c.path[k] & 0x8000) continue;
-      const t = c.path[k] & 0x7fff;
+      if (c.path[k] & RIDE) continue;
+      const t = c.path[k] & TILE;
       if (world.use[t] && !admits(world.use[t], c.species)) {
         e++;
         if (tile < 0) tile = t;

@@ -64,6 +64,7 @@ them on the real map):
 | dread | a meat hall spreads 40/70/105 over 2/3/4 tiles; LV −0.8·dread (twice a works); herbivores mind it, carnivores do not |
 | use-zoning | `U` paints lots and roads predator-only / prey-only / mixed; a gate on homes and jobs (the player's line, not the species'); a forbidden road step costs ×6 in the commute search; a repainted household has 3 months to rehome or leaves |
 | trespass | `E` forbidden walking tiles on the commute (+4 for a forbidding home or job); `p = min(0.3, 0.02·E·cover/60)` a month — no police, no stop; the cells for a month and a record; the third offence meets the sentence table |
+| rail | a commute is the cheapest walk-and-ride: a step 1, a ride 0.3 between stations a road touches; traffic and trespass count walking steps only — neutral travel until you step off |
 | walls | every area effect radiates by flood fill; a wall blocks it and receives nothing; a road through it is a tunnel, open along the road; a killer's reach stops at a wall (Glades of Arcadia's law) |
 
 The hover card's **WHY NOT** line is computed by the same function that
@@ -115,6 +116,13 @@ and the third offence meets the sentence table. Rail (coming) is neutral
 travel; only where you step off counts. The `O` overlay shows the line in
 rust and teal.
 
+**Rail.** `T` lays track and `G` makes a station of a rail tile beside a
+road. A commute is the cheapest walk-and-ride: a ride costs 0.3 of a walk,
+makes no road traffic, and is neutral ground for the player's line — a
+wolf may ride through prey-only streets, and is only stopped where it
+steps off. Riders are counted on the census; the walkers sit up on the
+train.
+
 **Crime and punishment.** Any adult may kill a neighbour — carnivores
 likely, the unemployed twenty times likelier ("no jobs means hungry
 wolves"), prey rarely — and a grey-market **meat hall** (zone `M`) is the
@@ -144,7 +152,7 @@ mill-town with a fox problem").
 
 - `tools/playtest.mjs --layout balanced|dormitory|millbelt --schedule 15:13,22:7`
   — a scripted mayor on the real map; the SPEC's acceptance targets.
-- `tools/check.mjs` — 103 checks: ledger conservation to the §, valves
+- `tools/check.mjs` — 113 checks: ledger conservation to the §, valves
   bounded, no NaN, the dangling-id law, rosters and capacities, commutes on
   roads, determinism, save → load → continue hash-equal, input-log replay,
   the crime-and-punishment invariants, the walls (the flood reproduces the
@@ -153,7 +161,12 @@ mill-town with a fox problem").
   commute is the BFS tile-for-tile with no line; a rabbit takes the legal way
   round a predator-only road and a fox the short way; two years after a
   repaint nobody lives or works where the line forbids; a forced month stops
-  the exposed and the third offence meets the table), the cheat op (booked under `cheat`,
+  the exposed and the third offence meets the table), rail (a line beside
+  a road rides at a known cost with the ride bit on the track and not at
+  the platforms, traffic counts walking steps only, a wall across the line
+  is a tunnel open along the track, bulldozing a station makes the commute
+  walk, riders on the scripted city each no slower than the walk), the
+  cheat op (booked under `cheat`,
   logged, replayed, clamped, never undone, lifts a receivership at once),
   `budget.post` as the only cash mutator, relative imports, no
   `Math.random`, the sim blind to browser preferences, the title screen

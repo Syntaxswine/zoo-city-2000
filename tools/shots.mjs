@@ -23,6 +23,7 @@ import { art } from "../js/art/index.js";
 import { BUILDINGS, PARK, ZOO, FIRE_STATION, POLICE_STATION, PACIFICATION_CENTRE, OVERLAYS } from "../js/art/buildings.js";
 import { ROADS, BRIDGES, N, E, S, W, DECK_TOP } from "../js/art/roads.js";
 import { WALLS, TUNNELS } from "../js/art/walls.js";
+import { RAILS, STATIONS } from "../js/art/rail.js";
 import { GRASS, CHALK, CHALK_KEYS, RUBBLE, WATER_TILE, KERB, TREE_LIST, ZOTS, PLAZA, CURSOR, GHOST, waterTint, WATER_FRAMES } from "../js/art/terrain.js";
 import { ink } from "../js/art/format.js";
 import { citizenSprite, SPECIES_IDS, FACINGS, TENT, HAT, MEETING } from "../js/art/citizens.js";
@@ -151,6 +152,25 @@ function sheets(z) {
       console.log(`  walls [r${Math.floor(i / cols)} c${i % cols}] ${cell.label}`);
     });
     out.push(save("sheet-walls.png", canvas, z));
+  }
+
+  // Rail: the 16 masks, then the two stations over their track.
+  {
+    const cells = [];
+    for (let m = 0; m < 16; m++) cells.push({ sprite: RAILS[m], label: `rail mask ${m}` });
+    cells.push({ sprite: STATIONS.ns, label: "station ns (over a N|S track)", under: RAILS[N | S] });
+    cells.push({ sprite: STATIONS.ew, label: "station ew (over an E|W track)", under: RAILS[E | W] });
+    const cols = 6, cellW = 84, cellH = 72, groundY = 52;
+    const canvas = createCanvas(cols * cellW, Math.ceil(cells.length / cols) * cellH);
+    const ctx = background(canvas);
+    cells.forEach((cell, i) => {
+      const cx = (i % cols) * cellW + cellW / 2;
+      const cy = Math.floor(i / cols) * cellH + groundY;
+      if (cell.under) blitAt(ctx, cell.under, cx, cy);
+      blitAt(ctx, cell.sprite, cx, cy);
+      console.log(`  rail [r${Math.floor(i / cols)} c${i % cols}] ${cell.label}`);
+    });
+    out.push(save("sheet-rail.png", canvas, z));
   }
 
   // Roads: 16 masks plain, 16 busy, 16 bridges (on water).

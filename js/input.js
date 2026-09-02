@@ -1,6 +1,6 @@
 // input.js — mouse and keyboard → ops. SPEC §11.
 //
-//   1 R · 2 C · 3 I · 4 Road · B Wall · U Use · 5 Tree · 6 Park · 7 Zoo · 8 Bulldoze · 9 Inspect
+//   1 R · 2 C · 3 I · 4 Road · B Wall · T Rail · G Station · U Use · 5 Tree · 6 Park · 7 Zoo · 8 Bulldoze · 9 Inspect
 //   D density · Space pause · , . speed · Z undo · S save · L load · O overlays
 //   +/- zoom · WASD / arrows / drag-pan (middle or right button, or left with Inspect)
 //   Esc: clears a drag or a pinned card; on a clean map, the title menu (title.js)
@@ -22,6 +22,8 @@ export const TOOLS = [
   { id: "M", key: "M", label: "Meat", hint: "zone meat market (drag) §12 — grey, off the books; carnivores staff it, herbivores smell it four tiles off" },
   { id: "road", key: "4", label: "Road", hint: "L-drag; Shift = straight; over water = bridge §40" },
   { id: "wall", key: "B", label: "Wall", hint: "L-drag §8; Shift = straight; across a road = a tunnel; smells, dread, cover and a killer's reach go round a wall" },
+  { id: "rail", key: "T", label: "Rail", hint: "L-drag §20 a tile, §3 a year; across a wall = a tunnel; a ride costs 0.3 of a walk and makes no traffic; not on water or a road yet" },
+  { id: "station", key: "G", label: "Station", hint: "click a rail tile §300, §100 a year — a door only beside a road; riders board and alight here" },
   { id: "use", key: "U", label: "Use", hint: "the player's line: paint lots and roads mixed / predator-only / prey-only (drag) §1 a tile — press U again to cycle; the O overlay shows it" },
   { id: "tree", key: "5", label: "Tree", hint: "plant trees (drag) §4" },
   { id: "park", key: "6", label: "Park", hint: "1×1, §150 — click" },
@@ -33,7 +35,7 @@ export const TOOLS = [
   { id: "inspect", key: "9", label: "Inspect", hint: "pin a card; left-drag pans" },
 ];
 const TOOL_BY_KEY = Object.fromEntries(TOOLS.map((t) => [t.key, t.id]));
-const PLACE_TOOLS = new Set(["park", "zoo", "fire", "police", "centre"]);
+const PLACE_TOOLS = new Set(["park", "zoo", "fire", "police", "centre", "station"]);
 const ZONE_OF = { R: ZONE.R, C: ZONE.C, I: ZONE.I, M: ZONE.M };
 const PAN_SPEED = 700; // projection px per second
 
@@ -87,6 +89,8 @@ export function createInput(canvas, app) {
         return { kind: "road", tiles: roadL(w, d.ax, d.ay, d.bx, d.by, d.shift) };
       case "wall":
         return { kind: "wall", tiles: roadL(w, d.ax, d.ay, d.bx, d.by, d.shift) };
+      case "rail":
+        return { kind: "rail", tiles: roadL(w, d.ax, d.ay, d.bx, d.by, d.shift) };
       default:
         return null;
     }
@@ -105,7 +109,7 @@ export function createInput(canvas, app) {
 
   function costLabel(op, plan) {
     const n = plan.tiles.length;
-    const name = op.kind === "use" ? `Use ${["mixed", "predator-only", "prey-only"][op.use]}` : { zone: op.zone === ZONE.R ? "R" : op.zone === ZONE.C ? "C" : op.zone === ZONE.M ? "Meat" : "I", road: "Road", wall: "Wall", tree: "Tree", bulldoze: "Bulldoze", park: "Park", zoo: "Zoo", fire: "Fire station", police: "Police station", centre: "Pacification centre" }[op.kind];
+    const name = op.kind === "use" ? `Use ${["mixed", "predator-only", "prey-only"][op.use]}` : { zone: op.zone === ZONE.R ? "R" : op.zone === ZONE.C ? "C" : op.zone === ZONE.M ? "Meat" : "I", road: "Road", wall: "Wall", rail: "Rail", station: "Station", tree: "Tree", bulldoze: "Bulldoze", park: "Park", zoo: "Zoo", fire: "Fire station", police: "Police station", centre: "Pacification centre" }[op.kind];
     if (plan.reason) return `${name}: blocked`;
     if (!n) return `${name}: nothing to do`;
     const bridges = plan.tiles.filter((t) => t.what === "bridge").length;
@@ -335,7 +339,7 @@ export function createInput(canvas, app) {
       const [tx, ty] = state.hover;
       const size = state.tool === "zoo" ? 2 : 1;
       const ok = !!state.cost && !state.cost.refused && state.cost.tiles.length > 0;
-      h.ghost = { tx, ty, w: size, h: size, ok, sprite: app.art.civic(state.tool) };
+      h.ghost = { tx, ty, w: size, h: size, ok, sprite: state.tool === "station" ? app.art.station("ns") : app.art.civic(state.tool) };
     }
     return h;
   }

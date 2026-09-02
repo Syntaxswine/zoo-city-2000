@@ -36,15 +36,19 @@ const hasWay = (world, i) => world.road[i] !== ROAD.NONE || onRail(world, i);
 export const isBarrier = (world, i) => world.wall[i] === 1 && !hasWay(world, i);
 
 /**
- * A tunnel's open axes, from the way's arms on that tile: N or S neighbour
- * → the NS axis, E or W → the EW axis, both at a crossroads, both for a stub
- * with no neighbours (a hole is a hole).
+ * A tunnel's open axes, from the arms of the way ON that tile — a road
+ * tunnel reads its road neighbours, a rail tunnel its rail neighbours (a
+ * road running beside a rail tunnel must not open it sideways; the suite
+ * caught exactly that): N or S neighbour → the NS axis, E or W → the EW
+ * axis, both at a crossroads, both for a stub with no neighbours (a hole
+ * is a hole).
  */
 export function tunnelMask(world, i) {
   const { w, h } = world;
   const tx = i % w;
   const ty = (i / w) | 0;
-  const way = (x, y) => x >= 0 && y >= 0 && x < w && y < h && hasWay(world, y * w + x);
+  const onRoad = world.road[i] !== ROAD.NONE;
+  const way = (x, y) => x >= 0 && y >= 0 && x < w && y < h && (onRoad ? world.road[y * w + x] !== ROAD.NONE : onRail(world, y * w + x));
   const ns = way(tx, ty - 1) || way(tx, ty + 1);
   const ew = way(tx + 1, ty) || way(tx - 1, ty);
   if (!ns && !ew) return AXIS_NS | AXIS_EW;

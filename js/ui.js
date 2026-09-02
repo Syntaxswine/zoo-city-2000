@@ -87,6 +87,7 @@ export function createUI(app) {
       ["fire stations", KNOBS.UPKEEP_STATION * (fig.fireStations || 0)], ["police stations", KNOBS.UPKEEP_STATION * (fig.policeStations || 0)],
       ["pacification centres", KNOBS.UPKEEP_CENTRE * (fig.centres || 0)], ["licence inspectors", fig.licence ? KNOBS.UPKEEP_LICENCE * (fig.markets || 0) : 0],
       ["walls", KNOBS.UPKEEP_WALL * (fig.walls || 0)],
+      ["rail", KNOBS.UPKEEP_RAIL * (fig.rails || 0)], ["stations", KNOBS.UPKEEP_STATION_RAIL * (fig.stations || 0)],
     ];
     const lines = raw.filter(([, v]) => v > 0).map(([name, v]) => [name, Math.round(v * k)]);
     const sum = lines.reduce((s, l) => s + l[1], 0);
@@ -266,7 +267,9 @@ export function createUI(app) {
     const lines = [];
     const head = el("div", "head");
     let what;
-    if (w.wall[i]) what = w.road[i] !== ROAD.NONE ? "Tunnel" : "Wall";
+    if (w.wall[i]) what = w.road[i] !== ROAD.NONE || w.rail[i] ? "Tunnel" : "Wall";
+    else if (w.rail[i] === 2) what = "Station";
+    else if (w.rail[i]) what = "Rail";
     else if (w.road[i] === ROAD.BRIDGE) what = "Bridge";
     else if (w.road[i] === ROAD.ROAD) what = "Road";
     else if (rep.civic === CIVIC.PARK) what = "Park";
@@ -315,6 +318,11 @@ export function createUI(app) {
       + (rep.dread ? `  dread ${rep.dread}` : "") + (rep.fireCov ? "  · fire cover" : "") + (rep.policeCov ? `  · police cover −${rep.policeCov}` : "");
     lines.push(env);
     if (w.use[i] && (rep.zone !== ZONE.NONE || w.road[i] !== ROAD.NONE)) lines.push(el("div", "warn", `use: ${USE_NAME[w.use[i]]}-only — ${w.use[i] === 1 ? "the hunters (fox, owl, wolf, cat, hawk) may live, work and walk here; nobody else" : "everyone but a hunter may live, work and walk here"}; the rest are stopped under police cover`));
+    if (w.rail[i] === 2) {
+      let door = -1;
+      for (const [dx, dy] of [[0, -1], [1, 0], [0, 1], [-1, 0]]) { const xx = tx + dx, yy = ty + dy; if (xx >= 0 && yy >= 0 && xx < w.w && yy < w.h && w.road[yy * w.w + xx] !== ROAD.NONE) { door = yy * w.w + xx; break; } }
+      lines.push(el("div", door >= 0 ? "dim" : "warn", door >= 0 ? `a station: riders board from the road at (${door % w.w},${(door / w.w) | 0}); a ride costs 0.3 of a walk and makes no traffic — neutral travel until they step off` : "a station with no road beside it: nobody can reach the platform"));
+    } else if (w.rail[i]) lines.push(el("div", "dim", "rail: trains ride it between stations at 0.3 of a walk; no road traffic, a little smoke"));
     if (w.wall[i]) lines.push(el("div", "dim", w.road[i] !== ROAD.NONE ? "a tunnel: the road runs through the wall; smells, dread and cover pass along it and nowhere else" : "a wall: smells, dread, cover and land-value halos go round it, and a killer's reach stops at it; a road through it is a tunnel"));
     if (rep.dread) lines.push(el("div", "dim", `dread ${rep.dread}: herbivores −${Math.min(KNOBS.DREAD_MOOD_CAP, Math.round(KNOBS.DREAD_MOOD_HERB * rep.dread))} mood and −${Math.round(KNOBS.DREAD_HOME_HERB * rep.dread)} on the home score; LV −${Math.round(KNOBS.LV_DREAD * rep.dread)}; carnivores do not mind`));
     for (const f of w.events.files) {
@@ -393,7 +401,7 @@ export function createUI(app) {
       if (x.e) lines.push(el("div", "warn", `trespass: ${x.e} forbidden tile${x.e === 1 ? "" : "s"} on the commute — ${x.p ? `${Math.round(x.p * 100)}% a month under this cover` : "no police cover, no stop"}`));
       const friends = c.friends.map((f) => w.byId.get(f)).filter(Boolean);
       lines.push(el("div", "dim", friends.length ? `friends: ${friends.map((f) => `${f.name} ${f.surname} (${f.species})`).join(", ")}` : "no friends yet"));
-      const doing = { commuter: "commuting", stroller: "out for a stroll", cub: "off to the park", arrival: "just arrived — walking home", meeting: "meeting a new friend" }[wk.kind] || wk.kind;
+      const doing = wk.riding ? "on the train" : { commuter: "commuting", stroller: "out for a stroll", cub: "off to the park", arrival: "just arrived — walking home", meeting: "meeting a new friend" }[wk.kind] || wk.kind;
       lines.push(el("div", "dim", doing + (c.centenary ? " · wears the centenary hat" : "")));
     } else {
       head.append(el("b", "", wk.name || cap(wk.species)), el("span", "dim", `  ${wk.species}`));
@@ -516,6 +524,8 @@ export function createUI(app) {
     tr("crime (built lots, mean / max)", `${Math.round(c.meanCrime)} / ${c.maxCrime}`);
     tr("stations", `${c.fireStations} fire · ${c.policeStations} police${c.centres ? ` · ${c.centres} pacification` : ""}`);
     if (c.walls) tr("walls · tunnels", `${c.walls} · ${c.tunnels}`);
+    if (c.railTiles || c.stations) tr("rail · stations · riders", `${c.railTiles} · ${c.stations} · ${c.riders}`);
+    if (c.commuteN) tr("mean commute (walk-steps; a ride is 0.3)", c.meanCommute.toFixed(1));
     if (c.markets) tr("meat halls", `${c.markets} (${c.Jm} jobs) · ${c.herbNear} herbivores within the smell`);
     { const j = w.events.justice || {}; const open = (w.events.files || []).filter((f) => !f.closed).length;
       if (c.usePred || c.usePrey) tr("use-zoned tiles (predator · prey)", `${c.usePred} · ${c.usePrey}`);

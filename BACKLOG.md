@@ -32,7 +32,10 @@ could ship whole.
 - Phase B use-zoning + trespass SHIPPED (SPEC §7.8, §9d). Left: the trespass
   zot (a commuter's card says it; the map does not); a "stopped" walker
   glyph; per-species stop counts.
-- Phase C rail: the proposal's §3.
+- Phase C rail SHIPPED (SPEC §7.9). Left: rail bridges (a deck sprite with
+  rails) and level crossings (a crossing sprite + the graph allows both ways
+  on one tile); a two-car train walker on busy lines; a lone rail tile draws
+  a bare pad (the wall draws its straight run — do the same).
 
 ## The title screen — SHIPPED 2026-09-02 (`js/title.js`; the owner's painting at `img/titlescreen.png`)
 - Built: NEW GAME · CONTINUE · LOAD · SAVE · OPTIONS on the painting; `Esc`

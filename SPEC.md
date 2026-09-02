@@ -73,7 +73,8 @@ so tuning changes one file.
   (0..3), `civic` (0 none, 1 park, 2 zoo anchor, 3 zoo part), `burning`
   (ticks left), `rubble` (0/1), `variant` (art seed byte), `wall` (0/1 —
   with a road or rail on the tile, a tunnel; §6b), `use` (0 mixed, 1
-  predator-only, 2 prey-only — the player's line on lots and roads; §7.8).
+  predator-only, 2 prey-only — the player's line on lots and roads; §7.8),
+  `rail` (0 none, 1 rail, 2 station; §7.9).
 - Seeded generation: one river 2–3 tiles wide as a biased random walk from one
   edge to the opposite edge (never straight); 1–2 ponds; tree clumps by seeded
   blue-noise clusters covering ~18% of land; the rest grass.
@@ -382,6 +383,31 @@ commuter's path tile-equal to `roadPath`. `save.rebuildDerived` uses the
 same search, so a loaded city takes the roads the live one took. The `O`
 overlay's `use` mode tints predator-only rust and prey-only teal.
 
+### 7.9 Rail (`rail[i]`; `fields.dial` two layers; docs/PROPOSAL-ZONING-RAIL-WALLS.md §3)
+
+The owner: *"rail … shortens commute times, lightens traffic, and allows
+neutral travel (as long as predators don't exit the train in a prey only
+zone)."* Tool `T` lays rail like a road (an L-drag, §20 a tile, §3 a year;
+grass or trees, across a wall — a tunnel; **not on water and not on a road
+in v1**: no bridges, no level crossings — BACKLOG); `G` makes a **station**
+of a rail tile (§300, §100 a year). A station is a **door only when a road
+tile touches it** (the card says so). **The commute graph has two layers:**
+walk nodes on road tiles and station tiles (a step `WALK` 10, ×6 onto a
+road the line forbids), ride nodes on rail tiles (`RAIL_COST` 3 a step —
+0.3 of a walk); the layers meet only at a station (board and alight, free).
+`dial` settles nodes in cost order; with no rail and no line it is the BFS
+node for node. **The stored path** carries the ride bit (`fields.RIDE`, bit
+15 of the `Uint16`) on the tiles the citizen rode onto; a station collapses
+to one WALKED entry whether the animal boards or alights there, so
+"predators don't exit the train in a prey only zone" is the same rule as any
+forbidden tile. The owner's three verbs, one line each: *shortens commute
+times* — `commuteTime` (a walking segment 1, a riding segment 0.3, never
+the trespass penalty) is what the mood's `≤ species.commute` reads;
+*lightens traffic* — `computeTraffic` counts walking entries only, and a
+rail tile emits `EMIT_RAIL` 1 flat with no traffic term; *neutral travel* —
+`exposure` counts walking entries only. Walkers ride at `RIDE_SPEED` ×3
+and sit 3 px up on the train (no train sprite in v1 — BACKLOG).
+
 ## 8. Budget (`js/sim/budget.js`), integer §, monthly slice of yearly figures
 
 ```
@@ -587,7 +613,7 @@ prints the exposure and the monthly chance.
 ## 11. Zoning UX (`js/input.js`, `js/ui.js`)
 
 Tool strip (field-guide chrome: one monospace row, no icons above 16 px):
-`1 R · 2 C · 3 I · M Meat · 4 Road · B Wall · U Use · 5 Tree · 6 Park · 7 Zoo · F Fire station · P Police · V Pacify ·
+`1 R · 2 C · 3 I · M Meat · 4 Road · B Wall · T Rail · G Station · U Use · 5 Tree · 6 Park · 7 Zoo · F Fire station · P Police · V Pacify ·
 8 Bulldoze · 9 Inspect · D density Low/High · Space pause · , . speed · Z undo · S save · L load · Esc menu`.
 The `O` overlay cycle is off → LV → pollution → crime (an open file is a ring) → dread → use (rust predator-only, teal prey-only) → score.
 
@@ -702,6 +728,15 @@ bend reads as folded paper); a run is one tile long so two neighbours never
 cover each other; a lone tile draws the straight E|W run. The tunnel is two
 piers either side of the road's 10-unit width and a lintel across, a
 STANDING sprite over the road tile so the road stays the road.
+
+### 12.4c Rail and the station (`js/art/rail.js`)
+
+The road's arm composition at a 6-unit bed: ballast in dark earth, a
+sleeper every two units across the arm, two rails 1.2 units either side of
+the centre line in the asphalt ramp's lightest key; the margins the road's
+grass. The station is a standing solid over a rail tile — a platform slab
+along the +a side of a N–S track (+b of an E–W one) and a shelter of two
+posts and a roof — so the track shows under the canopy.
 
 ### 12.5 Instruments
 `tools/shots.mjs --sheet` renders every family to a contact sheet PNG;
