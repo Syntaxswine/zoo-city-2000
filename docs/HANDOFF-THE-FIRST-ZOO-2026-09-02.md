@@ -31,7 +31,7 @@ measurement and SPEC gets edited — never the reverse.
   <270513546+StonePhilosopher@users.noreply.github.com>`; every commit ends
   with the Co-Authored-By line; commit messages are field notes and part of
   the archive. `.gitignore` = `Thumbs.db .DS_Store out/ node_modules/`.
-- **Before touching a file:** `node tools/check.mjs` — 91 checks, exits 1.
+- **Before touching a file:** `node tools/check.mjs` — 103 checks, exits 1.
   Green at the commit this file lands in. If it is red when you arrive, that
   is the first job; `git log -p` on the file it names is the fastest route.
 - **Run:**
@@ -574,9 +574,49 @@ the numbers and the build's rulings (§5). Three phases, three commits.
 - *Wall sprites missing from a sheet* — `allSprites()` has them
   (`allWalls()`), but `tools/shots.mjs` has no walls sheet yet (BACKLOG).
 
-Suite 80 → 91. Phases B (use-zoning + trespass) and C (rail) follow in
-their own commits; until they land, §2 and §3 of the proposal are the
-design and nothing of theirs is in the code.
+Suite 80 → 91.
+
+**Phase B — use-zoning and trespass (SPEC §7.8, §9d; `species.admits`,
+`fields.dial / commutePath / exposure`, `justice.trespassTick`).**
+- **The gate is the player's, not the species'.** `admits(use, species)` in
+  `vacantLots` and `searchJob`; nothing else in the roster changed. The
+  suite: two years after painting R prey-only and C predator-only, nobody
+  lives or works where the line forbids, and the departed are gone clean.
+- **The weighted commute replaces the BFS, node for node.** `dial()` is
+  Dial's buckets with FIFO inside a bucket and the BFS's neighbour order;
+  the frame check holds every commuter's stored path tile-equal to
+  `roadPath` on the unpainted city. `save.rebuildDerived` MUST use the same
+  search — the first run used `roadPath` and a loaded city under the line
+  took different roads (the hash caught it).
+- **The notice.** `hh.notice` (saved) counts months on a forbidding lot;
+  at 3 the household rehomes within 12 road tiles under the gate or leaves
+  ("ZONED OUT", `last.zonedOut`, `cit.zonedOutLines` → the ticker). Workers
+  on a repainted lot are released at the stale pass (`invalidatePaths` on
+  every `use` op).
+- **The stop is on the spot.** `trespassTick` draws only where `p > 0`;
+  `arrest(…, { minor: true })` sends the animal to the cells for a month
+  (`held = tick + 1`: absent for the rest of the month, released at the
+  next tick's start) with `record++`; at `RECORD_HARD` 3 the table applies
+  and the arrest record carries `hard: true`.
+
+**Traps (keyed by what you see):**
+- *A paint on the year-15 scripted clone does nothing and every check after
+  passes* — the clone cannot pay (receivership / no cash) and the op is
+  refused silently. Fund the clone through the cheat op and ASSERT the
+  paints took. The easy case cannot test.
+- *"in cells 0" after a forced stop* — a one-month sentence is
+  `held = tick + 1`, which equals `world.tick` after the tick; read the
+  stop off the arrest record and `held === tick`, not `held > tick`.
+- *Forced stops outnumber the animals in the cells* — the line was live,
+  unforced, for the fixture's 24 ticks; count this month's stops as the
+  counter's delta.
+- *Nobody is exposed* — the prey block's doors are on a mixed road; only a
+  door ON a forbidden road (or a forbidding lot) exposes anyone, and only
+  under police cover. The fixture paints the ring's north row and east
+  column, where the C and I doors are, under the station's cover.
+
+Suite 91 → 103. Phase C (rail) follows in its own commit; until it lands,
+§3 of the proposal is the design and nothing of it is in the code.
 
 ## 9. Verification recipe (what "done" looks like here)
 

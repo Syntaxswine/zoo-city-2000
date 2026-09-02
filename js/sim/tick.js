@@ -40,6 +40,7 @@ export function tick(world) {
   const lots = lotsTick(world);
   // 5. citizens
   const cit = citizensTick(world, cen, dem);
+  notices.push(...cit.zonedOutLines); // use-zoning: households that left under the player's line (SPEC §7.8)
   // 6. budget
   const bud = budgetTick(world);
   notices.push(...bud.notices);
@@ -53,7 +54,7 @@ export function tick(world) {
   // before anything counts or saves — a dead citizen must never survive a tick boundary.
   compact(world);
   // 8. history, report, advisor, milestones
-  world.last = { census: cen, demand: dem, budget: bud.fig, grew: lots.grew, decayed: lots.decayed, arrived: cit.arrived, left: cit.left, births: cit.births, deaths: cit.deaths, funerals: cit.funerals, littersLost: cit.littersLost, rehomed: cit.rehomed };
+  world.last = { census: cen, demand: dem, budget: bud.fig, grew: lots.grew, decayed: lots.decayed, arrived: cit.arrived, left: cit.left, births: cit.births, deaths: cit.deaths, funerals: cit.funerals, littersLost: cit.littersLost, rehomed: cit.rehomed, zonedOut: cit.zonedOut };
   world.notices = notices;
   const month = world.tick % 12;
   if (month === 0) {
@@ -87,7 +88,7 @@ export function refreshLast(world) {
   const dem = peekDemand(world, cen);
   const fig = yearlyFigures(world);
   const prev = world.last || {};
-  world.last = { census: cen, demand: dem, budget: fig, grew: prev.grew || 0, decayed: prev.decayed || 0, arrived: prev.arrived || 0, left: prev.left || 0, births: prev.births || 0, deaths: prev.deaths || 0, funerals: prev.funerals || 0, littersLost: prev.littersLost || 0, rehomed: prev.rehomed || 0 };
+  world.last = { census: cen, demand: dem, budget: fig, grew: prev.grew || 0, decayed: prev.decayed || 0, arrived: prev.arrived || 0, left: prev.left || 0, births: prev.births || 0, deaths: prev.deaths || 0, funerals: prev.funerals || 0, littersLost: prev.littersLost || 0, rehomed: prev.rehomed || 0, zonedOut: prev.zonedOut || 0 };
   return world.last;
 }
 

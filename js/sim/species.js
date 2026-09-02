@@ -62,6 +62,15 @@ export const SPECIES_INDEX = Object.freeze(Object.fromEntries(SPECIES.map((s, i)
 export const DIET_OF = Object.freeze(Object.fromEntries(SPECIES.map((s) => [s.id, s.diet])));
 export const HUNTERS = new Set(SPECIES.filter((s) => s.diet === "carn").map((s) => s.id));
 
+/**
+ * Use-zoning (SPEC §7.8): does a tile painted `use` admit this species?
+ * Mixed (0) admits all; predator-only (1) admits the hunters (diet carn);
+ * prey-only (2) admits everyone else — omnivores are nobody's hunter in
+ * PREY_OF and live on the prey side (the build's ruling). A GATE, on
+ * purpose: it is the player's line, not the species' preference.
+ */
+export const admits = (use, species) => use === 0 || (use === 1) === (DIET_OF[species] === "carn");
+
 // Affinity for friendship rolls: 1.0 same or allied, 0.7 neutral, 0.4 wary.
 // Raccoon 1.2 with everyone — the glue species (SPEC §7.5).
 const ALLIED = new Set(["mouse|rabbit", "bear|beaver", "owl|tortoise", "fox|owl", "cow|tortoise", "pig|raccoon", "bear|wolf", "cat|fox", "cow|pig", "hawk|owl", "pig|skunk", "raccoon|skunk"]);

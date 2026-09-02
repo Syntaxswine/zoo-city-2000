@@ -72,7 +72,8 @@ so tuning changes one file.
   `zone` (0 none, 1 R, 2 C, 3 I), `maxTier` (1 or 3; default 3), `tier`
   (0..3), `civic` (0 none, 1 park, 2 zoo anchor, 3 zoo part), `burning`
   (ticks left), `rubble` (0/1), `variant` (art seed byte), `wall` (0/1 —
-  with a road or rail on the tile, a tunnel; §6b).
+  with a road or rail on the tile, a tunnel; §6b), `use` (0 mixed, 1
+  predator-only, 2 prey-only — the player's line on lots and roads; §7.8).
 - Seeded generation: one river 2–3 tiles wide as a biased random walk from one
   edge to the opposite edge (never straight); 1–2 ponds; tree clumps by seeded
   blue-noise clusters covering ~18% of land; the rest grass.
@@ -354,6 +355,33 @@ friendship samples. Target ≤ 3 ms per tick in Node.
 
 ---
 
+### 7.8 Use-zoning — the player's line (`use[i]`; `species.admits`; docs/PROPOSAL-ZONING-RAIL-WALLS.md §2)
+
+The owner: *"zoning allows areas to be designated as being for predators,
+prey, or mixed use. mixed use is the default, but players who want a more
+granular control of their city have the option to control it."* Tool `U`
+(press again to cycle mixed → predator-only → prey-only; a rectangle brush;
+§1 a repainted tile; one undo step) paints **lots and roads**. `admits(use,
+species)`: mixed admits all; predator-only the hunters (diet carn: fox, owl,
+wolf, cat, hawk); prey-only everyone else — omnivores are nobody's hunter
+and live on the prey side. **A gate, on purpose** — it is the player's line,
+not the species' preference (§7.6's "weights never gates" is about what
+species want): `vacantLots` and `searchJob` skip what does not admit, so
+every arrival, move-out, rehome and hire goes through it. A lot repainted
+against its occupants gives the household `ZONED_OUT_MONTHS` 3 of notice
+(`hh.notice`, saved), then rehomes within 12 road tiles under the gate or
+leaves town ("ZONED OUT — …", `last.zonedOut`); its workers are released at
+the next tick's stale pass and search again. Nobody moves in the month of
+the click. **Commutes prefer the legal way:** the search is Dial's buckets
+(`fields.dial`, integer costs: a step 10, a step onto a forbidden road
+`TRESPASS_STEP` × 10 = 60), so a citizen detours up to six times longer
+before it trespasses and trespasses when that is the only way to work. With
+no line every step costs the same and the settle order is the BFS's, so the
+paths — and the traffic — are the ones the BFS made; the suite holds every
+commuter's path tile-equal to `roadPath`. `save.rebuildDerived` uses the
+same search, so a loaded city takes the roads the live one took. The `O`
+overlay's `use` mode tints predator-only rust and prey-only teal.
+
 ## 8. Budget (`js/sim/budget.js`), integer §, monthly slice of yearly figures
 
 ```
@@ -518,6 +546,26 @@ and a centre (fixed 1–7, sold 2–4, wrongful 0–1 — the 5% is rare at that
 (the push and the rehome empty the street); a jobless dormitory of 80 sees one killing every ~7 years. Population is cap-pinned
 and never moves; read killings, arrests, fixed, littersLost, herbNear.
 
+### 9d. Trespass (`justice.trespassTick`, `fields.exposure`)
+
+The owner: *"i like the idea that citizens could get arrested for being in
+the wrong section if the road is not zoned for multi use."* Each month, for
+every adult at large: `E` = walking tiles on the commute whose use forbids
+the species (a riding step never counts — rail's neutral travel; a station
+in a forbidden zone is a walking tile, so "predators don't exit the train in
+a prey only zone" is the same rule) + `TRESPASS_HOME` 4 for a forbidding
+home or job lot; `p = min(TRESPASS_MAX 0.3, TRESPASS_P 0.02 · E ·
+maxCover/60)` — **no police cover, no stop**. The stop is on the spot: a
+file opened (cause `trespass`, stain 5 within 1) and closed in the same
+`arrest()` call, never wrongful. The sentence is a **minor** while the record
+is below `RECORD_HARD` 3: the cells for `TRESPASS_MONTHS` 1 and `record++`
+(`justice.trespass` counts them; the ticker: *"TRESPASS — … was stopped on
+prey-only ground at (x,y) on the way to work. A month in the cells; offence
+2 — the next meets the sentence table."*); from the third conviction the
+§9c table applies — the owner's "multiple offenses should send the citizen
+to the meat market" for the habitual trespasser. The pinned citizen card
+prints the exposure and the monthly chance.
+
 ## 10. Goals and pacing
 
 - **Milestones** (plaque + advisor line, never a fail state): hamlet 50,
@@ -539,9 +587,9 @@ and never moves; read killings, arrests, fixed, littersLost, herbNear.
 ## 11. Zoning UX (`js/input.js`, `js/ui.js`)
 
 Tool strip (field-guide chrome: one monospace row, no icons above 16 px):
-`1 R · 2 C · 3 I · M Meat · 4 Road · B Wall · 5 Tree · 6 Park · 7 Zoo · F Fire station · P Police · V Pacify ·
+`1 R · 2 C · 3 I · M Meat · 4 Road · B Wall · U Use · 5 Tree · 6 Park · 7 Zoo · F Fire station · P Police · V Pacify ·
 8 Bulldoze · 9 Inspect · D density Low/High · Space pause · , . speed · Z undo · S save · L load · Esc menu`.
-The `O` overlay cycle is off → LV → pollution → crime (an open file is a ring) → dread → score.
+The `O` overlay cycle is off → LV → pollution → crime (an open file is a ring) → dread → use (rust predator-only, teal prey-only) → score.
 
 - **Zones, trees, bulldoze:** rectangle drag; live cost in the strip
   ("R ×36 = §180"); an unaffordable drag draws the refused hatch and does

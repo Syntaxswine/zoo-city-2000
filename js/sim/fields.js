@@ -6,7 +6,7 @@
 
 import { KNOBS } from "./rules.js";
 import { TERRAIN, ROAD, ZONE, CIVIC, idx, inBounds, N4, isStation, absent } from "./world.js";
-import { SPECIES_BY_ID, DIET_OF } from "./species.js";
+import { SPECIES_BY_ID, DIET_OF, admits } from "./species.js";
 import { forEachWithin, computeOcclusion, isBarrier } from "./reach.js";
 
 const NO_ROAD = 255;
@@ -387,6 +387,108 @@ export function edgeRoads(world) {
     if (tx === 0 || ty === 0 || tx === w - 1 || ty === h - 1) out.push(i);
   }
   return out;
+}
+
+// ---------------------------------------------------------------------------
+// The commute search (SPEC §7.8): Dial's buckets over the road graph
+// ---------------------------------------------------------------------------
+
+/** One road step, in integer cost units (rail will ride cheaper on the same scale). */
+export const WALK = 10;
+
+/** The cost of stepping ONTO road tile j as `species`: a legal step, or TRESPASS_STEP legal steps for a tile the player's line forbids. */
+export function stepCost(world, species, j) {
+  return world.use[j] && !admits(world.use[j], species) ? KNOBS.TRESPASS_STEP * WALK : WALK;
+}
+
+/**
+ * Dial's shortest paths from `from` over road tiles with integer step
+ * costs, settling nodes in cost order — FIFO within a bucket, the same
+ * neighbour order as roadPath — so where every step costs the same (a city
+ * with no use-zoning) the settle order, the prev tree and the paths are the
+ * BFS's exactly; the suite checks every commuter's path against roadPath.
+ * `settle(i, cost)` is called once per node; return true to stop early.
+ * Returns the { dist, prev } scratch (valid until the next call; dist −1 = unreached).
+ */
+export function dial(world, species, from, maxCost, settle) {
+  const { w, h, road } = world;
+  const n = w * h;
+  const dist = world._ddist || (world._ddist = new Int32Array(n));
+  const prev = world._dprev || (world._dprev = new Int32Array(n));
+  dist.fill(-1);
+  const buckets = world._dbuckets || (world._dbuckets = []);
+  for (let c = 0; c <= maxCost; c++) { if (buckets[c]) buckets[c].length = 0; else buckets[c] = []; }
+  dist[from] = 0;
+  prev[from] = -1;
+  buckets[0].push(from);
+  for (let c = 0; c <= maxCost; c++) {
+    const b = buckets[c];
+    for (let q = 0; q < b.length; q++) {
+      const i = b[q];
+      if (dist[i] !== c) continue; // settled cheaper already
+      if (settle(i, c)) { b.length = 0; return { dist, prev }; }
+      const tx = i % w;
+      const ty = (i / w) | 0;
+      for (const [dx, dy] of N4) {
+        const nx = tx + dx;
+        const ny = ty + dy;
+        if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
+        const j = ny * w + nx;
+        if (road[j] === ROAD.NONE) continue;
+        const nc = c + stepCost(world, species, j);
+        if (nc > maxCost) continue;
+        if (dist[j] !== -1 && dist[j] <= nc) continue;
+        dist[j] = nc;
+        prev[j] = i;
+        buckets[nc].push(j);
+      }
+    }
+    b.length = 0;
+  }
+  return { dist, prev };
+}
+
+/** The commute from road tile `from` to road tile `to` as `species`: { path, cost } or null past max (in walk steps). */
+export function commutePath(world, species, from, to, max = KNOBS.COMMUTE_MAX) {
+  if (from === to) return { path: new Uint16Array([from]), cost: 0 };
+  const { dist, prev } = dial(world, species, from, max * WALK, (i) => i === to);
+  if (dist[to] < 0) return null;
+  const steps = [];
+  for (let k = to; k !== -1; k = prev[k]) steps.push(k);
+  steps.reverse();
+  return { path: Uint16Array.from(steps), cost: dist[to] };
+}
+
+/**
+ * Trespass exposure (SPEC §9c): the walking tiles of the commute whose use
+ * forbids the species — a riding step (bit 15, rail) never counts: neutral
+ * travel — plus TRESPASS_HOME for a home or job lot that forbids. `cov` is
+ * the best police cover over those tiles; no police, no arrest.
+ */
+export function exposure(world, c) {
+  let e = 0;
+  let cov = 0;
+  let tile = -1;
+  if (c.path) {
+    for (let k = 0; k < c.path.length; k++) {
+      if (c.path[k] & 0x8000) continue;
+      const t = c.path[k] & 0x7fff;
+      if (world.use[t] && !admits(world.use[t], c.species)) {
+        e++;
+        if (tile < 0) tile = t;
+        if (world.policeCov[t] > cov) cov = world.policeCov[t];
+      }
+    }
+  }
+  for (const lot of [c.home, c.job]) {
+    if (lot >= 0 && world.use[lot] && !admits(world.use[lot], c.species)) {
+      e += KNOBS.TRESPASS_HOME;
+      if (tile < 0) tile = lot;
+      if (world.policeCov[lot] > cov) cov = world.policeCov[lot];
+    }
+  }
+  const p = e ? Math.min(KNOBS.TRESPASS_MAX, KNOBS.TRESPASS_P * e * cov / KNOBS.POLICE_EFFECT) : 0;
+  return { e, cov, p, tile };
 }
 
 export { idx };

@@ -125,7 +125,7 @@ export const KNOBS = {
   UPKEEP_PARK: 300,
   UPKEEP_ZOO: 1500,
   UPKEEP_STATION: 400,
-  COST: { zoneR: 5, zoneC: 8, zoneI: 8, zoneM: 12, road: 10, bridge: 40, bulldoze: 2, bulldozeTree: 4, tree: 4, park: 150, zoo: 2500, pond: 40, fire: 500, police: 500, centre: 1500, wall: 8 },
+  COST: { zoneR: 5, zoneC: 8, zoneI: 8, zoneM: 12, road: 10, bridge: 40, bulldoze: 2, bulldozeTree: 4, tree: 4, park: 150, zoo: 2500, pond: 40, fire: 500, police: 500, centre: 1500, wall: 8, use: 1 },
   // ---- crime and punishment (the owner, 2026-09-02; docs/PROPOSAL-CRIME-AND-PUNISHMENT.md) ----
   // Zone M — the grey-market meat hall: stall / meat hall / cold store.
   M_JOBS: [0, 3, 8, 16],
@@ -207,6 +207,15 @@ export const KNOBS = {
   RAID_FINE: 200,           // × tier
   UPKEEP_CENTRE: 900,
   UPKEEP_WALL: 1,           // a tile a year — masonry needs pointing
+  // use-zoning and trespass (SPEC §7.8, §9c; docs/PROPOSAL-ZONING-RAIL-WALLS.md §2)
+  TRESPASS_STEP: 6,         // a forbidden road step costs six legal ones in the commute search — a preference, not a refusal
+  TRESPASS_P: 0.02,         // per forbidden tile a month under full police cover
+  TRESPASS_MAX: 0.3,        // the cap on that
+  TRESPASS_HOME: 4,         // living or working on a forbidding lot counts as four tiles
+  TRESPASS_MONTHS: 1,       // the minor sentence: the cells
+  TRESPASS_CRIME: 5,        // the stain a stop leaves (radius 1)
+  RECORD_HARD: 3,           // from this record a trespasser meets the sentence table (the owner: multiple offences → the market)
+  ZONED_OUT_MONTHS: 3,      // a household's notice when its lot is painted against it
   LV_VAN: 6,                // land value near the centre
   LV_VAN_RADIUS: 2,
   VAN_MOOD: 5,              // carnivores within VAN_RADIUS of a centre
@@ -264,6 +273,16 @@ export const RULES = Object.freeze([
     id: "W1", title: "Walls: a field spreads by flood fill, not by a square",
     formula: "Σ amount·(1 − d/(R+1)), d = the shortest walk round the walls (8-connected, unit diagonals = the old square where none intervene); a wall blocks and receives nothing; a tunnel is open along its road — pollution, dread, crime, cover, land-value halos and a killer's reach all go round",
     live: (w) => `${w.wallCount || 0} wall tile${w.wallCount === 1 ? "" : "s"}${w.last.census.tunnels ? ` · ${w.last.census.tunnels} tunnel${w.last.census.tunnels === 1 ? "" : "s"}` : ""}`,
+  },
+  {
+    id: "U1", title: "Use-zoning: the player's line admits",
+    formula: "use ∈ {mixed, predator-only, prey-only} on lots and roads; mixed admits all, predator-only the hunters (fox, owl, wolf, cat, hawk), prey-only everyone else — a GATE on homes and jobs; a repainted household has 3 months to rehome or leaves; a forbidden road step costs ×6 in the commute search",
+    live: (w) => `${w.last.census.usePred || 0} predator-only · ${w.last.census.usePrey || 0} prey-only tiles${w.last.zonedOut ? ` · ${w.last.zonedOut} zoned out last month` : ""}`,
+  },
+  {
+    id: "U2", title: "Trespass",
+    formula: "E = forbidden walking tiles on the commute (+4 for a forbidding home or job); p = min(0.3, 0.02·E·cover/60) a month — no police, no arrest; the cells for a month and a record; the third offence meets the sentence table",
+    live: (w) => `${w.events.justice.trespass || 0} stop${w.events.justice.trespass === 1 ? "" : "s"} since founding`,
   },
   {
     id: "D5", title: "The cap: a city can only hold so many until it mixes",

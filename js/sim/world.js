@@ -14,6 +14,9 @@ export const CIVIC = Object.freeze({ NONE: 0, PARK: 1, ZOO: 2, ZOO_PART: 3, FIRE
 export const isStation = (c) => c === CIVIC.FIRE || c === CIVIC.POLICE; // coverage
 export const isCivicEmployer = (c) => isStation(c) || c === CIVIC.CENTRE; // jobs
 export const ZONE_NAME = ["none", "R", "C", "I", "M"];
+/** Use-zoning: who a lot or a road admits. Mixed is the default; the other two are the player's line, not the species' (species.js admits). */
+export const USE = Object.freeze({ MIXED: 0, PRED: 1, PREY: 2 });
+export const USE_NAME = ["mixed", "predator", "prey"];
 /** In custody (the cells or the centre): not a worker, not at home for the flight rule, not on the street. */
 export const absent = (world, c) => (c.held || 0) > world.tick;
 
@@ -44,6 +47,7 @@ export function createWorld({ seed = "zoo", w = 64, h = 64 } = {}) {
     variant: new Uint8Array(n),
     flooded: new Uint8Array(n),
     wall: new Uint8Array(n), // a wall tile; with a road or rail on it, a tunnel (SPEC §6b, sim/reach.js)
+    use: new Uint8Array(n), // the player's line: 0 mixed · 1 predator-only · 2 prey-only, on lots AND roads (SPEC §7.8)
     // derived
     roadDist: new Uint8Array(n),
     pol: new Uint8Array(n),
@@ -68,7 +72,7 @@ export function createWorld({ seed = "zoo", w = 64, h = 64 } = {}) {
     campers: [],
     nextId: 1,
     nextHouseholdId: 1,
-    events: { active: [], cooldown: 0, log: [], lastGrant: -100000, lastFestival: -100000, choice: null, noDisasters: false, scrubbers: false, revoltArmed: 0, centenaries: [], files: [], licence: false, lastLicenceOffer: -100000, lastRaid: -100000, killings: 0, arrests: [], justice: { takenIn: 0, cells: 0, wrongful: 0, exonerated: 0, cold: 0, sold: 0, pacified: 0 } },
+    events: { active: [], cooldown: 0, log: [], lastGrant: -100000, lastFestival: -100000, choice: null, noDisasters: false, scrubbers: false, revoltArmed: 0, centenaries: [], files: [], licence: false, lastLicenceOffer: -100000, lastRaid: -100000, killings: 0, arrests: [], justice: { takenIn: 0, cells: 0, wrongful: 0, exonerated: 0, cold: 0, sold: 0, pacified: 0, trespass: 0 } },
     ledger: {},
     history: [],
     log: [],

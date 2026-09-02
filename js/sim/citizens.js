@@ -7,9 +7,9 @@
 // occupant and staff counts. check.mjs recounts all of it.
 
 import { KNOBS } from "./rules.js";
-import { SPECIES, SPECIES_BY_ID, NAME_PARTS, affinity, ARRIVING, PREY_OF, DIET_OF, isPredatorOf } from "./species.js";
-import { ZONE, CIVIC, TERRAIN, ROAD, idx, inBounds, capacityOf, jobsOf, jobZone, absent } from "./world.js";
-import { roadPath, doorOf, edgeRoads, hasAccess } from "./fields.js";
+import { SPECIES, SPECIES_BY_ID, NAME_PARTS, affinity, ARRIVING, PREY_OF, DIET_OF, isPredatorOf, admits } from "./species.js";
+import { ZONE, CIVIC, TERRAIN, ROAD, idx, inBounds, capacityOf, jobsOf, jobZone, absent, USE_NAME } from "./world.js";
+import { doorOf, edgeRoads, hasAccess, commutePath, dial, WALK } from "./fields.js";
 import { ageYears, ageMonths, isWorker } from "./census.js";
 
 const SURNAMES = {
@@ -225,13 +225,14 @@ function homeScore(world, species, i, strict) {
   return s;
 }
 
-/** Vacant R lots with room for `size`, optionally limited to a set of lots. */
-function vacantLots(world, size, allowed = null) {
+/** Vacant R lots with room for `size` that ADMIT the species (use-zoning, SPEC §7.8), optionally limited to a set of lots. */
+function vacantLots(world, species, size, allowed = null) {
   const out = [];
   const n = world.w * world.h;
   for (let i = 0; i < n; i++) {
     if (world.zone[i] !== ZONE.R || world.tier[i] === 0) continue;
     if (allowed && !allowed.has(i)) continue;
+    if (!admits(world.use[i], species)) continue; // the player's line — a gate, on purpose
     if (capacityOf(world, i) - world.occupants[i] >= size) out.push(i);
   }
   return out;
@@ -240,7 +241,7 @@ function vacantLots(world, size, allowed = null) {
 function bestHome(world, species, size, strict, allowed = null) {
   let best = -1;
   let bestS = -Infinity;
-  for (const i of vacantLots(world, size, allowed)) {
+  for (const i of vacantLots(world, species, size, allowed)) {
     const s = homeScore(world, species, i, strict);
     if (s > bestS) { bestS = s; best = i; }
   }
@@ -422,7 +423,7 @@ function pickSpecies(world, weights) {
 // ---------------------------------------------------------------------------
 
 export function citizensTick(world, cen, dem) {
-  const out = { arrived: 0, left: 0, births: 0, deaths: 0, notices: [], meetings: [], funerals: 0, littersLost: 0, rehomed: 0 };
+  const out = { arrived: 0, left: 0, births: 0, deaths: 0, notices: [], meetings: [], funerals: 0, littersLost: 0, rehomed: 0, zonedOut: 0, zonedOutLines: [] };
   const rng = world.rng;
   const tick = world.tick;
   world.meetings = out.meetings;
@@ -438,6 +439,32 @@ export function citizensTick(world, cen, dem) {
     const to = bestHome(world, hh.species, hh.members.length, false);
     if (to >= 0) placeHousehold(world, hh, to);
     else removeHousehold(world, hh, "homeless");
+  }
+
+  // 0b. The player's line (use-zoning, SPEC §7.8): a household whose lot no
+  //     longer admits its species gets ZONED_OUT_MONTHS of notice, then rehomes
+  //     within 12 road tiles under the gate or leaves town. Nobody moves in
+  //     the month of the click, so a misclick and Z cost nothing.
+  for (const hh of world.households) {
+    if (hh.gone || hh.home < 0) continue;
+    if (admits(world.use[hh.home], hh.species)) { hh.notice = 0; continue; }
+    hh.notice = (hh.notice || 0) + 1;
+    if (hh.notice < KNOBS.ZONED_OUT_MONTHS) continue;
+    const from = hh.home;
+    const allowed = lotsWithinRoad(world, from, KNOBS.REHOME_RADIUS);
+    allowed.delete(from);
+    for (const id of hh.members) { const c = world.byId.get(id); c.home = -1; world.occupants[from]--; }
+    hh.home = -1;
+    const to = bestHome(world, hh.species, hh.members.length, false, allowed);
+    if (to >= 0) { placeHousehold(world, hh, to); out.rehomed++; hh.notice = 0; }
+    else {
+      const n = hh.members.length;
+      out.left += n;
+      out.zonedOut += n;
+      world.departures.push({ species: hh.species, surname: hh.surname, n, from });
+      out.zonedOutLines.push(`ZONED OUT — the ${hh.surname}s (${n === 1 ? hh.species : `${n} ${hh.species}s`}) left (${from % world.w},${(from / world.w) | 0}): the lot is ${USE_NAME[world.use[from]]}-only land now, and nothing within twelve road tiles would have them.`);
+      removeHousehold(world, hh, "zonedOut");
+    }
   }
 
   // 1. Birthdays: adulthood (move out), retirement (release the job).
@@ -859,9 +886,12 @@ function jobSearch(world, out) {
     if (!c.stale || c.dead) continue;
     c.stale = false;
     if (c.job < 0 || c.home < 0) continue;
+    // The player's line: a lot repainted against its workers releases them (they search again under the gate).
+    if (!admits(world.use[c.job], c.species)) { releaseJob(world, c); continue; }
     const a = doorOf(world, c.home);
     const b = doorOf(world, c.job);
-    const path = a != null && b != null ? roadPath(world, a, b) : null;
+    const r = a != null && b != null ? commutePath(world, c.species, a, b) : null;
+    const path = r ? r.path : null;
     if (path) c.path = path;
     else {
       world.staff[c.job]--;
@@ -898,50 +928,31 @@ function jobSearch(world, out) {
 }
 
 function searchJob(world, door, sp, openByDoor, rng) {
-  const { w, h } = world;
-  const n = w * h;
-  const dist = world._jdist || (world._jdist = new Int16Array(n));
-  const prev = world._jprev || (world._jprev = new Int32Array(n));
-  dist.fill(-1);
-  const q = world._jqueue || (world._jqueue = new Int32Array(n));
-  let head = 0;
-  let tail = 0;
-  dist[door] = 0;
-  prev[door] = -1;
-  q[tail++] = door;
+  // Dial's buckets from the door (fields.js): a legal step 10, a step onto a
+  // road the player's line forbids 60 — so a citizen takes a detour up to
+  // six times longer before it trespasses, and trespasses when that is the
+  // only way to work. With no use-zoning this is the BFS it replaced, node
+  // for node (the suite holds every commuter's path to roadPath's).
   let best = null;
   let bestS = -Infinity;
-  while (head < tail) {
-    const i = q[head++];
-    const d = dist[i];
+  const { prev } = dial(world, sp.id, door, KNOBS.COMMUTE_MAX * WALK, (i, c) => {
     const lots = openByDoor.get(i);
-    if (lots) {
-      for (const lot of lots) {
-            // A meat hall hires by diet (carnivores 0.9, omnivores 0.5, herbivores 0.1 — a weight: a rabbit takes the job when nothing else is open).
-        const pref = world.zone[lot] === ZONE.M ? KNOBS.JOB_M[DIET_OF[sp.id]] : jobZone(world, lot) === ZONE.C ? sp.jobC : sp.jobI;
-        const s = pref * (1 / (1 + d / sp.commute)) * (0.8 + 0.4 * rng.next());
-        if (s > bestS) { bestS = s; best = { lot, door: i, d }; }
-      }
+    if (!lots) return false;
+    const d = c / WALK;
+    for (const lot of lots) {
+      if (!admits(world.use[lot], sp.id)) continue; // the player's line: not open to this species
+      // A meat hall hires by diet (carnivores 0.9, omnivores 0.5, herbivores 0.1 — a weight: a rabbit takes the job when nothing else is open).
+      const pref = world.zone[lot] === ZONE.M ? KNOBS.JOB_M[DIET_OF[sp.id]] : jobZone(world, lot) === ZONE.C ? sp.jobC : sp.jobI;
+      const s = pref * (1 / (1 + d / sp.commute)) * (0.8 + 0.4 * rng.next());
+      if (s > bestS) { bestS = s; best = { lot, door: i, d, cost: c }; }
     }
-    if (d >= KNOBS.COMMUTE_MAX) continue;
-    const tx = i % w;
-    const ty = (i / w) | 0;
-    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
-      const xx = tx + dx;
-      const yy = ty + dy;
-      if (!inBounds(world, xx, yy)) continue;
-      const j = yy * w + xx;
-      if (world.road[j] === ROAD.NONE || dist[j] !== -1) continue;
-      dist[j] = d + 1;
-      prev[j] = i;
-      q[tail++] = j;
-    }
-  }
+    return false;
+  });
   if (!best) return null;
-  const path = new Uint16Array(best.d + 1);
-  let k = best.door;
-  for (let s = best.d; s >= 0; s--) { path[s] = k; k = prev[k]; }
-  best.path = path;
+  const steps = [];
+  for (let k = best.door; k !== -1; k = prev[k]) steps.push(k);
+  steps.reverse();
+  best.path = Uint16Array.from(steps);
   return best;
 }
 

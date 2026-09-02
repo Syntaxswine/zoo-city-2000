@@ -33,7 +33,7 @@ const TICK_SECONDS = 1.5;
 const SPEEDS = [1, 3, 10];
 const MAX_CATCHUP = 3;
 const AUTOSAVE_EVERY = 12;
-const OVERLAYS = ["off", "lv", "pol", "crime", "dread", "score"];
+const OVERLAYS = ["off", "lv", "pol", "crime", "dread", "use", "score"];
 const KEY = (name) => `zoo.city:${name}`;
 const AUTO = (name) => `zoo.auto:${name}`;
 const META = (name) => `zoo.meta:${name}`;
@@ -231,7 +231,7 @@ app.togglePause = () => {
 app.resume = () => { app.paused = false; app.ui.refresh(); };
 app.cycleOverlay = () => {
   app.overlays = OVERLAYS[(OVERLAYS.indexOf(app.overlays) + 1) % OVERLAYS.length];
-  app.ui.flash(app.overlays === "off" ? "Overlay off" : { lv: "Overlay: land value (greener = higher)", pol: "Overlay: pollution (browner = worse)", crime: "Overlay: crime (redder = worse; blue = police cover; a ring = an open file)", dread: "Overlay: dread (wine = a meat hall's smell; herbivores keep away)", score: "Overlay: lot score (blue grows, red decays)" }[app.overlays]);
+  app.ui.flash(app.overlays === "off" ? "Overlay off" : { lv: "Overlay: land value (greener = higher)", pol: "Overlay: pollution (browner = worse)", crime: "Overlay: crime (redder = worse; blue = police cover; a ring = an open file)", dread: "Overlay: dread (wine = a meat hall's smell; herbivores keep away)", use: "Overlay: use — rust is predator-only, teal is prey-only, untinted is mixed (U paints it)", score: "Overlay: lot score (blue grows, red decays)" }[app.overlays]);
   app.ui.refresh();
 };
 app.zoomAt = (dir, sx, sy) => {

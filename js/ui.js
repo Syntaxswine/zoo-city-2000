@@ -12,10 +12,11 @@
 //   createUI(app) → { refresh, onTick, setTool, setCost, flash, updateHover,
 //                     showChoice, hideChoice, openNewCity, closeModals, modalOpen, setWorld }
 
-import { ZONE, CIVIC, TERRAIN, ROAD, ZONE_NAME } from "./sim/world.js";
+import { ZONE, CIVIC, TERRAIN, ROAD, ZONE_NAME, USE_NAME } from "./sim/world.js";
 import { dateOf, characterLine } from "./sim/tick.js";
 import { eventTitle, TICKER_BAD, TICKER_GOOD, TICKER_FLASH } from "./sim/events.js";
 import { lotReport, REASON } from "./sim/lots.js";
+import { exposure } from "./sim/fields.js";
 import { RULES, KNOBS } from "./sim/rules.js";
 import { yearlyFigures } from "./sim/budget.js";
 import { SPECIES, SPECIES_BY_ID } from "./sim/species.js";
@@ -142,6 +143,8 @@ export function createUI(app) {
     for (const b of dom.tools.querySelectorAll("button[data-tool]")) b.classList.toggle("on", b.dataset.tool === id);
     const d = $("#density");
     if (d) { d.innerHTML = ""; d.append(el("span", "key", "D"), " ", el("span", "", density === 3 ? "High" : "Low")); d.classList.toggle("on", density === 1); }
+    const ub = dom.tools.querySelector('button[data-tool="use"]');
+    if (ub && app.input) ub.lastElementChild.textContent = `Use: ${["mixed", "pred", "prey"][app.input.state.use]}`;
   }
 
   function setCost(text, refused = false) {
@@ -311,6 +314,7 @@ export function createUI(app) {
     env.textContent = `LV ${rep.lv}  Pol ${rep.pol}  crime ${rep.crime}  road ${rep.roadDist > KNOBS.ROAD_REACH ? "—" : rep.roadDist}` + (w.road[i] ? `  traffic ${rep.traffic}` : "")
       + (rep.dread ? `  dread ${rep.dread}` : "") + (rep.fireCov ? "  · fire cover" : "") + (rep.policeCov ? `  · police cover −${rep.policeCov}` : "");
     lines.push(env);
+    if (w.use[i] && (rep.zone !== ZONE.NONE || w.road[i] !== ROAD.NONE)) lines.push(el("div", "warn", `use: ${USE_NAME[w.use[i]]}-only — ${w.use[i] === 1 ? "the hunters (fox, owl, wolf, cat, hawk) may live, work and walk here; nobody else" : "everyone but a hunter may live, work and walk here"}; the rest are stopped under police cover`));
     if (w.wall[i]) lines.push(el("div", "dim", w.road[i] !== ROAD.NONE ? "a tunnel: the road runs through the wall; smells, dread and cover pass along it and nowhere else" : "a wall: smells, dread, cover and land-value halos go round it, and a killer's reach stops at it; a road through it is a tunnel"));
     if (rep.dread) lines.push(el("div", "dim", `dread ${rep.dread}: herbivores −${Math.min(KNOBS.DREAD_MOOD_CAP, Math.round(KNOBS.DREAD_MOOD_HERB * rep.dread))} mood and −${Math.round(KNOBS.DREAD_HOME_HERB * rep.dread)} on the home score; LV −${Math.round(KNOBS.LV_DREAD * rep.dread)}; carnivores do not mind`));
     for (const f of w.events.files) {
@@ -385,6 +389,8 @@ export function createUI(app) {
       if (c.fixed) status.push(`fixed${c.wrongful ? " — the wrong animal" : ""}${c.exonerated ? ", exonerated" : ""}`);
       if (c.record) status.push(`record ${c.record}`);
       if (status.length) lines.push(el("div", "warn", status.join(" · ")));
+      const x = exposure(w, c);
+      if (x.e) lines.push(el("div", "warn", `trespass: ${x.e} forbidden tile${x.e === 1 ? "" : "s"} on the commute — ${x.p ? `${Math.round(x.p * 100)}% a month under this cover` : "no police cover, no stop"}`));
       const friends = c.friends.map((f) => w.byId.get(f)).filter(Boolean);
       lines.push(el("div", "dim", friends.length ? `friends: ${friends.map((f) => `${f.name} ${f.surname} (${f.species})`).join(", ")}` : "no friends yet"));
       const doing = { commuter: "commuting", stroller: "out for a stroll", cub: "off to the park", arrival: "just arrived — walking home", meeting: "meeting a new friend" }[wk.kind] || wk.kind;
@@ -512,6 +518,9 @@ export function createUI(app) {
     if (c.walls) tr("walls · tunnels", `${c.walls} · ${c.tunnels}`);
     if (c.markets) tr("meat halls", `${c.markets} (${c.Jm} jobs) · ${c.herbNear} herbivores within the smell`);
     { const j = w.events.justice || {}; const open = (w.events.files || []).filter((f) => !f.closed).length;
+      if (c.usePred || c.usePrey) tr("use-zoned tiles (predator · prey)", `${c.usePred} · ${c.usePrey}`);
+      if (fig.zonedOut) tr("zoned out last month", `${fig.zonedOut}`);
+      if (j.trespass) tr("trespass stops since founding", `${j.trespass}`);
       if (w.events.killings || j.takenIn || j.cells || j.sold) {
         tr("killings since founding", `${w.events.killings}`);
         tr("files open / gone cold", `${open} / ${j.cold || 0}`);

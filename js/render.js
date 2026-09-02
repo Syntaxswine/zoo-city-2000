@@ -235,6 +235,7 @@ export function createRenderer(canvas, initialWorld, art) {
         else if (mode === "pol") fill = world.pol[i] > 2 ? `rgba(128,72,40,${(world.pol[i] / 100) * 0.75})` : null;
         else if (mode === "crime") fill = world.crime[i] > 5 ? `rgba(150,50,70,${(world.crime[i] / 100) * 0.75})` : world.policeCov[i] ? "rgba(60,110,138,0.18)" : null;
         else if (mode === "dread") fill = world.dread[i] > 2 ? `rgba(110,40,70,${(world.dread[i] / 100) * 0.7})` : null;
+        else if (mode === "use") fill = world.use[i] && (world.zone[i] !== ZONE.NONE || world.road[i] !== ROAD.NONE) ? (world.use[i] === 1 ? "rgba(160,70,40,0.55)" : "rgba(40,120,130,0.55)") : null; // the player's line: rust predator-only, teal prey-only
         else if (mode === "score" && world.zone[i] !== ZONE.NONE) {
           const s = lotScore(world, i).score;
           fill = s >= 0 ? `rgba(80,110,150,${Math.min(1, s * 2) * 0.6 + 0.08})` : `rgba(170,70,60,${Math.min(1, -s * 2) * 0.6 + 0.08})`;

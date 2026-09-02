@@ -62,6 +62,8 @@ them on the real map):
 | pollution | every source spreads linearly over its radius; a lone works stinks next door, pigs and skunks dirty their lot, parks are sinks; no wind |
 | crime | `40 − 0.5·LV + 0.4·density + 3·jobless in the 3×3 + 40·unemployed share + a hall's hill + open files − police`; above 60 it costs land value and shops; it is also the killing's hazard |
 | dread | a meat hall spreads 40/70/105 over 2/3/4 tiles; LV −0.8·dread (twice a works); herbivores mind it, carnivores do not |
+| use-zoning | `U` paints lots and roads predator-only / prey-only / mixed; a gate on homes and jobs (the player's line, not the species'); a forbidden road step costs ×6 in the commute search; a repainted household has 3 months to rehome or leaves |
+| trespass | `E` forbidden walking tiles on the commute (+4 for a forbidding home or job); `p = min(0.3, 0.02·E·cover/60)` a month — no police, no stop; the cells for a month and a record; the third offence meets the sentence table |
 | walls | every area effect radiates by flood fill; a wall blocks it and receives nothing; a road through it is a tunnel, open along the road; a killer's reach stops at a wall (Glades of Arcadia's law) |
 
 The hover card's **WHY NOT** line is computed by the same function that
@@ -101,6 +103,18 @@ a walled prey compound is safe from the wolf next door. Lay a road across
 the wall and it is a tunnel: the traffic passes, and so does the smell,
 along the road and nowhere else.
 
+**The player's line.** `U` paints any lot or road *predator-only*,
+*prey-only* or back to *mixed* (the default, which plays exactly as
+before). Hunters cannot live or work on prey-only ground and prey cannot on
+predator-only; a household whose street is repainted against it has three
+months to find a home within twelve road tiles or it leaves. Commutes
+prefer the legal way round — a forbidden road step costs six legal ones in
+the search — but an animal whose only way to work crosses the line walks
+it, and under police cover it is stopped: a month in the cells and a record,
+and the third offence meets the sentence table. Rail (coming) is neutral
+travel; only where you step off counts. The `O` overlay shows the line in
+rust and teal.
+
 **Crime and punishment.** Any adult may kill a neighbour — carnivores
 likely, the unemployed twenty times likelier ("no jobs means hungry
 wolves"), prey rarely — and a grey-market **meat hall** (zone `M`) is the
@@ -130,12 +144,16 @@ mill-town with a fox problem").
 
 - `tools/playtest.mjs --layout balanced|dormitory|millbelt --schedule 15:13,22:7`
   — a scripted mayor on the real map; the SPEC's acceptance targets.
-- `tools/check.mjs` — 91 checks: ledger conservation to the §, valves
+- `tools/check.mjs` — 103 checks: ledger conservation to the §, valves
   bounded, no NaN, the dangling-id law, rosters and capacities, commutes on
   roads, determinism, save → load → continue hash-equal, input-log replay,
   the crime-and-punishment invariants, the walls (the flood reproduces the
   square byte-for-byte on a wall-less city, then cuts a works' smell behind
-  a wall and leaks it through a tunnel), the cheat op (booked under `cheat`,
+  a wall and leaks it through a tunnel), the player's line (the weighted
+  commute is the BFS tile-for-tile with no line; a rabbit takes the legal way
+  round a predator-only road and a fox the short way; two years after a
+  repaint nobody lives or works where the line forbids; a forced month stops
+  the exposed and the third offence meets the table), the cheat op (booked under `cheat`,
   logged, replayed, clamped, never undone, lifts a receivership at once),
   `budget.post` as the only cash mutator, relative imports, no
   `Math.random`, the sim blind to browser preferences, the title screen

@@ -1,6 +1,6 @@
 // input.js — mouse and keyboard → ops. SPEC §11.
 //
-//   1 R · 2 C · 3 I · 4 Road · B Wall · 5 Tree · 6 Park · 7 Zoo · 8 Bulldoze · 9 Inspect
+//   1 R · 2 C · 3 I · 4 Road · B Wall · U Use · 5 Tree · 6 Park · 7 Zoo · 8 Bulldoze · 9 Inspect
 //   D density · Space pause · , . speed · Z undo · S save · L load · O overlays
 //   +/- zoom · WASD / arrows / drag-pan (middle or right button, or left with Inspect)
 //   Esc: clears a drag or a pinned card; on a clean map, the title menu (title.js)
@@ -22,6 +22,7 @@ export const TOOLS = [
   { id: "M", key: "M", label: "Meat", hint: "zone meat market (drag) §12 — grey, off the books; carnivores staff it, herbivores smell it four tiles off" },
   { id: "road", key: "4", label: "Road", hint: "L-drag; Shift = straight; over water = bridge §40" },
   { id: "wall", key: "B", label: "Wall", hint: "L-drag §8; Shift = straight; across a road = a tunnel; smells, dread, cover and a killer's reach go round a wall" },
+  { id: "use", key: "U", label: "Use", hint: "the player's line: paint lots and roads mixed / predator-only / prey-only (drag) §1 a tile — press U again to cycle; the O overlay shows it" },
   { id: "tree", key: "5", label: "Tree", hint: "plant trees (drag) §4" },
   { id: "park", key: "6", label: "Park", hint: "1×1, §150 — click" },
   { id: "zoo", key: "7", label: "Zoo", hint: "2×2, §2,500 — click" },
@@ -40,6 +41,7 @@ export function createInput(canvas, app) {
   const state = {
     tool: "R",
     density: 3, // 3 High, 1 Low
+    use: 0, // the Use brush: 0 mixed · 1 predator-only · 2 prey-only
     hover: null, // [tx, ty] | null
     pinned: null, // tile index | null
     pinnedWalker: null,
@@ -52,7 +54,9 @@ export function createInput(canvas, app) {
 
   const world = () => app.world;
 
+  const USE_LABEL = ["mixed — everyone", "predator-only — the hunters", "prey-only — everyone but a hunter"];
   function setTool(id) {
+    if (id === "use" && state.tool === "use") { state.use = (state.use + 1) % 3; app.ui.flash(`Use brush: ${USE_LABEL[state.use]}.`); }
     state.tool = id;
     state.drag = null;
     state.cost = null;
@@ -77,6 +81,8 @@ export function createInput(canvas, app) {
         return { kind: "tree", x0: d.ax, y0: d.ay, x1: d.bx, y1: d.by };
       case "bulldoze":
         return { kind: "bulldoze", x0: d.ax, y0: d.ay, x1: d.bx, y1: d.by };
+      case "use":
+        return { kind: "use", use: state.use, x0: d.ax, y0: d.ay, x1: d.bx, y1: d.by };
       case "road":
         return { kind: "road", tiles: roadL(w, d.ax, d.ay, d.bx, d.by, d.shift) };
       case "wall":
@@ -99,7 +105,7 @@ export function createInput(canvas, app) {
 
   function costLabel(op, plan) {
     const n = plan.tiles.length;
-    const name = { zone: op.zone === ZONE.R ? "R" : op.zone === ZONE.C ? "C" : op.zone === ZONE.M ? "Meat" : "I", road: "Road", wall: "Wall", tree: "Tree", bulldoze: "Bulldoze", park: "Park", zoo: "Zoo", fire: "Fire station", police: "Police station", centre: "Pacification centre" }[op.kind];
+    const name = op.kind === "use" ? `Use ${["mixed", "predator-only", "prey-only"][op.use]}` : { zone: op.zone === ZONE.R ? "R" : op.zone === ZONE.C ? "C" : op.zone === ZONE.M ? "Meat" : "I", road: "Road", wall: "Wall", tree: "Tree", bulldoze: "Bulldoze", park: "Park", zoo: "Zoo", fire: "Fire station", police: "Police station", centre: "Pacification centre" }[op.kind];
     if (plan.reason) return `${name}: blocked`;
     if (!n) return `${name}: nothing to do`;
     const bridges = plan.tiles.filter((t) => t.what === "bridge").length;

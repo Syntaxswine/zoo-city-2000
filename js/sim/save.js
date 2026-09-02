@@ -8,11 +8,11 @@
 
 import { createWorld } from "./world.js";
 import { makeRng } from "./rng.js";
-import { computeFields, recountRosters, roadPath, doorOf } from "./fields.js";
+import { computeFields, recountRosters, commutePath, doorOf } from "./fields.js";
 import { rebuildMaps } from "./citizens.js";
 import { refreshLast } from "./tick.js";
 
-const TILE_ARRAYS = ["terrain", "road", "zone", "maxTier", "tier", "civic", "burning", "rubble", "variant", "flooded", "wall"];
+const TILE_ARRAYS = ["terrain", "road", "zone", "maxTier", "tier", "civic", "burning", "rubble", "variant", "flooded", "wall", "use"];
 
 function plainCitizen(c) {
   return {
@@ -32,7 +32,7 @@ export function toPlain(world) {
     cash: world.cash, rates: { ...world.rates }, start: world.start,
     valves: { ...world.valves }, festivalBonus: world.festivalBonus,
     citizens: world.citizens.filter((c) => !c.dead).map(plainCitizen),
-    households: world.households.filter((h) => !h.gone).map((h) => ({ id: h.id, members: h.members.slice(), home: h.home, species: h.species, surname: h.surname, arrived: h.arrived })),
+    households: world.households.filter((h) => !h.gone).map((h) => ({ id: h.id, members: h.members.slice(), home: h.home, species: h.species, surname: h.surname, arrived: h.arrived, notice: h.notice || 0 })),
     campers: world.campers.map((c) => ({ ...c })),
     nextId: world.nextId, nextHouseholdId: world.nextHouseholdId,
     events: JSON.parse(JSON.stringify({ ...world.events, log: world.events.log.slice(-200) })),
@@ -70,7 +70,9 @@ export function fromPlain(o) {
   world.campers = o.campers.map((c) => ({ ...c }));
   world.nextId = o.nextId;
   world.nextHouseholdId = o.nextHouseholdId;
+  const jDefaults = world.events.justice;
   world.events = { ...world.events, ...o.events };
+  world.events.justice = { ...jDefaults, ...(o.events.justice || {}) }; // an old save without a counter keeps 0, never NaN
   world.ledger = { ...o.ledger };
   world.history = o.history.slice();
   world.log = o.log.slice();
@@ -99,7 +101,7 @@ export function rebuildDerived(world) {
     if (c.job < 0 || c.home < 0) continue;
     const a = doorOf(world, c.home);
     const b = doorOf(world, c.job);
-    c.path = a != null && b != null ? roadPath(world, a, b) : null;
+    c.path = a != null && b != null ? (commutePath(world, c.species, a, b) || { path: null }).path : null; // the weighted commute (use-zoning), never the unit BFS: a loaded city must take the roads the live one took
   }
   computeFields(world);
   // A loaded city reads complete at once (the play-tester saw placeholders

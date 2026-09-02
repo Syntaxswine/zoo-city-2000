@@ -279,6 +279,7 @@ function auditIds(w) {
   for (const c of plainOld.citizens) { delete c.held; delete c.heldAt; delete c.fixed; delete c.record; delete c.wrongful; delete c.wrongedBy; delete c.exonerated; delete c.moodPenalty; delete c.moodPenaltyUntil; }
   delete plainOld.valves.M;
   delete plainOld.wall;
+  delete plainOld.use;
   delete plainOld.events.files; delete plainOld.events.justice; delete plainOld.events.arrests; delete plainOld.events.killings;
   let oldOk = true;
   try { const O = load(JSON.stringify(plainOld)); tick(O); tick(O); } catch (e) { oldOk = false; }
@@ -414,6 +415,91 @@ check("determinism: same seed + same inputs ⇒ same hash", stateHash(A.world) =
   for (let t = 0; t < 24; t++) { tick(F); tick(G); }
   check("walls: save → load → 24 ticks with walls hash-equals", stateHash(F) === stateHash(G), `${stateHash(F)} vs ${stateHash(G)}`);
   check("walls: the census counts them", F.last.census.walls === 11 && F.last.census.tunnels === 1, `walls ${F.last.census.walls} · tunnels ${F.last.census.tunnels}`);
+}
+
+// ---- use-zoning and trespass (docs/PROPOSAL-ZONING-RAIL-WALLS.md §2; SPEC §7.8, §9c) ----
+{
+  const { admits } = await import("../js/sim/species.js");
+  const { commutePath, roadPath, exposure } = await import("../js/sim/fields.js");
+  // Frame: with no use-zoning the weighted search IS the BFS — every commuter's stored path is roadPath's, tile for tile.
+  let pathDiff = 0, paths = 0;
+  for (const c of A.world.citizens) {
+    if (!c.path) continue;
+    paths++;
+    const p = roadPath(A.world, c.path[0], c.path[c.path.length - 1]);
+    if (!p || p.length !== c.path.length || p.some((t, k) => t !== c.path[k])) pathDiff++;
+  }
+  check("use: the weighted commute is the BFS on a city with no line (every stored path tile-equal to roadPath)", paths > 50 && pathDiff === 0, `${pathDiff} of ${paths}`);
+  // A ring road on a fresh map, the short side painted predator-only: a rabbit takes the long way, a fox the short.
+  const F = createWorld({ seed: SEED });
+  let px = -1, py = -1;
+  outer: for (let y = 4; y < F.h - 8; y++) for (let x = 4; x < F.w - 12; x++) {
+    let ok = true;
+    for (let yy = y; yy < y + 3 && ok; yy++) for (let xx = x; xx < x + 7; xx++) { const i = yy * F.w + xx; if (F.terrain[i] === 1 || F.road[i] || F.zone[i] || F.civic[i] || F.wall[i]) { ok = false; break; } }
+    if (ok) { px = x; py = y; break outer; }
+  }
+  const at = (x, y) => y * F.w + x;
+  const ring = [];
+  for (let x = px; x <= px + 6; x++) { ring.push(at(x, py)); ring.push(at(x, py + 2)); }
+  ring.push(at(px, py + 1), at(px + 6, py + 1));
+  apply(F, { kind: "road", tiles: ring });
+  const ru = apply(F, { kind: "use", use: 1, x0: px + 1, y0: py, x1: px + 5, y1: py });
+  computeFields(F);
+  const a = at(px, py), b = at(px + 6, py);
+  const rabbit = commutePath(F, "rabbit", a, b), fox = commutePath(F, "fox", a, b);
+  check("use: painting five road tiles predator-only costs §1 a tile and is undoable", ru.ok && ru.cost === 5 * KNOBS.COST.use && ru.undoable === true, `${ru.cost}`);
+  check("use: a rabbit takes the legal way round (11 tiles), a fox the short predator-only way (7)", !!rabbit && !!fox && rabbit.path.length === 11 && fox.path.length === 7, `rabbit ${rabbit && rabbit.path.length} · fox ${fox && fox.path.length}`);
+  check("use: the rabbit's way has no forbidden tile; the fox's cost is the plain walk", !!rabbit && !!fox && Array.from(rabbit.path).every((t) => admits(F.use[t], "rabbit")) && fox.cost === 60, `${fox && fox.cost}`);
+  // The gate, the notice and the stop on the scripted city: R prey-only, C predator-only, the ring's north row and east column predator-only.
+  const G = load(save(A.world));
+  const sx = G.start.tx, sy = G.start.ty;
+  const wrong0 = G.citizens.filter((c) => (c.home >= 0 && G.zone[c.home] === ZONE.R && ["fox", "owl", "wolf", "cat", "hawk"].includes(c.species)) || (c.job >= 0 && G.zone[c.job] === ZONE.C && !["fox", "owl", "wolf", "cat", "hawk"].includes(c.species))).length;
+  // The year-15 city cannot pay for a repaint (the first draft's paints were refused and every check after passed on an unpainted map —
+  // the easy case cannot test). Fund it through the cheat op, then require the paints to have taken.
+  apply(G, { kind: "cheat", amount: KNOBS.CHEAT_MAX });
+  const paints = [
+    apply(G, { kind: "use", use: 2, x0: sx - 3, y0: sy - 3, x1: sx, y1: sy + 3 }),
+    apply(G, { kind: "use", use: 1, x0: sx + 1, y0: sy - 3, x1: sx + 3, y1: sy - 1 }),
+    apply(G, { kind: "use", use: 1, x0: sx - 4, y0: sy - 4, x1: sx + 4, y1: sy - 4 }),
+    apply(G, { kind: "use", use: 1, x0: sx + 4, y0: sy - 4, x1: sx + 4, y1: sy + 4 }),
+  ];
+  computeFields(G);
+  const painted = (() => { let n = 0; for (let i = 0; i < G.w * G.h; i++) if (G.use[i]) n++; return n; })();
+  check("use: the four paints took (R prey-only, C predator-only, the ring's north row and east column predator-only)", paints.every((r) => r.ok) && painted >= 40, paints.map((r) => r.reason || r.cost).join(", ") + ` · painted ${painted}`);
+  let zonedOut = 0;
+  for (let t = 0; t < 24; t++) { tick(G); zonedOut += G.last.zonedOut || 0; }
+  const wrongHome = G.citizens.filter((c) => c.home >= 0 && !admits(G.use[c.home], c.species)).length;
+  const wrongJob = G.citizens.filter((c) => c.job >= 0 && !admits(G.use[c.job], c.species)).length;
+  check("use: two years on, nobody lives or works where the line forbids (rehomed, released or zoned out)", wrong0 > 0 && wrongHome === 0 && wrongJob === 0, `were ${wrong0} · home ${wrongHome} · job ${wrongJob} · zoned out ${zonedOut}`);
+  check("use: the zoned-out are gone clean (dangling-id law)", auditIds(G) === 0, `${auditIds(G)}`);
+  // Trespass: prey working at doors on the predator-only ring under the station's cover; force a month.
+  const stops0 = G.events.justice.trespass; // stops before the forced month: the line was live, unforced, for 24 ticks and a few animals were stopped at the real rate
+  const saveP = KNOBS.TRESPASS_P, saveM = KNOBS.TRESPASS_MAX;
+  KNOBS.TRESPASS_P = 1e6; KNOBS.TRESPASS_MAX = 1;
+  tick(G);
+  KNOBS.TRESPASS_P = saveP; KNOBS.TRESPASS_MAX = saveM;
+  const j = G.events.justice;
+  // A month in the cells ends at the next tick's start (held = tick + 1), so read the stop off the arrest record: the animal has a record, no job, and its release is due now.
+  // This month's stops off the arrest records (tick = the month just run): a minor goes to the cells to the next tick with a
+  // record and no job; an animal already at RECORD_HARD − 1 from the unforced months meets the table instead (hard).
+  const month = G.events.arrests.filter((a) => a.cause === "trespass" && a.tick === G.tick - 1);
+  const minorA = month.filter((a) => !a.hard);
+  const inCells = minorA.map((a) => G.byId.get(a.citizenId)).filter((c) => c && c.record >= 1 && c.heldAt === -1 && c.held === G.tick && c.job < 0);
+  check("use: a forced month stops the exposed — a minor's cells to the next tick, a record, no job; the counter counts the minors", minorA.length > 0 && inCells.length === minorA.length && j.trespass - stops0 === minorA.length, `this month ${month.length} (${minorA.length} minor · ${month.length - minorA.length} hard) · in cells ${inCells.length} · counter +${j.trespass - stops0}`);
+  const tline = G.events.log.filter((l) => l.id === "arrest" && /^TRESPASS/.test(l.line));
+  check("use: the ticker names the stop and uses no pronoun", tline.length > 0 && tline.every((l) => !/\b(he|she|his|her|him)\b/i.test(l.line)), tline.slice(0, 1).map((l) => l.line).join(""));
+  let hard = 0;
+  for (let t = 0; t < 24 && !hard; t++) {
+    KNOBS.TRESPASS_P = 1e6; KNOBS.TRESPASS_MAX = 1;
+    tick(G);
+    KNOBS.TRESPASS_P = saveP; KNOBS.TRESPASS_MAX = saveM;
+    hard = G.events.arrests.filter((x) => x.cause === "trespass" && x.hard).length;
+  }
+  check("use: a habitual trespasser's third offence meets the sentence table", hard > 0, `hard ${hard} · stops ${G.events.justice.trespass} · sold ${G.events.justice.sold} · taken in ${G.events.justice.takenIn}`);
+  check("use: exposure reads zero for everyone the line admits everywhere", G.citizens.filter((c) => c.path && Array.from(c.path).every((t) => admits(G.use[t], c.species)) && admits(G.use[c.home], c.species) && (c.job < 0 || admits(G.use[c.job], c.species))).every((c) => exposure(G, c).e === 0));
+  const H = load(save(G));
+  for (let t = 0; t < 12; t++) { tick(G); tick(H); }
+  check("use: save → load → 12 ticks with the line and a notice hash-equals", stateHash(G) === stateHash(H), `${stateHash(G)} vs ${stateHash(H)}`);
 }
 
 // ---- Part B: the code ----------------------------------------------------------

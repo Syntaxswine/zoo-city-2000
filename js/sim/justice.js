@@ -23,12 +23,12 @@
 // Every line names the animals and uses no pronoun — the sim has no sex.
 
 import { KNOBS } from "./rules.js";
-import { ZONE, CIVIC, inBounds, absent } from "./world.js";
+import { ZONE, CIVIC, inBounds, absent, USE_NAME } from "./world.js";
 import { DIET_OF, isPredatorOf } from "./species.js";
 import { post } from "./budget.js";
 import { removeCitizen, holdFuneral, releaseJob } from "./citizens.js";
 import { ageYears, isWorker } from "./census.js";
-import { hasAccess } from "./fields.js";
+import { hasAccess, exposure } from "./fields.js";
 import { reachFrom, forEachWithin } from "./reach.js";
 
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
@@ -273,14 +273,16 @@ function exonerate(world, culprit, notices) {
  * table (the owner's rulings): a predator's first conviction → the centre;
  * prey, or anyone already fixed → the meat hall; no hall / no bed → the cells.
  */
-export function arrest(world, f, c, wrongful, notices) {
+export function arrest(world, f, c, wrongful, notices, opts = {}) {
   const ev = world.events;
   const tick = world.tick;
   f.closed = true;
   const culprit = world.byId.get(f.culpritId);
   c.record = (c.record || 0) + 1;
+  // A minor (trespass, SPEC §9c): the cells for a month and the record — until the record reaches RECORD_HARD, when the table applies.
+  const minor = !!opts.minor && c.record < KNOBS.RECORD_HARD;
   if (wrongful) { c.wrongful = true; c.wrongedBy = f.culpritId; ev.justice.wrongful++; }
-  ev.arrests.push({ tick, tile: f.tile, citizenId: c.id, name: nameOf(c), culpritId: f.culpritId, culpritName: culprit ? nameOf(culprit) : "", wrongful, cause: f.cause, exonerated: false });
+  ev.arrests.push({ tick, tile: f.tile, citizenId: c.id, name: nameOf(c), culpritId: f.culpritId, culpritName: culprit ? nameOf(culprit) : "", wrongful, cause: f.cause, exonerated: false, hard: !!opts.minor && !minor });
   if (ev.arrests.length > 200) ev.arrests.splice(0, ev.arrests.length - 200);
   if (!wrongful) exonerate(world, c, notices);
   const why = `for the ${f.cause} at ${at(world, f.tile)}`;
@@ -288,9 +290,17 @@ export function arrest(world, f, c, wrongful, notices) {
   const tail = wrongful ? ` ${c.name} was at home on Tuesday; it was the wrong animal.${still}` : "";
   const home = c.home;
   const diet = DIET_OF[c.species];
-  const hall = c.fixed || diet === "herb" ? hallWithAccess(world, home) : -1;
+  const hall = minor ? -1 : c.fixed || diet === "herb" ? hallWithAccess(world, home) : -1;
   let line;
-  if (hall >= 0) {
+  if (minor) {
+    releaseJob(world, c);
+    c.held = tick + KNOBS.TRESPASS_MONTHS;
+    c.heldAt = -1;
+    ev.justice.trespass++;
+    const onWay = f.tile !== c.home && f.tile !== c.job;
+    const months = KNOBS.TRESPASS_MONTHS === 1 ? "A month" : `${KNOBS.TRESPASS_MONTHS} months`;
+    line = `TRESPASS — ${nameOf(c)} was stopped on ${USE_NAME[world.use[f.tile]]}-only ground at ${at(world, f.tile)}${onWay ? " on the way to work" : ", living where the line forbids"}. ${months} in the cells; offence ${c.record}${c.record === KNOBS.RECORD_HARD - 1 ? " — the next meets the sentence table" : ""}.`;
+  } else if (hall >= 0) {
     const hh = world.hhById.get(c.household);
     const family = hh ? hh.members.filter((id) => id !== c.id) : [];
     const wasFixed = c.fixed;
@@ -381,11 +391,32 @@ export function custodyTick(world, notices) {
 }
 
 /** One month of crime and punishment, after the events roll and before compact. */
+/**
+ * Trespass (SPEC §9c; the owner: "citizens could get arrested for being in
+ * the wrong section if the road is not zoned for multi use"): each month,
+ * every adult with exposure — forbidden walking tiles on the commute, or a
+ * forbidding home or job — is stopped with probability p (fields.exposure:
+ * no police cover, no arrest). The stop is on the spot: a file opened and
+ * closed in the same call, never wrongful. Draws only where p > 0.
+ */
+export function trespassTick(world, cen, notices) {
+  for (const c of world.citizens) {
+    if (c.dead || c.home < 0 || absent(world, c)) continue;
+    if (ageYears(world, c) < KNOBS.ADULT_AGE) continue;
+    const x = exposure(world, c);
+    if (x.p <= 0) continue;
+    if (!world.rng.chance(x.p)) continue;
+    const f = openFile(world, { tile: x.tile, culpritId: c.id, cause: "trespass", crime: KNOBS.TRESPASS_CRIME, radius: 1 });
+    arrest(world, f, c, false, notices, { minor: true });
+  }
+}
+
 export function justiceTick(world, cen) {
   const notices = [];
   custodyTick(world, notices);
   killingTick(world, cen, notices);
   burglaryTick(world, cen, notices);
+  trespassTick(world, cen, notices);
   filesTick(world, cen, notices);
   return notices;
 }

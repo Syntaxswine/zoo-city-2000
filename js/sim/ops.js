@@ -100,6 +100,18 @@ export function costOf(world, op) {
       }
       break;
     }
+    case "use": {
+      // The player's line (SPEC §7.8): a rectangle repaint of lots and roads to
+      // mixed / predator-only / prey-only, §1 a changed tile. Grass, water,
+      // civics and chalk-less ground take no line.
+      const v = Math.max(0, Math.min(2, op.use | 0));
+      for (const i of rect(world, op)) {
+        if (world.zone[i] === ZONE.NONE && world.road[i] === ROAD.NONE && !(world.rail && world.rail[i])) continue;
+        if (world.use[i] === v) continue;
+        add(i, C.use, "use");
+      }
+      break;
+    }
     case "wall": {
       // A wall is an L-drag like a road (SPEC §6b); across a road or rail tile it
       // is a TUNNEL. Never on water, chalk, a civic or a building — a wall
@@ -126,7 +138,7 @@ function snapshot(world, tiles) {
   return tiles.map(({ i }) => ({
     i,
     terrain: world.terrain[i], road: world.road[i], zone: world.zone[i], maxTier: world.maxTier[i],
-    tier: world.tier[i], civic: world.civic[i], rubble: world.rubble[i], wall: world.wall[i],
+    tier: world.tier[i], civic: world.civic[i], rubble: world.rubble[i], wall: world.wall[i], use: world.use[i],
   }));
 }
 
@@ -174,6 +186,7 @@ export function apply(world, op, { log = true } = {}) {
   const snap = snapshot(world, plan.tiles);
   let roads = false;
   let walls = false;
+  let lines = false; // a use repaint: every commute may prefer another way now
   for (const { i, what } of plan.tiles) {
     switch (op.kind) {
       case "zone":
@@ -231,12 +244,17 @@ export function apply(world, op, { log = true } = {}) {
         world.wall[i] = 1;
         walls = true;
         break;
+      case "use":
+        world.use[i] = Math.max(0, Math.min(2, op.use | 0));
+        lines = true;
+        break;
       default:
         break;
     }
   }
   // A wall changes what a road can reach (doors, road distance) as much as a road does; a road across a wall makes a tunnel.
   if (roads || walls) { world.roadsDirty = true; invalidatePaths(world); computeOcclusion(world); } // occlusion now, so wallCount reads live; roadDist at the tick
+  else if (lines) invalidatePaths(world); // the stale pass re-searches under the line and releases the workers it forbids
   post(world, "build", -plan.cost);
   world.undoStack = plan.evicts ? [] : [{ op, snap, cost: plan.cost, roads: roads || walls, t: world.tick }];
   if (log) world.log.push({ t: world.tick, op: stripOp(op) });
@@ -287,9 +305,10 @@ export function undo(world) {
   for (const s of u.snap) {
     if (world.tier[s.i] > 0 && s.tier === 0) continue; // something grew here since; leave it
     world.terrain[s.i] = s.terrain; world.road[s.i] = s.road; world.zone[s.i] = s.zone; world.maxTier[s.i] = s.maxTier;
-    world.tier[s.i] = s.tier; world.civic[s.i] = s.civic; world.rubble[s.i] = s.rubble; world.wall[s.i] = s.wall;
+    world.tier[s.i] = s.tier; world.civic[s.i] = s.civic; world.rubble[s.i] = s.rubble; world.wall[s.i] = s.wall; world.use[s.i] = s.use;
   }
   if (u.roads) { world.roadsDirty = true; invalidatePaths(world); computeOcclusion(world); }
+  else if (u.op.kind === "use") invalidatePaths(world);
   post(world, "build", u.cost);
   world.log.push({ t: world.tick, op: { kind: "undo" } });
   return { ok: true };
