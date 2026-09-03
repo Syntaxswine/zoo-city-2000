@@ -3,12 +3,11 @@
 // THE STEP IS NEVER SCALED, ONLY THE NUMBER OF STEPS: real time accumulates
 // and whole ticks are stepped — speed 1 = one tick per 1.5 s, ×3, ×10, pause;
 // catch-up is capped at 3 ticks a frame so a background tab does not lurch.
-// The rAF loop draws every frame. Two slots per city (round-3 play-test: the
-// autosave used to overwrite the S save, so L at year 12 gave year 12):
-//   zoo.city:<name>  the S save — a CHECKPOINT; only S and the list write it
-//   zoo.auto:<name>  the autosave — every 12 ticks, on pagehide, on hide
-// `zoo.last` remembers which city to reopen; boot resumes the newer of the
-// two. A loaded or resumed city opens PAUSED (its speed kept in
+// The rAF loop draws every frame. Named slots live under zoo.slot:<city>:<id>,
+// indexed by zoo.slots:<city>; one autosave per city is overwritten every 12
+// ticks, on pagehide and on hide. Old checkpoint/autosave keys are migrated
+// without deletion. `zoo.last` remembers which city's newest slot to reopen.
+// A loaded or resumed city opens PAUSED (its speed kept in
 // zoo.meta:<name>) so a month cannot pass before the panel is read.
 // The title screen (title.js) stands over whatever boot found — CONTINUE
 // drops it; NEW GAME / LOAD / SAVE / OPTIONS are its buttons — and comes
@@ -31,17 +30,17 @@ import { createUI } from "./ui.js";
 import { createTitle } from "./title.js";
 import { createNews } from "./news.js";
 import { KNOBS } from "./sim/rules.js";
+import { listSlots, listAllSlots, writeSlot, readSlot, deleteSlot, bytesUsed, migrate } from "./slots.js";
 
 const TICK_SECONDS = 1.5;
 const SPEEDS = [1, 3, 10];
 const MAX_CATCHUP = 3;
 const AUTOSAVE_EVERY = 12;
 const OVERLAYS = ["off", "lv", "pol", "crime", "dread", "use", "score"];
-const KEY = (name) => `zoo.city:${name}`;
-const AUTO = (name) => `zoo.auto:${name}`;
 const META = (name) => `zoo.meta:${name}`;
 const LAST = "zoo.last";
 const PREF = "zoo.pref"; // UI preferences (the cheat switch, the news read marks) — this browser's, never the city's
+const STORAGE_BUDGET = 5 * 1024 * 1024; // localStorage's usual floor; the menu labels this an estimate
 
 const canvas = document.getElementById("map");
 const app = {
@@ -61,6 +60,7 @@ const app = {
   entered: false, // a city is in play behind the title (founded, loaded or resumed): CONTINUE, SAVE and the autosave need one
   acc: 0,
   sinceSave: 0,
+  unsavedExport: null,
 };
 
 // ---- storage (guarded: private windows throw) ---------------------------------
@@ -152,20 +152,40 @@ app.undo = () => {
   else app.ui.flash(r.reason === "nothing to undo" ? "Nothing to undo (a bulldoze that turned animals out cannot be undone)." : r.reason || "Nothing to undo.");
 };
 
-/** S (auto=false) writes the checkpoint slot; the clock (auto=true) writes the autosave slot. */
-app.save = (name = app.cityName, quiet = false, auto = false) => {
-  const ok = store.set(auto ? AUTO(name) : KEY(name), save(app.world));
-  store.set(META(name), JSON.stringify({ speed: app.speed, paused: app.paused, at: Date.now() }));
-  if (!quiet) app.ui.flash(ok ? `Saved "${name}" at ${dateOf(app.world).label} — L reloads this checkpoint (autosave is separate).` : "Save failed — storage unavailable.");
-  if (ok) { store.set(LAST, name); if (!auto) app.sinceSave = 0; }
-  return ok;
+function rememberSave(name, json, result, manual) {
+  if (result.ok) {
+    store.set(META(name), JSON.stringify({ speed: app.speed, paused: app.paused, at: Date.now() }));
+    store.set(LAST, name);
+    if (manual) {
+      app.unsavedExport = null;
+      app.sinceSave = 0;
+    }
+  } else {
+    // A quota failure must not strand the city in memory: the saves panel
+    // immediately exposes exactly this JSON for copying somewhere safe.
+    app.unsavedExport = json;
+  }
+  return { ...result, json };
+}
+
+/** Write a named manual slot for the current city, or replace one by id. */
+app.saveAs = (slotName, replaceId = null) => {
+  const json = save(app.world);
+  return rememberSave(app.cityName, json, writeSlot(store, app.cityName, slotName, json, "manual", replaceId), true);
 };
 
-function readSlot(key) {
-  const json = store.get(key);
-  if (!json) return null;
-  try { return { json, tick: JSON.parse(json).tick }; } catch { return null; }
-}
+/** S opens the named-save panel. The clock calls the same entry point with auto=true. */
+app.save = (name = app.cityName, quiet = false, auto = false) => {
+  if (!auto) {
+    app.title.open();
+    app.title.showPanel("saves", "name");
+    return { ok: true, panel: true };
+  }
+  const json = save(app.world);
+  const result = rememberSave(name, json, writeSlot(store, name, "Autosave", json, "auto"), false);
+  if (!quiet && !result.ok) app.ui.flash(`Autosave failed: ${result.reason}. Open SAVE to copy the city JSON.`);
+  return result;
+};
 
 /** Adopt a saved city paused, at its saved speed. `what` names the slot for the flash. */
 function adoptSaved(json, name, what) {
@@ -177,39 +197,23 @@ function adoptSaved(json, name, what) {
   return true;
 }
 
-/** L: the checkpoint S wrote — never the autosave. */
-app.load = (name = app.cityName) => {
-  const slot = readSlot(KEY(name));
-  if (!slot) {
-    app.ui.flash(store.get(AUTO(name)) ? `No checkpoint for "${name}" yet — S saves one (the autosave only resumes a reload).` : `No save named "${name}".`);
-    return false;
-  }
-  try { return adoptSaved(slot.json, name, "Loaded"); } catch (e) { app.ui.flash(`Load failed: ${e.message}`); return false; }
+/** L opens the same saves panel as S, focused on its list. */
+app.load = () => {
+  app.title.open();
+  app.title.showPanel("saves", "list");
+  return true;
 };
 
-/** Resume the autosave slot (the list's "resume" button; boot when it is newer). */
-app.resumeAuto = (name = app.cityName) => {
-  const slot = readSlot(AUTO(name));
-  if (!slot) { app.ui.flash(`No autosave of "${name}".`); return false; }
-  try { return adoptSaved(slot.json, name, "Resumed the autosave of"); } catch (e) { app.ui.flash(`Resume failed: ${e.message}`); return false; }
+app.slots = (city = null) => city == null ? listAllSlots(store) : listSlots(store, city);
+app.slotText = (city, id) => readSlot(store, city, id)?.json || "";
+app.storageUsage = () => ({ used: bytesUsed(store), limit: STORAGE_BUDGET });
+app.loadSlot = (city, id) => {
+  const slot = readSlot(store, city, id);
+  if (!slot) { app.ui.flash("That save no longer exists."); return false; }
+  try { return adoptSaved(slot.json, city, `Loaded “${slot.name}” from`); }
+  catch (e) { app.ui.flash(`Load failed: ${e.message}`); return false; }
 };
-
-app.savedCities = () => {
-  const rows = new Map();
-  const row = (name) => { if (!rows.has(name)) rows.set(name, { name, when: name === app.cityName ? "current" : "" }); return rows.get(name); };
-  const describe = (json) => {
-    try {
-      const o = JSON.parse(json);
-      return { tick: o.tick, date: dateOf({ tick: o.tick }).label, pop: o.citizens.length };
-    } catch { return { tick: 0, date: "?", pop: "?", unreadable: true }; }
-  };
-  for (const k of store.keys()) {
-    if (k.startsWith("zoo.city:")) row(k.slice("zoo.city:".length)).saved = describe(store.get(k));
-    else if (k.startsWith("zoo.auto:")) row(k.slice("zoo.auto:".length)).auto = describe(store.get(k));
-  }
-  return [...rows.values()].sort((a, b) => a.name.localeCompare(b.name));
-};
-app.deleteCity = (name) => { store.del(KEY(name)); store.del(AUTO(name)); store.del(META(name)); };
+app.deleteSlot = (city, id) => deleteSlot(store, city, id);
 app.exportText = () => save(app.world);
 app.importText = (text) => {
   const world = load(text.trim());
@@ -260,7 +264,10 @@ function stepTick() {
   app.walkers.notify();
   app.ui.onTick(notices);
   if (app.world.events.choice) { app.paused = true; app.ui.showChoice(); }
-  if (++app.sinceSave >= AUTOSAVE_EVERY) { app.sinceSave = 0; app.save(app.cityName, true, true); }
+  if (++app.sinceSave >= AUTOSAVE_EVERY) {
+    const result = app.save(app.cityName, true, true);
+    if (result.ok) app.sinceSave = 0;
+  }
 }
 
 /** Console / verifier hook: step n whole months now (the same path the clock uses). */
@@ -300,16 +307,16 @@ function frame(now) {
 
 // ---- boot ----------------------------------------------------------------------------------
 function boot() {
+  migrate(store);
   const lastName = store.get(LAST);
-  // Resume the newer of the two slots (the autosave is usually ahead of the
-  // checkpoint; a fresh S save after a resume is the newer one).
   let slot = null;
-  let what = null; // "autosave" | "checkpoint": the slot the title's CONTINUE names
+  let what = null; // the named slot the title's CONTINUE names
   if (lastName) {
-    const saved = readSlot(KEY(lastName));
-    const auto = readSlot(AUTO(lastName));
-    if (auto && (!saved || auto.tick > saved.tick)) { slot = auto; what = "autosave"; }
-    else if (saved) { slot = saved; what = "checkpoint"; }
+    const newest = listSlots(store, lastName)[0];
+    if (newest) {
+      slot = readSlot(store, lastName, newest.id);
+      what = newest.name;
+    }
   }
   let world = null;
   let name = lastName || "zoo";

@@ -35,6 +35,7 @@ import { post } from "../js/sim/budget.js";
 import { doorOf, hasAccess, computeFields, commuteTime } from "../js/sim/fields.js";
 import { census } from "../js/sim/census.js";
 import { CIVIC } from "../js/sim/world.js";
+import { listSlots, writeSlot, readSlot, deleteSlot, bytesUsed, migrate } from "../js/slots.js";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const argv = process.argv.slice(2);
@@ -821,6 +822,87 @@ for (const f of files) {
 check("budget.post is the only cash mutator", cashMut.length === 0, cashMut.join(", "));
 check("every import is relative", absImports.length === 0, absImports.join(", "));
 check("no Math.random under js/", mathRandom.length === 0, mathRandom.join(", "));
+
+// ---- Part J': named save slots (SPEC §15) -----------------------------------
+{
+  const memoryStore = () => {
+    const data = new Map();
+    const api = {
+      limit: Infinity,
+      get: (key) => data.get(key) ?? null,
+      keys: () => data.keys(),
+      del: (key) => data.delete(key),
+      set(key, value) {
+        const next = new Map(data);
+        next.set(key, String(value));
+        let used = 0;
+        for (const [k, v] of next) used += new TextEncoder().encode(k + v).length;
+        if (used > api.limit) return false;
+        data.set(key, String(value));
+        return true;
+      },
+    };
+    return api;
+  };
+  const cityJson = (tickNo, pop = 0, pad = "") => JSON.stringify({ tick: tickNo, citizens: Array.from({ length: pop }, (_, id) => ({ id })), pad });
+
+  const mem = new Map();
+  const ids = [
+    writeSlot(mem, "menagerie", "first", cityJson(1, 1)),
+    writeSlot(mem, "menagerie", "second", cityJson(2, 2)),
+    writeSlot(mem, "menagerie", "third", cityJson(3, 3)),
+  ];
+  check("slots: three named writes list newest first",
+    ids.every((r) => r.ok) && listSlots(mem, "menagerie").map((s) => s.name).join(",") === "third,second,first");
+
+  const punctuation = writeSlot(mem, "menagerie", `mayor's “north: gate”`, cityJson(4));
+  check("slots: names preserve quotes and colons as data",
+    punctuation.ok && listSlots(mem, "menagerie")[0].name === `mayor's “north: gate”`);
+
+  const removed = deleteSlot(mem, "menagerie", ids[1].id);
+  check("slots: deleting one leaves its neighbours intact",
+    removed.ok && !readSlot(mem, "menagerie", ids[1].id)
+      && !!readSlot(mem, "menagerie", ids[0].id) && !!readSlot(mem, "menagerie", ids[2].id));
+
+  const capped = memoryStore();
+  for (let i = 1; i <= 3; i++) writeSlot(capped, "cap", `slot ${i}`, cityJson(i));
+  const beforeCap = listSlots(capped, "cap").map((s) => s.name).join(",");
+  capped.limit = bytesUsed(capped) + 32;
+  const refused = writeSlot(capped, "cap", "slot 4", cityJson(4, 0, "x".repeat(200)));
+  check("slots: a capped store refuses a fourth write without harming the first three",
+    !refused.ok && /full|unavailable/.test(refused.reason)
+      && listSlots(capped, "cap").map((s) => s.name).join(",") === beforeCap);
+
+  const old = memoryStore();
+  const checkpoint = cityJson(12, 2);
+  const automatic = cityJson(18, 3);
+  old.set("zoo.save:old town", checkpoint);
+  old.set("zoo.auto:old town", automatic);
+  old.set("zoo.city:actual old key", checkpoint);
+  const moved = migrate(old);
+  const movedAuto = listSlots(old, "old town").find((s) => s.kind === "auto");
+  const freshAuto = writeSlot(old, "old town", "Autosave", cityJson(24, 4), "auto");
+  const movedAgain = migrate(old);
+  check("slots: legacy migration is idempotent and leaves old keys untouched",
+    moved.ok && moved.migrated === 3 && movedAgain.ok && movedAgain.migrated === 0
+      && old.get("zoo.save:old town") === checkpoint && old.get("zoo.auto:old town") === automatic
+      && old.get("zoo.city:actual old key") === checkpoint && listSlots(old, "actual old key").length === 1
+      && freshAuto.ok && freshAuto.id === movedAuto.id && listSlots(old, "old town").length === 2
+      && readSlot(old, "old town", freshAuto.id).tick === 24);
+
+  const auto = memoryStore();
+  const auto1 = writeSlot(auto, "one-auto", "Autosave", cityJson(1), "auto");
+  const auto2 = writeSlot(auto, "one-auto", "Autosave", cityJson(9), "auto");
+  check("slots: autosave overwrites exactly one stable slot",
+    auto1.ok && auto2.ok && auto1.id === auto2.id && listSlots(auto, "one-auto").length === 1
+      && readSlot(auto, "one-auto", auto2.id).tick === 9);
+
+  const mainSrc = readFileSync(path.join(ROOT, "js", "main.js"), "utf8");
+  const titleSrcSlots = readFileSync(path.join(ROOT, "js", "title.js"), "utf8");
+  check("slots: S and L enter one saves panel and quota JSON has a UI path",
+    /showPanel\("saves", "name"\)/.test(mainSrc) && /showPanel\("saves", "list"\)/.test(mainSrc)
+      && /unsavedExport/.test(mainSrc) && /app\.ui\.savesPanel/.test(titleSrcSlots));
+}
 
 // the title screen (SPEC §11): the module, the mount, the owner's art — and
 // the sim never reads a browser preference (the cheat reaches it as an op).

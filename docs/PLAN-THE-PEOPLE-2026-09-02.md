@@ -954,11 +954,15 @@ checks; half a session.
 
 ### S. Saves — *"the save button only lets you save the game once, a load save menu would be better"*
 
+**Status: SHIPPED 2026-09-03.** Named manual slots, one autosave per city,
+legacy-key migration, quota-safe writes and the shared SAVE/LOAD panel are
+implemented as specified below.
+
 **Goal.** A saves menu: any number of named slots per city, save-as,
 load, delete, export and import in one place, on `S` and `L` and on the
 title screen. The autosave stays its own slot in the same list.
 
-**Today.** Two slots a city — the S checkpoint and the autosave — and S
+**Before S.** Two slots a city — the S checkpoint and the autosave — and S
 overwrites the checkpoint (BACKLOG: "a save-as name field is not built").
 
 **Design.**

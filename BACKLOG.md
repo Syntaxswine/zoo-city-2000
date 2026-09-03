@@ -4,7 +4,7 @@ Open work, ranked. The design record is `SPEC.md`; the numbers are in
 `js/sim/rules.js` (KNOBS). Later layers were labelled at design time so v1
 could ship whole.
 
-## The People — IN PROGRESS 2026-09-03 (`docs/PLAN-THE-PEOPLE-2026-09-02.md`); Part K shipped
+## The People — IN PROGRESS 2026-09-03 (`docs/PLAN-THE-PEOPLE-2026-09-02.md`); Parts K and S shipped
 The owner: *"a master plan for how to really improve zoo city … one part i'd
 like is to be able to see the residents thoughts when they walk around. a
 larger goal of relating more strongly with the individual citizens. i think
@@ -61,7 +61,7 @@ use your judgement on the rest"* → WASD pans and does nothing else anywhere
 (the news reader loses WASD stepping); number row = positions 1–10 (`0` =
 park); zoo Z · pacify V · police P · fire F · inspect I · bulldoze B;
 density D → H; undo Z → Backspace/Ctrl+Z; S → the saves menu on L and
-Ctrl+S; density and Use stay on top) · **S** saves (`js/slots.js` named slots per
+Ctrl+S; density and Use stay on top) · **S SHIPPED 2026-09-03** saves (`js/slots.js` named slots per
 city, save-as / load / overwrite / delete / export in one menu on S, L and
 the title; the autosave one slot; a full store shows the export box — a
 refusal must not lose work). The control city → `docs/fixtures/
@@ -213,9 +213,10 @@ edits two `post` sites; F edits one advisor function; D never opens them.
 - Built: NEW GAME · CONTINUE · LOAD · SAVE · OPTIONS on the painting; `Esc`
   as the pause menu; OPTIONS = the cheat switch (a GIVE ME CASH button,
   each press an op under ledger key `cheat`, the owner's "good middle
-  option") and per-city no-disasters.
-- Left: SAVE writes the current name's checkpoint only — a "save as" name
-  field is not built; no key-binding page; the painting has no credit line
+  option") and per-city no-disasters. SAVE and LOAD now share the named-slots
+  panel (save-as, load, overwrite, one-slot delete, export/import, one
+  autosave and quota-recovery JSON).
+- Left: no key-binding page; the painting has no credit line
   on the screen (the owner's — say who painted it if they want it said).
 
 ## The news — SHIPPED 2026-09-02 (SPEC §11b; `js/news.js`; 19 checks)

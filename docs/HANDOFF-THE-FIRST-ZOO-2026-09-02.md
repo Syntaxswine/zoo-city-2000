@@ -1283,3 +1283,36 @@ No later part should replace these seams. A reads `moodTerms`; B fills
 `lifeLines` and call sites; D replaces neutral `look`; E reads `majority`; F
 fills `storyTick`; H advances `meat`. The hash-neutral baseline is the tripwire
 for all six.
+
+---
+
+## 17. Session 10 — The People, Part S: named saves (2026-09-03)
+
+The one checkpoint per city is now a list of named slots. `js/slots.js` is a
+DOM-free layer over either a `Map` or the guarded browser store: counter ids,
+names as data, newest-first indexes, exact one-slot deletion, one overwritten
+autosave per city and quota-safe rollback. Boot migrates the old `zoo.city:`,
+`zoo.save:` and `zoo.auto:` keys without deleting them; the migration marker
+survives later overwrites, so an old autosave can never return on the next
+reload.
+
+SAVE and LOAD are two doors into one panel. SAVE focuses the default
+`<city> — <month year>` name; LOAD focuses the newest-first list. Each manual
+row loads, confirms an overwrite, confirms deletion of that row only, and
+exports its own JSON. The autosave row loads, deletes and exports but is only
+overwritten by the clock. The foot reports used/free storage and a current-size
+slot estimate. If a write is refused, the attempted JSON remains in the export
+textarea with a recovery notice. CONTINUE opens the newest manual or automatic
+slot belonging to the last city, paused as before.
+
+Verification on the landing tree: `node tools/check.mjs` is **174 checks,
+0 failures** (seven new Part J' checks cover plain-Map ordering and punctuation,
+one-slot deletion, capped-store rollback, legacy migration across a later
+autosave, autosave cardinality and the shared panel route). Node syntax checks
+pass, the balanced 30-year hash remains **292e7fa1**, and the local server
+returns 200 for the page, `main.js` and `slots.js`.
+The required interactive browser round remains to be repeated: this Codex
+session's installed Browser plugin rejected its own `browser-service.mjs` as
+outside the configured trusted path before it could open localhost; reconnect
+and a fresh browser session failed the same way. No alternate browser driver
+was substituted.

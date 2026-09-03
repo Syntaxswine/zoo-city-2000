@@ -31,9 +31,14 @@ No dependencies, no build. Everything under `js/sim/`, `js/art/` and
 
 ## The title screen
 
-The game opens on a painting: NEW GAME, CONTINUE (the newer of a city's
-checkpoint and autosave), LOAD (every saved city, with import and export),
-SAVE, OPTIONS. `Esc` brings it back mid-game as the pause menu. OPTIONS
+The game opens on a painting: NEW GAME, CONTINUE (the newest named slot of
+the last city), LOAD, SAVE, OPTIONS. LOAD and SAVE enter one named-saves
+panel: save as many copies as you want, load, overwrite or delete one,
+export any slot, and import city JSON. `S` focuses the save name and `L`
+focuses the list; the automatic save remains one overwritten row per city.
+If browser storage fills up, the refused save's JSON is left in the export
+box so the city can still be copied somewhere safe. `Esc` brings the title
+back mid-game as the pause menu. OPTIONS
 holds one cheat: a switch that unlocks a **GIVE ME CASH** button beside
 the treasury — §100,000 a press, booked in the ledger under `cheat` and
 written to the city's input log like any other op, so the Budget tab

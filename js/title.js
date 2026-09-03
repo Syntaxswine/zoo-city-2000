@@ -15,7 +15,8 @@
 // Budget tab's ledger says how much of the treasury came that way.
 //
 // The panels are the new-city dialog's own builders (ui.js foundForm /
-// savesList / portBox), so the N key and the title never drift apart.
+// savesPanel), so the N key and the title never drift apart. SAVE and LOAD
+// are two doors into that one panel: the name field and the slot list.
 
 import { dateOf } from "./sim/tick.js";
 import { KNOBS } from "./sim/rules.js";
@@ -31,7 +32,7 @@ const money = (v) => `§${Math.round(v).toLocaleString()}`;
 export function createTitle(app) {
   const root = document.getElementById("title");
   let shown = false;
-  let panel = null; // null | "new" | "load" | "options"
+  let panel = null; // null | "new" | "saves" | "options"
   let bootCity = null; // { name, tick, slot } while the boot-time title stands: what CONTINUE resumes
   let said = null; // the last line a flash routed here while the painting covered #flash
 
@@ -57,8 +58,8 @@ export function createTitle(app) {
   };
   mk("new", "New game", () => showPanel("new"));
   mk("continue", "Continue", () => close());
-  mk("load", "Load", () => showPanel("load"));
-  mk("save", "Save", () => app.save()); // its flash lands in the note while the title stands
+  mk("load", "Load", () => app.load());
+  mk("save", "Save", () => app.save());
   mk("options", "Options", () => showPanel("options"));
 
   const cityLine = () => {
@@ -72,11 +73,12 @@ export function createTitle(app) {
     buttons.continue.disabled = !inPlay;
     buttons.save.disabled = !inPlay;
     buttons.continue.title = inPlay ? "back to the map (Esc)" : "no city yet — NEW GAME founds one, LOAD reopens a saved one";
-    buttons.save.title = inPlay ? "save a checkpoint of this city (the autosave is a separate slot)" : "nothing to save yet";
+    buttons.load.title = "load, delete, export or import a named save";
+    buttons.save.title = inPlay ? "write a new named save of this city" : "nothing to save yet";
     for (const b of Object.values(buttons)) b.classList.remove("primary");
     (inPlay ? buttons.continue : buttons.new).classList.add("primary");
     if (!inPlay) note.textContent = "No city yet. NEW GAME founds one; LOAD reopens a saved city or imports one.";
-    else if (bootCity && bootCity.name === app.cityName && bootCity.tick === app.world.tick) note.textContent = `Continue resumes the ${bootCity.slot} of ${cityLine()}`;
+    else if (bootCity && bootCity.name === app.cityName && bootCity.tick === app.world.tick) note.textContent = `Continue loads “${bootCity.slot}” from ${cityLine()}`;
     else note.textContent = `${cityLine()} · Continue returns to the map`;
   }
 
@@ -100,7 +102,7 @@ export function createTitle(app) {
     card.innerHTML = "";
     renderMenu();
   }
-  function showPanel(which) {
+  function showPanel(which, focus = "list") {
     panel = which;
     card.innerHTML = "";
     card.hidden = false;
@@ -110,11 +112,8 @@ export function createTitle(app) {
       backRow();
       seed.focus();
       seed.select();
-    } else if (which === "load") {
-      card.append(el("h2", "", "Saved cities"));
-      app.ui.savesList(card, close, () => showPanel("load"));
-      card.append(el("h2", "", "Export / import"));
-      app.ui.portBox(card, close);
+    } else if (which === "saves") {
+      app.ui.savesPanel(card, close, () => showPanel("saves", focus), focus);
       backRow();
     } else {
       card.append(el("h2", "", "Options"));
@@ -166,7 +165,7 @@ export function createTitle(app) {
   }
 
   // ---- open / close ----------------------------------------------------------------------
-  /** `boot` + `slot` ("autosave" | "checkpoint" | null): the boot-time title over what boot found. */
+  /** `boot` + the newest slot's name: the boot-time title over what boot found. */
   function open({ boot = false, slot = null } = {}) {
     if (shown) return;
     shown = true;
@@ -187,8 +186,8 @@ export function createTitle(app) {
     root.hidden = true;
     const same = bootCity && bootCity.name === app.cityName && bootCity.tick === app.world.tick;
     const w = app.world;
-    if (same && !w.events.choice) app.ui.flash(`${bootCity.slot === "autosave" ? "Resumed the autosave of" : "Loaded"} "${app.cityName}" — ${dateOf(w).label}, paused; Space resumes.`);
-    else if (said && !same) app.ui.flash(said);
+    if (said) app.ui.flash(said);
+    else if (same && !w.events.choice) app.ui.flash(`Loaded “${bootCity.slot}” from "${app.cityName}" — ${dateOf(w).label}, paused; Space resumes.`);
     bootCity = null;
     said = null;
     document.getElementById("map").focus({ preventScroll: true });

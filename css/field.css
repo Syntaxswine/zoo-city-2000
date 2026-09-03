@@ -179,8 +179,8 @@ main { flex: 1; display: flex; min-height: 0; }
 .modalbox textarea { resize: vertical; margin: 4px 0; }
 .modalbox input[type=checkbox] { accent-color: var(--accent); margin: 0; }
 .btnrow { display: flex; gap: 6px; margin: 8px 0 0; }
-.saves .save { display: flex; align-items: center; gap: 6px; margin: 2px 0; }
-.saves .save b { font-weight: 600; }
+.saves .save { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 4px 0; }
+.saves .save b { font-weight: 600; max-width: 100%; overflow-wrap: anywhere; }
 .saves .save .dim { flex: 1; color: var(--dim); }
 
 /* ---- the title screen (js/title.js): the owner's painting under the name,

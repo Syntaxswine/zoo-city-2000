@@ -669,9 +669,10 @@ The `O` overlay cycle is off → LV → pollution → crime (an open file is a r
   (`img/titlescreen.png`, 1424×848, "center top / cover") under the name in
   letter-spaced type, five buttons on a parchment bar (NEW GAME · CONTINUE ·
   LOAD · SAVE · OPTIONS) and one card for the panels, which are the
-  new-city dialog's own builders (`foundForm`, `savesList`, `portBox` in
-  `ui.js`) so `N` and the title never drift apart. It stands at boot over
-  whatever boot resumed — CONTINUE names the slot, and the "paused; Space
+  new-city dialog's own builders (`foundForm`, `savesPanel` in `ui.js`) so
+  `N` and the title never drift apart. LOAD and SAVE are two entries to the
+  same panel (`L` focuses the slot list; `S` focuses the save-as name). It
+  stands at boot over whatever boot resumed — CONTINUE names the slot, and the "paused; Space
   resumes" flash fires when the map is actually seen — and returns on `Esc`
   (a drag or a pinned card is cleared first) or the strip's `menu`. Under
   it the clock is stopped (`modalOpen()` counts it) and the map is not
@@ -906,7 +907,19 @@ at a 12-px sprite to decide is how you see what you expected.
 - **The input log** `log: [{t, op}]` is every player op with its tick.
   `check.mjs` replays the log from the seed and requires the same hash; save
   at year 10 → load → 10 more years must hash-equal the straight run.
-- localStorage slot per city name + export/import textarea.
+- **Browser slots** (`js/slots.js`, DOM-free): any number of named manual
+  slots per city plus exactly one overwritten autosave. The index is
+  `zoo.slots:<city>` and values are `zoo.slot:<city>:<id>`; ids are counters
+  and names are data, so punctuation is safe. `listSlots` is newest first.
+  LOAD and SAVE share one panel with save-as, load, confirmed overwrite,
+  confirmed one-slot delete, per-slot export, import and an estimated
+  used/free byte count. CONTINUE loads the newest slot of `zoo.last`.
+- Autosave runs every 12 ticks and on hide/page exit, updating its one row.
+  A failed write returns a reason without changing earlier slots and leaves
+  the current city JSON in the panel's export textarea for recovery.
+- On boot, `migrate(store)` copies legacy `zoo.city:<city>`,
+  `zoo.save:<city>` and `zoo.auto:<city>` values into slots idempotently;
+  it never deletes the old keys.
 - `zoo.pref` — this browser's preferences (the cheat switch, §8): not a
   city, not saved with one, never read by the sim (the suite greps for it).
 

@@ -3,7 +3,7 @@
 // Everything here is DOM: the tool strip, the three demand bars over the map,
 // the date/cash/population/approval strip, the hover card, the four tabs
 // (Rules · Budget · Census · News), the CHOICE card and the new-city dialog —
-// whose three builders (foundForm, savesList, portBox) the title screen
+// whose builders (foundForm, savesPanel) the title screen
 // (title.js) mounts on its own card. The cheat's button beside the treasury
 // lives here too; the Options switch that unlocks it is title.js's.
 // The card's WHY NOT line is `lotReport().score.reason` — the same
@@ -141,8 +141,8 @@ export function createUI(app) {
     mk("btnFaster", ".", "faster", ". faster", () => app.setSpeed(1));
     sep();
     mk("btnUndo", "Z", "undo", "Z: undo the last op (this month only)", () => app.undo());
-    mk("btnSave", "S", "save", "S: save a checkpoint of this city (the autosave is a separate slot)", () => app.save());
-    mk("btnLoad", "L", "load", "L: reload this city's S checkpoint (not the autosave)", () => app.load());
+    mk("btnSave", "S", "save", "S: open named saves with the save-as name focused", () => app.save());
+    mk("btnLoad", "L", "load", "L: open named saves on the slot list", () => app.load());
     mk("btnOverlay", "O", "overlay", "O: cycle land value / pollution / crime / lot score overlays", () => app.cycleOverlay());
     mk("btnNews", "R", "news", "R: the news — every dispatch this city ever made, oldest first; ← → step one at a time", () => app.news.toggle());
     mk("btnZoom", "+", "zoom", "+ / −: zoom ×1 / ×2", () => app.zoomAt(app.camera.zoom === 1 ? 1 : -1));
@@ -698,9 +698,9 @@ export function createUI(app) {
     return `${a}-${b}-${(Date.now() % 997).toString(36)}`;
   }
 
-  // The three pieces of the dialog are builders the title screen (title.js)
-  // mounts on its own card: the found form, the saved-cities list, the port
-  // box. Checkbox ids are per instance — the N dialog and the title can both
+  // These dialog pieces are builders the title screen (title.js) mounts on
+  // its own card: the found form and the one named-saves panel. Checkbox ids
+  // are per instance — the N dialog and the title can both
   // be in the DOM.
   let uid = 0;
 
@@ -734,32 +734,44 @@ export function createUI(app) {
     return seed;
   }
 
-  /** Two slots a city: the S checkpoint ("load") and the autosave ("resume"). `done()` after a load; `again()` rebuilds after a delete. */
-  function savesList(box, done, again) {
+  const formatBytes = (n) => n < 1024 ? `${n} B` : n < 1024 * 1024 ? `${(n / 1024).toFixed(1)} KB` : `${(n / 1024 / 1024).toFixed(2)} MB`;
+
+  /** Every named slot, newest first. `again()` rebuilds after a write/delete. */
+  function savesList(box, done, again, exportJson) {
     const list = el("div", "saves");
-    const saves = app.savedCities();
-    if (!saves.length) list.append(el("div", "dim", "none yet — S saves the current city"));
+    const saves = app.slots();
+    if (!saves.length) list.append(el("div", "dim", "none yet — SAVE writes a named copy of the current city"));
     for (const s of saves) {
       const r = el("div", "save");
-      const bits = [];
-      if (s.saved) bits.push(`saved ${s.saved.date} · ${s.saved.pop} animals`);
-      if (s.auto) bits.push(`autosave ${s.auto.date} · ${s.auto.pop} animals`);
-      if (s.when) bits.push(s.when);
-      r.append(el("b", "", s.name), el("span", "dim", ` ${bits.join(" · ")}`));
+      r.append(el("b", "", s.name), el("span", "dim", `${s.city} · ${s.date} · ${s.pop} animals · ${formatBytes(s.bytes)}${s.kind === "auto" ? " · automatic" : ""}`));
       const load = el("button", "", "load");
-      load.title = s.saved ? "the S checkpoint" : "no checkpoint — S saves one";
-      load.disabled = !s.saved;
-      load.addEventListener("click", () => { if (app.load(s.name)) done(); });
+      load.title = `load “${s.name}” from ${s.city}`;
+      load.addEventListener("click", () => { if (app.loadSlot(s.city, s.id)) done(); });
       r.append(load);
-      if (s.auto) {
-        const res = el("button", "", "resume");
-        res.title = "the autosave (every 12 months and on leaving the page)";
-        res.addEventListener("click", () => { if (app.resumeAuto(s.name)) done(); });
-        r.append(res);
+      if (s.kind === "manual") {
+        const over = el("button", "", "overwrite");
+        over.disabled = !app.entered || s.city !== app.cityName;
+        over.title = over.disabled ? "load this city before overwriting its slot" : `replace “${s.name}” with the city now in play`;
+        over.addEventListener("click", () => {
+          if (!confirm(`Overwrite “${s.name}” with ${dateOf(app.world).label}?`)) return;
+          const result = app.saveAs(s.name, s.id);
+          if (!result.ok) { exportJson(result.json, `Overwrite failed: ${result.reason}. Copy the city JSON below.`); return; }
+          again();
+          if (app.title?.isOpen()) app.title.say(`Overwrote “${s.name}” at ${dateOf(app.world).label}.`);
+          else flash(`Overwrote “${s.name}” at ${dateOf(app.world).label}.`);
+        });
+        r.append(over);
       }
       const del = el("button", "", "delete");
-      del.addEventListener("click", () => { if (confirm(`Delete "${s.name}" (checkpoint and autosave)?`)) { app.deleteCity(s.name); again(); } });
-      r.append(del);
+      del.addEventListener("click", () => {
+        if (!confirm(`Delete only “${s.name}” from “${s.city}”?`)) return;
+        const result = app.deleteSlot(s.city, s.id);
+        if (!result.ok) { flash(`Delete failed: ${result.reason}`); return; }
+        again();
+      });
+      const ex = el("button", "", "export");
+      ex.addEventListener("click", () => exportJson(app.slotText(s.city, s.id), `Exporting “${s.name}” — copy the city JSON below.`));
+      r.append(del, ex);
       list.append(r);
     }
     box.append(list);
@@ -767,13 +779,15 @@ export function createUI(app) {
   }
 
   /** Export the current city as text / import one. `done()` after an import. */
-  function portBox(box, done) {
+  function portBox(box, done, initialText = "") {
     const ta = el("textarea");
     ta.rows = 4;
     ta.spellcheck = false;
     ta.placeholder = "paste a city here and press IMPORT — or EXPORT the current one";
+    ta.value = initialText;
     const br = el("div", "btnrow");
     const ex = el("button", "", "EXPORT current");
+    ex.disabled = !app.entered;
     ex.addEventListener("click", () => { ta.value = app.exportText(); ta.select(); });
     const im = el("button", "", "IMPORT");
     im.addEventListener("click", () => { try { app.importText(ta.value); done(); } catch (e) { flash(`Import failed: ${e.message}`); } });
@@ -782,15 +796,60 @@ export function createUI(app) {
     return ta;
   }
 
+  /** SAVE and LOAD both open this panel; `focus` chooses the useful first control. */
+  function savesPanel(box, done, again, focus = "list") {
+    let ta = null;
+    const exportJson = (json, message) => {
+      ta.value = json || "";
+      ta.focus();
+      ta.select();
+      if (app.title?.isOpen()) app.title.say(message);
+      else flash(message);
+    };
+    let name = null;
+    if (app.entered) {
+      box.append(el("h2", "", "Save this city"));
+      const row = el("div", "row");
+      row.append(el("label", "", "name"));
+      name = el("input");
+      name.type = "text";
+      name.value = `${app.cityName} — ${dateOf(app.world).label}`;
+      name.spellcheck = false;
+      const go = el("button", "primary", "SAVE AS");
+      const write = () => {
+        const result = app.saveAs(name.value);
+        if (!result.ok) { exportJson(result.json, `Save failed: ${result.reason}. Copy the city JSON below.`); return; }
+        const savedName = name.value.trim();
+        again();
+        if (app.title?.isOpen()) app.title.say(`Saved “${savedName}” at ${dateOf(app.world).label}.`);
+        else flash(`Saved “${savedName}” at ${dateOf(app.world).label}.`);
+      };
+      go.addEventListener("click", write);
+      name.addEventListener("keydown", (e) => { if (e.key === "Enter") write(); });
+      row.append(name, go);
+      box.append(row);
+    }
+    box.append(el("h2", "", "Named saves"));
+    savesList(box, done, again, exportJson);
+    const usage = app.storageUsage();
+    const free = Math.max(0, usage.limit - usage.used);
+    const sampleBytes = app.entered ? new TextEncoder().encode(app.exportText()).length : 0;
+    const room = sampleBytes ? ` · roughly ${Math.floor(free / sampleBytes)} more saves this size` : "";
+    box.append(el("p", "note", `Used ${formatBytes(usage.used)} of about ${formatBytes(usage.limit)} · about ${formatBytes(free)} free${room}. Autosave keeps exactly one slot per city.`));
+    if (app.unsavedExport) box.append(el("p", "note", "The last save was refused by browser storage. Its complete city JSON is preserved below — copy it before leaving this page."));
+    box.append(el("h2", "", "Export / import"));
+    ta = portBox(box, done, app.unsavedExport || "");
+    if (focus === "name" && name) { name.focus(); name.select(); }
+    else if (focus === "list") (box.querySelector(".saves button") || ta).focus();
+    return name || ta;
+  }
+
   function openNewCity() {
     dom.newcity.innerHTML = "";
     const box = el("div", "modalbox wide");
     box.append(el("h2", "", "A new city"));
     const seed = foundForm(box, closeModals);
-    box.append(el("h2", "", "Saved cities"));
-    savesList(box, closeModals, openNewCity);
-    box.append(el("h2", "", "Export / import"));
-    portBox(box, closeModals);
+    savesPanel(box, closeModals, openNewCity);
     const close = el("button", "", "close");
     close.addEventListener("click", closeModals);
     const closeRow = el("div", "btnrow");
@@ -827,5 +886,5 @@ export function createUI(app) {
   hideChoice();
   closeModals();
 
-  return { refresh, onTick, setTool, setCost, flash, updateHover, showChoice, hideChoice, openNewCity, closeModals, modalOpen, setWorld, foundForm, savesList, portBox, get tab() { return tab; } };
+  return { refresh, onTick, setTool, setCost, flash, updateHover, showChoice, hideChoice, openNewCity, closeModals, modalOpen, setWorld, foundForm, savesPanel, savesList, portBox, get tab() { return tab; } };
 }
