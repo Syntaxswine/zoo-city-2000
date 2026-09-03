@@ -354,8 +354,14 @@ export function createUI(app) {
     head.append(el("b", "", `(${rep.part ? `${rep.at.tx},${rep.at.ty}` : `${tx},${ty}`}) ${what}`));
     if (rep.zone !== ZONE.NONE) {
       const t = rep.tier;
-      const name = rep.landmark ? `3×3 ${rep.landmark.name}` : rep.side > 1 ? `${rep.side}×${rep.side} ${BLOCK_NAME[rep.side][rep.zone - 1]}` : rep.shop ? `tier 1 ${rep.shop.name}` : `tier ${t} ${TIER_NAME[t][rep.zone - 1]}`;
-      head.append(el("span", "dim", t ? `  ${name}` : "  zoned, empty"));
+      // LAZY, and it must stay lazy: on a zoned but EMPTY lot `t` is 0 and
+      // TIER_NAME has no row 0, so building the string eagerly throws. It sat
+      // inside the ternary below until the blocks commit hoisted it out to a
+      // const, and from that day hovering a lot you had just zoned threw
+      // inside the rAF frame — which never rescheduled, so the whole game
+      // froze. See the handoff's trap table.
+      const name = () => (rep.landmark ? `3×3 ${rep.landmark.name}` : rep.side > 1 ? `${rep.side}×${rep.side} ${BLOCK_NAME[rep.side][rep.zone - 1]}` : rep.shop ? `tier 1 ${rep.shop.name}` : `tier ${t} ${TIER_NAME[t][rep.zone - 1]}`);
+      head.append(el("span", "dim", t ? `  ${name()}` : "  zoned, empty"));
       if (t) {
         const occ = rep.zone === ZONE.R ? `occ ${rep.occupants}/${rep.capacity}` : `jobs ${rep.staff}/${rep.jobs}`;
         head.append(el("span", "", `  ${occ}`));

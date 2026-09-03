@@ -285,7 +285,34 @@ function clampCamera() {
 
 let last = performance.now();
 let hoverAt = 0;
+let frameFaults = 0; // one throw used to end the game — see `frame` below
+
+/**
+ * ONE BAD FRAME MUST NOT END THE GAME. `requestAnimationFrame(frame)` is the
+ * last line of the loop, so anything that threw above it — a card that read a
+ * table row it did not have, a sprite that came back undefined — stopped the
+ * loop for good: no ticks, no drawing, no input. It reads to a player as a
+ * hang with nothing in the window to explain it, and it cost the owner a
+ * session (a hover on a lot they had just zoned; handoff §23).
+ *
+ * So the body is guarded and the loop always reschedules. The fault is NOT
+ * swallowed: the first few go to the console with their stack, and the player
+ * is told once that the panel stumbled, so a real bug is still loud — it is
+ * simply no longer fatal. The suite, not this catch, is what keeps the card
+ * honest (check.mjs Part U' runs the real one over every tile state).
+ */
 function frame(now) {
+  try {
+    frameBody(now);
+  } catch (e) {
+    frameFaults++;
+    if (frameFaults <= 5) console.error(`frame ${frameFaults}:`, e);
+    if (frameFaults === 1 && app.ui) app.ui.flash("Something in the panel stumbled — the game keeps running; the console has it.");
+  }
+  requestAnimationFrame(frame);
+}
+
+function frameBody(now) {
   const dt = Math.min(0.25, (now - last) / 1000);
   last = now;
   if (!app.paused && !app.ui.modalOpen()) {
@@ -304,7 +331,6 @@ function frame(now) {
     app.renderer.draw(app.camera, app.input.hover(), app.walkers, app.overlays, dt);
     if (now - hoverAt > 90) { hoverAt = now; app.ui.updateHover(app.input.hoverInfo()); }
   }
-  requestAnimationFrame(frame);
 }
 
 // ---- boot ----------------------------------------------------------------------------------

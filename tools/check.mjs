@@ -3269,6 +3269,119 @@ function costOfBulldoze(w, x, y) { return (0, costOfOp)(w, { kind: "bulldoze", x
   }
 }
 
+// ---- Part U': the PANEL, actually run (js/ui.js; tools/dom-shim.mjs) --------
+//
+// This section exists because of a freeze the owner hit on 2026-09-03: hover a
+// lot you have just zoned and the card threw. `TIER_NAME` has rows 1, 2, 3 —
+// there is no row 0 — and the name string was built EAGERLY beside the ternary
+// that only uses it when the tier is non-zero, so `TIER_NAME[0][0]` was read on
+// every empty lot. The throw landed inside main.js's rAF frame, one line above
+// `requestAnimationFrame(frame)`, so the loop never rescheduled: no ticks, no
+// drawing, no input, nothing in the window to say why. The line had been safe
+// until the blocks commit hoisted it out of the ternary into a `const`.
+//
+// Nothing in the suite could see it, because NOTHING IN THE SUITE HAD EVER RUN
+// `js/ui.js`. Two greps read it as text; the panel — the game's largest text
+// surface, the card, the tabs, the census, the rules — was never executed. So:
+// a DOM shim thin enough to be honest, the REAL createUI, and a sweep over
+// every distinct tile state a thirty-year city holds, hovered and pinned.
+{
+  const { installDom, textOf, stubApp } = await import("./dom-shim.mjs");
+  installDom();
+  const { createUI } = await import("../js/ui.js");
+  const { TERRAIN, CIVIC: CIV } = await import("../js/sim/world.js");
+
+  // The scripted city A already has thirty years of states in it; add by hand
+  // the ones a mayor never makes, so the sweep meets them too.
+  const U = load(A.saved);
+  computeFields(U);
+  const uat = (x, y) => y * U.w + x;
+  const spare = [];
+  for (let y = 2; y < U.h - 2 && spare.length < 12; y++) for (let x = 2; x < U.w - 2; x++) {
+    const i = uat(x, y);
+    if (U.terrain[i] !== 0 || U.road[i] || U.zone[i] || U.civic[i] || U.wall[i] || U.rail[i] || U.tier[i]) continue;
+    spare.push(i);
+    if (spare.length >= 12) break;
+  }
+  // zoned but EMPTY, every zone at both densities — the owner's case
+  const empties = [];
+  for (const [k, z] of [["R", ZONE.R], ["C", ZONE.C], ["I", ZONE.I], ["M", ZONE.M]]) {
+    for (const density of [1, 3]) {
+      const i = spare.pop();
+      if (i === undefined) continue;
+      U.zone[i] = z; U.maxTier[i] = density; U.tier[i] = 0;
+      empties.push({ i, k, density });
+    }
+  }
+  // and the states a card can meet that a calm town may not have today
+  if (spare.length) { const i = spare.pop(); U.zone[i] = ZONE.R; U.tier[i] = 1; U.rubble[i] = 4; }
+  if (spare.length) { const i = spare.pop(); U.zone[i] = ZONE.C; U.tier[i] = 2; U.burning[i] = 2; }
+  if (spare.length) { const i = spare.pop(); U.zone[i] = ZONE.I; U.tier[i] = 1; U.flooded[i] = 1; }
+
+  const ui = createUI(stubApp(U));
+  const stateKey = (i) => [U.zone[i], U.tier[i], U.big[i], U.civic[i], U.road[i], U.rail[i], U.wall[i], U.terrain[i], U.rubble[i] > 0 ? 1 : 0, U.burning[i] > 0 ? 1 : 0, U.flooded[i] > 0 ? 1 : 0, U.theme[i] > 0 ? 1 : 0, U.use[i], U.maxTier[i]].join("/");
+  const seen = new Map();
+  const throwsAt = [];
+  let blank = 0;
+  for (let i = 0; i < U.w * U.h; i++) {
+    const k = stateKey(i);
+    if (seen.has(k)) continue;
+    seen.set(k, i);
+    for (const pinned of [false, true]) {
+      try {
+        ui.updateHover({ tile: i, pinned });
+        if (!textOf(document.getElementById("card")).trim()) blank++;
+      } catch (e) {
+        throwsAt.push(`${i % U.w},${(i / U.w) | 0} [${k}] ${e.message} @ ${String(e.stack).split("\n")[1].trim()}`);
+      }
+    }
+  }
+  check("panel: the REAL card is built for every distinct tile state a thirty-year city holds, hovered and pinned, and none of them throws",
+    seen.size >= 30 && throwsAt.length === 0 && blank === 0,
+    `${seen.size} states · ${throwsAt.length} threw${throwsAt.length ? ": " + throwsAt[0] : ""} · ${blank} blank`);
+
+  // The owner's exact case, named, so a regression says which lot it was.
+  const emptyBad = [];
+  for (const { i, k, density } of empties) {
+    try {
+      ui.updateHover({ tile: i, pinned: false });
+      const t = textOf(document.getElementById("card"));
+      if (!/zoned, empty/.test(t)) emptyBad.push(`${k}${density === 1 ? " Low" : " High"} → "${t.slice(0, 60)}"`);
+    } catch (e) { emptyBad.push(`${k}${density === 1 ? " Low" : " High"} THREW ${e.message}`); }
+  }
+  check("panel: a lot that is zoned and still EMPTY reads 'zoned, empty' in all four zones at both densities — the tier-name table has no row 0, and the card must not reach for one",
+    empties.length === 8 && emptyBad.length === 0, `${empties.length} lots · ${emptyBad.join(" · ")}`);
+
+  // A built lot of every zone and tier still names itself, so the fix did not
+  // simply stop printing the name.
+  const named = [];
+  const nameBad = [];
+  for (const [k, z] of [["R", ZONE.R], ["C", ZONE.C], ["I", ZONE.I], ["M", ZONE.M]]) {
+    for (let t = 1; t <= 3; t++) {
+      let found = -1;
+      for (let i = 0; i < U.w * U.h; i++) if (U.zone[i] === z && U.tier[i] === t && !U.big[i] && !U.rubble[i] && !U.burning[i]) { found = i; break; }
+      if (found < 0) continue;
+      named.push(`${k}${t}`);
+      try {
+        ui.updateHover({ tile: found, pinned: false });
+        const txt = textOf(document.getElementById("card"));
+        if (!new RegExp(`tier ${t}\\b`).test(txt) && !/3×3|2×2/.test(txt)) nameBad.push(`${k}${t} → "${txt.slice(0, 60)}"`);
+      } catch (e) { nameBad.push(`${k}${t} THREW ${e.message}`); }
+    }
+  }
+  check("panel: a BUILT lot still names its tier — the lazy name is still a name",
+    named.length >= 6 && nameBad.length === 0, `${named.join(" ")} · ${nameBad.join(" · ")}`);
+
+  // And the frame loop must survive whatever the panel does. main.js is the
+  // only place that decides the game keeps running; read it, because a check
+  // cannot drive rAF here.
+  const mainSrc = readFileSync(path.join(ROOT, "js", "main.js"), "utf8");
+  const guarded = /function frame\s*\([^)]*\)\s*\{\s*try\s*\{/.test(mainSrc) && /catch\s*\([^)]*\)\s*\{[\s\S]{0,400}?\}\s*requestAnimationFrame\(frame\)/.test(mainSrc);
+  check("panel: ONE BAD FRAME DOES NOT END THE GAME — main.js's frame body is guarded and reschedules from the catch, so a throw in the panel is a glitch and never a freeze",
+    guarded, guarded ? "" : "frame() must wrap its body in try/catch and call requestAnimationFrame(frame) after it");
+}
+
+
 // ---- Part D: the walker layer never writes the sim (SPEC §14) ---------------------
 const walkersPath = path.join(ROOT, "js", "walkers.js");
 if (existsSync(walkersPath)) {
