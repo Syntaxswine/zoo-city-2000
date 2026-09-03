@@ -30,6 +30,9 @@ selecting build items. a remote control on the left side of the screen.
 top"* → Part S (a saves menu with named slots) and Part P (the palette),
 and the control city becomes the suite's real-save fixture (§4-G).
 
+And: *"railroads and roads should be able to cross over each other
+perpendicularly."* → Part X, the level crossing (§4-X).
+
 Plan only. Nothing here is built. Each part is sized for one agent-session,
 owns its own files, and codes against contracts written down in §3 so the
 parts can run at the same time. The keel (§3) lands first and is small.
@@ -52,10 +55,11 @@ them.
 | **see them in their homes** — the house tells you who lives there | 12 families × 2 mirrored variants, no occupant on the outside | **E. Buildings with character** |
 | **be told** what happened to them | 74–84% of dispatches never pop; no dispatch names a birth or an ordinary death | **F. The story channel** |
 
-Plus three parts that are not about relating but were in the same breath:
+Plus four parts that are not about relating but were in the same breath:
 **H. Meat on hand** — the hall's stock, its inflows and its till; **P. The
 palette** — the build tools as a remote control on the left; **S. Saves** —
-a menu of named slots instead of one checkpoint.
+a menu of named slots instead of one checkpoint; **X. The level crossing**
+— rail across a road, square-on.
 
 Then **G. Integration** — the suite, the docs, the browser round — after
 the parts have merged.
@@ -205,8 +209,9 @@ none), recomputed each tick in `census.js` from occupants (R) or staff
 writes log rows; it is the ONLY place a life event becomes news.
 
 **K5. Registry names reserved in `js/art/index.js`:** `art.bubble(w, h)`,
-`art.portrait(species, opts)`, `art.mark(species)`, `art.look(id)` — each
-throws "not built" tonight so a caller's typo fails loudly.
+`art.portrait(species, opts)`, `art.mark(species)`, `art.look(id)`,
+`art.crossing(axis, busy)` — each throws "not built" tonight so a caller's
+typo fails loudly.
 
 **K6. `walkers.list()` entries gain `need: null`** and `make()` gains
 `look: art.look(id)` (returns `{ shade: 0, mark: 0 }` until D lands).
@@ -995,9 +1000,92 @@ keep the city name on the slot record so marks follow the city.
 **Size.** ≈ 120 slots + 150 title + 60 ui + 40 main; ~7 checks; half a
 session.
 
+### X. The level crossing — *"railroads and roads should be able to cross over each other perpendicularly"*
+
+**Goal.** A rail line may cross a road square-on, on one tile that is
+both; walkers cross on foot along the road, riders cross on the rail, and
+the tile draws as a crossing. Rail bridges (rail over water) stay out, as
+BACKLOG has them.
+
+**What the code already does, read tonight.** The commute graph needs no
+change: `fields.dial` walks on any tile with a road (`fields.js:492`) and
+rides on any tile with rail (`:502`), and the two layers meet ONLY at a
+station (`rail === 2`) — so a tile with both is walkable along the road
+and rideable along the rail with no boarding, which is exactly a level
+crossing. The suite's path law (`check.mjs:158`) holds for it as written.
+Traffic counts walking entries (`fields.js:56`) and `EMIT_RAIL` spreads
+from any rail tile (`:99`) — both apply to a crossing, and the plan says so
+rather than special-casing them. The whole of v1's "no level crossings" is
+two refusals in `ops.js` (`:54` the road op, `:121` the rail op) and one
+draw line (`render.js:165`, which draws a road before it would look for
+rail).
+
+**Design.**
+- **The rule (`ops.js`):** a road may be laid onto a rail tile, and rail
+  onto a road tile, when the RESULT on that tile is two straight runs on
+  different axes: after placement the tile's road mask is `N|S` or `E|W`
+  and its rail mask is the other one. Not on water, not on a bridge, not
+  on a wall (a tunnel is open along ONE axis), not a station. A crossing
+  stays straight: a later road or rail that would add an arm ON the
+  crossing tile is refused (junctions beside it are fine). The refusal
+  reason is a new string, `"square-on"`, and the cost strip prints it
+  through `costOf` as it prints "blocked" today. A wall drag across a
+  crossing is refused (a wall wants one open axis).
+- **Bulldoze** on a crossing removes the rail and leaves the road (rail is
+  the cheaper, later layer); a second press removes the road. One undo
+  step each, through the existing `replaced` record.
+- **Art (`art/rail.js`):** `crossingSprite(axis, busy)` — the straight road
+  strip (its busy variant when the road is busy) with the two rails
+  inlaid across the tarmac in the asphalt ramp's lightest key, the
+  ballast and sleepers only in the grass margins where the rail leaves
+  the road, and a crossing post (a 2-px stamp, concrete ramp) at each of
+  the two road-side corners. Two axes × busy = four sprites in the audit
+  and on the rail sheet.
+- **Draw (`render.js` `rebuildGround`):** `if (road && rail) sprite =
+  art.crossing(railAxis, busy)` before the road line. The crossing is
+  ground, so it lives in the static layer and every op already
+  invalidates.
+- Walkers: nothing — `roadPath` walks the road across; a rider passes at
+  ride speed. The train sprite stays a BACKLOG line.
+- Save: no format change — `road[i]` and `rail[i]` both exist; the new
+  state is their coexistence, which old saves never contain.
+
+**Owns.** The validation lines of the road, rail, wall and bulldoze ops in
+`ops.js` (nobody else edits `ops.js`), `art/rail.js`, `art.crossing` in
+`index.js`, the one ground line in `render.js` (A/D/E own other
+functions), Part L' checks, the rail sheet in `shots.mjs`, SPEC §7.9 and
+§12.4c, the rail line in BACKLOG.
+
+**Acceptance.**
+- Invariant, every world the suite builds: `road[i] && rail[i]` ⇒ both
+  masks straight, on different axes, no wall, not a station, not water.
+- The rail fixture (`check.mjs:512`): lay a road line, drag rail across it
+  → ok and the tile is both; drag rail ALONG it → refused `"square-on"`;
+  drag a third road arm onto the crossing → refused; bulldoze once → rail
+  gone, road stays; a commuter whose road crosses the line walks the
+  crossing tile (its path has the tile un-flagged); a rider between two
+  stations either side rides it (flagged) — both from `dial`, unchanged.
+- The mayor's hash on every standing gate is unchanged (a validation that
+  now accepts a case nobody attempted cannot move a run).
+- Browser: lay both, at ×1 and ×2 the crossing reads as a road with rails
+  across it; a wall dragged over it is refused with the reason on the
+  strip; 0 console messages; `play.mjs --at` photographs it for the
+  commit.
+
+**Traps.** `railMask` in `render.js:133` reads neighbours with rail — on a
+crossing the road's neighbours also matter for the busy variant; read
+both masks, not one. The road op's L-drag validates tile by tile (`:54`)
+— the perpendicular test needs the mask AFTER the whole drag, so validate
+the drag's result, not each tile in isolation. `hasAccess` and `door()`
+treat a crossing as a road tile (it is one) — a lot's door may sit on a
+crossing; say so in SPEC rather than forbid it.
+
+**Size.** ≈ 80 ops + 60 art + 10 render + 60 checks; half a session; no
+keel needed.
+
 ### G. Integration — after the parts have merged
 
-One agent, after A–F, H, P and S are on `main`:
+One agent, after A–F, H, P, S and X are on `main`:
 - **The control city** (the owner: *"i will build one for you soon"*):
   when it arrives, `docs/fixtures/control-city.json` — loaded by the
   suite (`load` → `rebuildDerived` → 12 months → a recorded hash, the
@@ -1073,6 +1161,10 @@ The two UI parts, by file:
 | `tools/check.mjs` | Part K' | Part J' | — |
 | `SPEC.md` | §11 | §15 | — |
 
+And X, the crossing: `js/sim/ops.js` (validation lines — nobody else),
+`js/art/rail.js`, `art.crossing` in `index.js`, one ground line in
+`render.js`, the rail sheet in `shots.mjs`, Part L', SPEC §7.9 / §12.4c.
+
 Files touched by two parts are touched in DIFFERENT hunks (`render.js`,
 `walkers.js`, `index.js`, `census.js`, `check.mjs`, `shots.mjs`,
 `SPEC.md`); each part adds its own function/section and never edits
@@ -1087,17 +1179,18 @@ day 0   K (½ session)  ─┬─ A needs ────────────�
                         ├─ H meat on hand ──────┤
                         ├─ P palette (½) ───────┤
                         ├─ S saves (½) ─────────┤
+                        ├─ X crossing (½) ──────┤
                         ├─ B lives ─────────────┤   G integration (1 session)
                         ├─ C inspect (stubs) ───┤   + the control city when it lands
                         ├─ D looks ─────────────┤
                         ├─ E buildings ─────────┤
                         └─ F story ─────────────┘
 ```
-Nine sessions in parallel after the keel; C and F finish against the
-merged tree because they consume the most; P and S are half-sessions and
-need no keel at all (they can start tonight). If only two agents are
+Ten sessions in parallel after the keel; C and F finish against the
+merged tree because they consume the most; P, S and X are half-sessions
+and need no keel at all (they can start tonight). If only two agents are
 available: P+S first (small, and the owner asked for them by name), then
-A+H, then E+B, then D+C, then F; K before A/B/H.
+X+A, then H+E, then B+D, then C+F; K before A/B/H.
 
 ## 7. What this plan does NOT do, and why
 

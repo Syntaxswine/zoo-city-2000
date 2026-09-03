@@ -67,7 +67,14 @@ the title; the autosave one slot; a full store shows the export box — a
 refusal must not lose work). The control city → `docs/fixtures/
 control-city.json`, the suite's first real-save regression and every
 probe's `--save`. This section (the title-screen one below) said "a
-save-as name field is not built" — S is that.
+save-as name field is not built" — S is that. And *"railroads and roads
+should be able to cross over each other perpendicularly"* → **X** the
+level crossing (plan §4-X): the commute graph ALREADY allows it (`dial`
+walks any road tile, rides any rail tile, meets only at a station) — v1's
+"no level crossings" is two refusals in `ops.js` and one draw line; the
+rule is two straight runs on different axes, not on a wall/water/station,
+a crossing stays straight, bulldoze takes the rail first; `art.crossing`.
+The rail line below ("level crossings … the graph allows both ways") is X.
 
 ## Crime and punishment — SHIPPED 2026-09-02 (SPEC §9c; `js/sim/justice.js`); what is left
 - **Hunger visibility.** The scripted towns run at U 0–4, so the ×20 hunger
