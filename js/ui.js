@@ -318,7 +318,7 @@ export function createUI(app) {
     let what;
     if (w.wall[i]) what = w.road[i] !== ROAD.NONE || w.rail[i] ? "Tunnel" : "Wall";
     else if (w.rail[i] === 2) what = "Station";
-    else if (w.rail[i]) what = "Rail";
+    else if (w.rail[i]) what = w.road[i] !== ROAD.NONE ? "Level crossing" : "Rail"; // the head names BOTH layers, the way a road under a wall reads "Tunnel"
     else if (w.road[i] === ROAD.BRIDGE) what = "Bridge";
     else if (w.road[i] === ROAD.ROAD) what = "Road";
     else if (rep.civic === CIVIC.PARK) what = "Park";
@@ -388,7 +388,7 @@ export function createUI(app) {
       let door = -1;
       for (const [dx, dy] of [[0, -1], [1, 0], [0, 1], [-1, 0]]) { const xx = tx + dx, yy = ty + dy; if (xx >= 0 && yy >= 0 && xx < w.w && yy < w.h && w.road[yy * w.w + xx] !== ROAD.NONE) { door = yy * w.w + xx; break; } }
       lines.push(el("div", door >= 0 ? "dim" : "warn", door >= 0 ? `a station: riders board from the road at (${door % w.w},${(door / w.w) | 0}); a citizen's ride costs 0.3 of a walk, while a hall cart's ride is free distance; neither changes property-value distance` : "a station with no road beside it: nobody can reach the platform"));
-    } else if (w.rail[i]) lines.push(el("div", "dim", "rail: citizen commutes price it at 0.3 of a walk; hall logistics count it as free travel; it never shortens property-value distance"));
+    } else if (w.rail[i]) lines.push(el("div", "dim", w.road[i] !== ROAD.NONE ? "a level crossing: the road and the line share this tile square-on — animals walk across it, anything on the line passes straight through without stopping, and the city maintains both" : "rail: citizen commutes price it at 0.3 of a walk; hall logistics count it as free travel; it never shortens property-value distance"));
     if (w.wall[i]) lines.push(el("div", "dim", w.road[i] !== ROAD.NONE ? "a tunnel: the road runs through the wall; smells, dread and cover pass along it and nowhere else" : "a wall: smells, dread, cover and land-value halos go round it, and a killer's reach stops at it; a road through it is a tunnel"));
     if (rep.dread) lines.push(el("div", "dim", `dread ${rep.dread}: herbivores −${Math.min(KNOBS.DREAD_MOOD_CAP, Math.round(KNOBS.DREAD_MOOD_HERB * rep.dread))} mood and −${Math.round(KNOBS.DREAD_HOME_HERB * rep.dread)} on the home score; LV −${Math.round(KNOBS.LV_DREAD * rep.dread)}; carnivores do not mind`));
     for (const f of w.events.files) {

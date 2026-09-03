@@ -531,7 +531,14 @@ check("determinism: same seed + same inputs ⇒ same hash", stateHash(A.world) =
   const s1 = apply(F, { kind: "station", tx: px, ty: py + 1 });
   const s2 = apply(F, { kind: "station", tx: px + 13, ty: py + 1 });
   check("rail: a 14-tile line costs §20 a tile; a station is a click on rail, §300", rr.ok && rr.cost === 14 * KNOBS.COST.rail && s1.ok && s2.ok && s1.cost === KNOBS.COST.station && F.rail[at(px, py + 1)] === 2 && F.rail[at(px + 13, py + 1)] === 2, `${rr.cost} · ${s1.reason || s1.cost} · ${s2.reason || s2.cost}`);
-  check("rail: no crossings and no bridges in v1 — rail on a road tile and a road on a rail tile are nothing to do; a station off the rail is blocked", apply(F, { kind: "rail", tiles: [at(px + 3, py)] }).ok === false && apply(F, { kind: "road", tiles: [at(px + 3, py + 1)] }).ok === false && apply(F, { kind: "station", tx: px + 3, ty: py + 2 }).reason === "blocked");
+  // Level crossings ARRIVED in session 14 (SPEC §7.9, Part L' below); what
+  // this line still holds is that a SINGLE tile is never square-on — a
+  // one-tile rail op onto the road leaves the line a stub, and a one-tile
+  // road op onto the line leaves the road a stub, so neither is a crossing
+  // and both are refused. It used to say "and no bridges in v1" too, on a
+  // fixture that is dry by construction and could not have failed for it;
+  // Part L' lays real water for that.
+  check("rail: a SINGLE tile is never square-on — a one-tile rail onto the road and a one-tile road onto the line are both refused (rail bridges are Part L's water fixture); a station off the rail is blocked", apply(F, { kind: "rail", tiles: [at(px + 3, py)] }).ok === false && apply(F, { kind: "road", tiles: [at(px + 3, py + 1)] }).ok === false && apply(F, { kind: "station", tx: px + 3, ty: py + 2 }).reason === "blocked");
   computeFields(F);
   const a = at(px, py), b = at(px + 13, py);
   const ride = commutePath(F, "rabbit", a, b);
@@ -578,6 +585,489 @@ check("determinism: same seed + same inputs ⇒ same hash", stateHash(A.world) =
   for (let t = 0; t < 12; t++) { tick(G); tick(H); }
   check("rail: save → load → 12 ticks with rail and riders hash-equals", stateHash(G) === stateHash(H), `${stateHash(G)} vs ${stateHash(H)}`);
 }
+
+// ---- Part L': the level crossing (SPEC §7.9, §12.4c; plan §4-X) -------------
+//
+// The owner: "railroads and roads should be able to cross over each other
+// perpendicularly." The commute graph already allowed it — `dial` walks any
+// road tile and rides any rail tile, and the two layers meet ONLY at a
+// station — so the whole of "no level crossings in v1" was two refusals in
+// ops.js and one draw line. What this section pins is the four halves of the
+// change: the RULE (square-on, and what a crossing refuses afterwards), the
+// GRAPH (a walker crosses on foot, a rider passes at ride cost, neither pays
+// for the other, and nobody boards there), the LEDGER (a crossing is a road
+// AND a line, so it costs and smokes as both — a ruling, said out loud, not
+// an accident), and the ART (composed from the road's own family and the
+// line's own, never a third drawing of a road).
+{
+  const { crossingKey, crossingSprite, squareOnCrossings, railKey, onRail, RAILS, N: RN, E: RE, S: RS, W: RW } = await import("../js/art/rail.js");
+  const { onRoad, roadKey, ROADS } = await import("../js/art/roads.js");
+  const { squareOn, maskAround } = await import("../js/sim/ops.js");
+  const { commutePath, computeTraffic, rides, RIDE, TILE, WALK } = await import("../js/sim/fields.js");
+  const { yearlyFigures } = await import("../js/sim/budget.js");
+  const { keysOf } = await import("../js/art/palette.js");
+  const { TERRAIN } = await import("../js/sim/world.js");
+  const { art } = await import("../js/art/index.js");
+
+  const NS = RN | RS;
+  const EW = RE | RW;
+
+  // A clear 7 × 18 patch of grass, found the way the rail fixture finds one.
+  const F = createWorld({ seed: SEED });
+  let px = -1, py = -1;
+  cross: for (let y = 4; y < F.h - 12; y++) for (let x = 4; x < F.w - 22; x++) {
+    let ok = true;
+    for (let yy = y; yy < y + 7 && ok; yy++) for (let xx = x; xx < x + 18; xx++) { const i = yy * F.w + xx; if (F.terrain[i] !== 0 || F.road[i] || F.zone[i] || F.civic[i] || F.wall[i]) { ok = false; break; } }
+    if (ok) { px = x; py = y; break cross; }
+  }
+  // If the seed has no such patch the section must not die on the first null
+  // it meets thirty checks later — clear one by hand and carry on. (`--seed`
+  // is a flag; the suite has to work on any of them.)
+  if (px < 0) {
+    px = 4; py = 4;
+    for (let y = py; y < py + 7; y++) for (let x = px; x < px + 18; x++) {
+      const i = y * F.w + x;
+      F.terrain[i] = 0; F.road[i] = 0; F.zone[i] = 0; F.civic[i] = 0; F.wall[i] = 0; F.rail[i] = 0; F.tier[i] = 0;
+    }
+  }
+  const at = (x, y) => y * F.w + x;
+
+  // The line: E–W along row py+3. The road: N–S down column px+4.
+  const line = []; for (let x = px; x <= px + 17; x++) line.push(at(x, py + 3));
+  const rr = apply(F, { kind: "rail", tiles: line });
+  const col = []; for (let y = py; y <= py + 6; y++) col.push(at(px + 4, y));
+  const X = at(px + 4, py + 3);
+  const planned = costOfOp(F, { kind: "road", tiles: col });
+  const rd = apply(F, { kind: "road", tiles: col });
+  check("crossing: a road dragged square-on across a line makes ONE tile that is both, at a plain road's price, and the strip calls it a crossing",
+    rr.ok && rd.ok && F.road[X] === ROAD.ROAD && F.rail[X] === 1 && rd.cost === 7 * KNOBS.COST.road && (planned.tiles.find((t) => t.i === X) || {}).what === "crossing",
+    `${rd.reason || rd.cost} · road ${F.road[X]} rail ${F.rail[X]} · what ${(planned.tiles.find((t) => t.i === X) || {}).what}`);
+  // The law itself, as arithmetic. PARALLEL is unreachable through the ops —
+  // a crossing whose road and line run the same way needs both its
+  // neighbours on that axis to carry BOTH layers, i.e. to be crossings, and
+  // those would have to be parallel too, all the way out — so a mutation
+  // that let `squareOn` accept two parallel straight runs sailed past every
+  // fixture. Test the statement where the statement lives.
+  check("crossing: square-on is two straight runs on DIFFERENT axes — parallel is not a crossing, a corner is not, a stub is not, a junction is not",
+    squareOn(NS, EW) && squareOn(EW, NS) &&
+    !squareOn(NS, NS) && !squareOn(EW, EW) &&
+    !squareOn(NS | RE, EW) && !squareOn(RN, EW) && !squareOn(RN | RE, EW) && !squareOn(15, EW) && !squareOn(0, EW) && !squareOn(NS, 0) && !squareOn(NS, RW),
+    `NS/EW ${squareOn(NS, EW)} · NS/NS ${squareOn(NS, NS)} · EW/EW ${squareOn(EW, EW)}`);
+  check("crossing: and it IS square-on — the road straight one way, the line straight the other, by the rule's own two functions",
+    squareOn(maskAround(F, F.road, null, X), maskAround(F, F.rail, null, X)) && maskAround(F, F.road, null, X) === NS && maskAround(F, F.rail, null, X) === EW,
+    `road mask ${maskAround(F, F.road, null, X)} · rail mask ${maskAround(F, F.rail, null, X)}`);
+
+  // The other direction: a line dragged across a road that is already there.
+  const row1 = []; for (let x = px + 10; x <= px + 17; x++) row1.push(at(x, py + 1));
+  const r1 = apply(F, { kind: "road", tiles: row1 });
+  const col13 = []; for (let y = py; y <= py + 2; y++) col13.push(at(px + 13, y));
+  const Y = at(px + 13, py + 1);
+  const planned2 = costOfOp(F, { kind: "rail", tiles: col13 });
+  const r2 = apply(F, { kind: "rail", tiles: col13 });
+  check("crossing: a LINE dragged square-on across a road makes one too — the rule is the same read the other way round, and this op calls the tile a crossing as well",
+    r1.ok && r2.ok && F.road[Y] === ROAD.ROAD && F.rail[Y] === 1 && squareOn(maskAround(F, F.road, null, Y), maskAround(F, F.rail, null, Y)) &&
+    (planned2.tiles.find((t) => t.i === Y) || {}).what === "crossing",
+    `${r1.reason || ""} ${r2.reason || ""} · road ${F.road[Y]} rail ${F.rail[Y]} · what ${(planned2.tiles.find((t) => t.i === Y) || {}).what}`);
+
+  // A crossing is a THROUGH road. A drag that stops on the line is refused
+  // there — and the rest of the drag still lays, the way every other blocked
+  // tile in an L-drag behaves.
+  const stub = []; for (let y = py; y <= py + 3; y++) stub.push(at(px + 6, y));
+  const rs = apply(F, { kind: "road", tiles: stub });
+  check("crossing: a road that DEAD-ENDS on the line is refused at the line and the rest of the drag still lays — a crossing is a through road",
+    rs.ok && F.road[at(px + 6, py + 3)] === ROAD.NONE && F.road[at(px + 6, py + 2)] === ROAD.ROAD && F.rail[at(px + 6, py + 3)] === 1,
+    `${rs.reason || rs.cost} · on the line ${F.road[at(px + 6, py + 3)]} · one short of it ${F.road[at(px + 6, py + 2)]}`);
+
+  // A road ALONG the line is parallel, never square-on: nothing lays, and the
+  // op says why rather than leaving a silent gap.
+  const along = []; for (let x = px + 8; x <= px + 11; x++) along.push(at(x, py + 3));
+  const ra = apply(F, { kind: "road", tiles: along });
+  check("crossing: a road dragged ALONG the line lays nothing and says why — parallel is not square-on",
+    ra.ok === false && /square-on/.test(ra.reason || "") && F.road[at(px + 9, py + 3)] === ROAD.NONE, `${ra.reason}`);
+
+  // A crossing KEEPS its two straight runs, and the rule needs a SECOND
+  // clause to say so — this section first claimed the first clause implied it
+  // and the claim was false twice over (see the handoff's trap table). An op
+  // that would leave a NEIGHBOURING crossing crooked is refused as well.
+  const thruRoad = []; for (let x = px + 2; x <= px + 6; x++) thruRoad.push(at(x, py + 3));
+  const t1 = apply(F, { kind: "road", tiles: thruRoad });
+  const thruRail = [at(px + 4, py + 1), at(px + 4, py + 2)];
+  const t2 = apply(F, { kind: "rail", tiles: thruRail });
+  check("crossing: neither a road nor a line may grow an existing crossing a third arm — it keeps the two straight runs it was made with",
+    t1.ok === false && t2.ok === false && maskAround(F, F.road, null, X) === NS && maskAround(F, F.rail, null, X) === EW,
+    `road op ${t1.reason} · rail op ${t2.reason} · masks ${maskAround(F, F.road, null, X)}/${maskAround(F, F.rail, null, X)}`);
+  // The case the first draft's argument missed: a road laid one tile ALONG
+  // the line is square-on on its own tile and still makes a T-junction of its
+  // neighbour. The drag lays every tile but that one.
+  // An L-drag whose other leg runs ALONG the line: that leg is refused, and
+  // the crossing at the corner must NOT be refused with it. The first draft
+  // judged one downward pass, so the corner was condemned by a phantom arm
+  // belonging to a tile the same call was in the act of throwing away.
+  {
+    const P = createWorld({ seed: SEED });
+    for (let y = py; y < py + 7; y++) for (let x = px; x < px + 18; x++) { const i = y * P.w + x; P.terrain[i] = 0; P.road[i] = 0; P.zone[i] = 0; P.civic[i] = 0; P.wall[i] = 0; P.rail[i] = 0; P.tier[i] = 0; }
+    const nsLine = []; for (let y = py + 1; y <= py + 5; y++) nsLine.push(at(px + 4, y));
+    apply(P, { kind: "rail", tiles: nsLine });
+    apply(P, { kind: "road", tiles: [at(px + 1, py + 3), at(px + 2, py + 3), at(px + 3, py + 3)] });
+    apply(P, { kind: "road", tiles: [at(px + 5, py + 3), at(px + 6, py + 3), at(px + 7, py + 3)] });
+    const C = at(px + 4, py + 3);
+    const parallel = at(px + 4, py + 2);
+    const drag = [at(px + 1, py + 2), at(px + 2, py + 2), at(px + 3, py + 2), parallel, C]; // the L, corner ON the line
+    const fp = apply(P, { kind: "road", tiles: drag });
+    check("crossing: a drag whose leg runs ALONG the line and then crosses it lays the CROSSING and refuses only the parallel tile — the prune is a fixpoint, not one downward pass",
+      fp.ok && P.road[C] === ROAD.ROAD && P.rail[C] === 1 && P.road[parallel] === ROAD.NONE &&
+      squareOn(maskAround(P, P.road, null, C), maskAround(P, P.rail, null, C)),
+      `${fp.reason || fp.cost} · crossing road ${P.road[C]} rail ${P.rail[C]} · the parallel tile ${P.road[parallel]}`);
+  }
+
+  const B = load(save(F)); // on a twin: the fixture below measures commutes, and a bulldoze here would cut the line
+  const beside = []; for (let y = py; y <= py + 6; y++) beside.push(at(px + 5, y));
+  const t3 = apply(B, { kind: "road", tiles: beside });
+  check("crossing: a road that would be square-on ITSELF is still refused one tile along the line, because it would make a T-junction of the crossing beside it — and the rest of that drag lays",
+    t3.ok && B.road[at(px + 5, py + 3)] === ROAD.NONE && B.road[at(px + 5, py + 2)] === ROAD.ROAD && maskAround(B, B.road, null, X) === NS,
+    `on the line ${B.road[at(px + 5, py + 3)]} · one short ${B.road[at(px + 5, py + 2)]} · crossing road mask ${maskAround(B, B.road, null, X)}`);
+
+  // A tunnel is open along ONE axis; a crossing has two. And a platform would
+  // stand in the road.
+  const wl = apply(F, { kind: "wall", tiles: [X] });
+  const st = apply(F, { kind: "station", tx: px + 4, ty: py + 3 });
+  check("crossing: no wall over it (a tunnel has one open axis, a crossing two) and no station on it (the platform would stand in the road)",
+    wl.ok === false && /one axis/.test(wl.reason || "") && F.wall[X] === 0 && st.ok === false && /station cannot stand/.test(st.reason || "") && F.rail[X] === 1,
+    `wall ${wl.reason} · station ${st.reason}`);
+
+  // The invariant, over every tile of the fixture: whatever the player did,
+  // a tile that carries both carries them square-on, and is never a station,
+  // never walled, never water.
+  const both = [];
+  let notSquare = 0, walled = 0, stationed = 0, wet = 0;
+  for (let i = 0; i < F.w * F.h; i++) {
+    if (!(F.road[i] !== ROAD.NONE && F.rail[i])) continue;
+    both.push(i);
+    if (!squareOn(maskAround(F, F.road, null, i), maskAround(F, F.rail, null, i))) notSquare++;
+    if (F.wall[i]) walled++;
+    if (F.rail[i] !== 1) stationed++;
+    if (F.terrain[i] === TERRAIN.WATER || F.road[i] === ROAD.BRIDGE) wet++;
+  }
+  check("crossing: the invariant holds over the whole fixture — every both-tile square-on, rail 1, no wall, dry land",
+    both.length === 2 && notSquare === 0 && walled === 0 && stationed === 0 && wet === 0,
+    `${both.length} crossings · ${notSquare} not square-on · ${walled} walled · ${stationed} stations · ${wet} wet`);
+
+  // The ONE thing that can take square-on away is the bulldozer removing a
+  // neighbour — no rule can stop that without trapping the player beside it.
+  // So: the crooked crossing is allowed to EXIST, an op may not build on the
+  // damage, putting the line back mends it, and a crooked tile still saves,
+  // loads and draws. (The whole reason `art.crossing` takes both live masks.)
+  {
+    const D = createWorld({ seed: SEED });
+    const dline = []; for (let x = px; x <= px + 9; x++) dline.push(at(x, py + 3));
+    const dcol = []; for (let y = py; y <= py + 6; y++) dcol.push(at(px + 4, y));
+    apply(D, { kind: "rail", tiles: dline });
+    apply(D, { kind: "road", tiles: dcol });
+    const straightBefore = squareOn(maskAround(D, D.road, null, X), maskAround(D, D.rail, null, X));
+    apply(D, { kind: "bulldoze", x0: px + 5, y0: py + 3, x1: px + 5, y1: py + 3 }); // the line, one tile east
+    const crookedNow = !squareOn(maskAround(D, D.road, null, X), maskAround(D, D.rail, null, X));
+    const onDamage = apply(D, { kind: "road", tiles: [at(px + 5, py + 3)] }); // bare ground, but it would T the crossing
+    const mend = apply(D, { kind: "rail", tiles: [at(px + 5, py + 3)] });
+    check("crossing: the bulldozer may leave one crooked (a neighbour taken away), an op may NOT build on that damage, and putting the line back mends it",
+      straightBefore && crookedNow && onDamage.ok === false && /square-on/.test(onDamage.reason || "") && D.road[at(px + 5, py + 3)] === ROAD.NONE &&
+      mend.ok && squareOn(maskAround(D, D.road, null, X), maskAround(D, D.rail, null, X)),
+      `straight ${straightBefore} · crooked ${crookedNow} · road op ${onDamage.reason} · mended ${mend.ok}`);
+    // and a crooked one is still a legal, savable, drawable tile
+    apply(D, { kind: "bulldoze", x0: px + 5, y0: py + 3, x1: px + 5, y1: py + 3 });
+    const crooked = load(save(D));
+    check("crossing: a crooked crossing round-trips through save and load and still carries both layers",
+      crooked.road[X] === D.road[X] && crooked.rail[X] === D.rail[X] && !squareOn(maskAround(crooked, crooked.road, null, X), maskAround(crooked, crooked.rail, null, X)),
+      `road ${crooked.road[X]} rail ${crooked.rail[X]}`);
+  }
+
+  // ---- the graph: the whole point of the feature ----------------------------
+  const s1 = apply(F, { kind: "station", tx: px, ty: py + 3 });
+  const s2 = apply(F, { kind: "station", tx: px + 17, ty: py + 3 });
+  computeFields(F);
+  const down = commutePath(F, "rabbit", at(px + 4, py), at(px + 4, py + 6));
+  check("crossing: a walker crosses it on foot at a plain road's price — the line under their feet costs a pedestrian nothing",
+    s1.ok && s2.ok && !!down && down.cost === 6 * WALK && down.path.length === 7 && !rides(down.path) && Array.from(down.path).some((p) => (p & TILE) === X && !(p & RIDE)),
+    `cost ${down && down.cost} vs ${6 * WALK} · tiles ${down && down.path.length}`);
+  const through = commutePath(F, "rabbit", at(px, py + 3), at(px + 17, py + 3));
+  const atX = through ? Array.from(through.path).filter((p) => (p & TILE) === X) : [];
+  check("crossing: a rider passes THROUGH it at ride cost with the ride bit set, and cannot board or alight there — a crossing is rail 1, never a platform",
+    !!through && through.cost === 17 * KNOBS.RAIL_COST && atX.length === 1 && (atX[0] & RIDE) !== 0 && F.rail[X] === 1,
+    `cost ${through && through.cost} vs ${17 * KNOBS.RAIL_COST} · entries at the crossing ${atX.length} · ridden ${atX.length ? !!(atX[0] & RIDE) : "—"}`);
+
+  // The crossing is the first tile in the game that is a walk node AND a ride
+  // node at once, so a stored path may name it twice (ride over it between the
+  // stations, walk back over it to the door). Nothing downstream may double it.
+  const keepCitizens = F.citizens;
+  const traffic = (path) => { F.citizens = [{ path }]; computeTraffic(F); return F.traffic[X]; };
+  const twice = Uint16Array.from([at(px, py + 3), X | RIDE, at(px + 17, py + 3), X, at(px + 4, py + 4)]);
+  const walkedX = traffic(down.path);
+  const riddenX = traffic(through.path);
+  const twiceX = traffic(twice);
+  F.citizens = keepCitizens;
+  computeTraffic(F);
+  check("crossing: traffic counts the walked crossing (a real commute) and not the ridden one (a real ride); and — on a path built by hand, since no search need produce one — it counts a tile named twice only once",
+    walkedX === 1 && riddenX === 0 && twiceX === 1, `walked ${walkedX} · ridden ${riddenX} · named twice ${twiceX}`);
+  check("crossing: commuteTime charges a path's ridden entries a ride and its walked entries a walk, crossing or not",
+    Math.abs(commuteTime(twice) - (2 * KNOBS.RAIL_COST / WALK + 2)) < 1e-9, `${commuteTime(twice)}`);
+  check("crossing: it is a road for access — a crossing seeds the road-distance flood like any other road tile",
+    F.roadDist[X] === 0 && hasAccess(F, X) && hasAccess(F, at(px + 5, py + 3)), `roadDist ${F.roadDist[X]} · neighbour ${F.roadDist[at(px + 5, py + 3)]}`);
+
+  // ---- the ledger and the air: a crossing is BOTH, and pays for both -------
+  const figBefore = yearlyFigures(F);
+  const bz = apply(F, { kind: "bulldoze", x0: px + 4, y0: py + 3, x1: px + 4, y1: py + 3 });
+  const figAfter = yearlyFigures(F);
+  check("crossing: on the books it is a road AND a line — the bulldozer takes the line first, the road stays and keeps paying, and one press is one undo step",
+    bz.ok && F.rail[X] === 0 && F.road[X] === ROAD.ROAD && figAfter.rails === figBefore.rails - 1 && figAfter.roads === figBefore.roads,
+    `rails ${figBefore.rails} → ${figAfter.rails} · roads ${figBefore.roads} → ${figAfter.roads}`);
+  undo(F);
+  check("crossing: undo puts the line back under the road", F.rail[X] === 1 && F.road[X] === ROAD.ROAD, `road ${F.road[X]} rail ${F.rail[X]}`);
+  // The same TILE with the line and without it — not a different tile four
+  // rows up, which is what the first draft compared and which is won by road
+  // geometry (a mid-column tile has two road neighbours, an end tile one)
+  // before the line is consulted at all. That version passed with the rail's
+  // emission deleted from the sim.
+  computeFields(F);
+  const polBoth = F.pol[X];
+  F.rail[X] = 0; computeFields(F); const polNoLine = F.pol[X];
+  F.rail[X] = 1; F.road[X] = ROAD.NONE; computeFields(F); const polNoRoad = F.pol[X];
+  F.road[X] = ROAD.ROAD; computeFields(F);
+  check("crossing: it smokes as BOTH — take the line off that very tile and its air loses exactly the line's emission; take the road off and it loses the road's (SPEC §7.9)",
+    polBoth === F.pol[X] && polBoth - polNoLine === KNOBS.EMIT_RAIL && polBoth > polNoRoad,
+    `both ${polBoth} · no line ${polNoLine} (−${polBoth - polNoLine}, EMIT_RAIL ${KNOBS.EMIT_RAIL}) · no road ${polNoRoad}`);
+
+  // ---- the art -------------------------------------------------------------
+  // Law 6 on the art: off the line the crossing IS the road's own surface, off
+  // the road it IS the line's own. Neither is redrawn in rail.js.
+  const GRID = [];
+  for (let a = 0.25; a < 16; a += 0.5) for (let b = 0.25; b < 16; b += 0.5) GRID.push([a, b]);
+  let roadPts = 0, railPts = 0, disagree = 0;
+  for (const rdm of [NS, EW, RN | RE, 15, 0]) for (const rlm of [EW, NS, RW, 15, 0]) {
+    for (const [a, b] of GRID) {
+      const sx = (a * 4) | 0, sy = (b * 4) | 0;
+      const onBed = onRail(rlm, a, b), onTar = onRoad(rdm, a, b);
+      const k = crossingKey(rdm, rlm, false, a, b, sx, sy);
+      if (onTar && !onBed) { roadPts++; if (k !== roadKey(rdm, false, a, b, sx, sy)) disagree++; }
+      else if (onBed && !onTar) { railPts++; if (k !== railKey(rlm, a, b, sx, sy)) disagree++; }
+    }
+  }
+  check("crossing art: off the line it IS the road's own surface and off the road it IS the line's own — one implementation, never a third drawing of a road",
+    disagree === 0 && roadPts > 500 && railPts > 500, `${disagree} disagreements over ${roadPts} road points and ${railPts} line points`);
+
+  const EARTH = keysOf("earth");
+  let overlap = 0, earthy = 0, busyDiff = 0;
+  for (const [a, b] of GRID) {
+    if (!(onRoad(NS, a, b) && onRail(EW, a, b))) continue;
+    overlap++;
+    const sx = (a * 4) | 0, sy = (b * 4) | 0;
+    const k = crossingKey(NS, EW, false, a, b, sx, sy);
+    if (EARTH.includes(k)) earthy++;
+    if (crossingKey(NS, EW, true, a, b, sx, sy) !== k) busyDiff++;
+  }
+  check("crossing art: where the line is in the road the ballast, the sleepers and the lane dash all stop — two rails in tarmac, and busy changes nothing there",
+    overlap > 100 && earthy === 0 && busyDiff === 0, `${overlap} overlap points · ${earthy} earth keys · ${busyDiff} busy differences`);
+
+  const SQ = squareOnCrossings();
+  const cross = SQ[0].ew;
+  check("crossing art: the square-on tile is neither the plain road with its rails forgotten nor the plain track with its road forgotten",
+    cross.rows.join("") !== ROADS[0][NS].rows.join("") && cross.rows.join("") !== RAILS[EW].rows.join(""), cross.name);
+
+  // `busy` must ACT on the road half. The check above asserts it changes
+  // nothing where the line crosses, which is the one place it is meant to be
+  // ignored — so on its own it is satisfied by a crossing that drops the
+  // argument entirely, and a crossing that did was green.
+  let busyPts = 0;
+  for (const [a, b] of GRID) {
+    if (!onRoad(NS, a, b) || onRail(EW, a, b)) continue;
+    const sx = (a * 4) | 0, sy = (b * 4) | 0;
+    if (crossingKey(NS, EW, true, a, b, sx, sy) !== crossingKey(NS, EW, false, a, b, sx, sy)) busyPts++;
+  }
+  check("crossing art: a busy crossing keeps the road's lane dashes where the line is NOT — busy is not a dropped argument",
+    busyPts > 0 && SQ[1].ew.rows.join("") !== SQ[0].ew.rows.join("") && SQ[1].ns.rows.join("") !== SQ[0].ns.rows.join(""),
+    `${busyPts} points differ off the line`);
+
+  // A line with no neighbour left has no direction, and used to fall through
+  // to plain tarmac: the crossing became pixel-identical to the road it lay
+  // in, while the city went on charging, counting, riding and smoking it.
+  let vanished = 0;
+  for (let m = 0; m < 16; m++) for (const busy of [0, 1]) if (crossingSprite(m, 0, !!busy).rows.join("|") === ROADS[busy][m].rows.join("|")) vanished++;
+  check("crossing art: a crossing whose line has been bulldozed off BOTH sides still shows its bed — it never draws as a plain road, busy or quiet",
+    vanished === 0, `${vanished} of 32 road masks draw the line away`);
+
+  // Every one of the 512, tied back to the masks it was asked for — `built
+  // === 512` was arithmetic, not coverage, and a one-bit typo in the cache
+  // key handed back the wrong sprite for half the family with nothing to
+  // notice. The name IS the identity here (identity, never an index).
+  let wrongSize = 0, noTwin = 0, wrongSprite = 0;
+  const names = new Set();
+  for (let rdm = 0; rdm < 16; rdm++) for (let rlm = 0; rlm < 16; rlm++) for (const busy of [false, true]) {
+    const s = crossingSprite(rdm, rlm, busy);
+    names.add(s.name);
+    if (s.name !== `crossing-${rdm}-${rlm}${busy ? "-busy" : ""}`) wrongSprite++;
+    if (s.w !== 64 || s.h !== 32 || s.anchor[0] !== 32 || s.anchor[1] !== 16) wrongSize++;
+    const hi = art.hires(s);
+    if (!hi || hi.w !== 128 || hi.h !== 64) noTwin++;
+  }
+  check("crossing art: all 512 of the family compose as legal 64×32 ground diamonds (defineSprite refuses a key outside the palette), each hands back the sprite its two masks asked for, and each has a 128×64 twin from its own recipe",
+    names.size === 512 && wrongSprite === 0 && wrongSize === 0 && noTwin === 0,
+    `${names.size} distinct · ${wrongSprite} wrong sprite for the masks · ${wrongSize} wrong size · ${noTwin} without a twin`);
+  check("crossing art: the same two masks hand back the SAME sprite — the family is composed once and kept, not rebuilt per frame",
+    crossingSprite(NS, EW, false) === SQ[0].ew && crossingSprite(EW, NS, true) === SQ[1].ns);
+
+  // The RENDERER has to PICK it, and the first draft of this check did not
+  // prove that: it rendered the tile with the line and without it and demanded
+  // two different pictures — but taking the line off the crossing also changes
+  // the MASK of the two track tiles either side of it, so the picture changed
+  // whether or not the crossing sprite was ever drawn. A mutation that made
+  // rebuildGround fall through to the plain road sailed past it. The honest
+  // test names the sprite: the crossing's concrete APRON (palette key `^`,
+  // 36 px on a square-on tile) appears in no road, rail or grass sprite in the
+  // game — so count that colour in the finished frame, over a bare world where
+  // nothing else could have put it there.
+  {
+    const HC = await import("./headless-canvas.mjs");
+    HC.installCanvas();
+    const { createRenderer } = await import("../js/render.js");
+    const { createWalkers } = await import("../js/walkers.js");
+    const { toScreen, HALF_H } = await import("../js/iso/iso.js");
+    const { colourOf, keysOf } = await import("../js/art/palette.js"); // colourOf: the sprite-match below compares real pixels
+    const APRON = colourOf(keysOf("concrete")[1]);
+
+    // A bare world: one line, one road across it, nothing else in frame — and
+    // the patch cleared by hand, so the picture is the same on every seed. (It
+    // was not, and on a seed whose ground carries water the CONTROL tile
+    // picked up a kerb overlay and the check failed for a reason that had
+    // nothing to do with crossings.)
+    const V = createWorld({ seed: SEED });
+    for (let y = py - 1; y < py + 8; y++) for (let x = px - 1; x < px + 19; x++) {
+      if (x < 0 || y < 0 || x >= V.w || y >= V.h) continue;
+      const i = y * V.w + x;
+      V.terrain[i] = 0; V.road[i] = 0; V.zone[i] = 0; V.civic[i] = 0; V.wall[i] = 0; V.rail[i] = 0; V.tier[i] = 0; V.rubble[i] = 0;
+    }
+    const vline = []; for (let x = px; x <= px + 8; x++) vline.push(at(x, py + 3));
+    const vcol = []; for (let y = py; y <= py + 6; y++) vcol.push(at(px + 4, y));
+    apply(V, { kind: "rail", tiles: vline });
+    apply(V, { kind: "road", tiles: vcol });
+    computeFields(V);
+    const canvas = HC.createCanvas(200, 140);
+    const renderer = createRenderer(canvas, V, art);
+    const walkers = createWalkers(V);
+    walkers.notify();
+    const [ax, ay] = toScreen(px + 4 + 0.5, py + 3 + 0.5);
+    const cam = { x: ax, y: ay + HALF_H, zoom: 1 };
+    const aprons = () => {
+      renderer.invalidate();
+      renderer.draw(cam, null, walkers, "off", 0);
+      const d = canvas._data;
+      let n = 0;
+      for (let k = 0; k < d.length; k += 4) if (d[k] === APRON[0] && d[k + 1] === APRON[1] && d[k + 2] === APRON[2] && d[k + 3] === 255) n++;
+      return n;
+    };
+    const drawn = aprons();
+    const VX = at(px + 4, py + 3);
+    V.rail[VX] = 0;
+    const gone = aprons();
+    V.rail[VX] = 1;
+    const back = aprons();
+    check("crossing: the RENDERER draws THE CROSSING — its concrete apron, a colour no road, rail or grass tile in the game contains, is in the finished frame; take the line off the tile and the apron goes with it",
+      drawn > 0 && gone === 0 && back === drawn, `apron pixels ${drawn} with the line · ${gone} without it · ${back} with it back`);
+
+    // …and the apron alone cannot tell the right crossing from its transpose
+    // (swap the two masks in render.js and the apron count is identical, 36
+    // either way, because the corners are symmetric). So MATCH THE SPRITE:
+    // every opaque pixel of `art.crossing(roadMask, railMask, busy)` must be
+    // that colour at that place in the finished frame — with a plain road
+    // tile in the same frame as the control, so a bad anchoring fails loudly
+    // instead of quietly agreeing with everything.
+    renderer.invalidate();
+    renderer.draw(cam, null, walkers, "off", 0);
+    const d = canvas._data;
+    const matches = (tx, ty, sprite) => {
+      const [ox, oy] = renderer.tileToScreen(tx, ty);
+      let hit = 0, miss = 0;
+      for (let y = 0; y < sprite.h; y++) for (let x = 0; x < sprite.w; x++) {
+        const ch = sprite.rows[y][x];
+        if (ch === ".") continue;
+        const sx = Math.round(ox - sprite.anchor[0] + x);
+        const sy = Math.round(oy - sprite.anchor[1] + y);
+        if (sx < 0 || sy < 0 || sx >= canvas.width || sy >= canvas.height) continue;
+        const k = (sy * canvas.width + sx) * 4;
+        const c = colourOf(ch);
+        if (d[k] === c[0] && d[k + 1] === c[1] && d[k + 2] === c[2]) hit++; else miss++;
+      }
+      return { hit, miss };
+    };
+    const right = matches(px + 4, py + 3, art.crossing(5, 10, false)); // road N|S, line E|W
+    const transposed = matches(px + 4, py + 3, art.crossing(10, 5, false)); // the masks swapped
+    const control = matches(px + 4, py + 1, art.road(5, false)); // a plain road two tiles up the column
+    check("crossing: and it draws THAT crossing — every opaque pixel of art.crossing(roadMask, railMask) lands where the renderer put it, the mask-swapped twin does not, and a plain road tile in the same frame matches its own sprite",
+      right.miss === 0 && right.hit > 900 && transposed.miss > 100 && control.miss === 0 && control.hit > 900,
+      `crossing ${right.hit}/${right.miss} · transposed ${transposed.hit}/${transposed.miss} · control road ${control.hit}/${control.miss}`);
+  }
+
+  // The two clauses of `crossable` the ops actually reach: a crossing is never
+  // a station's tile and never a tunnel's. Both on a world of their own, so
+  // the roads they lay cannot disturb the commute figures measured above.
+  {
+    const G2 = createWorld({ seed: SEED });
+    const l2 = []; for (let x = px; x <= px + 9; x++) l2.push(at(x, py + 3));
+    apply(G2, { kind: "rail", tiles: l2 });
+    apply(G2, { kind: "station", tx: px + 2, ty: py + 3 });
+    apply(G2, { kind: "wall", tiles: [at(px + 6, py + 3)] }); // a rail tunnel
+    const overStation = []; for (let y = py + 1; y <= py + 5; y++) overStation.push(at(px + 2, y));
+    const overTunnel = []; for (let y = py + 1; y <= py + 5; y++) overTunnel.push(at(px + 6, y));
+    apply(G2, { kind: "road", tiles: overStation });
+    apply(G2, { kind: "road", tiles: overTunnel });
+    check("crossing: never a station's tile (the platform stands on the track) and never a tunnel's (one open axis) — a road dragged square-on through either lays round it and leaves it alone",
+      G2.road[at(px + 2, py + 3)] === ROAD.NONE && G2.rail[at(px + 2, py + 3)] === 2 && G2.road[at(px + 2, py + 1)] === ROAD.ROAD &&
+      G2.road[at(px + 6, py + 3)] === ROAD.NONE && G2.wall[at(px + 6, py + 3)] === 1 && G2.rail[at(px + 6, py + 3)] === 1 && G2.road[at(px + 6, py + 1)] === ROAD.ROAD,
+      `station tile road ${G2.road[at(px + 2, py + 3)]} · tunnel tile road ${G2.road[at(px + 6, py + 3)]}`);
+    const roadRow = []; for (let x = px + 12; x <= px + 16; x++) roadRow.push(at(x, py + 3));
+    apply(G2, { kind: "road", tiles: roadRow });
+    apply(G2, { kind: "wall", tiles: [at(px + 14, py + 3)] }); // a road tunnel
+    const lineDown = []; for (let y = py + 1; y <= py + 5; y++) lineDown.push(at(px + 14, y));
+    apply(G2, { kind: "rail", tiles: lineDown });
+    check("crossing: nor may a LINE cross a road already under a wall — the tunnel keeps its one open axis, and the line lays round it",
+      G2.rail[at(px + 14, py + 3)] === 0 && G2.wall[at(px + 14, py + 3)] === 1 && G2.road[at(px + 14, py + 3)] === ROAD.ROAD && G2.rail[at(px + 14, py + 1)] === 1,
+      `tunnel tile rail ${G2.rail[at(px + 14, py + 3)]} · one short of it ${G2.rail[at(px + 14, py + 1)]}`);
+  }
+
+  // "No rail bridges" is the one v1 limit SPEC §7.9 still leans on, and no
+  // check in the suite had ever laid rail on water — the fixture that carried
+  // the claim is dry by construction, so it could not fail for the reason it
+  // named. Find real water, bridge it, and try both ways over it.
+  {
+    const Wt = createWorld({ seed: SEED });
+    // a water tile with dry, empty ground directly north and south of it, so
+    // a N–S rail drag has a bank either side of the crossing it is refused
+    let wet = -1;
+    const clear = (i) => Wt.terrain[i] !== TERRAIN.WATER && !Wt.road[i] && !Wt.zone[i] && !Wt.civic[i] && !Wt.wall[i] && !Wt.rail[i];
+    for (let y = 2; y < Wt.h - 2 && wet < 0; y++) for (let x = 2; x < Wt.w - 2; x++) {
+      const i = y * Wt.w + x;
+      if (Wt.terrain[i] !== TERRAIN.WATER) continue;
+      if (!clear(i - Wt.w) || !clear(i + Wt.w)) continue;
+      wet = i; break;
+    }
+    if (wet < 0) {
+      check("crossing: the water fixture found a one-tile channel", false, "no isolated water tile on this seed");
+    } else {
+      const wx = wet % Wt.w, wy = (wet / Wt.w) | 0;
+      const onWater = apply(Wt, { kind: "rail", tiles: [wet] });
+      const span = apply(Wt, { kind: "road", tiles: [wet] }); // a bridge
+      const overBridge = apply(Wt, { kind: "rail", tiles: [wet - Wt.w, wet, wet + Wt.w] });
+      check("crossing: still no rail bridges — a line may not be laid on water, nor square-on across a road that is a BRIDGE; the bridge keeps the channel to itself",
+        onWater.ok === false && Wt.rail[wet] === 0 && span.ok && Wt.road[wet] === ROAD.BRIDGE &&
+        Wt.rail[wet] === 0 && Wt.rail[wet - Wt.w] === 1 && Wt.rail[wet + Wt.w] === 1,
+        `water at (${wx},${wy}) · rail on water ${onWater.reason || onWater.ok} · bridge ${Wt.road[wet]} · rail on the deck ${Wt.rail[wet]} · either bank ${Wt.rail[wet - Wt.w]}/${Wt.rail[wet + Wt.w]}`);
+    }
+  }
+
+  // Two crossings in the saved city, reloaded and run on: the shape that
+  // catches stale derived state (roadDist, occlusion, the ground bitmap).
+  const CL = load(save(F));
+  for (let t = 0; t < 12; t++) { tick(F); tick(CL); }
+  check("crossing: save → load → 12 ticks with two crossings in the city hash-equals", stateHash(F) === stateHash(CL), `${stateHash(F)} vs ${stateHash(CL)}`);
+}
+
 
 // ---- what a station BUYS: fire, police, and the rubble clock (session 8; tools/serviceprobe.mjs) ----
 {

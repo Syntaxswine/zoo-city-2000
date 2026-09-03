@@ -26,7 +26,7 @@
 //   art.portrait(species, opts)         16×16 face; opts.age/look/expression
 //   art.mark(species)                   reserved for Part E
 //   art.look(id)                        stable { shade, mark } citizen look
-//   art.crossing(axis, busy)            reserved for Part X
+//   art.crossing(roadMask, railMask, busy)  a level crossing: the road's mask, the line's mask (rail.js)
 //   allSprites()                        [{ name, sprite }] for the audit
 //
 // Every sprite is { rows, anchor, w, h, footprint } from defineSprite —
@@ -39,7 +39,7 @@ import { allShops } from "./shops.js"; // registers the shop pool (SPEC §12.2d)
 import { hires } from "./hires.js";
 import { roadSprite, bridgeSprite, allRoads } from "./roads.js";
 import { wallSprite, tunnelSprite, allWalls } from "./walls.js";
-import { railSprite, stationSprite, allRail } from "./rail.js";
+import { railSprite, stationSprite, crossingSprite, allRail } from "./rail.js";
 import { GRASS, CHALK, RUBBLE, WATER_TILE, KERB, TREES, TREE_LIST, ZOTS, PLAZA, CURSOR, GHOST, waterTint, WATER_FRAMES, allTerrain } from "./terrain.js";
 import { citizenSprite, portraitSprite, TENT, HAT, MEETING, SACKS, allCitizens } from "./citizens.js";
 import { bubbleSprite, BUBBLE_SAMPLES } from "./bubbles.js";
@@ -108,7 +108,6 @@ export function look(id) {
   h ^= h >>> 16;
   return Object.freeze({ shade: h & 1, mark: (h >>> 1) & 1 });
 }
-export function crossing(_axis, _busy = false) { return notBuilt("crossing"); }
 
 export const art = Object.freeze({
   building: buildingSprite,
@@ -129,7 +128,7 @@ export const art = Object.freeze({
   portrait,
   mark,
   look,
-  crossing,
+  crossing: crossingSprite,
   waterTint,
   WATER_FRAMES,
   hires,

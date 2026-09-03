@@ -241,7 +241,9 @@ export function createRenderer(canvas, initialWorld, art) {
         } else {
           let sprite;
           let tint = null;
-          if (hasRoad) sprite = art.road(roadMask(tx, ty), world.traffic[i] > BUSY);
+          // A level crossing is BOTH (SPEC §7.9): one sprite from the two live masks, so it agrees with the road beside it and the track beside it.
+          if (hasRoad && world.rail[i] === 1) sprite = art.crossing(roadMask(tx, ty), railMask(tx, ty), world.traffic[i] > BUSY);
+          else if (hasRoad) sprite = art.road(roadMask(tx, ty), world.traffic[i] > BUSY);
           else if (world.rail[i]) sprite = art.rail(railMask(tx, ty));
           else if (world.rubble[i] && world.tier[i] === 0) sprite = art.ground("rubble");
           else if (world.zone[i] !== ZONE.NONE && world.tier[i] === 0) {

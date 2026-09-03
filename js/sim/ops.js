@@ -29,6 +29,121 @@ function rect(world, op) {
 
 const isBuilt = (world, i) => world.tier[i] > 0 || world.burning[i] || world.rubble[i];
 
+// ---- the level crossing (SPEC §7.9) ---------------------------------------
+// A road and a line may share ONE tile when they cross SQUARE-ON: after the
+// op the tile's road runs straight on one axis and its line straight on the
+// other. Never on water or a bridge (a deck carries one way), never under a
+// wall (a tunnel is open along ONE axis, and a crossing has two), never a
+// station (the platform stands on the track). The masks are read AFTER THE
+// WHOLE DRAG, never tile by tile: an L-drag's own arm is half of what makes
+// its road straight, so a per-tile test would refuse every crossing a player
+// ever draws.
+//
+// And a crossing KEEPS its two straight runs: an op that would give one an
+// arm is refused too. That second half is NOT implied by the first — this
+// was claimed and was wrong. A road laid one tile east of a crossing, on the
+// line, is itself square-on and still makes a T-junction of its neighbour;
+// and after the bulldozer takes the line east of a crossing, that tile is
+// bare ground the first rule never looks at. The one thing that can still
+// take square-on away is the BULLDOZER removing a road or a line beside a
+// crossing — no rule can stop that without trapping the player — so the tile
+// becomes a road and a line sharing ground, the art draws the stub it has
+// become (which is why the family is 512 sprites and not four), and nothing
+// in the sim minds. What an op may never do is take it away.
+const CROSS_REASON = "a crossing must be square-on — a straight road across a straight line";
+const M_N = 1, M_E = 2, M_S = 4, M_W = 8;
+const M_NS = M_N | M_S, M_EW = M_E | M_W;
+
+/** The 4-bit mask of `layer` round tile i (N=1 E=2 S=4 W=8), counting the tiles in `also` as present. */
+export function maskAround(world, layer, also, i) {
+  const { w, h } = world;
+  const tx = i % w;
+  const ty = (i / w) | 0;
+  const on = (x, y) => x >= 0 && y >= 0 && x < w && y < h && (layer[y * w + x] !== 0 || (also !== null && also.has(y * w + x)));
+  return (on(tx, ty - 1) ? M_N : 0) | (on(tx + 1, ty) ? M_E : 0) | (on(tx, ty + 1) ? M_S : 0) | (on(tx - 1, ty) ? M_W : 0);
+}
+
+/** Square-on: both runs straight, on different axes. The whole rule, in one line. */
+export function squareOn(roadMask, railMask) {
+  return (roadMask === M_NS && railMask === M_EW) || (roadMask === M_EW && railMask === M_NS);
+}
+
+/**
+ * Could this tile carry a road AND a line at all, whatever the masks say?
+ * The whole rule in one place, so it reads the same from either op. Each op
+ * reaches only part of it — the road op meets a tunnel (`wall`) and a station
+ * (`rail` 2), the rail op meets a tunnel — and refuses water, chalk, a civic
+ * and a building on its own line above; the rest is this predicate saying the
+ * rule out loud rather than leaving it to be inferred from two other lists.
+ */
+function crossable(world, i) {
+  return world.terrain[i] !== TERRAIN.WATER && world.road[i] !== ROAD.BRIDGE && !world.wall[i] && world.rail[i] !== 2 && !world.civic[i] && !world.zone[i] && !isBuilt(world, i);
+}
+
+/**
+ * Judge the crossings a drag would make AND the crossings it would disturb,
+ * on the drag's OWN result. `laying` is "road" or "rail" — the layer this op
+ * puts down; `lay` is every tile it will put it on, and counts toward THAT
+ * layer's mask. Returns the tiles to drop:
+ *   - a tile that becomes a crossing which is not square-on, and
+ *   - a tile whose new arm would leave a NEIGHBOURING crossing crooked.
+ * A crossing the bulldozer has already left crooked is judged the same way:
+ * beside it, the only ops allowed are the ones that make it square-on again,
+ * and one press of the bulldozer on the crossing itself clears the line.
+ * Every mask is read from the surviving set, and the whole CANDIDATE list is
+ * re-judged each round until the answer settles. It has to be a fixpoint over
+ * the candidates and not one downward pass: the first draft judged one round
+ * and threw away a perfectly square-on crossing, because the L-drag's other
+ * leg — refused for running ALONG the line — had put a phantom third arm on
+ * it, and a tile refused in round one was never looked at again. Re-judging
+ * lets a tile come BACK once the sibling that condemned it has gone.
+ *
+ * Legality is not monotone in the set (a tile can turn a neighbour's stub
+ * into a straight run, or a straight run into a T), so a pair of candidates
+ * could in principle flip each other for ever. `CROSS_ROUNDS` caps it, and
+ * whatever set the loop ends on is then pruned DOWNWARD, which only ever
+ * removes and so always terminates. `lay` is left holding the survivors and
+ * the tiles taken out of it are returned.
+ */
+const CROSS_ROUNDS = 8;
+
+function refuseCrossings(world, lay, laying) {
+  const candidates = [...lay];
+  const { w, h } = world;
+  /** Would tile i be legal if the op laid exactly `set`? */
+  const legal = (i, set) => {
+    const alsoRoad = laying === "road" ? set : null;
+    const alsoRail = laying === "rail" ? set : null;
+    const ok = (j) => squareOn(maskAround(world, world.road, alsoRoad, j), maskAround(world, world.rail, alsoRail, j));
+    const other = laying === "road" ? world.rail[i] : world.road[i];
+    if (other && !ok(i)) return false; // it would be a crossing, and not square-on
+    const tx = i % w;
+    const ty = (i / w) | 0;
+    for (const [dx, dy] of [[0, -1], [1, 0], [0, 1], [-1, 0]]) {
+      const x = tx + dx;
+      const y = ty + dy;
+      if (x < 0 || y < 0 || x >= w || y >= h) continue;
+      const j = y * w + x;
+      if (world.road[j] && world.rail[j] && !ok(j)) return false; // it would leave a crossing crooked
+    }
+    return true;
+  };
+  let cur = new Set(candidates); // NOT `lay` — the loop can break on round 0, and the rebuild below clears it
+  for (let round = 0; round < CROSS_ROUNDS; round++) {
+    const next = new Set(candidates.filter((i) => legal(i, cur)));
+    if (next.size === cur.size && candidates.every((i) => next.has(i) === cur.has(i))) break;
+    cur = next;
+  }
+  for (;;) { // whatever it settled on, make it stable: this only removes
+    const bad = candidates.filter((i) => cur.has(i) && !legal(i, cur));
+    if (!bad.length) break;
+    for (const i of bad) cur.delete(i);
+  }
+  lay.clear();
+  for (const i of candidates) if (cur.has(i)) lay.add(i);
+  return candidates.filter((i) => !cur.has(i));
+}
+
 /** What an op would do: { cost, tiles: [{i, cost, what}], reason }. */
 export function costOf(world, op) {
   const tiles = [];
@@ -50,14 +165,22 @@ export function costOf(world, op) {
       break;
     }
     case "road": {
-      for (const i of op.tiles || []) {
-        if (!(i >= 0 && i < world.w * world.h)) continue;
-        if (world.road[i] || world.civic[i] || world.rail[i] || isBuilt(world, i)) continue; // no level crossings in v1 (BACKLOG)
+      const line = (op.tiles || []).filter((i) => i >= 0 && i < world.w * world.h);
+      const lay = new Set();
+      for (const i of line) {
+        if (world.road[i] || world.civic[i] || isBuilt(world, i)) continue;
+        if (world.rail[i] && !crossable(world, i)) continue; // a station, a tunnel, a bridge — never a crossing
+        lay.add(i);
+      }
+      const refused = refuseCrossings(world, lay, "road");
+      for (const i of line) {
+        if (!lay.has(i)) continue;
         let c = world.terrain[i] === TERRAIN.WATER ? C.bridge : C.road;
         if (world.terrain[i] === TERRAIN.TREE) c += C.bulldozeTree;
-        add(i, c, world.terrain[i] === TERRAIN.WATER ? "bridge" : "road");
+        add(i, c, world.terrain[i] === TERRAIN.WATER ? "bridge" : world.rail[i] ? "crossing" : "road");
         if (world.zone[i]) replaced++; // an empty zoned lot under the road: the strip says so
       }
+      if (!tiles.length && refused.length) return { cost: 0, tiles, reason: CROSS_REASON };
       break;
     }
     case "bulldoze": {
@@ -135,35 +258,48 @@ export function costOf(world, op) {
       break;
     }
     case "rail": {
-      // Rail is an L-drag like a road (SPEC §7.9): grass or trees (felled), across a wall (a tunnel);
-      // not on water, a road, chalk, a civic or a building — no bridges or crossings in v1.
-      for (const i of op.tiles || []) {
-        if (!(i >= 0 && i < world.w * world.h)) continue;
-        if (world.rail[i] || world.road[i] || world.terrain[i] === TERRAIN.WATER || world.civic[i] || world.zone[i] || isBuilt(world, i)) continue;
+      // Rail is an L-drag like a road (SPEC §7.9): grass or trees (felled), across a wall (a tunnel),
+      // square-on across a road (a level crossing); not on water, chalk, a civic or a building — no bridges.
+      const line = (op.tiles || []).filter((i) => i >= 0 && i < world.w * world.h);
+      const lay = new Set();
+      for (const i of line) {
+        if (world.rail[i] || world.terrain[i] === TERRAIN.WATER || world.civic[i] || world.zone[i] || isBuilt(world, i)) continue;
+        if (world.road[i] && !crossable(world, i)) continue;
+        lay.add(i);
+      }
+      const refused = refuseCrossings(world, lay, "rail");
+      for (const i of line) {
+        if (!lay.has(i)) continue;
         let c = C.rail;
         if (world.terrain[i] === TERRAIN.TREE) c += C.bulldozeTree;
-        add(i, c, world.wall[i] ? "tunnel" : "rail");
+        add(i, c, world.wall[i] ? "tunnel" : world.road[i] ? "crossing" : "rail");
       }
+      if (!tiles.length && refused.length) return { cost: 0, tiles, reason: CROSS_REASON };
       break;
     }
     case "station": {
       // A station is a click on a plain rail tile; it is a door only when a road tile touches it (the card says).
       const i = inBounds(world, op.tx, op.ty) ? idx(world, op.tx, op.ty) : -1;
       if (i < 0 || world.rail[i] !== 1) return { cost: 0, tiles, reason: "blocked" };
+      if (world.road[i]) return { cost: 0, tiles, reason: "a station cannot stand on a level crossing" }; // the platform would sit in the road
       add(i, C.station, "station");
       break;
     }
     case "wall": {
       // A wall is an L-drag like a road (SPEC §6b); across a road or rail tile it
       // is a TUNNEL. Never on water, chalk, a civic or a building — a wall
-      // stands on ground of its own.
+      // stands on ground of its own — and never over a level crossing, which
+      // has two open axes and a tunnel has one (SPEC §7.9).
+      let walled = 0;
       for (const i of op.tiles || []) {
         if (!(i >= 0 && i < world.w * world.h)) continue;
         if (world.wall[i] || world.terrain[i] === TERRAIN.WATER || world.civic[i] || world.zone[i] || isBuilt(world, i)) continue;
+        if (world.road[i] && world.rail[i]) { walled++; continue; }
         let c = C.wall;
         if (world.terrain[i] === TERRAIN.TREE) c += C.bulldozeTree;
         add(i, c, world.road[i] || (world.rail && world.rail[i]) ? "tunnel" : "wall");
       }
+      if (!tiles.length && walled) return { cost: 0, tiles, reason: "a tunnel is open along one axis — a level crossing has two" };
       break;
     }
     default:

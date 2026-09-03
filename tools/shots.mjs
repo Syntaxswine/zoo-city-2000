@@ -29,7 +29,7 @@ import { LANDMARKS } from "../js/sim/landmarks.js";
 import { hires } from "../js/art/hires.js";
 import { ROADS, BRIDGES, N, E, S, W, DECK_TOP } from "../js/art/roads.js";
 import { WALLS, TUNNELS } from "../js/art/walls.js";
-import { RAILS, STATIONS } from "../js/art/rail.js";
+import { RAILS, STATIONS, squareOnCrossings, crossingSprite } from "../js/art/rail.js";
 import { GRASS, CHALK, CHALK_KEYS, RUBBLE, WATER_TILE, KERB, TREE_LIST, ZOTS, PLAZA, CURSOR, GHOST, waterTint, WATER_FRAMES } from "../js/art/terrain.js";
 import { ink } from "../js/art/format.js";
 import { citizenSprite, SPECIES_IDS, FACINGS, TENT, HAT, MEETING, SACKS } from "../js/art/citizens.js";
@@ -237,12 +237,21 @@ function sheets(z) {
     out.push(save("sheet-walls.png", canvas, z));
   }
 
-  // Rail: the 16 masks, then the two stations over their track.
+  // Rail: the 16 masks, then the two stations over their track, then the level crossings.
   {
     const cells = [];
     for (let m = 0; m < 16; m++) cells.push({ sprite: RAILS[m], label: `rail mask ${m}` });
     cells.push({ sprite: STATIONS.ns, label: "station ns (over a N|S track)", under: RAILS[N | S] });
     cells.push({ sprite: STATIONS.ew, label: "station ew (over an E|W track)", under: RAILS[E | W] });
+    // The four square-on crossings the rule allows (SPEC §7.9), then two stubs
+    // — what a crossing becomes when the road or the line beside it comes down.
+    const sq = squareOnCrossings();
+    cells.push({ sprite: sq[0].ew, label: "crossing: an E|W line across a N|S road" });
+    cells.push({ sprite: sq[0].ns, label: "crossing: a N|S line across an E|W road" });
+    cells.push({ sprite: sq[1].ew, label: "crossing: an E|W line across a BUSY N|S road" });
+    cells.push({ sprite: sq[1].ns, label: "crossing: a N|S line across a BUSY E|W road" });
+    cells.push({ sprite: crossingSprite(N, E | W, false), label: "crossing stub: the road south of it came down" });
+    cells.push({ sprite: crossingSprite(N | S, W, false), label: "crossing stub: the line east of it came down" });
     const cols = 6, cellW = 84, cellH = 72, groundY = 52;
     const canvas = createCanvas(cols * cellW, Math.ceil(cells.length / cols) * cellH);
     const ctx = background(canvas);

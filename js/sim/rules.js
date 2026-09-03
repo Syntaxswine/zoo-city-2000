@@ -331,7 +331,7 @@ export const RULES = Object.freeze([
   },
   {
     id: "R1", title: "Rail: a commute is the cheapest walk-and-ride",
-    formula: "walk 1 a step (×6 onto a road the line forbids), ride 0.3 a step between stations; board and alight free at a station a road touches; traffic and trespass count walking steps only — neutral travel, until you step off",
+    formula: "walk 1 a step (×6 onto a road the line forbids), ride 0.3 a step between stations; board and alight free at a station a road touches; a level crossing is walked and ridden through, and boards nobody; traffic and trespass count walking steps only — neutral travel, until you step off",
     live: (w) => `${w.last.census.railTiles || 0} rail tiles · ${w.last.census.stations || 0} stations · ${w.last.census.riders || 0} riders · mean commute ${(w.last.census.meanCommute || 0).toFixed(1)} walk-steps`,
   },
   {

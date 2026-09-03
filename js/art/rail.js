@@ -18,6 +18,7 @@ import { defineSprite } from "./format.js";
 import { keysOf } from "./palette.js";
 import { box, render, A_STEP, RECIPES } from "./solid.js";
 import { groundSprite, grassKey, hash, TILE_ANCHOR } from "./terrain.js";
+import { onRoad, roadKey, tarmacKey } from "./roads.js";
 
 const EARTH = keysOf("earth"); // q r s t u
 const ASPH = keysOf("asphalt"); // 1 2 3 4
@@ -109,9 +110,91 @@ export function stationSprite(axis = "ns") {
   return STATIONS[axis === "ew" ? "ew" : "ns"];
 }
 
+// ------------------------------------------------------------------ the level crossing
+
+/**
+ * THE LEVEL CROSSING (SPEC §7.9, §12.4c) — a road and a line on one tile.
+ *
+ * The road half is drawn by roads.js's own predicate and the line half by
+ * this file's, each from the tile's LIVE mask, so a crossing can never
+ * disagree with the road beside it or the track beside it — and one whose
+ * neighbour came down draws the stub it has become rather than a straight
+ * run that is no longer there. Where the two overlap the ballast, the
+ * sleepers and the lane dash all stop and the two rails run flush in the
+ * tarmac, which is what a crossing looks like from above; where the line
+ * leaves the road it is ordinary track again. The one piece of furniture is
+ * a concrete apron in each corner where the road's edge meets the bed's
+ * edge — composed from BOTH masks, so a stub grows only the corners it
+ * still has.
+ *
+ * The family is 16 road masks × 16 rail masks × busy = 512 tiles, so it is
+ * composed LAZILY and cached: a city pays for the crossings it actually
+ * has, and a city with none pays nothing — which is why `squareOnCrossings`
+ * below is a function and not a const. The four square-on tiles the rule
+ * allows (SPEC §7.9) are in the audit and on the sheet; the suite walks all
+ * 512 for legality.
+ */
+const APRON = 1.5; // the concrete corner, in units
+
+/** Crossing surface key at (a, b, px, py) for the two masks; null off both. */
+export function crossingKey(roadMask, railMask, busy, a, b, px, py) {
+  const onBed = onRail(railMask, a, b);
+  const onTar = onRoad(roadMask, a, b);
+  if (onBed && onTar) {
+    const axis = armOf(railMask, a, b);
+    // A line with no neighbour left is a bare bed pad and has no direction to
+    // lay rails along — `art.rail(0)` draws it as bare ballast, and so does
+    // this. Falling through to tarmac here made a crossing whose line had been
+    // bulldozed off BOTH sides pixel-identical to a plain road, while the city
+    // went on charging for the line, counting it, riding it and smoking it.
+    if (axis === "pad") return railKey(railMask, a, b, px, py);
+    const across = axis === "ns" ? a - 8 : b - 8;
+    if (Math.abs(Math.abs(across) - RAIL_AT) < RAIL_W) return ASPH[3]; // the rails, flush in the road
+    return tarmacKey(px, py); // no ballast, no sleeper, no dash where the line crosses
+  }
+  if (onBed) return railKey(railMask, a, b, px, py);
+  if (onTar) return roadKey(roadMask, busy, a, b, px, py);
+  const nearRoad = onRoad(roadMask, a + APRON, b) || onRoad(roadMask, a - APRON, b) || onRoad(roadMask, a, b + APRON) || onRoad(roadMask, a, b - APRON);
+  const nearBed = onRail(railMask, a + APRON, b) || onRail(railMask, a - APRON, b) || onRail(railMask, a, b + APRON) || onRail(railMask, a, b - APRON);
+  if (nearRoad && nearBed) return CONC[1]; // the apron in the corner
+  return null;
+}
+
+const crossFn = (roadMask, railMask, busy) => (a, b, px, py) => crossingKey(roadMask, railMask, busy, a, b, px, py) || grassKey(px, py, 0);
+
+const CROSSINGS = new Map();
+
+/** The crossing of `roadMask` and `railMask` — composed on first sight and kept (512 in the family; a city builds the few it has). */
+export function crossingSprite(roadMask, railMask, busy = false) {
+  const rd = roadMask & 15;
+  const rl = railMask & 15;
+  const b = busy ? 1 : 0;
+  const key = (rd << 5) | (rl << 1) | b;
+  let s = CROSSINGS.get(key);
+  if (!s) {
+    s = groundSprite({ name: `crossing-${rd}-${rl}${b ? "-busy" : ""}`, anchor: TILE_ANCHOR, tags: ["ground", "rail", "crossing"] }, crossFn(rd, rl, !!b));
+    CROSSINGS.set(key, s);
+  }
+  return s;
+}
+
+/**
+ * The four the rule allows (SPEC §7.9), keyed by the LINE's axis:
+ * `squareOnCrossings()[busy][railAxis]`. A FUNCTION, not a const: at module
+ * scope it would rasterise four diamonds on every import and the family
+ * would not be lazy after all — only 508 of the 512 would be. The audit and
+ * the sheet call it; the game never does.
+ */
+export const squareOnCrossings = () => [0, 1].map((busy) => ({
+  ns: crossingSprite(E | W, N | S, !!busy), // a N–S line across an E–W road
+  ew: crossingSprite(N | S, E | W, !!busy), // an E–W line across a N–S road
+}));
+
 /** Every rail sprite, named, for the audit. */
 export function allRail() {
   const out = RAILS.map((s) => ({ name: s.name, sprite: s }));
   out.push({ name: STATIONS.ns.name, sprite: STATIONS.ns }, { name: STATIONS.ew.name, sprite: STATIONS.ew });
+  const sq = squareOnCrossings();
+  for (const busy of [0, 1]) for (const axis of ["ns", "ew"]) out.push({ name: sq[busy][axis].name, sprite: sq[busy][axis] });
   return out;
 }

@@ -70,6 +70,11 @@ export function roadKey(mask, busy, a, b, px, py) {
     const dash = nsArm ? Math.floor(b) % 4 < 2 : ewArm ? Math.floor(a) % 4 < 2 : false;
     if (dash) return ASPH[3];
   }
+  return tarmacKey(px, py);
+}
+
+/** The plain tarmac at a screen pixel — the road away from its kerb and its dashes. The level crossing (rail.js) lays its rails in this, so the two can never disagree about what a road looks like. */
+export function tarmacKey(px, py) {
   return hash(px, py, 61) < 0.08 ? ASPH[1] : ASPH[2];
 }
 

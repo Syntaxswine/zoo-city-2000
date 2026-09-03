@@ -20,9 +20,9 @@ export const TOOLS = [
   { id: "C", key: "2", label: "C", hint: "zone commercial (drag)" },
   { id: "I", key: "3", label: "I", hint: "zone industrial (drag)" },
   { id: "M", key: "M", label: "Meat", hint: "zone meat market (drag) §12 — grey, off the books; carnivores staff it, herbivores smell it four tiles off" },
-  { id: "road", key: "4", label: "Road", hint: "L-drag; Shift = straight; over water = bridge §40" },
+  { id: "road", key: "4", label: "Road", hint: "L-drag; Shift = straight; over water = bridge §40; square-on across a line = a level crossing" },
   { id: "wall", key: "B", label: "Wall", hint: "L-drag §8; Shift = straight; across a road = a tunnel; smells, dread, cover and a killer's reach go round a wall" },
-  { id: "rail", key: "T", label: "Rail", hint: "L-drag §20 a tile, §3 a year; across a wall = a tunnel; a ride costs 0.3 of a walk and makes no traffic; not on water or a road yet" },
+  { id: "rail", key: "T", label: "Rail", hint: "L-drag §20 a tile, §3 a year; across a wall = a tunnel; square-on across a road = a level crossing; a ride costs 0.3 of a walk and makes no traffic; not on water yet" },
   { id: "station", key: "G", label: "Station", hint: "click a rail tile §300, §100 a year — a door only beside a road; riders board and alight here" },
   { id: "use", key: "U", label: "Use", hint: "the player's line: paint lots and roads mixed / predator-only / prey-only (drag) §1 a tile — press U again to cycle; the O overlay shows it" },
   { id: "tree", key: "5", label: "Tree", hint: "plant trees (drag) §4" },
@@ -126,11 +126,12 @@ export function createInput(canvas, app) {
   function costLabel(op, plan) {
     const n = plan.tiles.length;
     const name = op.kind === "use" ? `Use ${["mixed", "predator-only", "prey-only"][op.use]}` : { zone: op.zone === ZONE.R ? "R" : op.zone === ZONE.C ? "C" : op.zone === ZONE.M ? "Meat" : "I", road: "Road", wall: "Wall", rail: "Rail", station: "Station", tree: "Tree", bulldoze: "Bulldoze", park: "Park", zoo: "Zoo", fire: "Fire station", police: "Police station", centre: "Pacification centre" }[op.kind];
-    if (plan.reason) return `${name}: blocked`;
+    if (plan.reason) return `${name}: ${plan.reason}`; // the old reasons ARE the word "blocked"; a rule with something to say (the level crossing, SPEC §7.9) says it here
     if (!n) return `${name}: nothing to do`;
     const bridges = plan.tiles.filter((t) => t.what === "bridge").length;
     const tunnels = plan.tiles.filter((t) => t.what === "tunnel").length;
-    const extra = bridges ? ` (${bridges} bridge)` : tunnels ? ` (${tunnels} tunnel${tunnels === 1 ? "" : "s"})` : "";
+    const crossings = plan.tiles.filter((t) => t.what === "crossing").length;
+    const extra = bridges ? ` (${bridges} bridge)` : tunnels ? ` (${tunnels} tunnel${tunnels === 1 ? "" : "s"})` : crossings ? ` (${crossings} level crossing${crossings === 1 ? "" : "s"})` : "";
     // costOf() counts the empty zoned lots a road paves over (`replaced`, no
     // refund) and the built lots a bulldoze empties of animals (`evicts`, not undoable).
     const repl = plan.replaced ? ` · replaces ${plan.replaced} zoned lot${plan.replaced === 1 ? "" : "s"}` : "";
