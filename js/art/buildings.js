@@ -28,10 +28,10 @@
 // The anchor is the pixel under world (8, 8, 0) — the ground centre of the
 // tile (A_STEP for the 2×2 zoo) — so `painter.placeAt` needs nothing else.
 
-import { box, render, litSkin, flatSkin, A_STEP, TO_X, TO_Y } from "./solid.js";
+import { box, render, litSkin, flatSkin, A_STEP, TO_X, TO_Y, RECIPES } from "./solid.js";
 import { defineSprite, part, toRows, T } from "./format.js";
 import { keysOf } from "./palette.js";
-import { TREE_ROUND, TREE_TALL, TREE_WILLOW, RUBBLE, diamond, hash } from "./terrain.js";
+import { TREE_ROUND, TREE_TALL, TREE_WILLOW, RUBBLE, groundSprite, hash } from "./terrain.js";
 
 const BRICK = keysOf("brick"); // ! @ # $
 const CONC = keysOf("concrete"); // % ^ & * (
@@ -138,9 +138,10 @@ export function solidSprite(name, boxes, { hub = A_STEP / 2, footprint = [1, 1],
  * sprite it made, so the same plan can be rasterised again: at scale 2 for
  * the hi-res set (js/art/hires.js), or with its z-buffer for the depth
  * audit (tools/depthaudit.mjs). A sprite is frozen rows; a recipe is how
- * the rows were made.
+ * the rows were made. The map lives in solid.js so walls, rail and the
+ * bridges (which call `render` themselves) register in the same one.
  */
-export const RECIPES = new Map();
+export { RECIPES };
 
 /** Rasterise a recipe at `scale`: { grid, zbuf, anchor, ox, oy, scale, name }. Stamps go through the z-buffer as in `solidSprite`. */
 export function renderRecipe(recipe, scale = 1) {
@@ -903,15 +904,10 @@ const FIRE_B = defineSprite({
 export const FIRE = [FIRE_A, FIRE_B];
 
 /** A water checker over the tile: the flood overlay. */
-export const FLOOD = defineSprite({
-  name: "flood",
-  anchor: [32, 16],
-  tags: ["overlay"],
-  rows: diamond((a, b, px, py) => {
-    if ((px + py) & 1) return null;
-    const h = hash(px, py, 53);
-    return h < 0.08 ? "K" : h < 0.5 ? "I" : "H";
-  }),
+export const FLOOD = groundSprite({ name: "flood", anchor: [32, 16], tags: ["overlay"] }, (a, b, px, py) => {
+  if ((px + py) & 1) return null;
+  const h = hash(px, py, 53);
+  return h < 0.08 ? "K" : h < 0.5 ? "I" : "H";
 });
 
 export const OVERLAYS = { scaffold: [SCAFFOLD], fire: FIRE, flood: [FLOOD], rubble: [RUBBLE] };

@@ -36,8 +36,8 @@
 
 import { defineSprite, T } from "./format.js";
 import { keysOf } from "./palette.js";
-import { box, render, litSkin, A_STEP } from "./solid.js";
-import { diamond, grassKey, hash, TILE_ANCHOR } from "./terrain.js";
+import { box, render, litSkin, A_STEP, RECIPES } from "./solid.js";
+import { diamond, groundSprite, grassKey, hash, TILE_ANCHOR } from "./terrain.js";
 
 const ASPH = keysOf("asphalt"); // 1 2 3 4
 const CONC = keysOf("concrete");
@@ -73,8 +73,9 @@ export function roadKey(mask, busy, a, b, px, py) {
   return hash(px, py, 61) < 0.08 ? ASPH[1] : ASPH[2];
 }
 
+const roadFn = (mask, busy) => (a, b, px, py) => roadKey(mask, busy, a, b, px, py) || grassKey(px, py, 0);
 function roadRows(mask, busy) {
-  return diamond((a, b, px, py) => roadKey(mask, busy, a, b, px, py) || grassKey(px, py, 0));
+  return diamond(roadFn(mask, busy));
 }
 
 /** The three reference strips SPEC §12.4 names. */
@@ -82,16 +83,9 @@ export const STRIP_STRAIGHT = roadRows(N | S, false);
 export const STRIP_CORNER = roadRows(N | E, false);
 export const STRIP_STUB = roadRows(N, false);
 
-/** ROADS[busy ? 1 : 0][mask] — 32 sprites. */
+/** ROADS[busy ? 1 : 0][mask] — 32 sprites (ground diamonds with a recipe, so the hi-res set can remake them at 2×). */
 export const ROADS = [0, 1].map((busy) =>
-  Array.from({ length: 16 }, (_, mask) =>
-    defineSprite({
-      name: `road-${mask}${busy ? "-busy" : ""}`,
-      anchor: TILE_ANCHOR,
-      rows: roadRows(mask, !!busy),
-      tags: ["ground", "road"],
-    })
-  )
+  Array.from({ length: 16 }, (_, mask) => groundSprite({ name: `road-${mask}${busy ? "-busy" : ""}`, anchor: TILE_ANCHOR, tags: ["ground", "road"] }, roadFn(mask, !!busy)))
 );
 
 export function roadSprite(mask, busy = false) {
@@ -129,8 +123,11 @@ function bridgeBoxes(mask) {
 }
 
 export const BRIDGES = Array.from({ length: 16 }, (_, mask) => {
-  const r = render(bridgeBoxes(mask), { hub: A_STEP / 2 });
-  return defineSprite({ name: `bridge-${mask}`, anchor: r.anchor, rows: r.rows, tags: ["ground", "bridge"] });
+  const boxes = bridgeBoxes(mask);
+  const r = render(boxes, { hub: A_STEP / 2 });
+  const s = defineSprite({ name: `bridge-${mask}`, anchor: r.anchor, rows: r.rows, tags: ["ground", "bridge"] });
+  RECIPES.set(s, { name: s.name, boxes, hub: A_STEP / 2, footprint: [1, 1], extent: [], stamps: [] }); // the hi-res set re-renders it at 2×
+  return s;
 });
 
 export function bridgeSprite(mask) {

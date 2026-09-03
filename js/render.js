@@ -21,6 +21,15 @@
 // Camera = { x, y, zoom }: the projection-space point under the canvas
 // centre and an integer zoom (1 or 2). Sprites are rasterised once from
 // their text rows (format.rasterize) and cached per (sprite, tint).
+//
+// THE HI-RES SET (SPEC §12.6). At zoom 2 every sprite that has a 2× twin
+// (art.hires: every box solid and every ground diamond — not the animals,
+// trees or glyphs, which are hand-drawn) is drawn from its 2× rows at one
+// device pixel per sprite pixel, under a transform of zoom/2, with its
+// anchor on the same projection point placeAt put the 1× anchor on; a
+// sprite without a twin is drawn as before, scaled by the zoom. The static
+// ground layer is built at 2× too, so the roads and the grass sharpen with
+// the buildings. S below is that factor: 1 at zoom 1, 2 at zoom 2.
 
 import { toScreen, toWorld, pickTile, HALF_H, HALF_W, TILE_W, TILE_H } from "./iso/iso.js";
 import { paintScene, Z_BUILDING } from "./iso/painter.js";
@@ -82,6 +91,32 @@ export function createRenderer(canvas, initialWorld, art) {
     c.getContext("2d").putImageData(new ImageData(img.data, img.w, img.h), 0, 0);
     slot.set(key, c);
     return c;
+  }
+
+  // ---- the hi-res set --------------------------------------------------------------
+  const hiOf = new Map(); // sprite → its 2× twin or null (art.hires renders lazily and caches; this saves the call)
+  function hi(sprite) {
+    if (!art.hires) return null;
+    let h = hiOf.get(sprite);
+    if (h === undefined) { h = art.hires(sprite); hiOf.set(sprite, h); }
+    return h;
+  }
+  const hiScaleFor = (zoom) => (zoom >= 2 ? 2 : 1);
+  /**
+   * Blit `sprite` on context `c` whose device transform is projection × base.z
+   * + (base.tx, base.ty), with its rows' top-left at projection (sx, sy) — what
+   * placeAt returns. With S = 2 and a twin, the twin's rows go down instead at
+   * base.z / 2, positioned so ITS anchor sits on the same projection point.
+   */
+  function blitScaled(c, base, S, sprite, sx, sy, tint) {
+    const h = S === 2 ? hi(sprite) : null;
+    if (!h) {
+      c.setTransform(base.z, 0, 0, base.z, base.tx, base.ty);
+      c.drawImage(raster(sprite, tint), sx, sy);
+      return;
+    }
+    c.setTransform(base.z / 2, 0, 0, base.z / 2, base.tx, base.ty);
+    c.drawImage(raster(h, tint), 2 * (sx + sprite.anchor[0]) - h.anchor[0], 2 * (sy + sprite.anchor[1]) - h.anchor[1]);
   }
 
   // ---- geometry -------------------------------------------------------------------
@@ -153,11 +188,13 @@ export function createRenderer(canvas, initialWorld, art) {
     const top = Math.floor(view.top - MARGIN);
     const w = Math.ceil(view.w + 2 * MARGIN);
     const h = Math.ceil(view.h + 2 * MARGIN);
-    if (ground.width !== w || ground.height !== h) { ground.width = w; ground.height = h; }
-    G = { left, top, w, h };
+    const S = hiScaleFor(view.zoom); // the layer is built at the hi-res scale, S device px per projection px
+    if (ground.width !== w * S || ground.height !== h * S) { ground.width = w * S; ground.height = h * S; }
+    G = { left, top, w, h, S };
     gctx.setTransform(1, 0, 0, 1, 0, 0);
-    gctx.clearRect(0, 0, w, h);
+    gctx.clearRect(0, 0, w * S, h * S);
     gctx.imageSmoothingEnabled = false;
+    const base = { z: S, tx: -left * S, ty: -top * S };
     water = [];
     const range = tileRange(G);
     const items = [];
@@ -191,7 +228,8 @@ export function createRenderer(canvas, initialWorld, art) {
         if (world.flooded[i]) items.push({ sprite: flood, tx, ty, kind: "ground", z: 2 });
       }
     }
-    paintScene(items, (sprite, sx, sy, item) => gctx.drawImage(raster(sprite, item.tint || null), sx - left, sy - top));
+    paintScene(items, (sprite, sx, sy, item) => blitScaled(gctx, base, S, sprite, sx, sy, item.tint || null));
+    gctx.setTransform(1, 0, 0, 1, 0, 0);
     computeZots(range);
     computePlaza();
     dirty = false;
@@ -231,7 +269,7 @@ export function createRenderer(canvas, initialWorld, art) {
   }
 
   const needsRebuild = () =>
-    dirty || !G ||
+    dirty || !G || G.S !== hiScaleFor(view.zoom) ||
     view.left < G.left + 8 || view.top < G.top + 8 ||
     view.left + view.w > G.left + G.w - 8 || view.top + view.h > G.top + G.h - 8;
 
@@ -295,13 +333,19 @@ export function createRenderer(canvas, initialWorld, art) {
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     ctx.imageSmoothingEnabled = false;
     // Projection space → device: scale by zoom, translate by the view's top-left.
-    ctx.setTransform(z, 0, 0, z, -Math.round(view.left * z), -Math.round(view.top * z));
+    const S = hiScaleFor(z);
+    const base = { z, tx: -Math.round(view.left * z), ty: -Math.round(view.top * z) };
+    ctx.setTransform(z, 0, 0, z, base.tx, base.ty);
 
     // Water, cycling, under the transparent holes in the ground layer.
-    const wf = raster(art.ground("water"), waterTints[Math.floor(clock * 4) % 6]);
+    const waterSprite = art.ground("water");
+    const waterTint = waterTints[Math.floor(clock * 4) % 6];
     const vl = view.left - TILE_W, vt = view.top - TILE_H, vr = view.left + view.w + TILE_W, vb = view.top + view.h + TILE_H;
-    for (const [sx, sy] of water) if (sx > vl && sx < vr && sy > vt && sy < vb) ctx.drawImage(wf, sx - HALF_W, sy);
-    ctx.drawImage(ground, G.left, G.top);
+    for (const [sx, sy] of water) if (sx > vl && sx < vr && sy > vt && sy < vb) blitScaled(ctx, base, S, waterSprite, sx - HALF_W, sy, waterTint);
+    // The ground layer was built at G.S device px per projection px (needsRebuild remakes it when the zoom crosses 2).
+    ctx.setTransform(z / G.S, 0, 0, z / G.S, base.tx, base.ty);
+    ctx.drawImage(ground, G.left * G.S, G.top * G.S);
+    ctx.setTransform(z, 0, 0, z, base.tx, base.ty);
 
     const range = tileRange(view);
     if (overlays && overlays !== "off") drawOverlay(overlays, range);
@@ -396,7 +440,7 @@ export function createRenderer(canvas, initialWorld, art) {
     }
     paintScene(items, (sprite, sx, sy, item) => {
       if (item.alpha != null) ctx.globalAlpha = item.alpha;
-      ctx.drawImage(raster(sprite, item.tint || null), sx, sy + (item.dy || 0));
+      blitScaled(ctx, base, S, sprite, sx, sy + (item.dy || 0), item.tint || null);
       if (item.alpha != null) ctx.globalAlpha = 1;
     });
     ctx.setTransform(1, 0, 0, 1, 0, 0);

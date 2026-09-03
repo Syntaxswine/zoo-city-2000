@@ -19,6 +19,7 @@
 //                                       | 'sack' 0 open (falling) | 1 tied | 2 tied, wriggling
 //   art.zot(kind)                       'noroad' | 'smog' | 'nojob' | 'nodemand'
 //   art.waterTint(frame)                key map for the water cycle, frame mod WATER_FRAMES (4)
+//   art.hires(sprite)                   the sprite's 2× twin from its recipe (hires.js), or null for a hand-drawn one; the renderer uses it at zoom 2
 //   art.bubble(w, h)                    reserved for Part A
 //   art.portrait(species, opts)         reserved for Part D
 //   art.mark(species)                   reserved for Part E
@@ -31,6 +32,7 @@
 
 import { buildingSprite, civicSprite, overlaySprite, allBuildings } from "./buildings.js";
 import { allBlocks } from "./blocks.js"; // registers the 2×2 and 3×3 families with buildings.js at load
+import { hires } from "./hires.js";
 import { roadSprite, bridgeSprite, allRoads } from "./roads.js";
 import { wallSprite, tunnelSprite, allWalls } from "./walls.js";
 import { railSprite, stationSprite, allRail } from "./rail.js";
@@ -116,6 +118,7 @@ export const art = Object.freeze({
   crossing,
   waterTint,
   WATER_FRAMES,
+  hires,
 });
 
 /** Every sprite the registry can hand out, named — the check.mjs audit walks this. */

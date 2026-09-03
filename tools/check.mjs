@@ -1202,6 +1202,50 @@ if (existsSync(artIndex)) {
   let artM = true;
   try { art.chalk(4, false); art.chalk(4, true); for (const t of [1, 2, 3]) for (const v of [0, 1]) art.building(4, t, v); art.civic("centre"); } catch (e) { artM = false; }
   check("art: zone M (chalk, three tiers) and the centre exist — the renderer, not the sim, gates a fourth zone", artM);
+  // THE HI-RES SET (js/art/hires.js, SPEC §12.6): every box solid and every
+  // ground diamond has a 2× twin made from its recipe — the same picture
+  // twice the size: the anchor on the same world point, the ink within 12%
+  // of 4× (grain gets finer, edges do not move), every pixel a palette key
+  // (defineSprite), the prism gate at 2×. The animals, trees and glyphs
+  // stay hand-drawn and have none.
+  {
+    const { hires, allHires } = await import("../js/art/hires.js");
+    const { ink } = await import("../js/art/format.js");
+    const twins = allHires(list);
+    const bad = [];
+    for (const { name, sprite, hi } of twins) {
+      // The grid's 1-px pad does not scale and floor/ceil round once per side, so a twin is up to 6 px short of double on each axis, never over.
+      const okSize = hi.w <= 2 * sprite.w + 1 && hi.w >= 2 * sprite.w - 6 && hi.h <= 2 * sprite.h + 1 && hi.h >= 2 * sprite.h - 6;
+      const okAnchor = Math.abs(hi.anchor[0] / 2 - sprite.anchor[0]) <= 1 && Math.abs(hi.anchor[1] / 2 - sprite.anchor[1]) <= 1;
+      const i1 = ink(sprite.rows), i4 = ink(hi.rows) / 4;
+      const okInk = Math.abs(i4 - i1) <= Math.max(4, 0.12 * i1);
+      if (!(okSize && okAnchor && okInk && hi.scale === 2)) bad.push(`${name}: ${sprite.w}×${sprite.h}→${hi.w}×${hi.h} anchor ${sprite.anchor}→${hi.anchor} ink ${i1}→${i4.toFixed(0)}`);
+    }
+    check("hires: every twin is twice the size, anchored on the same world point, with the ink within 12% of 4×", twins.length >= 150 && bad.length === 0, bad.slice(0, 5).join("; ") || `${twins.length} twins`);
+    const names = new Set(twins.map((t) => t.name));
+    const solidsAndGround = list.filter(({ sprite }) => (sprite.tags || []).some((t) => ["building", "civic", "ground", "block", "wall", "station", "bridge", "road", "rail", "chalk", "grass", "water", "kerb", "rubble"].includes(t)) && !/^tree-|^overlay-fire|^overlay-rubble/.test(sprite.name));
+    const missing = solidsAndGround.filter(({ name }) => !names.has(name)).map((n) => n.name);
+    check("hires: every solid and every ground diamond has a twin; the animals and trees do not", missing.length === 0 && !hires(art.citizen("rabbit", "se", 0, "adult")) && !hires(art.tree("round")), missing.slice(0, 8).join(", "));
+    let overhang2 = [];
+    for (const { name, sprite, hi } of twins) {
+      const tags = sprite.tags || [];
+      if (!(tags.includes("building") || tags.includes("civic") || tags.includes("overlay"))) continue;
+      if (name.startsWith("overlay-fire") || name.startsWith("overlay-rubble") || name.startsWith("overlay-flood") || name === "flood") continue;
+      const [fw, fh] = sprite.footprint || [1, 1];
+      const A = 32 * fw, B = 32 * fh; // 2× px per unit is 4 along x, 2 along y — the prism scales with the grid
+      const ay = hi.anchor[1] - (16 * fw + 16 * fh);
+      let n = 0;
+      for (let py = 0; py < hi.rows.length; py++) for (let px = 0; px < hi.rows[py].length; px++) {
+        if (hi.rows[py][px] === ".") continue;
+        const x = px - hi.anchor[0], y = py - ay;
+        const yMax = 2 * Math.min(A, B + x / 2) - x / 2;
+        if (x < -2 * B - 2 || x > 2 * A + 2 || y > yMax + 2) n++;
+      }
+      if (n) overhang2.push(`${name}: ${n}px`);
+    }
+    check("hires: no 2× solid emits a pixel outside its footprint prism", overhang2.length === 0, overhang2.join(", "));
+    check("hires: a twin is cached — the same object twice", hires(art.building(1, 3, 0)) === hires(art.building(1, 3, 0)));
+  }
   console.log(`art: ${list.length} sprites audited · ${SPECIES.length} species checked`);
 } else {
   console.log("art: js/art/index.js not present yet — Part C skipped");
@@ -1279,6 +1323,38 @@ if (existsSync(artIndex)) {
   P.tier[lot] = 0;
   check("play: a BUILDING is in the per-frame pass and needs no invalidate at all",
     lot >= 0 && frame() !== withLot, `lot ${lot % P.w},${(lot / P.w) | 0}`);
+
+  // THE HI-RES SET IS VISIBLE (the "render upgrade must be visible" rule):
+  // at zoom 2 the 2× rows put detail inside device 2×2 blocks that a scaled
+  // 1× frame cannot have — finer grass dither, brick grain, a window's edge
+  // on an odd pixel. Same town, same integer camera: with art.hires,
+  // thousands of non-uniform 2×2 device blocks; with it removed, NONE — a
+  // 1× frame scaled by an even transform is 2×2-uniform everywhere.
+  {
+    const cam = { x: Math.round(ax), y: Math.round(ay + HALF_H), zoom: 2 };
+    const blocks = (c) => {
+      const d = c._data, W = c.width, H = c.height;
+      let n = 0;
+      for (let y = 0; y + 1 < H; y += 2) for (let x = 0; x + 1 < W; x += 2) {
+        const i = (y * W + x) * 4, j = i + 4, k = i + W * 4, l = k + 4;
+        if (d[i] !== d[j] || d[i + 1] !== d[j + 1] || d[i + 2] !== d[j + 2] || d[i] !== d[k] || d[i + 1] !== d[k + 1] || d[i + 2] !== d[k + 2] || d[i] !== d[l] || d[i + 1] !== d[l + 1] || d[i + 2] !== d[l + 2]) n++;
+      }
+      return n;
+    };
+    const cHi = HC.createCanvas(480, 320);
+    createRenderer(cHi, P, art).draw(cam, null, null, "off", 0);
+    const cLo = HC.createCanvas(480, 320);
+    createRenderer(cLo, P, { ...art, hires: null }).draw(cam, null, null, "off", 0);
+    const nHi = blocks(cHi), nLo = blocks(cLo);
+    check("hires: at zoom 2 the frame carries sub-block detail a scaled 1× frame cannot — thousands of non-uniform 2×2 device blocks with the twins, none without",
+      nHi > 2000 && nLo === 0, `${nHi} with the twins, ${nLo} without (of ${(480 / 2) * (320 / 2)})`);
+    // And at zoom 1 nothing changed: the same frame with and without the twins.
+    const cam1 = { ...cam, zoom: 1 };
+    const a1 = HC.createCanvas(480, 320), b1 = HC.createCanvas(480, 320);
+    createRenderer(a1, P, art).draw(cam1, null, null, "off", 0);
+    createRenderer(b1, P, { ...art, hires: null }).draw(cam1, null, null, "off", 0);
+    check("hires: zoom 1 is byte-identical with or without the twins", Buffer.from(a1._data).equals(Buffer.from(b1._data)));
+  }
 
   // The shim's scale is what makes the browser's zoom photographable.
   const c1 = HC.createCanvas(40, 40);

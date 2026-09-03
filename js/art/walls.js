@@ -18,7 +18,7 @@
 
 import { defineSprite } from "./format.js";
 import { keysOf } from "./palette.js";
-import { box, render, A_STEP } from "./solid.js";
+import { box, render, A_STEP, RECIPES } from "./solid.js";
 import { hash } from "./terrain.js";
 
 const CONC = keysOf("concrete"); // % ^ & * (  dark → light
@@ -63,7 +63,9 @@ function tunnelBoxes(axis) {
 
 const make = (name, boxes) => {
   const r = render(boxes, { hub: A_STEP / 2 });
-  return defineSprite({ name, anchor: r.anchor, rows: r.rows, tags: ["building", "wall"] });
+  const s = defineSprite({ name, anchor: r.anchor, rows: r.rows, tags: ["building", "wall"] });
+  RECIPES.set(s, { name, boxes, hub: A_STEP / 2, footprint: [1, 1], extent: [], stamps: [] }); // the hi-res set re-renders it at 2×
+  return s;
 };
 
 /** WALLS[mask] — 16 sprites. */

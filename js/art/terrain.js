@@ -22,29 +22,49 @@
 
 import { defineSprite, part, blank, stamp, toRows, T } from "./format.js";
 import { keysOf } from "./palette.js";
+import { RECIPES } from "./solid.js";
 
 export const TILE_ANCHOR = Object.freeze([32, 16]);
 
 /**
- * A 64×32 diamond from a predicate fn(a, b, px, py) → key | falsy. (a, b)
- * are world units in [0, 16) — a along +tx (down-right), b along +ty
+ * A 64×32 diamond from a predicate fn(a, b, px, py, scale) → key | falsy.
+ * (a, b) are world units in [0, 16) — a along +tx (down-right), b along +ty
  * (down-left) — sampled at the pixel centre.
+ *
+ * `scale` is the HI-RES SET (SPEC §12.6): the same predicate sampled at
+ * `scale` pixels per 1× pixel, a 128×64 diamond at 2. World-unit tests (a
+ * kerb at a < 0.5, a road's width) land on the same edges; pixel-keyed
+ * dither (grass, the road's speckle) gets finer, which is the point; a
+ * predicate that wants its bands in world units reads `scale`. Every pixel
+ * centre falls in exactly one tile at any scale (no centre lies on a
+ * boundary: py + ½ + (px + ½)/2 is never an integer), so the diamonds still
+ * tile without a doubled or a missing column. Scale 1 is byte-identical to
+ * the pre-scale generator.
  */
-export function diamond(fn) {
+export function diamond(fn, scale = 1) {
   const rows = [];
-  for (let py = 0; py < 32; py++) {
+  const W = 64 * scale;
+  const H = 32 * scale;
+  for (let py = 0; py < H; py++) {
     let r = "";
-    for (let px = 0; px < 64; px++) {
-      const x = px + 0.5 - 32;
-      const y = py + 0.5;
+    for (let px = 0; px < W; px++) {
+      const x = (px + 0.5) / scale - 32;
+      const y = (py + 0.5) / scale;
       const a = (y + x / 2) / 2;
       const b = (y - x / 2) / 2;
       const inside = a >= 0 && a < 16 && b >= 0 && b < 16;
-      r += inside ? fn(a, b, px, py) || T : T;
+      r += inside ? fn(a, b, px, py, scale) || T : T;
     }
     rows.push(r);
   }
   return rows;
+}
+
+/** A ground diamond WITH ITS RECIPE: defineSprite over diamond(fn), and the predicate kept in RECIPES so js/art/hires.js can sample it again at 2×. */
+export function groundSprite(def, fn) {
+  const s = defineSprite({ ...def, rows: diamond(fn) });
+  RECIPES.set(s, { name: s.name, diamond: fn });
+  return s;
 }
 
 /** A small deterministic hash in [0, 1) — dither, never randomness. */
@@ -83,12 +103,7 @@ export function grassKey(px, py, variant = 0) {
 }
 
 export const GRASS = [0, 1, 2].map((v) =>
-  defineSprite({
-    name: `grass-${v}`,
-    anchor: TILE_ANCHOR,
-    rows: diamond((a, b, px, py) => grassKey(px, py, v)),
-    tags: ["ground", "grass"],
-  })
+  groundSprite({ name: `grass-${v}`, anchor: TILE_ANCHOR, tags: ["ground", "grass"] }, (a, b, px, py) => grassKey(px, py, v))
 );
 
 // --------------------------------------------------------------------- chalk
@@ -148,36 +163,24 @@ export function chalkKey(zone, high, a, b, px, py) {
 }
 /** The keys a zone's chalk is drawn in, for the census in tools/shots.mjs. */
 export const CHALK_KEYS = { 1: [G[3], G[0]], 2: ["6"], 3: ["7"], 4: ["A"] };
-function chalkRows(zone, high) {
-  return diamond((a, b, px, py) => chalkKey(zone, high, a, b, px, py));
-}
+const chalkFn = (zone, high) => (a, b, px, py, s = 1) => chalkKey(zone, high, a, b, px, py, s);
 export const CHALK = {};
 for (const zone of [1, 2, 3, 4]) {
   CHALK[zone] = [false, true].map((high) =>
-    defineSprite({
-      name: `chalk-${["", "R", "C", "I", "M"][zone]}-${high ? "high" : "low"}`,
-      anchor: TILE_ANCHOR,
-      rows: chalkRows(zone, high),
-      tags: ["ground", "chalk"],
-    })
+    groundSprite({ name: `chalk-${["", "R", "C", "I", "M"][zone]}-${high ? "high" : "low"}`, anchor: TILE_ANCHOR, tags: ["ground", "chalk"] }, chalkFn(zone, high))
   );
 }
 
 // -------------------------------------------------------------------- rubble
 
 /** Earth-ramp ground with slate chunks — what a bulldozed or burnt lot is. */
-export const RUBBLE = defineSprite({
-  name: "rubble",
-  anchor: TILE_ANCHOR,
-  rows: diamond((a, b, px, py) => {
-    const h = hash(px, py, 23);
-    const chunk = hash(px >> 1, py, 29);
-    if (chunk < 0.06) return h < 0.5 ? "<" : ">";
-    if (h < 0.15) return E[1];
-    if (h < 0.55) return E[2];
-    return h < 0.9 ? E[3] : E[4];
-  }),
-  tags: ["ground", "rubble"],
+export const RUBBLE = groundSprite({ name: "rubble", anchor: TILE_ANCHOR, tags: ["ground", "rubble"] }, (a, b, px, py, s = 1) => {
+  const h = hash(px, py, 23);
+  const chunk = hash((px >> 1) / s | 0, (py / s) | 0, 29); // the slate chunks keep their size at 2×; the earth dither gets finer
+  if (chunk < 0.06) return h < 0.5 ? "<" : ">";
+  if (h < 0.15) return E[1];
+  if (h < 0.55) return E[2];
+  return h < 0.9 ? E[3] : E[4];
 });
 
 // --------------------------------------------------------------------- water
@@ -223,18 +226,13 @@ export const RUBBLE = defineSprite({
 export const WATER_CYCLE = WATER.slice(2); // H I J K — the keys that travel
 export const WATER_FRAMES = WATER_CYCLE.length;
 export const WATER_PERIOD = 8;
-export const WATER_TILE = defineSprite({
-  name: "water",
-  anchor: TILE_ANCHOR,
-  rows: diamond((a, b, px, py) => {
-    const phase = Math.round(1.5 * Math.sin((2 * Math.PI * a) / 16) + 1.5 * Math.sin((2 * Math.PI * b) / 16));
-    const v = py + Math.floor(px / 2) + phase;
-    const band = ((v % WATER_PERIOD) + WATER_PERIOD) % WATER_PERIOD;
-    const i = band >> 1; // 0..3 into H I J K, two rows each
-    if (hash(px, py, 41) < 0.02) return WATER[1];
-    return WATER_CYCLE[i];
-  }),
-  tags: ["ground", "water"],
+export const WATER_TILE = groundSprite({ name: "water", anchor: TILE_ANCHOR, tags: ["ground", "water"] }, (a, b, px, py, s = 1) => {
+  const phase = Math.round(1.5 * Math.sin((2 * Math.PI * a) / 16) + 1.5 * Math.sin((2 * Math.PI * b) / 16));
+  const v = Math.floor(py / s) + Math.floor(px / (2 * s)) + phase; // the ripple bands are world-sized: the same bands at 2×, twice as many pixels each
+  const band = ((v % WATER_PERIOD) + WATER_PERIOD) % WATER_PERIOD;
+  const i = band >> 1; // 0..3 into H I J K, two rows each
+  if (hash(px, py, 41) < 0.02) return WATER[1];
+  return WATER_CYCLE[i];
 });
 
 /**
@@ -254,14 +252,9 @@ export function waterTint(frame) {
  * 2 S (b = 16), 3 W (a = 0). Drawn on the LAND tile, over its grass.
  */
 export const KERB = [0, 1, 2, 3].map((side) =>
-  defineSprite({
-    name: `kerb-${"NESW"[side]}`,
-    anchor: TILE_ANCHOR,
-    rows: diamond((a, b) => {
-      const on = side === 0 ? b < 0.5 : side === 1 ? a >= 15.5 : side === 2 ? b >= 15.5 : a < 0.5;
-      return on ? WATER[0] : null;
-    }),
-    tags: ["ground", "kerb"],
+  groundSprite({ name: `kerb-${"NESW"[side]}`, anchor: TILE_ANCHOR, tags: ["ground", "kerb"] }, (a, b) => {
+    const on = side === 0 ? b < 0.5 : side === 1 ? a >= 15.5 : side === 2 ? b >= 15.5 : a < 0.5;
+    return on ? WATER[0] : null;
   })
 );
 
@@ -488,20 +481,10 @@ export const PLAZA = defineSprite({
 });
 
 /** The hover cursor: a 1-unit rim of light concrete around the diamond. */
-export const CURSOR = defineSprite({
-  name: "cursor",
-  anchor: TILE_ANCHOR,
-  tags: ["glyph"],
-  rows: diamond((a, b) => (a < 0.5 || b < 0.5 || a >= 15.5 || b >= 15.5 ? "(" : null)),
-});
+export const CURSOR = groundSprite({ name: "cursor", anchor: TILE_ANCHOR, tags: ["glyph"] }, (a, b) => (a < 0.5 || b < 0.5 || a >= 15.5 || b >= 15.5 ? "(" : null));
 
 /** The placement ghost: a glass checker, so the ground shows through. */
-export const GHOST = defineSprite({
-  name: "ghost",
-  anchor: TILE_ANCHOR,
-  tags: ["glyph"],
-  rows: diamond((a, b, px, py) => ((px + py) & 1 ? "=" : a < 0.5 || b < 0.5 || a >= 15.5 || b >= 15.5 ? "=" : null)),
-});
+export const GHOST = groundSprite({ name: "ghost", anchor: TILE_ANCHOR, tags: ["glyph"] }, (a, b, px, py) => ((px + py) & 1 ? "=" : a < 0.5 || b < 0.5 || a >= 15.5 || b >= 15.5 ? "=" : null));
 
 /** Every terrain sprite, named, for the audit. */
 export function allTerrain() {

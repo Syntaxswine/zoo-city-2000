@@ -32,6 +32,15 @@ import { TILE_W } from "../iso/iso.js";
 import { T } from "./format.js";
 
 export const A_STEP = TILE_W / 4; // units of `a` in one tile step (16)
+
+/**
+ * THE RECIPES — how every generated sprite was made, kept beside the sprite
+ * so it can be made again at another scale (js/art/hires.js) or with its
+ * z-buffer (tools/depthaudit.mjs). A box solid's recipe is { name, boxes,
+ * hub, footprint, extent, stamps }; a ground diamond's is { name, diamond:
+ * fn }. Hand-drawn sprites (animals, trees, zots) have none and stay at 1×.
+ */
+export const RECIPES = new Map();
 export const TO_X = (a, b) => 2 * a - 2 * b;
 export const TO_Y = (a, b, c) => a + b - c;
 const depthOf = (a, b, c) => a + b + 2 * c;

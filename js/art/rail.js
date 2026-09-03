@@ -16,8 +16,8 @@
 
 import { defineSprite } from "./format.js";
 import { keysOf } from "./palette.js";
-import { box, render, A_STEP } from "./solid.js";
-import { diamond, grassKey, hash, TILE_ANCHOR } from "./terrain.js";
+import { box, render, A_STEP, RECIPES } from "./solid.js";
+import { groundSprite, grassKey, hash, TILE_ANCHOR } from "./terrain.js";
 
 const EARTH = keysOf("earth"); // q r s t u
 const ASPH = keysOf("asphalt"); // 1 2 3 4
@@ -66,14 +66,10 @@ export function railKey(mask, a, b, px, py) {
   return hash(px, py, 83) < 0.15 ? EARTH[1] : EARTH[0]; // ballast
 }
 
-function railRows(mask) {
-  return diamond((a, b, px, py) => railKey(mask, a, b, px, py) || grassKey(px, py, 0));
-}
+const railFn = (mask) => (a, b, px, py) => railKey(mask, a, b, px, py) || grassKey(px, py, 0);
 
-/** RAILS[mask] — 16 sprites. */
-export const RAILS = Array.from({ length: 16 }, (_, mask) =>
-  defineSprite({ name: `rail-${mask}`, anchor: TILE_ANCHOR, rows: railRows(mask), tags: ["ground", "rail"] })
-);
+/** RAILS[mask] — 16 sprites (ground diamonds with a recipe, so the hi-res set can remake them at 2×). */
+export const RAILS = Array.from({ length: 16 }, (_, mask) => groundSprite({ name: `rail-${mask}`, anchor: TILE_ANCHOR, tags: ["ground", "rail"] }, railFn(mask)));
 
 export function railSprite(mask) {
   return RAILS[mask & 15];
@@ -101,8 +97,11 @@ function stationBoxes(axis) {
 }
 
 const makeStation = (axis) => {
-  const r = render(stationBoxes(axis), { hub: A_STEP / 2 });
-  return defineSprite({ name: `station-${axis}`, anchor: r.anchor, rows: r.rows, tags: ["building", "station"] });
+  const boxes = stationBoxes(axis);
+  const r = render(boxes, { hub: A_STEP / 2 });
+  const s = defineSprite({ name: `station-${axis}`, anchor: r.anchor, rows: r.rows, tags: ["building", "station"] });
+  RECIPES.set(s, { name: s.name, boxes, hub: A_STEP / 2, footprint: [1, 1], extent: [], stamps: [] }); // the hi-res set re-renders it at 2×
+  return s;
 };
 export const STATIONS = { ns: makeStation("ns"), ew: makeStation("ew") };
 

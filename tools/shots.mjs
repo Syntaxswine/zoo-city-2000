@@ -22,6 +22,7 @@ import { rasterize } from "../js/art/format.js";
 import { art } from "../js/art/index.js";
 import { BUILDINGS, PARK, ZOO, FIRE_STATION, POLICE_STATION, PACIFICATION_CENTRE, OVERLAYS } from "../js/art/buildings.js";
 import { BLOCKS } from "../js/art/blocks.js";
+import { hires } from "../js/art/hires.js";
 import { ROADS, BRIDGES, N, E, S, W, DECK_TOP } from "../js/art/roads.js";
 import { WALLS, TUNNELS } from "../js/art/walls.js";
 import { RAILS, STATIONS } from "../js/art/rail.js";
@@ -107,6 +108,34 @@ function sheets(z) {
   const b = [];
   for (const zone of [1, 2, 3, 4]) for (const tier of [1, 2, 3]) for (const v of [0, 1]) b.push({ sprite: BUILDINGS[zone][tier][v], label: BUILDINGS[zone][tier][v].name, onTile: true });
   out.push(sheet("sheet-buildings.png", b, { cols: 6, cellW: 80, cellH: 100, groundY: 84, z }));
+
+  // The hi-res set (js/art/hires.js): a 1× sprite scaled ×2 beside its 2× twin, at zoom 1 so the sheet IS the comparison.
+  {
+    const pairs = [
+      BUILDINGS[1][3][0], BUILDINGS[2][3][0], BUILDINGS[3][2][0], BUILDINGS[4][2][0], PARK, FIRE_STATION,
+      BLOCKS[1][2][0], BLOCKS[2][2][0], BLOCKS[3][2][0], BLOCKS[4][2][0],
+      GRASS[0], ROADS[0][N | S], ROADS[1][N | E | S | W], RAILS[N | S], WATER_TILE, CHALK[2][1], BRIDGES[N | S], RUBBLE,
+    ];
+    const cellW = 600, cellH = 240, cols = 2; // wide enough for a 2×2 block's 260-px twin beside its scaled 1×
+    const canvas = createCanvas(cols * cellW, Math.ceil(pairs.length / cols) * cellH);
+    const ctx = background(canvas);
+    pairs.forEach((sprite, i) => {
+      const hi = hires(sprite);
+      const cx = (i % cols) * cellW, cy = Math.floor(i / cols) * cellH + 190;
+      const isGround = (sprite.tags || []).includes("ground") || sprite.name === "water";
+      const under = isGround ? null : GRASS[0];
+      // Left: the 1× sprite scaled ×2 nearest-neighbour. Right: the 2× twin, 1:1.
+      const lo = zoomCanvas(rasterOf(sprite), 2);
+      if (under) ctx.drawImage(zoomCanvas(rasterOf(under), 2), cx + 150 - 64, cy - 32);
+      ctx.drawImage(lo, cx + 150 - sprite.anchor[0] * 2, cy - sprite.anchor[1] * 2);
+      if (hi) {
+        if (under) ctx.drawImage(rasterOf(hires(under)), cx + 450 - 64, cy - 32);
+        ctx.drawImage(rasterOf(hi), cx + 450 - hi.anchor[0], cy - hi.anchor[1]);
+      }
+      console.log(`  hires [r${Math.floor(i / cols)} c${i % cols}] ${sprite.name}: ${sprite.w}×${sprite.h} ×2 | ${hi ? `${hi.w}×${hi.h}` : "no twin"}`);
+    });
+    out.push(save("sheet-hires.png", canvas, 1));
+  }
 
   // The blocks: 4 zones × 2 sides × 2 variants, each on its own grass footprint (a row per zone).
   {
