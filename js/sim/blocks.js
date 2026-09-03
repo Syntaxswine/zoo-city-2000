@@ -44,6 +44,7 @@ import { KNOBS } from "./rules.js";
 import { ZONE, PART, anchorOf, sideOf, footprintOf, capacityOf } from "./world.js";
 import { hasAccess } from "./fields.js";
 import { placeHousehold, evictFromLot, fireFromLot } from "./citizens.js";
+import { KIND, remember } from "./life.js";
 
 /** Can lot j join a block with the tier-3 lot i: same zone, tier 2 or better, a lot of its own, High, on the same line, untroubled, served. */
 function joinable(world, i, j) {
@@ -132,6 +133,7 @@ export function mergeLots(world, win) {
     }
     hh.home = -1;
     placeHousehold(world, hh, anchor);
+    for (const id of hh.members) remember(world, world.byId.get(id), KIND.MOVED, anchor);
   }
   for (const c of world.citizens) {
     if (c.dead || !moving.has(c.job)) continue;

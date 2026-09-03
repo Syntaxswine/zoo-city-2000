@@ -1570,12 +1570,15 @@ if (existsSync(artIndex)) {
   const under = lotScore(F, at(12, 12)); // a tier-2 lot: no window of its own, and it is not a part
   check("blocks: a tier-2 lot does not start a block", under.reason !== REASON.MERGING && !under.merge && under.reason !== REASON.PART);
 
-  B.mergeLots(F, s2.merge);
   const parts2 = [at(11, 10), at(10, 11), at(11, 11)];
+  const mergeMovedIds = F.citizens.filter((c) => parts2.includes(c.home)).map((c) => c.id);
+  B.mergeLots(F, s2.merge);
   const homesOnAnchor = F.citizens.every((c) => c.dead || c.home === a) && F.households.every((h) => h.gone || h.home === a);
   check("blocks: the 2×2 — the anchor is big 2 at tier 3, the three parts point at it at tier 3, every animal and household is on the anchor, the parts hold nobody",
     F.big[a] === 2 && parts2.every((j) => W.isPart(F, j) && W.anchorOf(F, j) === a && F.tier[j] === 3 && F.occupants[j] === 0) && homesOnAnchor && F.occupants[a] === 40 && capacityOf(F, a) === 120 && W.sideOf(F, at(11, 11)) === 2,
     `big ${F.big[a]} occ ${F.occupants[a]} cap ${capacityOf(F, a)}`);
+  check("blocks: households absorbed into a large residential block remember the move to its anchor",
+    mergeMovedIds.length > 0 && mergeMovedIds.every((id) => F.byId.get(id)?.life.at(-1)?.[1] === 2 && F.byId.get(id)?.life.at(-1)?.[2] === a));
   const spread = [a, ...parts2].reduce((s, j) => s + W.occAt(F, j), 0);
   check("blocks: occAt spreads the anchor's 40 evenly over the footprint and sums back to 40", Math.abs(spread - 40) < 1e-9 && Math.abs(W.occAt(F, at(11, 11)) - 10) < 1e-9);
   const rep = lotReport(F, at(11, 11));
