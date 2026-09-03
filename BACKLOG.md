@@ -56,8 +56,12 @@ industrial, 4 meat, 5 road, 6 wall, 7 rail, 8 train station, 9 tree, 10
 park, 11 zoo, 12 pacification, 13 police, 14 fire. 15 inspect, 16
 bulldoze. i think the other buttons can stay on the top"* → **P** the
 palette (`js/tools.js` ONE tool table; `js/palette.js` 2 × 8 on the left
-with sprite thumbnails; keys unchanged, positions are the owner's order;
-density and Use stay on top) · **S** saves (`js/slots.js` named slots per
+with sprite thumbnails; **the key law** — *"wasd should only be movement,
+use your judgement on the rest"* → WASD pans and does nothing else anywhere
+(the news reader loses WASD stepping); number row = positions 1–10 (`0` =
+park); zoo Z · pacify V · police P · fire F · inspect I · bulldoze B;
+density D → H; undo Z → Backspace/Ctrl+Z; S → the saves menu on L and
+Ctrl+S; density and Use stay on top) · **S** saves (`js/slots.js` named slots per
 city, save-as / load / overwrite / delete / export in one menu on S, L and
 the title; the autosave one slot; a full store shows the export box — a
 refusal must not lose work). The control city → `docs/fixtures/

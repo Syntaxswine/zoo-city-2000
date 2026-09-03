@@ -846,19 +846,45 @@ The top strip keeps everything that is not a build tool.
   strip all read it): `{ id, key, label, op, sprite, order }` — sixteen
   rows in the owner's order:
   ```
-   1 R residential  2 C commercial      (keys 1, 2)
-   3 I industrial   4 M meat            (3, M)
-   5 road           6 wall              (4, B)
-   7 rail           8 station           (T, G)
-   9 tree          10 park              (5, 6)
-  11 zoo           12 pacification      (7, V)
+   1 residential    2 commercial        (keys 1, 2)
+   3 industrial     4 meat              (3, 4)
+   5 road           6 wall              (5, 6)
+   7 rail           8 station           (7, 8)
+   9 tree          10 park              (9, 0)
+  11 zoo           12 pacification      (Z, V)
   13 police        14 fire station      (P, F)
-  15 inspect       16 bulldoze          (9, 8)
+  15 inspect       16 bulldoze          (I, B)
   ```
-  The numbers are POSITIONS; the keys are today's keys and do not change
-  (a two-digit position cannot be a key). Density (`D Low/High`) and Use
-  (`U`) stay on the top strip as the owner said — they modify what the
-  zone tools paint, they do not build.
+  **The key law (the owner: *"wasd should only be movement, use your
+  judgement on the rest"*):** `W A S D` and the arrows pan the map and do
+  NOTHING else, anywhere — including the news reader, which today steps
+  dispatches on WASD and will step on the arrows only. The number row is
+  the palette's first ten positions in order (`1`…`9`, `0` = park); the
+  six below take a mnemonic letter that is not W/A/S/D. Every key is
+  printed small on its button, and the help line at the panel's foot is
+  generated from `TOOLS` so it cannot drift. The full map, was → is:
+
+  | what | was | is | why |
+  |---|---|---|---|
+  | zone R / C / I | `1 2 3` | `1 2 3` | positions |
+  | meat | `M` | `4` | position |
+  | road · wall · rail · station | `4 B T G` | `5 6 7 8` | positions |
+  | tree · park | `5 6` | `9 0` | positions; `0` sits after `9` on the row |
+  | zoo | `7` | `Z` | mnemonic; undo moves off `Z` |
+  | pacification · police · fire | `V P F` | `V P F` | unchanged, mnemonic |
+  | inspect | `9` | `I` | mnemonic |
+  | bulldoze | `8` | `B` | mnemonic |
+  | density Low/High | `D` | `H` | `D` is movement; `H` = High |
+  | use-zoning | `U` | `U` | stays on the top strip (a modifier, not a build) |
+  | undo | `Z` | `Backspace` (and `Ctrl+Z`) | `Z` is the zoo |
+  | save · load | `S` `L` | `L` opens the saves menu (Part S); `Ctrl+S` = save-as | `S` is movement |
+  | overlay · news · new city | `O R N` | `O R N` | unchanged |
+  | pause · slower · faster · zoom | `Space , . + −` | unchanged | |
+  | menu | `Esc` | `Esc` | |
+  | pan | arrows / WASD / right-drag | arrows / WASD / right-drag | **movement only** |
+
+  Density (`H`) and Use (`U`) stay on the top strip as the owner said —
+  they modify what the zone tools paint, they do not build.
 - `js/palette.js` (DOM): `<nav id="palette">` left of `#map` (`index.html`
   gains the element; the layout becomes palette | map | panel). Each
   button: a thumbnail painted by `render.paintSprite(canvas, sprite,
@@ -880,13 +906,18 @@ The top strip keeps everything that is not a build tool.
 **Owns.** `js/tools.js`, `js/palette.js`, `index.html`, the palette block
 in `css/field.css`, `buildStrip` in `ui.js` (ONE function — C owns the
 card and the tabs), the key map in `input.js` (reads `TOOLS`; C owns the
-pin logic, A the cursor line), the resize lines in `main.js` (C owns the
-camera lines), Part K' checks, SPEC §11 addition.
+pin logic, A the cursor line), the reader's `key()` in `news.js` (the one
+WASD removal — F owns the rest of the file), the resize lines in
+`main.js` (C owns the camera lines), Part K' checks, SPEC §11 addition,
+README's key list.
 
 **Acceptance.**
 - Node: `TOOLS` has 16 rows, positions 1–16 once each, keys unique, every
   `op.kind` `ops.apply` accepts has a tool or is named in an allow-list
-  (rate, toggle, choice, cheat); every `sprite` name resolves in `art`.
+  (rate, toggle, choice, cheat); every `sprite` name resolves in `art`;
+  **no binding anywhere in `TOOLS` or the strip's key table is `w`, `a`,
+  `s` or `d`** (the check reads both tables; the news reader's key
+  handler is grepped for the four letters).
 - Browser: on a fresh city click each of the sixteen and place one (the
   cost strip shows the price before, the ledger after); the key still
   selects the same tool the button does; at 1,280 × 720 nothing wraps or
@@ -1106,9 +1137,11 @@ A+H, then E+B, then D+C, then F; K before A/B/H.
    good idea, i will build one for you soon."* → `docs/fixtures/
    control-city.json` when it arrives (§4-G); Part S's menu is the export
    path. Until then every rig number stays labelled a rig number.
-6. **The palette's keys.** The sixteen positions keep today's keys (`1 2 3
-   M 4 B T G 5 6 7 V P F 9 8`), shown small on each button. Renumber the
-   keys to match the positions (1–9 only; the rest by letter), or leave
-   them?
-7. **Use-zoning (`U`)** is not in the sixteen; the plan leaves it on the
-   top strip beside density, as a modifier. Fine, or a seventeenth button?
+6. ~~**The palette's keys.**~~ **Ruled:** *"wasd should only be movement,
+   use your judgement on the rest of the keybindings."* → the key law and
+   the was → is table in §4-P: the number row is positions 1–10, the six
+   below are mnemonic letters, density moves to `H`, undo to `Backspace`,
+   the saves menu to `L`, and WASD pans and does nothing else anywhere.
+7. ~~**Use-zoning (`U`)**~~ Decided under the same ruling: it stays on the
+   top strip beside density as a modifier, on `U`. A seventeenth button
+   is a one-row change to `TOOLS` if the owner wants it later.
