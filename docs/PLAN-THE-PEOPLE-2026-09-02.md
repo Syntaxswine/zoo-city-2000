@@ -20,6 +20,16 @@ sounds right, although i think the meat vendors would grow them to
 adulthood for best return on investment."* → the hall buys the dead, and
 the hall buys livestock cubs and PENS them until they are grown (§4-H).
 
+And (2026-09-03): *"adding the control city is a good idea, i will build one
+for you soon, please add on that the save button only lets you save the
+game once, a load save menu would be better. i think we also need a GUI for
+selecting build items. a remote control on the left side of the screen.
+1 residential, 2 commercial, 3 industrial, 4 meat, 5 road, 6 wall, 7 rail,
+8 train station, 9 tree, 10 park, 11 zoo, 12 pacification, 13 police,
+14 fire. 15 inspect, 16 bulldoze. i think the other buttons can stay on the
+top"* → Part S (a saves menu with named slots) and Part P (the palette),
+and the control city becomes the suite's real-save fixture (§4-G).
+
 Plan only. Nothing here is built. Each part is sized for one agent-session,
 owns its own files, and codes against contracts written down in §3 so the
 parts can run at the same time. The keel (§3) lands first and is small.
@@ -42,8 +52,10 @@ them.
 | **see them in their homes** — the house tells you who lives there | 12 families × 2 mirrored variants, no occupant on the outside | **E. Buildings with character** |
 | **be told** what happened to them | 74–84% of dispatches never pop; no dispatch names a birth or an ordinary death | **F. The story channel** |
 
-Plus one part that is not about relating but was in the same breath:
-**H. Meat on hand** — the hall's stock, its inflows and its till.
+Plus three parts that are not about relating but were in the same breath:
+**H. Meat on hand** — the hall's stock, its inflows and its till; **P. The
+palette** — the build tools as a remote control on the left; **S. Saves** —
+a menu of named slots instead of one checkpoint.
 
 Then **G. Integration** — the suite, the docs, the browser round — after
 the parts have merged.
@@ -822,9 +834,146 @@ in the pen — the card's date makes that visible; the owner may want
 **Size.** ≈ 320 lines sim + 60 walkers + 50 ui + 150 probe; ~14 checks;
 one session, the probe first.
 
+### P. The palette — *"a remote control on the left side of the screen"*
+
+**Goal.** The sixteen build tools as a two-column panel on the left of the
+map, in the owner's order, each with a picture of the thing it builds.
+The top strip keeps everything that is not a build tool.
+
+**Design.**
+- `js/tools.js` (DOM-free): `TOOLS` — the ONE table of tools (Law 6: the
+  palette, the top strip's hint line, `input.js`'s key map and the cost
+  strip all read it): `{ id, key, label, op, sprite, order }` — sixteen
+  rows in the owner's order:
+  ```
+   1 R residential  2 C commercial      (keys 1, 2)
+   3 I industrial   4 M meat            (3, M)
+   5 road           6 wall              (4, B)
+   7 rail           8 station           (T, G)
+   9 tree          10 park              (5, 6)
+  11 zoo           12 pacification      (7, V)
+  13 police        14 fire station      (P, F)
+  15 inspect       16 bulldoze          (9, 8)
+  ```
+  The numbers are POSITIONS; the keys are today's keys and do not change
+  (a two-digit position cannot be a key). Density (`D Low/High`) and Use
+  (`U`) stay on the top strip as the owner said — they modify what the
+  zone tools paint, they do not build.
+- `js/palette.js` (DOM): `<nav id="palette">` left of `#map` (`index.html`
+  gains the element; the layout becomes palette | map | panel). Each
+  button: a thumbnail painted by `render.paintSprite(canvas, sprite,
+  scale)` (D's one canvas export, shared — the cottage, the shop, the
+  shed, the stall, a straight road, a wall run, a rail tile, the station,
+  the round tree, the park, the zoo, the centre, the police station, the
+  fire station, the cursor glyph, rubble), the label, the key in dim, the
+  cost on hover from `costOf` (the same call the cost strip makes). The
+  active tool is highlighted; clicking calls `ui.setTool` — the one
+  function that already owns tool state. 2 × 8 at ~44 px; under 720 px of
+  height it reflows to 4 × 4.
+- The top strip's tool buttons go; density, pause, slower/faster, undo,
+  save, load, overlay, news, zoom, new city and menu stay. The strip no
+  longer wraps at 1,600 px (handoff §11's trap) because it is half as
+  long.
+- The renderer's resize reads the map's actual box, so the palette's
+  width comes off the map, not the panel.
+
+**Owns.** `js/tools.js`, `js/palette.js`, `index.html`, the palette block
+in `css/field.css`, `buildStrip` in `ui.js` (ONE function — C owns the
+card and the tabs), the key map in `input.js` (reads `TOOLS`; C owns the
+pin logic, A the cursor line), the resize lines in `main.js` (C owns the
+camera lines), Part K' checks, SPEC §11 addition.
+
+**Acceptance.**
+- Node: `TOOLS` has 16 rows, positions 1–16 once each, keys unique, every
+  `op.kind` `ops.apply` accepts has a tool or is named in an allow-list
+  (rate, toggle, choice, cheat); every `sprite` name resolves in `art`.
+- Browser: on a fresh city click each of the sixteen and place one (the
+  cost strip shows the price before, the ledger after); the key still
+  selects the same tool the button does; at 1,280 × 720 nothing wraps or
+  scrolls sideways; the map's pick is still exact after the layout change
+  (click a tile at the map's left edge → its card); 0 console messages.
+
+**Traps.** `#tools` unwrapped scrolled the document sideways in session 4
+— any width change to the strip re-tests that. `pick()` is a flat inverse
+of the projection from the canvas origin — moving the canvas is fine,
+resizing it without `renderer.resize()` is not. The thumbnails are 16
+rasters at boot — cheap, but paint them once, not per refresh.
+
+**Size.** ≈ 80 tools + 150 palette + 40 css + 30 ui/input/main; ~5
+checks; half a session.
+
+### S. Saves — *"the save button only lets you save the game once, a load save menu would be better"*
+
+**Goal.** A saves menu: any number of named slots per city, save-as,
+load, delete, export and import in one place, on `S` and `L` and on the
+title screen. The autosave stays its own slot in the same list.
+
+**Today.** Two slots a city — the S checkpoint and the autosave — and S
+overwrites the checkpoint (BACKLOG: "a save-as name field is not built").
+
+**Design.**
+- `js/slots.js` (DOM-free, a store injected — a Map in Node,
+  `localStorage` in the browser): `listSlots(store, city) → [{ id, name,
+  date, tick, pop, bytes, kind: "manual" | "auto" }]` newest first;
+  `writeSlot(store, city, name, json, kind) → { ok, id } | { ok: false,
+  reason }`; `deleteSlot`; `bytesUsed(store)`; `migrate(store)` — the old
+  `zoo.save:<city>` / `zoo.auto:<city>` keys become slots on first open
+  and the old keys are left in place (idempotent; a migration never
+  deletes). Keys `zoo.slot:<city>:<id>`, an index `zoo.slots:<city>`; the
+  id is a counter, the name is data (quotes and colons are fine).
+- The menu (`title.js`'s SAVE and LOAD panels become one SAVES panel;
+  `S` opens it with the name field focused, `L` opens it on the list;
+  Esc closes): a name field defaulting to *"<city> — <month year>"*, SAVE
+  AS, and per row load · overwrite (asks) · delete (asks) · export (the
+  text box). IMPORT stays. Used / free bytes at the foot. CONTINUE on the
+  title = the newest slot of the last city, manual or auto.
+- The autosave (every 12 ticks, on hide) writes ONE auto slot per city,
+  overwritten — it must not multiply slots.
+- **A refusal must not lose work:** when `localStorage` is full,
+  `writeSlot` returns the reason and the menu shows the export box with
+  the JSON already in it — the save exists on the screen even when the
+  store said no. Every caller of `app.save` is walked for the assumption
+  that it succeeded (the autosave's quiet path, the title's SAVE, `S`).
+- B's save compaction halves a slot (~0.9 MB → ~0.45 MB at year 30), so a
+  5 MB store holds ~10 slots instead of ~5; the foot of the menu says how
+  many are left.
+
+**Owns.** `js/slots.js`, `js/title.js` (the SAVES panel), `savesList` /
+`portBox` in `ui.js` (ONE block, `ui.js:737–785`), `app.save` / `app.load`
+/ `app.resume` and the boot slot choice in `main.js` (`main.js:155–200`,
+`300–345`; C's camera lines are elsewhere), Part J' checks, SPEC §15
+addition, README's title-screen paragraph.
+
+**Acceptance.**
+- Node: three writes list newest first; delete one and the index agrees;
+  a Map store with a byte cap returns `{ ok: false }` on the fourth and
+  the first three are intact; `migrate` twice = once; an old-key city
+  shows as a slot and its old key still exists.
+- Browser: save as twice under two names → two rows; load the older →
+  its date on the clock; delete asks and removes one; the autosave after
+  a year is one row, not twelve; export of a city from the menu pastes
+  back through IMPORT and hash-equals (the suite's save → load law, done
+  by hand once). **This is the road the control city travels** (§8 q5).
+
+**Traps.** The title's CONTINUE logic compares two slots by tick today
+(`main.js:304–312`); with N slots it compares the list's head. A loaded
+city opens paused (BACKLOG) — unchanged. `zoo.pref`'s read marks are
+keyed by city NAME (handoff §13b); a slot's name is not the city's name —
+keep the city name on the slot record so marks follow the city.
+
+**Size.** ≈ 120 slots + 150 title + 60 ui + 40 main; ~7 checks; half a
+session.
+
 ### G. Integration — after the parts have merged
 
-One agent, after A–F and H are on `main`:
+One agent, after A–F, H, P and S are on `main`:
+- **The control city** (the owner: *"i will build one for you soon"*):
+  when it arrives, `docs/fixtures/control-city.json` — loaded by the
+  suite (`load` → `rebuildDerived` → 12 months → a recorded hash, the
+  real-save regression the suite has never had), and the input to every
+  probe's `--save` (`meatprobe`, `peopleprobe`, `newsprobe`, `savesize`).
+  Numbers from it replace the rig's in the handoff table. If it lands
+  before G, whichever part is running adds the load check that day.
 - Merge order if they collide: K → B → H → A → D → E → C → F (B before A
   so the card's life has data; H before A so `HOOKS` reads a real stock;
   D before E so both sheets are re-shot once; C last among the UI because
@@ -878,6 +1027,21 @@ One agent, after A–F and H are on `main`:
 | `tools/*probe.mjs` | — | `peopleprobe` | `savesize` | — | — | — | `newsprobe` | `meatprobe` |
 | `SPEC.md` | — | §14b | §7.10 | §11c | §12.3b | §12.2b | §11b | §9c |
 
+The two UI parts, by file:
+
+| file | P palette | S saves | who else is in the file |
+|---|---|---|---|
+| `js/tools.js`, `js/palette.js` | **owns** | — | — |
+| `js/slots.js` | — | **owns** | — |
+| `js/title.js` | — | **owns** | — |
+| `index.html` | **owns** (layout) | — | — |
+| `css/field.css` | the palette block | — | C (the card) |
+| `js/ui.js` | `buildStrip` | `savesList` / `portBox` (737–785) | C (card, tabs), H (the M card block) |
+| `js/input.js` | the key map reads `TOOLS` | — | C (pin), A (one cursor line) |
+| `js/main.js` | resize lines | `app.save/load/resume`, the boot slot (155–200, 300–345) | C (camera) |
+| `tools/check.mjs` | Part K' | Part J' | — |
+| `SPEC.md` | §11 | §15 | — |
+
 Files touched by two parts are touched in DIFFERENT hunks (`render.js`,
 `walkers.js`, `index.js`, `census.js`, `check.mjs`, `shots.mjs`,
 `SPEC.md`); each part adds its own function/section and never edits
@@ -890,16 +1054,19 @@ edits two `post` sites; F edits one advisor function; D never opens them.
 ```
 day 0   K (½ session)  ─┬─ A needs ─────────────┐
                         ├─ H meat on hand ──────┤
-                        ├─ B lives ─────────────┤
-                        ├─ C inspect (stubs) ───┤   G integration (1 session)
+                        ├─ P palette (½) ───────┤
+                        ├─ S saves (½) ─────────┤
+                        ├─ B lives ─────────────┤   G integration (1 session)
+                        ├─ C inspect (stubs) ───┤   + the control city when it lands
                         ├─ D looks ─────────────┤
                         ├─ E buildings ─────────┤
                         └─ F story ─────────────┘
 ```
-Seven sessions in parallel after the keel; C and F finish against the
-merged tree because they consume the most. If only two agents are
-available: A+H first (the owner's two asks tonight), then E+B, then D+C,
-then F; K still first.
+Nine sessions in parallel after the keel; C and F finish against the
+merged tree because they consume the most; P and S are half-sessions and
+need no keel at all (they can start tonight). If only two agents are
+available: P+S first (small, and the owner asked for them by name), then
+A+H, then E+B, then D+C, then F; K before A/B/H.
 
 ## 7. What this plan does NOT do, and why
 
@@ -935,7 +1102,13 @@ then F; K still first.
 4. **The save compaction** (B's first commit) changes the save format's
    bytes but not its meaning; old saves load. Fine to ship, or keep the
    verbose form?
-5. **Your city as the rig.** The LOAD panel exports a city as text. If you
-   paste one into the repo under `docs/fixtures/`, `meatprobe --save`
-   measures H on the town you actually build, and the `estate` layout is
-   calibrated against it rather than against my guess at your shape.
+5. ~~**Your city as the rig.**~~ **Ruled:** *"adding the control city is a
+   good idea, i will build one for you soon."* → `docs/fixtures/
+   control-city.json` when it arrives (§4-G); Part S's menu is the export
+   path. Until then every rig number stays labelled a rig number.
+6. **The palette's keys.** The sixteen positions keep today's keys (`1 2 3
+   M 4 B T G 5 6 7 V P F 9 8`), shown small on each button. Renumber the
+   keys to match the positions (1–9 only; the rest by letter), or leave
+   them?
+7. **Use-zoning (`U`)** is not in the sixteen; the plan leaves it on the
+   top strip beside density, as a modifier. Fine, or a seventeenth button?

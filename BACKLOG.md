@@ -46,8 +46,24 @@ first draft of H ("within 6") repeated the mistake. H's law: meat travels
 by ROAD, town-wide (`hallReach` on the commute graph, MEAT_ROAD 60
 walk-steps; a cart walker fetches the dead and the cubs); the rig gains
 `--layout estate` and `meatprobe --save` takes a real exported city. §8
-still asks: `RECORD_HARD` 3 → 2, the save compaction, a weaner age, and
-the owner's own save as a fixture.
+still asks: `RECORD_HARD` 3 → 2, the save compaction, a weaner age.
+**2026-09-03, two more parts and a fixture coming:** *"adding the control
+city is a good idea, i will build one for you soon, please add on that the
+save button only lets you save the game once, a load save menu would be
+better. i think we also need a GUI for selecting build items. a remote
+control on the left side of the screen. 1 residential, 2 commercial, 3
+industrial, 4 meat, 5 road, 6 wall, 7 rail, 8 train station, 9 tree, 10
+park, 11 zoo, 12 pacification, 13 police, 14 fire. 15 inspect, 16
+bulldoze. i think the other buttons can stay on the top"* → **P** the
+palette (`js/tools.js` ONE tool table; `js/palette.js` 2 × 8 on the left
+with sprite thumbnails; keys unchanged, positions are the owner's order;
+density and Use stay on top) · **S** saves (`js/slots.js` named slots per
+city, save-as / load / overwrite / delete / export in one menu on S, L and
+the title; the autosave one slot; a full store shows the export box — a
+refusal must not lose work). The control city → `docs/fixtures/
+control-city.json`, the suite's first real-save regression and every
+probe's `--save`. This section (the title-screen one below) said "a
+save-as name field is not built" — S is that.
 
 ## Crime and punishment — SHIPPED 2026-09-02 (SPEC §9c; `js/sim/justice.js`); what is left
 - **Hunger visibility.** The scripted towns run at U 0–4, so the ×20 hunger
