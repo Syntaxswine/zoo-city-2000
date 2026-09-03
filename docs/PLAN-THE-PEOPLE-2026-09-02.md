@@ -1,4 +1,4 @@
-# PLAN — The People: thoughts, lives, faces, homes (a master plan in seven parts)
+# PLAN — The People: needs, lives, faces, homes, meat (a master plan in eight parts)
 
 The owner (2026-09-02, night): *"can you come up with a master plan for how to
 really improve zoo city? … please break it up into parts so that multiple
@@ -6,6 +6,14 @@ agents can work on different parts at the same time. one part i'd like is to
 be able to see the residents thoughts when they walk around. a larger goal of
 relating more strongly with the individual citizens. i think more character
 and variety in the building sprites might help."*
+
+And, on reading the first draft: *"the thought bubble text should be clues
+about needs, stuff like 'i wish there was more shopping nearby'. probably
+the easiest thing to do is reuse the inspect button. also the meat market
+should have more meat on hand. out of 2,800 animals they only sold 20 units
+of meat in the whole history of the town and have 15 in cells."* → Part A
+is NEEDS shown through Inspect (not flavour, not a follow system); Part C
+shrinks to extending Inspect; a new Part H makes meat a STOCK with inflows.
 
 Plan only. Nothing here is built. Each part is sized for one agent-session,
 owns its own files, and codes against contracts written down in §3 so the
@@ -22,20 +30,23 @@ them.
 
 | the player must be able to… | today | part |
 |---|---|---|
-| **hear** them — a voice, in character, about their actual life | the card says `mood 41` | **A. Thoughts** |
+| **hear what they need** — a clue the player can act on, in the animal's own words | the card says `mood 41` | **A. Needs (thought bubbles under Inspect)** |
 | **remember** them — a past the player witnessed | a citizen has `born`, `friends`, a `record` and nothing else | **B. Lives** |
-| **attend** to them — pick one and stay with it | the card follows the hover; a walker's card dies with the walker | **C. Follow and favourites** |
+| **attend** to them — Inspect one and the card stays with it | the card follows the hover; a walker's card dies with the walker | **C. Inspect, extended** |
 | **recognise** them — pick one out of a crowd | every rabbit is the same rabbit; elders one shade lighter; one hat | **D. Looks and faces** |
 | **see them in their homes** — the house tells you who lives there | 12 families × 2 mirrored variants, no occupant on the outside | **E. Buildings with character** |
 | **be told** what happened to them | 74–84% of dispatches never pop; no dispatch names a birth or an ordinary death | **F. The story channel** |
 
-Then **G. Integration** — the suite, the docs, the browser round — after
-the six have merged.
+Plus one part that is not about relating but was in the same breath:
+**H. Meat on hand** — the hall's stock, its inflows and its till.
 
-The order of importance if the owner has to choose: **A, B, E, D, C, F.**
-A is the one they named; B is what makes A's lines true; E is the other
-thing they named; D is cheap and makes every screenshot better; C and F are
-the plumbing that turns the first four into attention.
+Then **G. Integration** — the suite, the docs, the browser round — after
+the parts have merged.
+
+The order of importance if the owner has to choose: **A, H, E, B, D, C,
+F.** A and H are the two they named tonight; E is the other thing they
+named; B is what gives A's card its past; D is cheap and makes every
+screenshot better; C and F are plumbing.
 
 ---
 
@@ -49,9 +60,11 @@ throwaway — part G writes the real instrument):
 |---|---|---|
 | P at year 30 | 1,732 alive · 1,055 households · 3,220 ids ever | the graveyard is as big as the town |
 | save size | **906 KB**, of which citizens **732 KB** at **380 bytes each** | ~two thirds of a citizen's bytes are default `false`/`0`/`-1` fields; a biography ledger has to pay for itself — §4-B does, by compacting the save first |
-| mean friends per citizen | **0.67** (1,154 links / 1,732) | the friendship graph is THIN. Most animals have no friend to lose. Thoughts and lives will lean on jobs, homes, smoke and neighbours more than on friends — and the low number is itself a design finding for later (it is a `FRIEND_P`/`FRIEND_MAX` knob question, not this plan's) |
+| mean friends per citizen | **0.67** (1,154 links / 1,732) | the friendship graph is THIN. Most animals have no friend to lose. Needs and lives will lean on jobs, homes, smoke and neighbours more than on friends — and the low number is itself a design finding for later (it is a `FRIEND_P`/`FRIEND_MAX` knob question, not this plan's) |
 | log rows in 30 years | 373 | the feed can afford ~+40% rows/year of people news before it drowns (§4-F budgets it) |
-| walkers on screen | ≤ 150 | six bubbles is the readable cap; a bubble per walker is noise |
+| walkers on screen | ≤ 150 | eight bubbles is the readable cap; a bubble per walker is noise — which is why bubbles live under the Inspect tool |
+| the meat economy (2 markets, stations, a centre, 30 y) | halls 11 · killings **4** · sold **2** · cut **§38,931** | the halls earned §38.9k from `CUT_PER_JOB` (§25 per filled job a year) and §300 from bodies. Meat is not a quantity today — a killing near a hall posts §50 and a line, a convict §100. The owner's real game: 20 sold, 15 in cells, out of 2,800 animals. Part H |
+| deaths in 30 years | ≈ 712 (3,220 ids − 1,732 alive − 776 left) | ≈ 24 a year of natural death — the supply the hall never buys (BACKLOG's "the market buys the dead") |
 | building families | 12 × 2 variants, `variant & 1` in `render.js:311` | `world.variant[i]` is a saved Uint8 — bits 1–7 are free, and keying by the TILE's byte is already the identity law |
 | suite | 167 checks | every part adds its checks to the same file, in its own Part letter |
 | the hover card today | name · species · age · home/job/mood · custody/record · trespass · friends · doing | this is the whole relationship surface; C rebuilds it around a citizen, not a tile |
@@ -69,9 +82,10 @@ throwaway — part G writes the real instrument):
    `ui.js`/`main.js`; Part B of the suite greps `js/sim` for it. A starred
    citizen's toast is a UI line, **never a log row** — the log is saved and
    hashed.
-3. **One implementation (Law 6).** A thought about smoke is computed from
-   the same term `moods()` subtracts. A biography sentence is written by one
-   function the card, the People tab and the news all call. Never a second
+3. **One implementation (Law 6).** A need about smoke is computed from the
+   same term `moods()` subtracts; the town's need histogram is the same
+   function over every citizen. A biography sentence is written by one
+   function the card, the Census and the news all call. Never a second
    copy of a rule in the UI.
 4. **Identity, never an index.** A citizen's look is `hash(id)`; a building's
    variant is `world.variant[i]`; a thought's phrasing is `hash(id, code)`.
@@ -130,8 +144,13 @@ writes log rows; it is the ONLY place a life event becomes news.
 `art.portrait(species, opts)`, `art.mark(species)`, `art.look(id)` — each
 throws "not built" tonight so a caller's typo fails loudly.
 
-**K6. `walkers.list()` entries gain `thought: null`** and `make()` gains
+**K6. `walkers.list()` entries gain `need: null`** and `make()` gains
 `look: art.look(id)` (returns `{ shade: 0, mark: 0 }` until D lands).
+
+**K6b. `world.meat`** — a `Uint16Array(n)` per tile (units on hand at an M
+lot), saved, zero tonight; `save.js` tolerates it absent. Part H fills it.
+Adding the array now means H's save-format change and B's land in one
+place and old saves are proved to load once.
 
 **K7. This file's §5 ownership table** copied into `BACKLOG.md` under a new
 heading, so an agent that only reads BACKLOG finds its lane.
@@ -147,87 +166,132 @@ green, SPEC section, BACKLOG entry, a handoff section appended (never
 edited), commit with the field-notes message, pushed, a browser or
 play-camera proof in the commit message.
 
-### A. Thoughts — *"see the residents thoughts when they walk around"*
+### A. Needs — *"the thought bubble text should be clues about needs … reuse the inspect button"*
 
-**Goal.** A walking animal shows, now and then, one short line in its own
-voice about its own life, and the line is TRUE — it is the sim's largest
-mood term or its newest life event, in words.
+**Goal.** With the Inspect tool active, the animals near the cursor say
+what they want — *"i wish there was more shopping nearby"* — and every
+line is a clue the player can act on with a tool they have. The card says
+the same thing for any citizen, and the census says it for the whole
+town. Nothing a citizen says is flavour: it is the sim's own term that is
+hurting, in the animal's words, with the remedy underneath.
 
 **Design.**
-- `js/sim/thoughts.js` (DOM-free, pure, no RNG): `thoughtOf(world, c,
-  errand = null) → { code, arg }`. Priority: (1) a life event in the last
-  two months from `c.life` (`LOST_FRIEND`, `LITTER`, `HIRED`, `LOST_JOB`,
-  `MOVED`, `LEFT_HOME`, `ARRESTED`, `FIXED`, `EXONERATED`, `CENTENARY`);
-  (2) the errand the walker layer passes in (`COMMUTE`, `STROLL`, `CUB`,
-  `MEET(name)`, `PREDATION(name)`, `ARRIVAL`, `RIDING`) when the roll says
-  "errand" (see the walker rule); (3) the largest-|value| term from
-  `moodTerms` other than `BASE`/`BOOST` (`NO_JOB`, `SMOKE`, `PARK`,
-  `FRIENDS(n)`, `FLIGHT(species)`, `DREAD`, `VAN`, `CRIME`, `COMMUTE`,
-  `GRIEF`, `FIXED`, `HELD`, `EVENT(id)`); (4) `IDLE`.
-- `js/sim/voice.js`: `LINES[code][diet | species]` → 2–3 strings with
-  `{name}` `{n}` `{species}` slots, ≤ 30 characters, the game's register
-  (dry, field-guide, a little dark: the wolf on a predation walk thinks
-  *"the Howells are having the neighbours in"*; the rabbit next door to
-  wolves, *"they moved in next door. all six."*; smoke, *"the works gets in
-  my fur"*; no job, *"third month. nobody's hiring rabbits"*; five friends,
-  *"a full dance card"*; the tortoise's idle, *"no hurry"*). A species table
-  overrides a diet table overrides a default. `line(world, c, thought) →
-  string` picks by `hash(c.id, code) % n` — **the same animal always says
-  the same thing about the same thing.** That consistency is character.
-- `js/walkers.js`: `w.thought = { code, arg, text, until }`. At spawn and at
-  every leg change the walker rolls on the WALKERS stream: p 0.35 to think
-  at all; if so, 0.4 errand / 0.6 `thoughtOf` with the errand as fallback.
-  Shown `THOUGHT_SHOW` 3 s, then a gap of 5–9 s before the next roll. Cap
-  `BUBBLES_MAX` 6 visible in the viewport: priority to the followed/pinned
-  citizen (Part C sets `walkers.attend(id)`), then tier (1) over (3) over
-  (4), then nearest the screen centre. `list()` carries `thought`.
-- `js/render.js`: after the scene, in screen space: for each visible walker
-  with a live thought, `art.bubble` nine-sliced to `measureText` + 6 px,
-  the panel's monospace at 10 px screen pixels (not scaled with zoom), 1-px
-  ink border, a 3-px tail to the head (dy −24 adult, −16 cub), clamped to
-  the canvas, painted in (tx+ty) order. Bubbles fade in the last 0.4 s
-  (alpha, not a sprite).
-- The card gets a `thinks: …` line for ANY citizen, walker or not (the same
-  `thoughtOf`), so a resident at home still has a thought when you hover
-  their house (C consumes; A exposes).
-- `tools/peopleprobe.mjs` (new, exit 0 always): 4 seeds × 30 y, every
-  citizen sampled monthly through `thoughtOf`: a histogram of codes, the
-  share of `IDLE`, the mean bubbles-on-screen from a simulated 150-walker
-  viewport. The commit message carries the table.
+- `js/sim/needs.js` (DOM-free, pure, no RNG): `needOf(world, c) → { code,
+  arg, act }` — the largest ACTIONABLE deficit, from four sources that all
+  already exist in the sim (Law 6 — a need is a term the code uses, never a
+  new opinion):
+  1. **The valves, as a wish.** `world.last.demand` is the town's want,
+     spoken by the animal who feels it: `rC > 0.05` → `SHOPS` *"i wish
+     there was more shopping nearby"* (act: zone C); `rR > 0.05` → `ROOMS`
+     *"my cousins would come if there were rooms"* (zone R); `rI > 0.05` →
+     `WORKS` *"there's money in a new works, they say"* (zone I); for a
+     carnivore, `rM > 0.05` or its hall's `meat` at 0 (Part H) → `HOOKS`
+     *"the hall's hooks are empty again"* (zone M / Part H).
+  2. **The mood's deficits** from `moodTerms` (K1), only the terms a tool can
+     answer: `NO_JOB` *"third month. nobody's hiring rabbits"* (zone C/I,
+     rail); `SMOKE` *"the works gets in my fur"* (trees, a park, a wall,
+     the scrubbers); `NO_PARK` (the +10 absent within 4) *"nowhere to sit
+     in the sun"* (park); `COMMUTE` (the +10 absent) *"an hour each way"*
+     (rail, roads, jobs nearer); `FLIGHT(species)` *"they moved in next
+     door. all six."* (use-zoning, a wall); `DREAD` *"the hall's smell
+     reaches the kitchen"* (a wall, the licence); `CRIME` *"someone tried
+     the door again"* (police); `VAN` (carnivores) *"the van came down our
+     street"* (— a clue with no remedy but the centre; still said).
+     `GRIEF`, `HELD`, `FIXED`, `FRIENDS` are NOT needs (nothing to zone) —
+     they belong to the card's life (B), not the bubble.
+  3. **The home preference unmet** — `homeScore`'s own species terms read
+     back at the lot the animal lives in: beaver/pig `WATER` *"no water for
+     miles"* (zone nearer water); owl/bear/wolf/skunk `TREES` *"not a tree
+     in sight"* (the tree tool); mouse/hawk `HIGH` *"wish we lived higher
+     up"* (zone High); bear/cow `LOW` *"too many neighbours"* (zone Low);
+     cow `PASTURE` *"no grass to speak of"* (a park); fox `LV` *"this
+     street has come down"* (parks, trees, police); raccoon, the one joke
+     the table allows, `CLEAN` *"it's too clean round here"* (— none).
+  4. **The lot's own reason** from `lotScore` on the home lot (Law 6: the
+     same call the growth rule makes): `NO_ROAD` *"no road to our door"*,
+     `CAPPED` *"town's full — a park or a zoo, they say"*, `NO_DEMAND`
+     *"nobody's building on this street"*; and the tax term when the rate
+     is above neutral: `TAX` *"the taxes eat the wage"* (lower the rate).
+  Ranking: |value| of the term in mood points, valves and lot reasons at a
+  fixed weight (`NEED_VALVE_PTS` 8, `NEED_LOT_PTS` 6) so a real mood hurt
+  outranks a town-wide wish; ties by `hash(id)`. Below `NEED_MIN` 4 points
+  → `CONTENT` *"nothing to want today"* (rare; the glad face in D).
+- `js/sim/voice.js`: `LINES[code][species | diet | default]` → 2–3 strings
+  ≤ 30 characters, `{n}` `{species}` slots; `line(world, c, need)` picks by
+  `hash(c.id, code) % n` — **the same animal always says the same thing
+  about the same want.** Every code also carries `ACT[code]` — the remedy
+  in the tool's own words (*"zone C within 6 road tiles"*) — printed under
+  the bubble's line on the card and in the census.
+- **Inspect is the switch.** With tool 9 active: every walker within
+  `NEED_REACH` 6 tiles of the cursor gets a bubble, nearest first, cap
+  `BUBBLES_MAX` 8; the pinned citizen's walker always. Any other tool: no
+  bubbles. (An OPTIONS switch *ambient thoughts* — one random bubble every
+  4 s under any tool — is a BACKLOG line, not this part.) `walkers.list()`
+  carries `need` (recomputed at each tile centre; the walker layer never
+  stores the text, only the code, so the card and bubble agree).
+- `js/render.js`: `drawBubbles(list, cursor)` after the scene, in screen
+  space after the transform is reset: `art.bubble` nine-sliced to
+  `measureText` + 6 px, the panel's monospace at 10 px screen pixels (not
+  scaled with zoom), 1-px ink border, a 3-px tail to the head (dy −24
+  adult, −16 cub), clamped to the canvas, painted in (tx+ty) order.
+- The card (C prints, A supplies): `wants: "the works gets in my fur"` and
+  a dim `→ trees or a park within 4` under it, for ANY citizen, walker or
+  not. The house card: the household's top need. **The Census tab gains
+  "what the town wants":** the need histogram over every citizen this
+  tick (`needCensus(world)`, computed on tick, cached on `world.last`) —
+  *SHOPS 412 · NO_PARK 288 · SMOKE 140 …* — the same function, so the
+  dashboard and the bubble can never disagree. That histogram is the
+  cheapest advisor the game will ever have.
+- `tools/peopleprobe.mjs` (new, exit 0 always): 4 seeds × 30 y × 3 layouts
+  (balanced / dormitory / millbelt), every citizen monthly through
+  `needOf`: the histogram, the `CONTENT` share, and per layout the TOP need
+  — the dormitory must say `NO_JOB`, the millbelt `SMOKE`, the balanced
+  town something else. The commit message carries the table.
 
-**Owns.** `js/sim/thoughts.js`, `js/sim/voice.js`, `js/walkers.js`, the
+**Owns.** `js/sim/needs.js`, `js/sim/voice.js`, `js/walkers.js`, the
 bubble block in `js/render.js` (its own function, `drawBubbles`), a
-`BUBBLE` sprite in a new `js/art/bubbles.js`, `tools/peopleprobe.mjs`, the
-Part E' checks in `tools/check.mjs`, SPEC §14b, `docs/shots/sheet-bubbles.png`.
+`BUBBLE` sprite in a new `js/art/bubbles.js`, the Inspect-tool hook in
+`input.js` (ONE line: `walkers.setCursor(tile | null)` when tool 9 is
+active — C owns the rest of `input.js`), `tools/peopleprobe.mjs`, the Part
+E' checks in `tools/check.mjs`, SPEC §14b, `docs/shots/sheet-bubbles.png`.
 
-**Consumes.** K1 `moodTerms`, K2 `c.life` (empty until B lands — A must
-work with `life: []` and its checks must not require B), K5 `art.bubble`,
-K6.
+**Consumes.** K1 `moodTerms`, K3/K6b (`world.meat` for `HOOKS` — reads 0
+until H lands), `lotScore`, `homeScore` (export the per-term breakdown the
+same way as K1: `homeTerms(world, species, i)`, and `bestHome` sums it —
+hash-proved; this is A's one edit in `citizens.js`, coordinated with B's
+one-liners by hunk), K5 `art.bubble`, K6.
 
 **Acceptance.**
-- Every code `thoughtOf` can return has a line in the default table, and
-  every species/diet override is a known code (a table typo fails).
-- Over the probe's 120 city-years every code appears at least once and no
-  code is > 40% of non-idle samples (a code that never fires is dead text; a
-  code that dominates is noise) — **the "metric must discriminate" rule.**
-- Mutation: zero the `SMOKE` term → the millbelt town's `SMOKE` share
-  drops to 0; the check fails if it does not.
-- Hash: 30 years with thoughts on and off equal; `js/sim` never reads
-  `.thought` (grep).
-- Browser: seed 7 ring city at ×1 and ×2, a screenshot with ≥ 3 bubbles
-  legible; the followed citizen's bubble always present while it walks;
-  0 console messages; the frame with 6 bubbles costs < 1 ms over the
-  frame without (measured with `performance.now()` around `draw`).
+- Every code `needOf` can return has a line in the default table and an
+  `ACT`; every species/diet override is a known code (a table typo fails).
+- **Discrimination:** over the probe's 360 city-years every code appears
+  at least once and no code is > 40% of non-content samples; the three
+  layouts have three different top needs. A need that never fires is dead
+  text; one that fires everywhere is noise.
+- **Truth:** mutation — zero the `SMOKE` term in `moodTerms` → the
+  millbelt's `SMOKE` share is 0; set `rC` to 0 → no `SHOPS`; the checks
+  fail if not. And the remedy works: in the suite, a town whose top need
+  is `NO_PARK` gets a park placed by the check and the count falls within
+  a year (the clue was true).
+- Hash: 30 years with Inspect bubbles on and off equal; `js/sim` never
+  reads `.need` or the cursor (grep).
+- Browser: seed 7 ring city, Inspect active, cursor on a busy street at
+  ×1 and ×2: a screenshot with ≥ 4 legible bubbles; switch to the road
+  tool: none; the card's `wants` line matches the bubble; the census
+  histogram's top three; 0 console messages; the frame with 8 bubbles
+  costs < 1 ms over the frame without (`performance.now()` around
+  `draw`).
 
 **Traps.** Canvas text scales with the zoom transform — draw bubbles AFTER
-resetting the transform. `measureText` is per frame ×6 — cache by text.
-The hidden pane fires no rAF: verify with the sim paused and
-`app.walkers.update(0.05, …)` by hand (handoff §14's recipe). A thought
-that names a friend must survive the friend dying that month — resolve the
-name through `world.names` (K2), never `byId` alone.
+resetting it. `measureText` per frame ×8 — cache by text. The hidden pane
+fires no rAF: verify with the sim paused and `app.walkers.update(0.05, …)`
+by hand (handoff §14's recipe). `world.last` is null on tick 0 — `needOf`
+must answer `CONTENT` before the first tick. A valve wish spoken by 1,600
+animals at once is the noise case — the ranking weights exist to keep a
+personal hurt above the town's wish; the probe's 40% line is the guard.
 
-**Size.** ≈ 350 lines sim + 120 walkers + 80 render + 60 art + 200 probe;
-~12 checks; one session.
+**Size.** ≈ 350 lines sim + 100 walkers + 80 render + 60 art + 200 probe;
+~14 checks; one session.
 
 ### B. Lives — the biography every animal carries
 
@@ -298,68 +362,67 @@ session 8 (`say(id, line)`); hook the same place.
 **Size.** ≈ 250 lines + 30 one-liners; ~10 checks; one session, the save
 compaction first as its own commit.
 
-### C. Follow and favourites — attention as a mechanic
+### C. Inspect, extended — *"reuse the inspect button"*
 
-**Goal.** Pick an animal and stay with it: the card is pinned to the
-CITIZEN (not the walker), the camera follows it when it walks and rests on
-its home when it does not, a star keeps it in a People tab, and its life
-events reach you as they happen.
+**Goal.** The Inspect tool (9) already pins a card. Make the pin a CITIZEN
+(not a walker, not a tile), so the card outlives the walk, and make the
+card the whole relationship: face, wants, life, friends. Follow and
+favourites are the stretch half, not the core.
 
 **Design.**
-- `js/follow.js` (DOM-free): `followTarget(world, walkersList, id) → { tx,
+- `js/follow.js` (DOM-free): `pinTarget(world, walkersList, id) → { tx,
   ty, state: "walking" | "home" | "away" | "gone", line }` — pure, so it is
   unit-checked in Node. "away" = at the centre/cells/winter; "gone" = dead
-  or emigrated (the target holds on the last known home and the line is the
-  epitaph from `lifeLines`).
-- `input.js`/`main.js`: click a walker or a name → `app.pin = { citizen: id
-  }`; `F` toggles follow (camera lerps to the target each frame, 4 tiles/s,
-  released by any drag); `S` toggles the star; `Esc` unpins. The pinned card
-  outlives the walker; when the citizen dies the card stays with the
-  epitaph until the next click.
+  or emigrated (the target holds on the last known home and the line is
+  the epitaph from `lifeLines`).
+- `input.js`/`main.js`: under Inspect, clicking a walker or a name in a
+  card → `app.pin = { citizen: id }`; clicking a lot pins the lot as today;
+  `Esc` unpins. The pinned citizen's card outlives the walker; when the
+  citizen dies the card stays with the epitaph until the next click. The
+  hovered walker's card still shows on hover as today.
 - `ui.js`: `cardForCitizen(id)` replaces `cardForWalker` (the walker is one
   input to it): portrait (D, via `render.paintPortrait(canvas, sprite)`),
-  name · species · age · household line · home/job · **thinks:** (A) ·
-  **life:** (B, last 4 lines, "more" expands) · friends (each a link that
-  pins that friend) · doing · star/follow buttons.
-- The **People** tab (fifth tab; SPEC §11 lists four — the plan adds one):
-  starred first, then notables computed by a DOM-free `notables(world)` in
-  `js/sim/census.js` (oldest resident, biggest household, most friends,
-  newest litter, the last arrested, the last killer) — each row: portrait,
-  name, species, age, mood, one life line, find · follow · star.
-- Stars in `zoo.pref.stars[city] = [ids]` (browser-only, like read marks);
-  starred citizens' `world.lifeEvents` become UI toasts (`flash`, never a
-  log row — Law 2) — *"★ Fenpa Howell was hired at the works (30,12)"*.
-- `walkers.attend(id)`: the followed citizen is sampled first every tick
-  when its path crosses the viewport, so following actually shows walks.
+  name · species · age · household line · home/job · **wants:** + the dim
+  remedy (A) · **life:** (B, last 4 lines, "more" expands) · friends (each
+  a link that pins that friend) · doing.
+- The house card lists its households with each member a link (pin), and
+  the household's top need (A).
+- **Stretch, only after the card is done:** `F` follows the pinned citizen
+  (camera lerps to `pinTarget`, 4 tiles/s, released by any drag);
+  `walkers.attend(id)` samples it first when its path crosses the
+  viewport; `S` stars it into `zoo.pref.stars[city]` (browser-only, like
+  read marks), and a **People** section at the top of the Census tab
+  (not a fifth tab — `#tools` must not unwrap, handoff §11) lists starred
+  citizens with find · follow. Starred citizens' `world.lifeEvents` become
+  UI toasts (`flash`, never a log row — Law 2).
 
-**Owns.** `js/follow.js`, `js/input.js`, `js/main.js`, `js/ui.js` (the
-card, the tabs, the People tab), `css/field.css`, `notables()` in
-`census.js`, `attend()` in `walkers.js` (ONE function, coordinated with A
-— A adds the sampler priority hook; C calls it), the Part G' checks, SPEC
-§11c.
+**Owns.** `js/follow.js`, `js/input.js` (all but A's one cursor line),
+`js/main.js`, `js/ui.js` (the card, the Census People section),
+`css/field.css`, `attend()` in `walkers.js` (ONE function, coordinated
+with A), the Part G' checks, SPEC §11c.
 
-**Consumes.** A's `thoughtOf`/`line`, B's `lifeLines`/`memorial`/
+**Consumes.** A's `needOf`/`line`/`ACT`, B's `lifeLines`/`memorial`/
 `lifeEvents`, D's `art.portrait` + `render.paintPortrait`. C can start on
 day 0 against the K stubs and fills the card as the others land.
 
 **Acceptance.**
-- `followTarget` in Node: walking → the walker's tile; between walks →
-  home; after `removeCitizen` → "gone" with the epitaph; a citizen with no
-  home → "away".
+- `pinTarget` in Node: walking → the walker's tile; between walks → home;
+  after `removeCitizen` → "gone" with the epitaph; a citizen with no home
+  → "away".
 - `js/sim` never reads `zoo.pref`, `pin`, `stars` (grep).
-- Browser: pin a rabbit, press F, run ×3 for a game year: the camera stays
-  within 3 tiles of it while it walks and on its house otherwise; star it;
-  the People tab lists it; a hire toast appears when its `HIRED` fires
-  (force with the cheat: bulldoze its job lot); 0 console messages.
+- Browser: Inspect, click a rabbit, let its walker finish: the card stays,
+  says `at home`; bulldoze its job lot: the card's `wants` turns to
+  `NO_JOB` on the next tick; click a friend's name: the pin moves; 0
+  console messages. Stretch: F keeps the camera within 3 tiles of it for a
+  game year at ×3.
 
-**Traps.** `#tools` wraps — a fifth tab must not unwrap it (handoff §11).
-The card is rebuilt on every hover today — a pinned card must not flicker
-(rebuild only on tick or pin change). A loaded city opens paused; the
-follow camera must not lerp while paused. The People tab's notables walk
-all citizens — compute on tick, not on render.
+**Traps.** The card is rebuilt on every hover today — a pinned card must
+not flicker (rebuild only on tick or pin change). A loaded city opens
+paused; a follow camera must not lerp while paused. The Census People
+section walks all citizens — compute on tick, not on render.
 
-**Size.** ≈ 120 follow + 250 ui + 60 input/main + 40 css; ~8 checks; one
-session.
+**Size.** ≈ 100 follow + 200 ui + 60 input/main + 30 css; ~6 checks; half
+a session for the core, a session with the stretch.
 
 ### D. Looks and faces — one rabbit is not another rabbit
 
@@ -534,83 +597,203 @@ keep `keyOf`), the hidden pane's timers. An obituary for every death is
 **Size.** ≈ 150 story + 80 news + 40 events + 40 probe; ~6 checks; half a
 session.
 
-### G. Integration — after the six have merged
+### H. Meat on hand — *"the meat market should have more meat on hand"*
 
-One agent, after A–F are on `main`:
-- Merge order if they collide: K → B → A → D → E → C → F (B before A so
-  A's life-event tier has data; D before E so both sheets are re-shot once;
-  C last among the UI because it consumes all of them).
+**Goal.** Meat is a QUANTITY the hall holds, with inflows the town
+produces and an outflow the carnivores eat, and the card, the census and
+the news read it. Today it is a counter and two prices.
+
+**What is wrong, measured (§1).** Scripted town, two market blocks, 30
+years: 11 halls, 4 killings, 2 sold, §38.9k of "cut" — of which §300 was
+bodies and the rest `CUT_PER_JOB` (§25 per filled job a year). The owner's
+real game: 20 sold and 15 in the cells out of 2,800 animals. The sentence
+table is working as ruled (predator's first → the centre; prey or the fixed
+→ the hall; a trespass minor → the cells until `RECORD_HARD` 3): SOLD is a
+rare outcome of a rare arrest, and the killing (`KILL_P` 0.3/yr in a fed
+town, ×3 within a hall's smell) is rare by design. **The hall's stock
+cannot come from crime alone**; the town's 24 natural deaths a year are the
+supply that is never bought (BACKLOG has held this as "the market buys the
+dead — v2" since session 3).
+
+**Design.**
+- `world.meat[i]` (K6b): units on hand per M lot. One unit = one body.
+- **Inflows**, each ONE unit to a hall with road access:
+  1. **The killing** → the killer's nearest hall within `KILL_HALL_R` 6
+     (today that hall only earns the mayor §50 and a line); the sack walks
+     INTO the hall when one is in reach (the walker-layer item BACKLOG
+     already lists — the killer's leg 1 goes to the hall's door, then
+     home).
+  2. **The dead** → `buyTick`: a natural death whose home is within
+     `MEAT_BUY_R` 6 of a hall is BOUGHT with p `MEAT_BUY_P` 0.6 (any
+     species — the Beastars rule; the owner's §8 question 1 can narrow
+     it); the family's household gets nothing (there is no household cash)
+     but the mayor's cut gets `MEAT_PRICE` §50 as it does for a killing,
+     and the line says so (*"…and the hall at (30,12) paid the family"*).
+     ≈ 14 units/yr in the scripted town — the supply the owner is asking
+     for, without a single extra killing.
+  3. **The sentence** — SOLD as ruled, unchanged. The lever for volume, if
+     the owner wants more sold and fewer in cells, is `RECORD_HARD` 3 → 2
+     (a second trespass meets the table) — a knob, named, not moved.
+  4. **Livestock (owner's call, §8):** pigs and cows are livestock species;
+     a household of five with `litter` 5 could sell a cub to the hall at
+     16 instead of splitting it — the honest farm economy. NOT in the
+     plan's default; a question.
+- **Outflow**: `eatTick` per hall per month: `demand = MEAT_EAT ×
+  carnivores within reach(6)` (0.05 → a 40-carnivore neighbourhood eats 2
+  units a month); `sold = min(stock, demand)`; the till `MEAT_SALE` §20 ×
+  sold → the C rate's tax when licensed, else the mayor's cut (the
+  licence's existing split). `ev.justice.sold` stays the CONVICT count;
+  the census gains `meatSold` (units) and `meatOnHand` (Σ stock).
+- **Read back into the sim, weights never gates:** a hall's `lotScore`
+  local term gains `+MEAT_LOCAL × min(1, stock/8)` (a stocked hall grows)
+  and the dread field scales `×(0.5 + 0.5·min(1, stock/8))` — a full hall
+  smells, an empty one half as much. Part A's carnivore `HOOKS` need reads
+  `stock === 0`. The mayor's `rM` valve is unchanged.
+- **Readouts:** the hall's card `meat on hand 12 · sold this year 40 ·
+  bought 9 dead, 2 killings`; the census line; two ticker lines — `EMPTY
+  HOOKS — the hall at (30,12) has nothing on the hooks` (once per hall per
+  dry spell, `TICKER_FLASH`) and a yearly `THE MARKET — 118 units, 96 of
+  them bought at the door`; the Rules tab entries M4–M6.
+- **Measure first, like session 8:** `tools/meatprobe.mjs` (exit 0) prints,
+  per seed × layout, inflow by source, the stock curve, units sold per
+  hall-year, and the cut — BEFORE the knobs are chosen, then after. The
+  target: a two-hall town holds 5–20 units and sells most of what it buys;
+  a hall in a herbivore block runs dry and prints.
+
+**Owns.** `js/sim/meat.js` (buy/eat/readouts), the hall lines in
+`justice.js`'s `kill()` and `arrest()` (the two `post(world, "cut", …)`
+sites — B's one-liners are elsewhere in those functions; merge by hunk),
+`budget.js`'s till line, the M-zone local term in `lots.js`, the dread
+scale in `fields.js`, the `MEAT_*` knobs in `rules.js` + Rules entries,
+the M hall card lines in `ui.js`'s `cardForTile` (ONE block — C owns the
+rest of `ui.js`), `world.meat` in `census.js`, the Part I' checks,
+`tools/meatprobe.mjs`, SPEC §9c addition, the predation walker's hall leg
+in `walkers.js` (ONE function `hallLeg`, coordinated with A).
+
+**Consumes.** K6b, B's `KIND.KILLED` (no dependency — H records nothing
+in the ledger; B's `LOST_FRIEND` cause `"sold"` already exists).
+
+**Acceptance.**
+- The hash MOVES (a sim change); the commit records before/after on the
+  standing gate (`--markets 1 --csv`) and the meatprobe table.
+- Conservation: `Σ bought + killed + convicted − eaten = Σ stock` over a
+  run, exact; stock ≤ `MEAT_CAP` 40 per hall; a hall with no road buys
+  nothing; a dry hall prints EMPTY HOOKS once, not monthly.
+- Monotone: buy radius 0/3/6/9 → units bought rises; `MEAT_EAT` 0/0.05/0.1
+  → units sold rises and stock falls — the service-curve rule; all three
+  columns printed.
+- Mutation: cut the buy → stock stays at the killing count; cut the eat →
+  stock climbs to the cap.
+- Old saves load with `meat` absent (zeros) and hash-equal for the
+  pre-H continuation.
+- Browser: a hall's card shows the three numbers; force a death beside it
+  (the cheat + bulldoze a house — evictions are not deaths; use the
+  suite's forced-killing recipe instead) and watch the stock tick; the
+  sack walks into the hall.
+
+**Traps.** `ev.justice.sold` is the CONVICT counter the census prints and
+the suite pins — do not overload it with units. A death in `compact()`'s
+sweep happens after `removeCitizen`; the buy must hook `removeCitizen`'s
+cause `"died"` (or a per-tick `world.deaths` list like `predations`),
+never the sweep. The licence changes who gets the till — read
+`budget.js:40` before adding a second path. Dread scaling by stock moves
+every herbivore's mood in a hall's reach — expect the playtest's
+`herbivores within the smell` and the flight numbers to shift; say so.
+
+**Size.** ≈ 250 lines sim + 40 walkers + 40 ui + 150 probe; ~10 checks;
+one session, the probe first.
+
+### G. Integration — after the parts have merged
+
+One agent, after A–F and H are on `main`:
+- Merge order if they collide: K → B → H → A → D → E → C → F (B before A
+  so the card's life has data; H before A so `HOOKS` reads a real stock;
+  D before E so both sheets are re-shot once; C last among the UI because
+  it consumes all of them).
 - The suite end to end; every part's mutation tests re-run on the merged
   tree (a check that passed alone can pass for the wrong reason together).
 - `tools/play.mjs --follow citizen <id>` (a new shutter: the camera tracks
   one animal's walker, falls back to its home) and a film of a starred
   rabbit's year for the README.
-- `peopleprobe`, `newsprobe`, `savesize` numbers in one table in the
-  handoff §16, plus each part's trap table (symptom-keyed).
-- SPEC: §7.10 lives, §11c follow/people, §11b chips, §12.2b variants and
-  marks, §12.3b looks and portraits, §14b thoughts; README's "the
-  population is not a number" paragraph earns its sentence; BACKLOG
+- `peopleprobe`, `newsprobe`, `savesize`, `meatprobe` numbers in one
+  table in the handoff §16, plus each part's trap table (symptom-keyed).
+- SPEC: §7.10 lives, §9c meat on hand, §11c Inspect, §11b chips, §12.2b
+  variants and marks, §12.3b looks and portraits, §14b needs; README's
+  "the population is not a number" paragraph earns its sentence; BACKLOG
   reconciled (what each part left).
 - A browser round of the whole: a fresh city, ×3 for ten game years,
-  following one animal from arrival to its first friend; 0 console
-  messages; the frame cost with all six on.
+  Inspect on a street, following one animal's card from arrival to its
+  first friend, a hall's stock rising and falling; 0 console messages; the
+  frame cost with everything on.
 
 ---
 
 ## 5. Ownership — who edits what (copied to BACKLOG by K7)
 
-| file | K | A | B | C | D | E | F |
-|---|---|---|---|---|---|---|---|
-| `js/sim/citizens.js` | `moodTerms`, `life: []` | — | call-site one-liners | — | — | — | — |
-| `js/sim/life.js` | API stub | — | **owns** | — | — | — | — |
-| `js/sim/thoughts.js`, `voice.js` | — | **owns** | — | — | — | — | — |
-| `js/sim/story.js` | stub | — | — | — | — | — | **owns** |
-| `js/sim/save.js` | tolerate `life`/`names` | — | **owns** (compaction) | — | — | — | — |
-| `js/sim/census.js` | `majority` | — | — | `notables` | — | — | — |
-| `js/sim/justice.js`, `events.js` | — | — | call-site one-liners | — | — | — | REPORT lines (advisor fn) |
-| `js/sim/tick.js` | resets + `storyTick` call | — | — | — | — | — | — |
-| `js/sim/lots.js` | — | — | — | — | — | `lotReport.mark` | — |
-| `js/walkers.js` | `thought`, `look` fields | **owns** | — | `attend()` | — | — | — |
-| `js/follow.js` | — | — | — | **owns** | — | — | — |
-| `js/render.js` | — | `drawBubbles` | — | — | `paintPortrait` | building block | — |
-| `js/ui.js`, `input.js`, `main.js`, `css/` | — | — | — | **owns** | — | — | — |
-| `js/news.js` | — | — | — | — | — | — | **owns** |
-| `js/art/citizens.js` | — | — | — | — | **owns** | — | — |
-| `js/art/bubbles.js` | — | **owns** | — | — | — | — | — |
-| `js/art/buildings.js` | — | — | — | — | — | **owns** | — |
-| `js/art/index.js` | reserve names | — | — | — | `look`, `portrait` | `mark` | — |
-| `tools/check.mjs` | — | Part E' | Part F' | Part G' | Part C adds | Part C adds | Part H' |
-| `tools/shots.mjs` | — | bubbles sheet | — | — | looks, portraits | buildings, marks | — |
-| `tools/*probe.mjs` | — | `peopleprobe` | `savesize` | — | — | — | `newsprobe` |
-| `SPEC.md` | — | §14b | §7.10 | §11c | §12.3b | §12.2b | §11b |
+| file | K | A | B | C | D | E | F | H |
+|---|---|---|---|---|---|---|---|---|
+| `js/sim/citizens.js` | `moodTerms`, `life: []` | `homeTerms` (one fn) | call-site one-liners | — | — | — | — | — |
+| `js/sim/life.js` | API stub | — | **owns** | — | — | — | — | — |
+| `js/sim/needs.js`, `voice.js` | — | **owns** | — | — | — | — | — | — |
+| `js/sim/meat.js` | — | — | — | — | — | — | — | **owns** |
+| `js/sim/story.js` | stub | — | — | — | — | — | **owns** | — |
+| `js/sim/save.js` | tolerate `life`/`names`/`meat` | — | **owns** (compaction) | — | — | — | — | — |
+| `js/sim/census.js` | `majority` | `needCensus` | — | (stretch: `notables`) | — | — | — | `meatSold`, `meatOnHand` |
+| `js/sim/justice.js` | — | — | call-site one-liners | — | — | — | — | the two hall `post` sites |
+| `js/sim/events.js` | — | — | call-site one-liners | — | — | — | REPORT lines (advisor fn) | — |
+| `js/sim/tick.js` | resets + `storyTick` call | — | — | — | — | — | — | `meatTick` call |
+| `js/sim/lots.js`, `fields.js`, `budget.js`, `rules.js` | — | — | — | — | — | `lotReport.mark` | — | M local term · dread scale · till · `MEAT_*` |
+| `js/walkers.js` | `need`, `look` fields | **owns** | — | `attend()` | — | — | — | `hallLeg()` |
+| `js/follow.js` | — | — | — | **owns** | — | — | — | — |
+| `js/render.js` | — | `drawBubbles` | — | — | `paintPortrait` | building block | — | — |
+| `js/input.js` | — | the cursor line | — | **owns** | — | — | — | — |
+| `js/ui.js` | — | — | — | **owns** | — | — | — | the M card block |
+| `js/main.js`, `css/` | — | — | — | **owns** | — | — | — | — |
+| `js/news.js` | — | — | — | — | — | — | **owns** | — |
+| `js/art/citizens.js` | — | — | — | — | **owns** | — | — | — |
+| `js/art/bubbles.js` | — | **owns** | — | — | — | — | — | — |
+| `js/art/buildings.js` | — | — | — | — | — | **owns** | — | — |
+| `js/art/index.js` | reserve names | — | — | — | `look`, `portrait` | `mark` | — | — |
+| `tools/check.mjs` | — | Part E' | Part F' | Part G' | Part C adds | Part C adds | Part H' | Part I' |
+| `tools/shots.mjs` | — | bubbles sheet | — | — | looks, portraits | buildings, marks | — | — |
+| `tools/*probe.mjs` | — | `peopleprobe` | `savesize` | — | — | — | `newsprobe` | `meatprobe` |
+| `SPEC.md` | — | §14b | §7.10 | §11c | §12.3b | §12.2b | §11b | §9c |
 
-Two files are touched by two parts in DIFFERENT hunks (`render.js`,
-`walkers.js`, `index.js`, `check.mjs`, `shots.mjs`, `SPEC.md`); each part
-adds its own function/section and never edits another's. Git merges those.
-`citizens.js` and `events.js` are the risk: B adds one-liners at call
-sites; F edits one advisor function; A and D never open them after K.
+Files touched by two parts are touched in DIFFERENT hunks (`render.js`,
+`walkers.js`, `index.js`, `census.js`, `check.mjs`, `shots.mjs`,
+`SPEC.md`); each part adds its own function/section and never edits
+another's. Git merges those. `citizens.js`, `justice.js` and `events.js`
+are the risk: B adds one-liners at call sites; A adds one function; H
+edits two `post` sites; F edits one advisor function; D never opens them.
 
 ## 6. Schedule
 
 ```
-day 0   K (½ session)  ─┬─ A thoughts ──────────┐
+day 0   K (½ session)  ─┬─ A needs ─────────────┐
+                        ├─ H meat on hand ──────┤
                         ├─ B lives ─────────────┤
-                        ├─ C follow (stubs) ────┤   G integration (1 session)
+                        ├─ C inspect (stubs) ───┤   G integration (1 session)
                         ├─ D looks ─────────────┤
                         ├─ E buildings ─────────┤
                         └─ F story ─────────────┘
 ```
-Six sessions in parallel after the keel; C and F finish against the merged
-tree because they consume the most. If only two agents are available: A+E
-first (the owner's two named asks), then B+D, then C+F, K still first.
+Seven sessions in parallel after the keel; C and F finish against the
+merged tree because they consume the most. If only two agents are
+available: A+H first (the owner's two asks tonight), then E+B, then D+C,
+then F; K still first.
 
 ## 7. What this plan does NOT do, and why
 
 - **The 3×3 landmarks** (`docs/PROPOSAL-LANDMARKS.md`): still awaiting the
   owner's go; E leaves `landmarks.js` as their home so both can run.
 - **Friendship density** (mean 0.67 friends): a knob question that changes
-  the hash and the cap curve; measured here, not touched. Lives and
-  thoughts will make the thinness VISIBLE — that is the right order.
+  the hash and the cap curve; measured here, not touched. Lives will make
+  the thinness VISIBLE — that is the right order.
+- **The arrest volume** (15 in cells, 20 sold): the sentence table is the
+  owner's ruling and H leaves it; `RECORD_HARD` 3 → 2 is the named lever
+  if more of the cells should reach the hall.
+- **Ambient thoughts under every tool**: a BACKLOG line behind an OPTIONS
+  switch; Inspect is the switch in this plan.
 - **Sound** (L3), **elevation** (L2), **the wedding** (L1 — it wants B's
   ledger and the household merge rule; a natural follow-on).
 - **Names on signs**: unreadable at 12 px; the card carries the name.
@@ -619,13 +802,16 @@ first (the owner's two named asks), then B+D, then C+F, K still first.
 
 ## 8. Questions for the owner (none block the keel)
 
-1. **Register of the thoughts.** The game's voice is dry and a little dark
-   (*"did not come home"*). Should a predator's thought on its way to a
-   neighbour be that dark, or should predation stay wordless on the
-   killer's side and speak only through the prey's fear?
-2. **Bubbles: text, or a glyph with text on hover?** The plan says text,
-   six at a time. A glyph-only crowd mode is cheap to add later.
-3. **A fifth tab (People)** or a section inside Census? The plan says a tab.
+1. **Whose bodies does the hall buy?** H's default: any natural death
+   within reach, p 0.6 — the Beastars rule, and the only supply big
+   enough (24 a year). Narrow it to prey species only, or to herbivores,
+   and the supply is roughly halved; say which.
+2. **Livestock as product?** Pigs (litter 5) and cows are livestock
+   species. A farm household selling a cub to the hall at 16 instead of
+   splitting it is the honest farm economy and a dark line. In or out?
+3. **The cells.** 15 in cells against 20 sold is the trespass minor at
+   `RECORD_HARD` 3 (the third offence meets the table). Lower it to 2, or
+   leave the ruling?
 4. **The save compaction** (B's first commit) changes the save format's
    bytes but not its meaning; old saves load. Fine to ship, or keep the
    verbose form?

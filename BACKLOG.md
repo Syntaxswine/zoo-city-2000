@@ -8,21 +8,33 @@ could ship whole.
 The owner: *"a master plan for how to really improve zoo city … one part i'd
 like is to be able to see the residents thoughts when they walk around. a
 larger goal of relating more strongly with the individual citizens. i think
-more character and variety in the building sprites might help."* Seven parts
-for parallel agents: **K** the keel (`moodTerms`, `life.js` API,
-`world.majority`, `storyTick` stub, reserved art names — lands FIRST, ½
-session) then **A** thoughts (bubbles from the mood's largest term or the
-newest life event; the walkers' stream decides who speaks) · **B** lives (a
-12-entry ring per citizen + the graveyard; the save compaction pays for it —
-citizens are 732 KB of a 906 KB year-30 save, mostly default fields) · **C**
-follow and favourites (a citizen-pinned card, F to follow, S to star, a
-People tab) · **D** looks and faces (4 looks per species, portraits, an idle
-pose) · **E** buildings with character (4 plans per family, windows lit by
-fill, a species mark on the socket) · **F** the story channel (obituaries,
-litters, a people chip, clickable names) · **G** integration. The plan's §5
-is the file-ownership table; K7 copies it here when the keel lands.
-Measured for it: mean friends per citizen 0.67 — the graph is thin; the
-plan makes that visible and does not touch the knob.
+more character and variety in the building sprites might help."* And on
+the first draft: *"the thought bubble text should be clues about needs,
+stuff like 'i wish there was more shopping nearby'. probably the easiest
+thing to do is reuse the inspect button. also the meat market should have
+more meat on hand. out of 2,800 animals they only sold 20 units of meat in
+the whole history of the town and have 15 in cells."* Eight parts for
+parallel agents: **K** the keel (`moodTerms`, `life.js` API,
+`world.majority`, `world.meat`, `storyTick` stub, reserved art names —
+lands FIRST, ½ session) then **A** needs (under the Inspect tool, the
+animals near the cursor say what they want — every line is a sim term that
+hurts, with the remedy under it on the card; the Census gains "what the
+town wants") · **H** meat on hand (`world.meat` per hall; inflows = the
+killing's sack walks INTO the hall, the hall BUYS the town's ~24 natural
+deaths a year, SOLD as ruled; outflow = carnivores eat; measured first:
+11 halls made §38.9k of cut with 4 killings and 2 sold in 30 y — meat is
+not a quantity today) · **B** lives (a 12-entry ring per citizen + the
+graveyard; the save compaction pays for it — citizens are 732 KB of a 906
+KB year-30 save, mostly default fields) · **C** Inspect extended (the pin
+is a CITIZEN; follow/star a stretch) · **D** looks and faces (4 looks per
+species, portraits, an idle pose) · **E** buildings with character (4
+plans per family, windows lit by fill, a species mark on the socket) ·
+**F** the story channel (obituaries, litters, a people chip, clickable
+names) · **G** integration. The plan's §5 is the file-ownership table; K7
+copies it here when the keel lands. Measured for it: mean friends per
+citizen 0.67 — the graph is thin; the plan makes that visible and does
+not touch the knob. §8 asks the owner four things: whose bodies the hall
+buys, livestock as product, `RECORD_HARD` 3 → 2, the save compaction.
 
 ## Crime and punishment — SHIPPED 2026-09-02 (SPEC §9c; `js/sim/justice.js`); what is left
 - **Hunger visibility.** The scripted towns run at U 0–4, so the ×20 hunger
