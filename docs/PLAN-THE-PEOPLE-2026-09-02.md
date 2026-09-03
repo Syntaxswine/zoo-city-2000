@@ -567,6 +567,19 @@ one session with the art workflow.
 
 ### E. Buildings with character — *"more character and variety in the building sprites"*
 
+**Status (2026-09-03, session 9):** the owner redirected E's first act to
+the BUILDING REDUX — *"some of commercial, industrial, residential, and
+meat buildings to be 2x2 and 3x3 tile sizes … the buildings that can hold
+a lot of people … new cute images … a more high res sprite set for when the
+camera is zoomed in."* SHIPPED in four commits: the painter's ray audit and
+size-aware pull-back; `js/sim/blocks.js` (SPEC §3b, §5 MERGE/SPLIT; RULES
+G5; 17 checks); `js/art/blocks.js` (SPEC §12.2b, eight families × two
+variants); `js/art/hires.js` (SPEC §12.6). What remains of E as drafted
+below — variants 2 → 4, lit windows by fill, species marks on a socket,
+wear — is still open and still E's; blocks.js is a second file beside
+buildings.js exactly as the trap paragraph asked, and the block families
+would take marks and lit windows through the same `KIT`.
+
 **Goal.** Four plans per family instead of two mirrored ones; windows that
 light with the people inside; a mark on the outside that says who lives
 there. The house becomes part of the citizen.

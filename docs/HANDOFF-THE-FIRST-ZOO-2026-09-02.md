@@ -1330,3 +1330,70 @@ caught that the first quota test failed on the value write and never reached
 the claimed index rollback. Two cap fixtures now force the value to fit and
 the index to fail, for both insert and overwrite, and assert byte/index/value
 restoration.
+
+
+---
+
+## 18. Session 11 — the building redux: blocks, eight families, the hi-res set (2026-09-03)
+
+The owner: *"can you tackle the building tile redux? i'd like some of
+commercial, industrial, residential, and meat buildings to be 2x2 and 3x3
+tile sizes. these should be the buildings that can hold a lot of people. we
+need new cute images. i'd also like a more high res sprite set for when the
+camera is zoomed in."* Four commits, in the order the handoff's own ranked
+list demanded (§6 item 1: "start with painter.js"):
+
+| commit | what | proof |
+|---|---|---|
+| c2ee285 | the ray audit (`tools/depthaudit.mjs`) and the size-aware pull-back `pullbackOf(side)` = 0.7 + (side − 2); `keyAt`/`footprint` item overrides so the cursor on a footprint tile keys as the building; the scene tool paints ground in its own pass as render.js always has; `render(boxes, { scale })`, `RECIPES`, `renderRecipe` | 681/681 sprites hash-identical; zoo 0 mis-ordered, 3×3 probe 0; suite 181 |
+| 9c89f73 | `js/sim/blocks.js` — SPEC §3b, §5 MERGE/SPLIT; `world.big`; RULES G5; footprint-wide bulldoze, fire, flood, use | 17 checks; hash-neutral where no block forms (dormitory a11c91e4 unchanged); balanced 292e7fa1 → ee47f999, P 1,645 → 1,721 |
+| 6eb7ce5 | `js/art/blocks.js` — terrace court · the towers · arcade · emporium · mill · foundry · abattoir · meat exchange, ×2 variants | footprint gate + ray audit on all 16; `sheet-blocks.png`; `blocks-towers.png` (the 3×3 in the town through render.js) |
+| 10b9b11 | `js/art/hires.js` — every solid and ground diamond at 2× from its recipe; the renderer draws twins 1:1 at zoom 2 | 6 checks incl. "visible" (thousands of non-uniform 2×2 device blocks with the twins, 0 without; zoom 1 byte-identical); `sheet-hires.png`; the browser at zoom 2 on an imported ten-year town, zero console messages |
+
+Suite 167 → 204. SPEC §3b, §5, §12.2b, §12.5, §12.6, §13, §15 carry it.
+
+### What the instruments caught (symptom-keyed; the traps for whoever touches this next)
+
+| what the picture / number looked like | what it was | the rule |
+|---|---|---|
+| the depth audit passed BOTH the flat 0.7 and the scaled 1.7 for a 3×3, and reported 73 "mis-ordered" pixels on the zoo | the audit placed every walker at (tx, ty) instead of the point (tx + ½, ty + ½) that `placeAt` puts its feet on — 16 units too deep — so it could not tell the two apart, and the zoo's 73 were 1-px grazes of that error | an instrument that passes both candidates is not measuring; fix its CONVENTION against the system's before believing a verdict. With the +½ in, 0.7 fails the 3×3 by 4,185 px (up to 64 units, the east road beside the back row) and 1.7 passes clean — and the zoo's grazes vanish |
+| a derivation said the ground of a block's own front tiles forbade any pull-back past 0.75 | true only in a painter that puts ground and buildings in ONE scene; render.js never has (static layer), and `shots.mjs --scene` did — its single pass replayed on the new code reproduced the old PNG to the pixel, so the split was the whole 91-px difference | ground is never in the building's scene; the scene tool now says so |
+| not one block formed in thirty years on any scripted layout | the first rule asked for all four lots at tier 3; the balanced town has 14 tier-3 R lots of 281 and none touch — LV under 60 caps R/C at tier 2, and I's score idles at 0.04 under the 0.05 threshold | a rule gated on a precondition must have that precondition's FREQUENCY measured before it ships; SC2000's dense lot absorbs tier-2 neighbours, and so does this one (first 2×2 month 35, first 3×3 month 55) |
+| every block in every scripted town is residential | C blocks need C at tier 3 (LV ≥ 60); I blocks need I lots that grow at all | not a defect of the blocks — the same levers as the towers (parks, trees, the zoo). The owner's town may differ; measure on the control city when it arrives |
+| a garden wall drawn in the plinth's grass keys vanished on grass; the arcade's roof of three flat trays read as a warehouse | the cottage's ziggurat lesson, again | look at the sheet before the commit — both fixed there (brick wall; a glazed pavilion with a clock tower) |
+| the hi-res twin of a 53×36 cottage is 103×67, not 106×72 | the grid's 1-px pad and the floor/ceil do not scale | a twin is up to 6 px short of double per axis, never over; position it by its ANCHOR POINT, never its corner |
+| `Port 8139 is in use` and the page there 404s `js/art/hires.js` | another session's `tools/serve.mjs` on another copy of the repo; the preview tool read the PARENT directory's launch.json (the session cwd is `AI/`, not the repo) and first started a different project's server | the zoo entry now lives in `AI/.claude/launch.json` with `autoPort` and no `--port` (serve.mjs reads `PORT`); verify with a curl for a file only your tree has before trusting any screenshot |
+| the first hi-res comparison sheet drew the 2×2 blocks over each other | a 260-px twin beside a 262-px scaled copy in a 300-px cell | cells 600 wide, two columns |
+
+### What I distrust in what I left
+
+- The blocks' people sit on the ANCHOR. `occAt` spreads them for crime and
+  customers, but mood, dread, LV and the flight rule read the anchor tile's
+  values for everyone in the block — a 3×3's 270 animals all feel the north
+  corner. Probably right for a building; say so if it surprises someone.
+- `evictFromLot` on a split rehomes newest-first; a 3×3 at 270 splitting
+  moves ~240 animals in one tick through `bestHome` (O(lots) each). Measured
+  fine at 64×64; a 128×128 map would feel it.
+- The 3×3 windows round a 2×2 are tried in raster order of their anchors,
+  so a 2×2 prefers to grow north-west. Deterministic, not neutral.
+- `blockSprite` falls back to the tier-3 lot when blocks.js has not
+  registered — that path is dead now that index.js imports blocks.js, and
+  it hides a missing registration behind a wrong picture. The suite's
+  "every solid has a twin" check would notice the count, not the picture.
+- The hover card for a PART was verified in Node (lotReport) and not seen
+  in the browser this session: the hover action in the pane did not raise a
+  card. Look once.
+
+### Ammunition for the next arc
+
+- The landmarks proposal (`docs/PROPOSAL-LANDMARKS.md`) is half shipped: the
+  merge mechanic IS the block mechanic. What remains is the theme — the
+  majority species (`world.majority`, the keel's K3) choosing a skin for the
+  block, Warren Towers for rabbits and the Dairy for cows — a ramp swap and
+  a stamp on the block families through `KIT`, no new sim state.
+- Part E as drafted (variants 2 → 4, lit windows by fill, species marks)
+  applies to the block families through the same `KIT`; `art.mark` is still
+  reserved.
+- The hi-res set makes a zoom 3 or 4 cheap: `HI_SCALE` is one number, the
+  renderer's S the other; the animals would want a 2× kit drawn by hand
+  before that reads as an upgrade.

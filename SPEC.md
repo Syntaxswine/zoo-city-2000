@@ -109,6 +109,39 @@ One lot = one tile = one building. Tiers 0..3 (0 = zoned, empty).
 `maxTier` is the density brush: Low = 1, High = 3 (one byte per lot; the
 species-selection lever — mice want towers, bears want cottages).
 
+### 3b. Blocks — one building on 2×2 or 3×3 tiles (`js/sim/blocks.js`; session 9, 2026-09-03)
+
+The owner: *"i'd like some of commercial, industrial, residential, and meat
+buildings to be 2x2 and 3x3 tile sizes. these should be the buildings that
+can hold a lot of people."* A block is never placed; it GROWS (§5). One
+saved byte per tile, `big[i]`: 0 a lot of its own; 2 | 3 the anchor (north
+corner) of a block that side; `PART | dx | dy << 2` a part pointing at its
+anchor. A part keeps its zone and tier 3 — every "is it built" test still
+says yes — and only capacity, jobs, the standing sprite and growth ask
+`isPart`. Everyone in a block lives or works on its ANCHOR; readers that
+want people per tile (crime's density, a shop's customers, a hall's
+carnivores) use `occAt` / `carnAtOf`, which spread the anchor's count over
+the footprint. Capacity is side² × BIG_BONUS (1.25) of a tier-3 lot:
+
+| | 1×1 | 2×2 | 3×3 |
+|---|---|---|---|
+| R animals | 24 | 120 | 270 |
+| C jobs | 20 | 100 | 225 |
+| I jobs | 24 | 120 | 270 |
+| M jobs | 16 | 80 | 180 |
+
+A block comes apart three ways, all through `splitLot`: decay (§5); a
+storey lost (fire saved, flood, a heist, a raid, the dam — `dissolve`
+splits first, then the one tile loses its storey); rubble or the bulldozer
+(every tile of the footprint at once — the bulldozer on any tile of a block
+takes the footprint, §2 a tile, one evict, not undoable when occupied). Fire
+takes the whole footprint at once too (`ignite`), so a block never
+half-burns. A `use` repaint covers the footprint. The census counts halls,
+not tiles (`markets`), and `blocks2` / `blocks3`. The hover card names the
+block (terrace court · arcade · mill · abattoir; the towers · emporium ·
+foundry · meat exchange), a part says whose it is, and a tier-3 lot says what
+its block is waiting for.
+
 ---
 
 ## 4. Demand — the five equations (`js/sim/demand.js`)
@@ -172,10 +205,21 @@ fill    = occupants/capacity (R) or workers/jobs (C, I)
 GROW  if tier < max && score > GROW_THRESH(0.05) && (tier == 0 || fill >= 0.7):
         p = (tier == 0 ? SPROUT_P(0.25) : 0.10) · score      per month
 DECAY if tier > 0 && score < −0.15 && (zone != R || fill < 0.5):  p = 0.10·(−score)
+MERGE (§3b, blocks.js): a tier-3 High lot of its own with three High lots of its zone at tier ≥ 2 in one of the
+      four 2×2 windows containing it (raster order of anchors) — same line, served, untroubled — the window
+      ≥ FILL_TO_GROW full together, and score > GROW_THRESH:  p = BIG_P(0.10)·score → one 2×2 at tier 3, its people
+      moved to the anchor, nobody evicted. A 2×2 anchor with five such lots in a 3×3 window containing it → a 3×3.
+      The first draft asked for all four at tier 3: 14 of 281 R lots in the scripted town, none touching.
+SPLIT a block whose anchor would DECAY comes apart into tier-3 lots of its own; the excess rehome within 12
+      road tiles (the singles it made are the nearest vacant lots) or, for C/I/M, lose the job.
 ```
-Reason codes returned by `lotScore()` (priority order): `NO_ROAD`, `SMOG`,
-`NO_DEMAND`, `LV_CAP`, `DENSITY_CAP`, `WAITING_FILL`, `CAPPED` (V_R pinned by
-Cap), `GROWING`, `DECAYING`, `STABLE`. The hover card prints the code's text.
+Reason codes returned by `lotScore()` (priority order): `PART` (a block's
+part — the report is the anchor's), `NO_ROAD`, `SMOG`, `NO_DEMAND`,
+`LV_CAP`, `DENSITY_CAP`, `WAITING_FILL`, `CAPPED` (V_R pinned by Cap),
+`GROWING`, `MERGING` (with `merge` = the window and `window` = { side,
+fill } on the report; a tier-3 lot with a window that is not yet full
+reports `window` under `STABLE`), `DECAYING`, `STABLE`. The hover card
+prints the code's text.
 
 On R decay the excess households look for a vacant home within 12 road tiles
 of the old one, else emigrate together. On C/I decay the excess workers are
@@ -784,6 +828,22 @@ scaffold (1), fire (2 frames), flood (1), rubble (earth-ramp ground). Two
 variants per family by mirrored offsets. A species skin (majority occupant)
 is a ramp swap at compose time — L1.
 
+### 12.2b The blocks — box solids per zone × side (`js/art/blocks.js`; 2×2 plans a, b ∈ [0, 32], 3×3 [0, 48])
+| zone | 2×2 | 3×3 |
+|---|---|---|
+| R | **terrace court** — two three-storey brick wings in an L round a courtyard: a round tree, a bench, path stones, a brick garden wall with gate gaps, a dormer, a chimney each wing | **the towers** — a U of five-storey blocks round a garden with a fountain and two trees; a stair tower a storey taller with a lamp; balcony strips; the garden wall with a wide gate |
+| C | **arcade** — a two-storey glass-fronted hall, a glazed pavilion on its roof carrying a clock tower with a white face and a lamp, a colonnade along its front (five posts, a slab, canvas awnings between) | **emporium** — a department store in three setbacks: glass ground floor with awnings on both faces, window bands, a roof sign with lit letters on a bracket, a corner entrance under a canopy, a paved forecourt with two trees and a bench |
+| I | **mill** — a long rust shed under a sawtooth roof, a tall brick stack, a water tank on legs, a two-step loading dock, a stack of crates | **foundry** — two sheds (sawtooth · lantern roof), a conveyor bridge between them, three stacks of three heights, a gantry across the yard, a coal heap, a loading apron |
+| M | **abattoir** — the meat hall with its clerestory, a windowless cold store, a stall under the striped awning with three hooks on its rail, a fenced pen on sawdust, the sign with its one '$' dot, a chimney | **meat exchange** — a great hall under a lantern roof, a cold-store wing off each end, the striped awning with five hooks, a loading dock with the van, two pens on sawdust, the sign, a chimney |
+
+Built from buildings.js's `KIT` (the same ramps, skins, grains, `walled`,
+`flipPlan`) so a block reads as its zone; hub at the footprint's centre;
+variant 1 the plan and its stamps mirrored across a = b. The footprint
+gate holds (every box in [0, 16·side]²) and the ray audit (§13) runs over
+all sixteen. `art.building(zone, tier, variant, side)` — side 2 | 3 returns
+the block, tier ignored; until blocks.js registers, a block draws its
+zone's tier-3 lot (a wrong picture, never a throw).
+
 ### 12.3 Citizens — hand-authored kit, the organic exception
 12×20 px adults, 8×12 cubs; facings SE and NE authored, SW/NW mirrored and
 re-lit; 2 walk frames + 1 stand. Kit = shared body rows (2 facings × 3
@@ -842,6 +902,38 @@ the month, the town and the watched tile in words (`RUBBLE 4mo left`),
 because a photograph cannot tell you how many months are left and squinting
 at a 12-px sprite to decide is how you see what you expected.
 
+`tools/depthaudit.mjs` is the RAY AUDIT for oblong footprints: for a
+building and a walker on each of the four roads round it, at 1/8-tile
+steps in three lanes, every shared screen pixel is compared — the
+building's depth from its z-buffer (re-rendered from its RECIPE), the
+walker's as a point on its feet at that height, on the convention that an
+item at (tx, ty) stands at the point (tx + ½, ty + ½) — and a pixel whose
+nearer owner is the one painter.js paints first is mis-ordered (within
+GRAZE 4 units it is a graze, the billboard's lean, reported not gated).
+`--probe 3 --pullback 0.7` shows the flat pull-back failing a 3×3 by
+4,185 pixels; the suite gates every oblong at 0.
+
+### 12.6 The hi-res set (`js/art/hires.js`; session 9)
+*"a more high res sprite set for when the camera is zoomed in."* Not a
+second set: every box solid and every ground diamond keeps the RECIPE it
+was made from (`solid.RECIPES` — { boxes, hub, extent, stamps } or
+{ diamond: fn }), and `hires(sprite)` samples it again at HI_SCALE 2 — a
+128 × 64 tile, a face edge where the 1× edge was, a door and a window the
+same at twice the resolution, the pixel-keyed grains (brick, the meat
+stripe, the grass dither, the road's speckle) finer. `render(boxes,
+{ scale })`, `diamond(fn, scale)` (fn is handed `scale`; the water's bands
+read it and stay world-sized) — byte-identical at scale 1, which the suite
+holds against a hash of every 1× sprite. The animals, trees, zots, fire,
+sacks and tents have no recipe and are scaled by the renderer as before.
+Rendered lazily, cached per sprite. The suite: every twin twice the size
+(within the 6 px the grid's pad costs), anchored on the same world point,
+ink within 12% of 4×; every solid and ground diamond has one and the
+animals do not; the 2× prism gate; and the upgrade is VISIBLE — at zoom 2
+a frame has thousands of non-uniform 2×2 device blocks with the twins and
+none with them removed, while zoom 1 is byte-identical either way.
+`tools/shots.mjs --sheet` writes `sheet-hires.png`, eighteen 1× sprites
+scaled ×2 beside their twins.
+
 ---
 
 ## 13. Rendering (`js/render.js`, the only canvas module)
@@ -863,6 +955,20 @@ at a 12-px sprite to decide is how you see what you expected.
 - Water palette-cycles 4 frames per second on the static layer's water tiles
   only (separate small canvas per frame is fine).
 - Pick: flat inverse of the projection (the map is flat).
+- **Oblongs** (the zoo, the blocks): keyed by the front-most tile pulled
+  back by `pullbackOf(side)` = 0.7 + (side − 2) — 0.7 for a 2×2, 1.7 for a
+  3×3 — derived in painter.js FOOTPRINTS (back ∈ (s − 1.75, s − 0.44) on
+  the tile-centre convention) and proved by the ray audit (§12.5). A
+  pull-back past 0.75 keys a block before the ground of its own front tiles,
+  which is fine because ground is never in the building's scene: the static
+  layer here, its own pass in `shots.mjs --scene`. The cursor on a footprint
+  tile borrows the block's key (`keyAt`, `footprint` item overrides), a hair
+  under it.
+- **Zoom 2 draws the hi-res set** (§12.6): S = 2, a twin under a transform
+  of zoom/2 with its anchor on the projection point placeAt put the 1×
+  anchor on; the static ground layer is built at S× and blitted at zoom/S,
+  remade when the zoom crosses 2; a sprite without a twin is drawn scaled
+  as before.
 
 ## 14. Walkers (`js/walkers.js`, DOM-free, its own RNG stream)
 
@@ -923,6 +1029,10 @@ at a 12-px sprite to decide is how you see what you expected.
   not the migrated row, so deleting or overwriting that row cannot resurrect
   it. If the store is too full to copy an old value, the old key appears as a
   directly loadable/exportable recovery row instead of disappearing.
+- `big` (§3b) is the fifteenth tile array; an all-zero `big` is omitted from
+  the hash (as the keel's empty fields are), so a town with no block hashes
+  as it did before the blocks. `occupants`, `staff`, `carnAt` are Uint16
+  (derived): a 3×3 R block keeps 270 on its anchor.
 - `zoo.pref` — this browser's preferences (the cheat switch, §8): not a
   city, not saved with one, never read by the sim (the suite greps for it).
 

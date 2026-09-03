@@ -169,6 +169,30 @@ another's. Git merges those. `citizens.js`, `justice.js` and `events.js`
 are the risk: B adds one-liners at call sites; A adds one function; H
 edits two `post` sites; F edits one advisor function; D never opens them.
 
+## The building redux — SHIPPED 2026-09-03 (SPEC §3b, §5, §12.2b, §12.6, §13; handoff §18; 37 checks)
+The owner: *"some of commercial, industrial, residential, and meat
+buildings to be 2x2 and 3x3 tile sizes. these should be the buildings that
+can hold a lot of people. we need new cute images. i'd also like a more
+high res sprite set for when the camera is zoomed in."* Built: blocks that
+GROW (`js/sim/blocks.js` — a tier-3 High lot absorbs three tier-2+
+neighbours into a 2×2, a 2×2 five more into a 3×3, ×1.25 the capacity of
+four/nine tier-3 lots; split on decay; fire, flood, bulldozer take the
+footprint whole; `world.big` saved, hash-neutral until the first block);
+eight families × two variants (`js/art/blocks.js`); the hi-res set
+(`js/art/hires.js` — every solid and ground diamond at 2× from its recipe,
+drawn 1:1 at zoom 2); the ray audit (`tools/depthaudit.mjs`) and the
+size-aware pull-back. What is left:
+- **Themed landmarks** (`docs/PROPOSAL-LANDMARKS.md`, half shipped): the
+  merge IS the block; the theme by majority species (`world.majority`) is a
+  skin on the block families through `KIT` — no new sim state.
+- **Part E as drafted** (variants 2 → 4, lit windows by fill, species marks)
+  now applies to eight more families.
+- **Blocks are all residential in the scripted towns** — C waits on LV ≥ 60,
+  I on a score over 0.05; measure on the owner's control city.
+- **A part's hover card** was verified in Node, not seen in the browser.
+- **Zoom 3/4**: `HI_SCALE` is one number; the animals would need a 2× kit
+  first.
+
 ## Crime and punishment — SHIPPED 2026-09-02 (SPEC §9c; `js/sim/justice.js`); what is left
 - **Hunger visibility.** The scripted towns run at U 0–4, so the ×20 hunger
   term only bites in dormitory / over-taxed towns (measured: one killing per
