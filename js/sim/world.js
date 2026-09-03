@@ -2,7 +2,7 @@
 //
 // One flat object holds everything; typed arrays per tile, plain arrays for
 // citizens and households. Derived fields (roadDist, pol, lv, traffic,
-// occupants, staff, paths) are rebuilt by `rebuildDerived` and never saved.
+// occupants, staff, majority, paths) are rebuilt by `rebuildDerived` and never saved.
 
 import { makeRng, seedFromString, hash01 } from "./rng.js";
 import { KNOBS } from "./rules.js";
@@ -49,6 +49,7 @@ export function createWorld({ seed = "zoo", w = 64, h = 64 } = {}) {
     wall: new Uint8Array(n), // a wall tile; with a road or rail on it, a tunnel (SPEC §6b, sim/reach.js)
     use: new Uint8Array(n), // the player's line: 0 mixed · 1 predator-only · 2 prey-only, on lots AND roads (SPEC §7.8)
     rail: new Uint8Array(n), // 0 none · 1 rail · 2 station (SPEC §7.9); a station is a door only beside a road
+    meat: new Uint16Array(n), // units on hand at a meat hall; Part H supplies the flows
     // derived
     roadDist: new Uint8Array(n),
     pol: new Uint8Array(n),
@@ -61,6 +62,7 @@ export function createWorld({ seed = "zoo", w = 64, h = 64 } = {}) {
     carnAt: new Uint8Array(n),
     occupants: new Uint8Array(n),
     staff: new Uint8Array(n),
+    majority: new Uint8Array(n), // majority resident/staff species index + 1; 0 means none
     occl: new Uint8Array(n), // reach.js: the eight directions influence may cross a tile (derived)
     roadsDirty: true,
     wallsDirty: true,
@@ -71,6 +73,8 @@ export function createWorld({ seed = "zoo", w = 64, h = 64 } = {}) {
     citizens: [],
     households: [],
     campers: [],
+    names: {}, // removed citizens by stable id; Part B fills the graveyard
+    lifeEvents: [], // this tick only; storyTick is the sole bridge to news
     nextId: 1,
     nextHouseholdId: 1,
     events: { active: [], cooldown: 0, log: [], lastGrant: -100000, lastFestival: -100000, choice: null, noDisasters: false, scrubbers: false, revoltArmed: 0, centenaries: [], files: [], licence: false, lastLicenceOffer: -100000, lastRaid: -100000, killings: 0, arrests: [], justice: { takenIn: 0, cells: 0, wrongful: 0, exonerated: 0, cold: 0, sold: 0, pacified: 0, trespass: 0 } },

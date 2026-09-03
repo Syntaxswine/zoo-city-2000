@@ -19,6 +19,11 @@
 //                                       | 'sack' 0 open (falling) | 1 tied | 2 tied, wriggling
 //   art.zot(kind)                       'noroad' | 'smog' | 'nojob' | 'nodemand'
 //   art.waterTint(frame)                key map for the water cycle, frame mod WATER_FRAMES (4)
+//   art.bubble(w, h)                    reserved for Part A
+//   art.portrait(species, opts)         reserved for Part D
+//   art.mark(species)                   reserved for Part E
+//   art.look(id)                        stable citizen look; neutral until Part D
+//   art.crossing(axis, busy)            reserved for Part X
 //   allSprites()                        [{ name, sprite }] for the audit
 //
 // Every sprite is { rows, anchor, w, h, footprint } from defineSprite —
@@ -78,6 +83,16 @@ export function zot(kind) {
   return s;
 }
 
+function notBuilt(name) {
+  throw new Error(`art.${name}: not built`);
+}
+
+export function bubble(_w, _h) { return notBuilt("bubble"); }
+export function portrait(_species, _opts = {}) { return notBuilt("portrait"); }
+export function mark(_species) { return notBuilt("mark"); }
+export function look(_id) { return { shade: 0, mark: 0 }; }
+export function crossing(_axis, _busy = false) { return notBuilt("crossing"); }
+
 export const art = Object.freeze({
   building: buildingSprite,
   civic: civicSprite,
@@ -93,6 +108,11 @@ export const art = Object.freeze({
   citizen: citizenSprite,
   overlay,
   zot,
+  bubble,
+  portrait,
+  mark,
+  look,
+  crossing,
   waterTint,
   WATER_FRAMES,
 });

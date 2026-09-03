@@ -10,6 +10,7 @@ import { citizensTick, compact } from "./citizens.js";
 import { budgetTick } from "./budget.js";
 import { eventsTick } from "./events.js";
 import { justiceTick } from "./justice.js";
+import { storyTick } from "./story.js";
 import { SPECIES } from "./species.js";
 import { ZONE } from "./world.js";
 
@@ -25,6 +26,7 @@ export function tick(world) {
   world.departures = [];
   world.arrivals = [];
   world.predations = []; // this month's killings, for the walker layer (justice.kill)
+  world.lifeEvents = []; // this month's biographies; storyTick is their only path to news
   if (!world.byId) {
     // First tick of a fresh world.
     world.byId = new Map();
@@ -51,6 +53,7 @@ export function tick(world) {
   // 7b. crime and punishment: releases, the killing, burglary, the files.
   const jNotices = justiceTick(world, cen);
   notices.push(...jNotices);
+  storyTick(world);
   // Events can remove households (revolt, rubble, a killing, a sale); compact
   // before anything counts or saves — a dead citizen must never survive a tick boundary.
   compact(world);

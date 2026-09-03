@@ -4,7 +4,7 @@ Open work, ranked. The design record is `SPEC.md`; the numbers are in
 `js/sim/rules.js` (KNOBS). Later layers were labelled at design time so v1
 could ship whole.
 
-## The People — PLANNED 2026-09-02 (`docs/PLAN-THE-PEOPLE-2026-09-02.md`); nothing built
+## The People — IN PROGRESS 2026-09-03 (`docs/PLAN-THE-PEOPLE-2026-09-02.md`); Part K shipped
 The owner: *"a master plan for how to really improve zoo city … one part i'd
 like is to be able to see the residents thoughts when they walk around. a
 larger goal of relating more strongly with the individual citizens. i think
@@ -13,8 +13,8 @@ the first draft: *"the thought bubble text should be clues about needs,
 stuff like 'i wish there was more shopping nearby'. probably the easiest
 thing to do is reuse the inspect button. also the meat market should have
 more meat on hand. out of 2,800 animals they only sold 20 units of meat in
-the whole history of the town and have 15 in cells."* Eight parts for
-parallel agents: **K** the keel (`moodTerms`, `life.js` API,
+the whole history of the town and have 15 in cells."* The shared keel and
+the independent parts: **K** the keel (`moodTerms`, `life.js` API,
 `world.majority`, `world.meat`, `storyTick` stub, reserved art names —
 lands FIRST, ½ session) then **A** needs (under the Inspect tool, the
 animals near the cursor say what they want — every line is a sim term that
@@ -108,6 +108,66 @@ side its road goes and traffic redistributes round every block. Hash moves. R:
 recompute at the op (hash-neutral, its own commit first), `served`, an
 `access` overlay mode, the card's "road access: 2 tiles · door (x,y)",
 `tools/accessprobe.mjs --save` on the control city. ROAD_REACH stays 3.
+
+### The People file ownership (Part K; copied from plan §5)
+
+| file | K | A | B | C | D | E | F | H |
+|---|---|---|---|---|---|---|---|---|
+| `js/sim/citizens.js` | `moodTerms`, `life: []` | `homeTerms` (one fn) | call-site one-liners | — | — | — | — | — |
+| `js/sim/life.js` | API stub | — | **owns** | — | — | — | — | — |
+| `js/sim/needs.js`, `voice.js` | — | **owns** | — | — | — | — | — | — |
+| `js/sim/meat.js` | — | — | — | — | — | — | — | **owns** |
+| `js/sim/story.js` | stub | — | — | — | — | — | **owns** | — |
+| `js/sim/save.js` | tolerate `life`/`names`/`meat` | — | **owns** (compaction) | — | — | — | — | — |
+| `js/sim/census.js` | `majority` | `needCensus` | — | (stretch: `notables`) | — | — | — | `meatSold`, `meatOnHand` |
+| `js/sim/justice.js` | — | — | call-site one-liners | — | — | — | — | the two hall `post` sites |
+| `js/sim/events.js` | — | — | call-site one-liners | — | — | — | REPORT lines (advisor fn) | — |
+| `js/sim/tick.js` | resets + `storyTick` call | — | — | — | — | — | — | `meatTick` call |
+| `js/sim/lots.js`, `fields.js`, `budget.js`, `rules.js` | — | — | — | — | — | `lotReport.mark` | — | M local term · dread scale · till · `MEAT_*` |
+| `js/walkers.js` | `need`, `look` fields | **owns** | — | `attend()` | — | — | — | `hallLeg()` |
+| `js/follow.js` | — | — | — | **owns** | — | — | — | — |
+| `js/render.js` | — | `drawBubbles` | — | — | `paintPortrait` | building block | — | — |
+| `js/input.js` | — | the cursor line | — | **owns** | — | — | — | — |
+| `js/ui.js` | — | — | — | **owns** | — | — | — | the M card block |
+| `js/main.js`, `css/` | — | — | — | **owns** | — | — | — | — |
+| `js/news.js` | — | — | — | — | — | — | **owns** | — |
+| `js/art/citizens.js` | — | — | — | — | **owns** | — | — | — |
+| `js/art/bubbles.js` | — | **owns** | — | — | — | — | — | — |
+| `js/art/buildings.js` | — | — | — | — | — | **owns** | — | — |
+| `js/art/index.js` | reserve names | — | — | — | `look`, `portrait` | `mark` | — | — |
+| `tools/check.mjs` | — | Part E' | Part F' | Part G' | Part C adds | Part C adds | Part H' | Part I' |
+| `tools/shots.mjs` | — | bubbles sheet | — | — | looks, portraits | buildings, marks | — | — |
+| `tools/*probe.mjs` | — | `peopleprobe` | `savesize` | — | — | — | `newsprobe` | `meatprobe` |
+| `SPEC.md` | — | §14b | §7.10 | §11c | §12.3b | §12.2b | §11b | §9c |
+
+The two UI parts, by file:
+
+| file | P palette | S saves | who else is in the file |
+|---|---|---|---|
+| `js/tools.js`, `js/palette.js` | **owns** | — | — |
+| `js/slots.js` | — | **owns** | — |
+| `js/title.js` | — | **owns** | — |
+| `index.html` | **owns** (layout) | — | — |
+| `css/field.css` | the palette block | — | C (the card) |
+| `js/ui.js` | `buildStrip` | `savesList` / `portBox` (737–785) | C (card, tabs), H (the M card block) |
+| `js/input.js` | the key map reads `TOOLS` | — | C (pin), A (one cursor line) |
+| `js/main.js` | resize lines | `app.save/load/resume`, the boot slot (155–200, 300–345) | C (camera) |
+| `tools/check.mjs` | Part K' | Part J' | — |
+| `SPEC.md` | §11 | §15 | — |
+
+And X, the crossing: `js/sim/ops.js` (validation lines — nobody else),
+`js/art/rail.js`, `art.crossing` in `index.js`, one ground line in
+`render.js`, the rail sheet in `shots.mjs`, Part L', SPEC §7.9 / §12.4c.
+And R, access: one call in `ops.js:287` (a different hunk from X's), the
+`access` case in `render.js`'s `drawOverlay`, one line each in `lots.js`
+`lotReport` and `ui.js` `cardForTile`, `tools/accessprobe.mjs`, Part M'.
+
+Files touched by two parts are touched in DIFFERENT hunks (`render.js`,
+`walkers.js`, `index.js`, `census.js`, `check.mjs`, `shots.mjs`,
+`SPEC.md`); each part adds its own function/section and never edits
+another's. Git merges those. `citizens.js`, `justice.js` and `events.js`
+are the risk: B adds one-liners at call sites; A adds one function; H
+edits two `post` sites; F edits one advisor function; D never opens them.
 
 ## Crime and punishment — SHIPPED 2026-09-02 (SPEC §9c; `js/sim/justice.js`); what is left
 - **Hunger visibility.** The scripted towns run at U 0–4, so the ×20 hunger

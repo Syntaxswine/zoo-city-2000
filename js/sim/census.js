@@ -9,6 +9,35 @@ import { hasAccess, edgeRoads , commuteTime, rides, fireExposure } from "./field
 export const ageMonths = (world, c) => world.tick - c.born;
 export const ageYears = (world, c) => Math.floor((world.tick - c.born) / 12);
 
+const SPECIES_SLOT = Object.freeze(Object.fromEntries(SPECIES.map((s, i) => [s.id, i])));
+
+/** Majority residents on R lots and majority staff on C/I/M lots. Derived. */
+export function recountMajority(world) {
+  const speciesN = SPECIES.length;
+  const n = world.w * world.h;
+  const counts = world._majorityCounts && world._majorityCounts.length === n * speciesN
+    ? world._majorityCounts
+    : (world._majorityCounts = new Uint16Array(n * speciesN));
+  counts.fill(0);
+  world.majority.fill(0);
+  for (const c of world.citizens) {
+    if (c.dead) continue;
+    const slot = SPECIES_SLOT[c.species];
+    if (slot == null) continue;
+    if (c.home >= 0 && world.zone[c.home] === ZONE.R) counts[c.home * speciesN + slot]++;
+    if (c.job >= 0 && world.zone[c.job] >= ZONE.C && world.zone[c.job] <= ZONE.M) counts[c.job * speciesN + slot]++;
+  }
+  for (let i = 0; i < n; i++) {
+    let best = 0;
+    let bestN = 0;
+    for (let s = 0; s < speciesN; s++) {
+      const count = counts[i * speciesN + s];
+      if (count > bestN) { bestN = count; best = s + 1; }
+    }
+    world.majority[i] = best;
+  }
+}
+
 export function isWorker(world, c) {
   const y = ageYears(world, c);
   if (y < KNOBS.ADULT_AGE) return false;
@@ -19,6 +48,7 @@ export function isWorker(world, c) {
 }
 
 export function census(world) {
+  recountMajority(world);
   const { citizens, w, h } = world;
   const n = w * h;
   const P = citizens.length;

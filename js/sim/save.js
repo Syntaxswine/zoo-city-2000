@@ -2,7 +2,7 @@
 //
 // Saved: tiles, citizens, households, campers, valves, events, ledger,
 // history, the input log, flags, rng states. Derived and NOT saved (rebuilt
-// by rebuildDerived): roadDist, pol, lv, traffic, occupants, staff, paths,
+// by rebuildDerived): roadDist, pol, lv, traffic, occupants, staff, majority, paths,
 // id maps. Paths are re-derived BEFORE the first tick so a loaded city and
 // the straight run see the same traffic — the save/load hash invariant.
 
@@ -12,12 +12,12 @@ import { computeFields, recountRosters, commutePath, doorOf } from "./fields.js"
 import { rebuildMaps } from "./citizens.js";
 import { refreshLast } from "./tick.js";
 
-const TILE_ARRAYS = ["terrain", "road", "zone", "maxTier", "tier", "civic", "burning", "rubble", "variant", "flooded", "wall", "use", "rail"];
+const TILE_ARRAYS = ["terrain", "road", "zone", "maxTier", "tier", "civic", "burning", "rubble", "variant", "flooded", "wall", "use", "rail", "meat"];
 
 function plainCitizen(c) {
   return {
     id: c.id, name: c.name, surname: c.surname, species: c.species, born: c.born, deathAge: c.deathAge,
-    home: c.home, job: c.job, household: c.household, friends: c.friends.slice(), mood: c.mood,
+    home: c.home, job: c.job, household: c.household, friends: c.friends.slice(), life: (c.life || []).map((e) => e.slice()), mood: c.mood,
     jobless: c.jobless, native: c.native, onLeave: c.onLeave, hired: c.hired,
     grief: c.grief || 0, centenary: !!c.centenary,
     // crime and punishment: custody, the record, the knife
@@ -32,6 +32,7 @@ export function toPlain(world) {
     cash: world.cash, rates: { ...world.rates }, start: world.start,
     valves: { ...world.valves }, festivalBonus: world.festivalBonus,
     citizens: world.citizens.filter((c) => !c.dead).map(plainCitizen),
+    names: { ...(world.names || {}) },
     households: world.households.filter((h) => !h.gone).map((h) => ({ id: h.id, members: h.members.slice(), home: h.home, species: h.species, surname: h.surname, arrived: h.arrived, notice: h.notice || 0 })),
     campers: world.campers.map((c) => ({ ...c })),
     nextId: world.nextId, nextHouseholdId: world.nextHouseholdId,
@@ -62,11 +63,12 @@ export function fromPlain(o) {
   world.festivalBonus = o.festivalBonus;
   for (const k of TILE_ARRAYS) if (o[k]) world[k].set(o[k]); // an old save without walls keeps its zeros
   world.citizens = o.citizens.map((c) => ({
-    ...c, friends: c.friends.slice(), path: null, stale: false,
+    ...c, friends: c.friends.slice(), life: (c.life || []).map((e) => e.slice()), path: null, stale: false,
     held: c.held || 0, heldAt: c.heldAt ?? -1, fixed: !!c.fixed, record: c.record || 0, wrongful: !!c.wrongful, wrongedBy: c.wrongedBy || 0, exonerated: !!c.exonerated,
     moodPenalty: c.moodPenalty || 0, moodPenaltyUntil: c.moodPenaltyUntil || 0,
   }));
   world.households = o.households.map((h) => ({ ...h, members: h.members.slice() }));
+  world.names = { ...(o.names || {}) };
   world.campers = o.campers.map((c) => ({ ...c }));
   world.nextId = o.nextId;
   world.nextHouseholdId = o.nextHouseholdId;
@@ -114,6 +116,11 @@ export function stateHash(world) {
   const o = toPlain(world);
   delete o.log;
   delete o.history;
+  // Part K adds empty, backward-compatible save fields without changing the
+  // standing simulation hash. Once Parts B/H put state in them, it is hashed.
+  if (!Object.keys(o.names).length) delete o.names;
+  if (o.meat.every((n) => n === 0)) delete o.meat;
+  for (const c of o.citizens) if (!c.life.length) delete c.life;
   const s = JSON.stringify(o);
   let h = 0x811c9dc5;
   for (let i = 0; i < s.length; i++) {

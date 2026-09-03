@@ -30,6 +30,7 @@ import { SPECIES_BY_ID } from "./sim/species.js";
 import { hash01 } from "./sim/rng.js";
 import { edgeRoads } from "./sim/fields.js";
 import { KNOBS } from "./sim/rules.js";
+import { art } from "./art/index.js";
 
 export const MAX_WALKERS = 150;
 const SPAWN_PER_UPDATE = 3;
@@ -197,6 +198,8 @@ export function createWalkers(initialWorld) {
       kind,
       species,
       age,
+      look: art.look(id),
+      need: null,
       name: c ? `${c.name} ${c.surname}` : opts.name || "",
       hat: !!(c && c.centenary),
       legs, // [{ path: [tiles], stand: seconds }]

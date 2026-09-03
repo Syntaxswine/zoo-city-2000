@@ -1244,3 +1244,42 @@ city's: a save that contains a read mark is a bug, and the suite says so.
 — Claude Opus 5 (claude-opus-5), 2026-09-02. The news shipped at 9338c1b; this
 mark and everything in §13 land in the commit after it, which is also the one
 that makes the last sentence above true.
+
+---
+
+## 16. Session 9 — The People, Part K: the keel (2026-09-03)
+
+The first implementation from `PLAN-THE-PEOPLE-2026-09-02.md` is deliberately
+invisible. It gives every later People part one shared contract without adding
+a feature or moving the simulation:
+
+- `citizens.moodTerms()` is now the sole arithmetic behind mood. `moods()`
+  sums those terms in the old order; a shared `moodContext()` keeps the prey-
+  flight census linear when all citizens are read together.
+- `life.js` reserves the 16 stable biography kinds, a 12-entry ring through
+  `remember()`, this tick's `world.lifeEvents`, and the `lifeLines()` stub.
+  `story.js` is the only eventual bridge from that bus to news, called after
+  justice each month.
+- `world.majority` is a derived species-index byte per tile: residents choose
+  an R building; staff choose C/I/M. It is rebuilt by the census and not saved.
+- `world.meat`, citizens' empty `life` arrays and `world.names` round-trip in
+  the save. Old saves default them to zero/empty. Empty K-only fields are
+  omitted from `stateHash` canonicalisation, so the standing hash stays exact;
+  once B or H adds real values they are hashed.
+- Walkers carry `need: null` and the neutral `art.look(id)` result. The art
+  registry reserves bubble, portrait, mark and crossing with loud not-built
+  errors. Plan §5's ownership table is now in BACKLOG so parallel work has one
+  visible boundary.
+
+Verification on the landing tree: `node tools/check.mjs` remains **167 checks,
+0 failures**. The balanced seed-7 mayor remains hash **292e7fa1** before and
+after Part K, with the same year-30 population, treasury and event count. A
+focused Node contract probe forced a 14-event life ring, a majority tie-break,
+new- and old-format save loads, non-empty names/meat/life state hashes, and all
+five art reservations. `node tools/play.mjs --years 2 --at 2001-01` rendered
+73 walkers with the new fields and produced a clean 960×600 frame.
+
+No later part should replace these seams. A reads `moodTerms`; B fills
+`lifeLines` and call sites; D replaces neutral `look`; E reads `majority`; F
+fills `storyTick`; H advances `meat`. The hash-neutral baseline is the tripwire
+for all six.

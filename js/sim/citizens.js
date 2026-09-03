@@ -61,6 +61,7 @@ function newCitizen(world, species, ageMonthsNow, household, surnameStr, native)
     job: -1,
     household,
     friends: [],
+    life: [],
     mood: 50,
     jobless: 0,
     path: null,
@@ -757,9 +758,8 @@ function friendships(world, out) {
   world._friendCursor = (start + samples) % N;
 }
 
-function moods(world) {
-  const { w } = world;
-  const moodBoost = world.events.active.reduce((m, e) => m + (e.moodBoost || 0), 0);
+/** Build the shared neighbourhood scratch once when reading many citizens. */
+export function moodContext(world) {
   // Who lives on each lot, per species: [all, threat]. threat = not fixed, not
   // held. PREY FLIGHT is proportional to the unfixed share of a predator
   // species in the 3×3 (measured: 5.2 adults of the feared kind beside every
@@ -775,83 +775,107 @@ function moods(world) {
     e[0]++;
     if (!c.fixed && !absent(world, c)) e[1]++;
   }
-  const wolfMoon = world.events.active.some((e) => e.id === "wolfMoon");
+  return {
+    lotSpecies,
+    wolfMoon: world.events.active.some((e) => e.id === "wolfMoon"),
+    moodBoost: world.events.active.reduce((m, e) => m + (e.moodBoost || 0), 0),
+  };
+}
+
+/**
+ * The exact terms that make a citizen's mood, in arithmetic order. Needs,
+ * cards and the town histogram read this function instead of copying rules.
+ */
+export function moodTerms(world, c, context = moodContext(world)) {
+  const { w } = world;
+  const { lotSpecies, wolfMoon, moodBoost } = context;
+  const sp = SPECIES_BY_ID[c.species];
+  const diet = DIET_OF[c.species];
+  const terms = [{ code: "BASE", value: 50 }];
+  if (c.job >= 0) terms.push({ code: "JOB", value: 15 });
+  if (isWorker(world, c) && c.job < 0) terms.push({ code: "NO_JOB", value: -20 });
+
+  // PREY FLIGHT: a predator of my kind next door (Chebyshev 1) costs mood,
+  // unless I have a friend of that species — the bridge. Weights, never gates.
+  let flight = 0;
+  const preds = PREY_OF[c.species];
+  if (preds && c.home >= 0) {
+    const tx = c.home % w;
+    const ty = (c.home / w) | 0;
+    const near = new Map();
+    for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+      const xx = tx + dx;
+      const yy = ty + dy;
+      if (!inBounds(world, xx, yy)) continue;
+      const m = lotSpecies.get(yy * w + xx);
+      if (!m) continue;
+      for (const p of preds) {
+        const e = m.get(p);
+        if (!e) continue;
+        let s = near.get(p);
+        if (!s) near.set(p, (s = [0, 0]));
+        s[0] += e[0];
+        s[1] += e[1];
+      }
+    }
+    for (const [p, s] of near) {
+      if (!s[1]) continue;
+      let bridged = false;
+      for (const f of c.friends) { const o = world.byId.get(f); if (o && o.species === p) { bridged = true; break; } }
+      if (!bridged) flight += KNOBS.PREY_FLIGHT * (s[1] / s[0]);
+    }
+    if (wolfMoon && preds.includes("wolf")) flight += KNOBS.PREY_FLIGHT;
+  }
+
+  if (c.home >= 0) {
+    terms.push({ code: "SMOKE", value: -0.5 * Math.max(0, world.pol[c.home] - sp.polTol) });
+    const tx = c.home % w;
+    const ty = (c.home / w) | 0;
+    let park = false;
+    let van = false;
+    for (let dy = -4; dy <= 4; dy++) for (let dx = -4; dx <= 4; dx++) {
+      const xx = tx + dx;
+      const yy = ty + dy;
+      if (!inBounds(world, xx, yy)) continue;
+      const civ = world.civic[yy * w + xx];
+      if (civ === CIVIC.PARK) park = true;
+      else if (civ === CIVIC.CENTRE) van = true;
+    }
+    if (park) terms.push({ code: "PARK", value: 10 });
+    // The meat hall's dread: herbivores mind it (halved with a carnivore friend); carnivores like the smell.
+    const dread = world.dread[c.home];
+    if (dread > 0) {
+      if (diet === "herb") {
+        let carnFriend = false;
+        for (const f of c.friends) { const o = world.byId.get(f); if (o && DIET_OF[o.species] === "carn") { carnFriend = true; break; } }
+        const value = -Math.min(KNOBS.DREAD_MOOD_CAP, KNOBS.DREAD_MOOD_HERB * dread) * (carnFriend ? 0.5 : 1);
+        terms.push({ code: "DREAD", value });
+      } else if (diet === "carn") terms.push({ code: "DREAD", value: KNOBS.DREAD_CARN_MOOD });
+    }
+    if (van && diet === "carn") terms.push({ code: "VAN", value: -KNOBS.VAN_MOOD });
+  }
+  terms.push({ code: "FRIENDS", value: 5 * c.friends.length });
+  terms.push({ code: "FLIGHT", value: -Math.min(20, flight) });
+  if (c.home >= 0) terms.push({ code: "CRIME", value: -KNOBS.CRIME_MOOD * Math.max(0, world.crime[c.home] - KNOBS.CRIME_MOOD_FROM) });
+  for (const e of world.events.active) {
+    const value = e.moodBySpecies && e.moodBySpecies[c.species];
+    if (value) terms.push({ code: "EVENT", arg: e.id, value });
+  }
+  if (c.path && commuteTime(c.path) <= sp.commute) terms.push({ code: "COMMUTE", value: 10 }); // a ride is 0.3 of a walk step
+  if (c.grief && c.grief > world.tick) terms.push({ code: "GRIEF", value: -10 });
+  if (c.moodPenalty && c.moodPenaltyUntil > world.tick) terms.push({ code: "PENALTY", value: c.moodPenalty });
+  if (c.fixed) terms.push({ code: "FIXED", value: -KNOBS.FIXED_MOOD });
+  if (absent(world, c)) terms.push({ code: "HELD", value: -KNOBS.HELD_MOOD });
+  terms.push({ code: "BOOST", value: moodBoost });
+  return terms;
+}
+
+function moods(world) {
+  const context = moodContext(world);
   for (const c of world.citizens) {
     if (c.dead) continue;
-    const sp = SPECIES_BY_ID[c.species];
-    const diet = DIET_OF[c.species];
-    // PREY FLIGHT: a predator of my kind next door (Chebyshev 1) costs mood,
-    // unless I have a friend of that species — the bridge. Weights, never gates.
-    let flight = 0;
-    const preds = PREY_OF[c.species];
-    if (preds && c.home >= 0) {
-      const tx = c.home % w;
-      const ty = (c.home / w) | 0;
-      const near = new Map();
-      for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
-        const xx = tx + dx;
-        const yy = ty + dy;
-        if (!inBounds(world, xx, yy)) continue;
-        const m = lotSpecies.get(yy * w + xx);
-        if (!m) continue;
-        for (const p of preds) {
-          const e = m.get(p);
-          if (!e) continue;
-          let s = near.get(p);
-          if (!s) near.set(p, (s = [0, 0]));
-          s[0] += e[0];
-          s[1] += e[1];
-        }
-      }
-      for (const [p, s] of near) {
-        if (!s[1]) continue;
-        let bridged = false;
-        for (const f of c.friends) { const o = world.byId.get(f); if (o && o.species === p) { bridged = true; break; } }
-        if (!bridged) flight += KNOBS.PREY_FLIGHT * (s[1] / s[0]);
-      }
-      if (wolfMoon && preds.includes("wolf")) flight += KNOBS.PREY_FLIGHT;
-    }
     const adult = ageYears(world, c) >= KNOBS.ADULT_AGE;
-    const worker = isWorker(world, c);
-    let m = 50;
-    if (c.job >= 0) m += 15;
-    if (worker && c.job < 0) m -= 20;
-    if (c.home >= 0) {
-      m -= 0.5 * Math.max(0, world.pol[c.home] - sp.polTol);
-      const tx = c.home % w;
-      const ty = (c.home / w) | 0;
-      let park = false;
-      let van = false;
-      for (let dy = -4; dy <= 4; dy++) for (let dx = -4; dx <= 4; dx++) {
-        const xx = tx + dx;
-        const yy = ty + dy;
-        if (!inBounds(world, xx, yy)) continue;
-        const civ = world.civic[yy * w + xx];
-        if (civ === CIVIC.PARK) park = true;
-        else if (civ === CIVIC.CENTRE) van = true;
-      }
-      if (park) m += 10;
-      // The meat hall's dread: herbivores mind it (halved with a carnivore friend); carnivores like the smell.
-      const dread = world.dread[c.home];
-      if (dread > 0) {
-        if (diet === "herb") {
-          let carnFriend = false;
-          for (const f of c.friends) { const o = world.byId.get(f); if (o && DIET_OF[o.species] === "carn") { carnFriend = true; break; } }
-          m -= Math.min(KNOBS.DREAD_MOOD_CAP, KNOBS.DREAD_MOOD_HERB * dread) * (carnFriend ? 0.5 : 1);
-        } else if (diet === "carn") m += KNOBS.DREAD_CARN_MOOD;
-      }
-      if (van && diet === "carn") m -= KNOBS.VAN_MOOD; // the pacification centre's van
-    }
-    m += 5 * c.friends.length;
-    m -= Math.min(20, flight);
-    if (c.home >= 0) m -= KNOBS.CRIME_MOOD * Math.max(0, world.crime[c.home] - KNOBS.CRIME_MOOD_FROM);
-    for (const e of world.events.active) if (e.moodBySpecies && e.moodBySpecies[c.species]) m += e.moodBySpecies[c.species];
-    if (c.path && commuteTime(c.path) <= sp.commute) m += 10; // a ride is 0.3 of a walk step
-    if (c.grief && c.grief > world.tick) m -= 10;
-    if (c.moodPenalty && c.moodPenaltyUntil > world.tick) m += c.moodPenalty;
-    if (c.fixed) m -= KNOBS.FIXED_MOOD;
-    if (absent(world, c)) m -= KNOBS.HELD_MOOD;
-    m += moodBoost;
+    const m = moodTerms(world, c, context).reduce((sum, term) => sum + term.value, 0);
     c.mood = Math.max(0, Math.min(100, Math.round(m)));
     if (!adult) c.mood = Math.max(c.mood, 50);
   }
