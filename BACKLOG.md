@@ -169,6 +169,25 @@ another's. Git merges those. `citizens.js`, `justice.js` and `events.js`
 are the risk: B adds one-liners at call sites; A adds one function; H
 edits two `post` sites; F edits one advisor function; D never opens them.
 
+## The shop pool — SHIPPED 2026-09-03 (SPEC §12.2d; handoff §20; 8 checks)
+The owner: *"unique low density shops would be a good target."* A tier-1 C
+lot is one of eleven small businesses by its `variant` byte (`js/sim/shops.js`
+— kind by `>> 1`, mirror by `& 1`; no state, no RNG, hash-neutral;
+`js/art/shops.js` — ten new solids × two variants); the card names it after
+its keepers by the staff's plurality species. What is left:
+- **The same trick for cottages and sheds** — tier-1 R and I draw one
+  family each; a pool of cottages (a thatch, a stone one, a timber one)
+  would come from the same byte, and `buildingSprite` already takes it whole.
+- **Species-kept shops** as an alternative rule (the kind by the staff's
+  species, the way a landmark is by its residents) — rejected here for
+  variety's sake and because a shop has no staff when it is built; the
+  keeper NAME carries the species instead.
+- **The keeper's name flickers** with staff churn (by design — derived, a
+  sale is a sale); if it bothers anyone, hysteresis would be one byte of
+  state and a hash change.
+- **Walkers do not know the kinds**: a customer walker "going to the
+  bakery" is Part A's bubble text plus `shopOf`.
+
 ## The landmarks — SHIPPED 2026-09-03 (SPEC §3c, §5, §12.2c, §15; handoff §19; 17 checks)
 The proposal's other half: a 3×3 block takes the name and the picture of
 the species that made it (`js/sim/landmarks.js` chooses the theme once, when

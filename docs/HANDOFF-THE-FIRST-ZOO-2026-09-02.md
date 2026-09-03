@@ -1492,3 +1492,66 @@ R, and every M staff, raise the plain block.
   EV before the first.
 - **Part E** (variants 2 → 4, lit windows by fill, species marks) now has
   nineteen block-scale families to apply to through the same kit.
+
+---
+
+## 20. Session 13 — the shop pool: a low-density shop is one of eleven (2026-09-03)
+
+The owner: *"lets make some more specialized buildings, unique low density
+shops would be a good target."* One commit of code and one of docs:
+
+| commit | what | proof |
+|---|---|---|
+| 03a639c | `js/sim/shops.js` — the pool of eleven, `shopKind(variant) = (variant >> 1) % 11`, `shopOf` (kind + keepers by `world.majority`); `js/art/shops.js` — ten new 1×1 solids × two variants on the corner shop's footprint; `buildingSprite` takes the WHOLE variant byte (render.js passes it for every lot; every other family still masks `& 1`); the card names the shop and its keepers; Part S (8 checks); `sheet-shops.png` | suite 240 → 248, 0 failures; every one of the 256 variant bytes maps to a kind with both mirrors, none under 10 of 128; variants 0 and 1 still the corner shop; the browser on the imported ten-year town at zoom 2: a street of tier-1 shops each its own kind, the card reading the kind and the keepers |
+| (docs) | SPEC §12.2 row, §12.2d, §16; BACKLOG; this section | — |
+
+### The design call: by position, not by species — and why
+
+The landmarks (§19) are chosen by WHO lives there. A shop could have been
+too — the staff's plurality species picking the kind — and it was
+rejected, for two reasons that hold: a shop has NO staff when it is built
+(the kind would flicker in from "nobody's" to something a month later, or
+need a byte of state and a hash change), and a species-chosen pool makes
+a fox street eleven bookshops, which is the opposite of "unique". The
+tile's `variant` byte already existed, was already saved and hashed, and
+only its low bit was used; the seven bits above it choose the kind, so a
+street of Low shops differs shop to shop, is the same on every load, and
+NOTHING in the sim changed — no state, no RNG, no hash moves. The species
+rides on the NAME instead: `shopOf` reads `world.majority` (derived every
+tick) and the card says *the Slyfields' bookshop (fox)*, and says
+*a bookshop, nobody's yet* until someone works there. Kind 0 is the corner
+shop the tier always drew, so an old save keeps about one shop in eleven
+unchanged and the other ten become what they were always going to be.
+
+### What the instruments caught
+
+| what it looked like | what it was | the rule |
+|---|---|---|
+| `art: every box of every solid lies inside its footprint` failed on four shops | a barrel at b 14 reaches 16.2; the park bench is 3.5 deep and was set at b 14; a parasol reaches 0.8 past its table; buckets at b 14 — every prop I put "out front" on a 1×1 sat half a unit past the tile | on a 1×1 the awning already takes b 13.5–16; a prop in front of the body lives in the same 2.5 units, so size it FIRST (a shallower bench, a barrel at 13.6) — the gate is the plan's, and the plan is sixteen units wide |
+| `SyntaxError` on load | `{ doorMid = 10.5 }` in an object literal argument — a default-parameter habit in a call site | — |
+| the fishmonger and the barber read as the corner shop on the first sheet | the same plain blue awning on a pale body; the tiled dado and the pole are a few pixels at 1× | the awning is the biggest patch of colour a 1×1 shop has — give each its own stripe (sea-and-white, salmon-and-white to match the pole) |
+
+### What I distrust in what I left
+
+- The keeper's name FLICKERS as staff change: a shop with two foxes and
+  two cats flips between the Slyfields' and the Purringtons' as one leaves.
+  Derived on purpose (a sale is a sale, and hysteresis would be state);
+  say so if it reads as a bug.
+- `shopOf` is called by `lotReport` on every card — a species lookup and a
+  string, nothing more — but if the card ever draws for every tile at once
+  (an overlay), note it is O(1) per tile only because `majority` is
+  precomputed by census.js.
+- The pool is spread by `>> 1 % 11` over 128 values: kinds 0–6 get 12 of
+  128, 7–10 get 11. Even enough; not exactly even.
+- Nothing draws lettering on a shop sign; the pub's sign is a gold disc,
+  the ironmonger's a plain slab. At zoom 2 through the hi-res twins the
+  tells are clearer; at zoom 1 the awning colour does most of the work.
+
+### Ammunition for the next arc
+
+- Cottages and sheds want the same byte: tier-1 R and I draw one family
+  each; a pool of three cottages (brick, stone, timber) and three sheds is
+  `buildingSprite`'s next branch and a `sheet-*.png` — no sim change.
+- Part A's bubble text can name the shop ("off to the Slyfields' bookshop")
+  from `shopOf`, and a customer walker could be drawn to a KIND (the
+  bakery in the morning) with one weight in walkers.js.

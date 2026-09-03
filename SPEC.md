@@ -887,7 +887,7 @@ Glades law, kept.
 | zone | tier 1 | tier 2 | tier 3 |
 |---|---|---|---|
 | R (brick + slate roof) | cottage 11×10×8 + hipped roof (two stepped boxes) + chimney 2×2×4 | 2-storey 13×13×16 + gable step | apartment 14×14×32 + balcony strip + roof box |
-| C (concrete + glass) | shop 13×11×10 + awning box (accent) | store 14×14×22 with glass-strip rows | tower 13×13×48 + roof plant |
+| C (concrete + glass) | **the shop pool** (§12.2d): eleven small businesses by the tile's variant byte; kind 0 the corner shop 13×11×10 + awning box (accent) | store 14×14×22 with glass-strip rows | tower 13×13×48 + roof plant |
 | I (rust) | shed 14×11×8 + chimney 2×2×14 | factory 14×14×14 + 2 chimneys + sawtooth | works 15×15×20 + chimney 3×3×34 + tank |
 Civics: park (low plinth 16×16×1 + 2 tree stamps + bench box), zoo 2×2
 (fence boxes on 4 sides, gate box, 3 canopy clumps, a hut box). Overlays:
@@ -929,6 +929,46 @@ draws a face: the species is in what the animals BUILT. Two variants each
 `<Z>3x3-<key>-<v>`; the footprint gate, the ray audit and the hi-res set
 cover all twenty-two. `sheet-landmarks.png` is the contact sheet (roster
 order, four to a row).
+
+### 12.2d The shop pool — a tier-1 C lot is one of eleven small businesses (`js/sim/shops.js`, `js/art/shops.js`; session 13, 2026-09-03)
+
+The owner: *"unique low density shops would be a good target."* A Low C
+lot stays at tier 1 for good, and every one drew the corner shop. Now the
+KIND is a function of the tile's `variant` byte — the per-tile random the
+world was founded with, already saved and hashed: `variant & 1` is the
+mirror it always was, `variant >> 1` (0..127) picks the kind, so a street
+of low shops is a bakery, a bookshop, a barber, a florist, a pub … the same
+ones every time the town is loaded, and NOTHING in the sim changes — no
+state, no RNG, every town hashes as it did. Kind 0 is the corner shop the
+tier drew before: an old save keeps about one shop in eleven unchanged and
+the rest become what they were always going to be. (SimCity 2000's low
+commercial: one lot, many small businesses, the pick by position.)
+
+| kind | shop | the tell at 1× |
+|---|---|---|
+| 0 | corner shop | the plain concrete shop, blue awning |
+| 1 | bakery | brick, a round window, the oven's stack, gold-and-white awning, a rack of loaves |
+| 2 | greengrocer | a green awning over crates of produce on the step |
+| 3 | fishmonger | whitewash over a blue tiled dado, sea-and-white awning, a slab of ice on the counter, a barrel |
+| 4 | bookshop | tall and narrow, two storeys, a timber shopfront with a bay window, a lamp on a bracket |
+| 5 | barber | salmon-and-white awning, the striped pole, a bench for the queue |
+| 6 | florist | a glass conservatory on the front, flower boxes, a green awning |
+| 7 | tea room | a cottage with a bay window and a chimney, a porch, two tables with parasols |
+| 8 | pub | brick below, timber-framed above, a dormer, the hanging sign, lamps, barrels |
+| 9 | ironmonger | rust-ribbed, a ladder against the end wall, buckets, a sign slab |
+| 10 | clockmaker | a clock tower on the roof, the face to the street, a lamp on its cap |
+
+Ten new solids × two mirrored variants on the corner shop's footprint
+(the door on the side face, END glass on the end, the awning off the lit
+face), through `buildings.js`'s `KIT` and `blocks.js`'s `BLOCK_KIT`; the
+footprint gate holds for every box (four props that reached b = 16.2 on
+the first pass were pulled inside) and the hi-res set twins each.
+`art.building(2, 1, variant)` takes the WHOLE byte (render.js passes it
+for every lot; every other family still masks `& 1`). WHO KEEPS IT is not
+state either: `shops.shopOf` reads `world.majority` (the staff's plurality
+species, derived every tick) and the card reads *"tier 1 bookshop — the
+Slyfields' bookshop (fox) — tall and narrow, …"*, or *"a bookshop,
+nobody's yet"*. `sheet-shops.png` is the contact sheet.
 
 ### 12.3 Citizens — hand-authored kit, the organic exception
 12×20 px adults, 8×12 cubs; facings SE and NE authored, SW/NW mirrored and
@@ -1152,7 +1192,7 @@ createWalkers(world) → { update(dtSeconds, viewport), list() → [{ id, citize
 // js/render.js
 createRenderer(canvas, world, art) → { draw(camera, hover, walkers, overlays), invalidate(), pick(sx, sy) → [tx, ty]|null }
 // js/art/index.js
-art.building(zone, tier, variant, side = 1, theme = 0) / art.civic(kind) / art.road(mask, busy) / art.ground(kind, variant) / art.tree(kind)
+art.building(zone, tier, variant, side = 1, theme = 0) /* variant: the tile's whole byte — & 1 the mirror, >> 1 the shop kind for C tier 1 */ / art.civic(kind) / art.road(mask, busy) / art.ground(kind, variant) / art.tree(kind)
 art.citizen(species, facing, frame, age) / art.overlay(kind, frame)   // each → { rows, anchor } (rasterised lazily by the renderer)
 ```
 
