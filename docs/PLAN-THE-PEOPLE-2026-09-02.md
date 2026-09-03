@@ -38,6 +38,10 @@ And: *"road access should not be limited to one side of a tile, as long as
 a tile is within 1-3 tiles of the road it has road access."* → Part R
 (§4-R): the law already reads that way in the code — so R makes access
 VISIBLE, fixes the one staleness the probe found, and asks what was seen.
+Then: *"i want that rule standardized, including rail and warehouses, and
+zoos."* and *"the other way to think about it is that all sides have
+access points"* → R4 is ONE predicate, `served`, doors on every side, and
+a table of every rule that asks for a road (§4-R).
 
 Plan only. Nothing here is built. Each part is sized for one agent-session,
 owns its own files, and codes against contracts written down in §3 so the
@@ -1148,24 +1152,39 @@ the cause.
    door (30,12)` from `lotReport.roadDist` and `doorOf`; at 4, `no road
    within 3 — the nearest is 5 tiles at (28,9)` (a second BFS to 8, only
    for the card).
-4. **One law for every rule that asks "is there a road?"** The owner,
-   clarifying: *"the 6x6 squares have roads around the whole perimeter,
-   so nothing is more than 3 tiles away"* — so the growth rule already
-   sees every tile of theirs, and the sentence is a RULING on the two
-   places that still demand a road TOUCHING the tile: (a) **a station is
-   a door only when a road tile touches it** (SPEC §7.9, `fields.js:492`
-   the walk layer's "a road, or a platform" adjacency) — becomes: a
-   station is a door when a road is within `ROAD_REACH`, the same BFS as
-   a lot's `doorOf`, walkers crossing the gap on foot as they do to any
-   lot; (b) **industry reaches tier 3 only at `roadDist ≤ 1`**
-   (`lots.js:110`, SC2000's frontage rule) — becomes tier 3 anywhere with
-   access, so the inside of an industrial 6×6 grows as tall as its edge.
-   Both move the hash (more stations are doors; interior works rise) and
-   the commit records before/after on the rail and millbelt gates. What
-   stays one-sided and is not access: `doorOf` picks ONE road tile (the
-   first in N-E-S-W order) so a lot's walkers always leave by the same
-   side — cosmetic, and SPEC says so; a building's drawn door is on the
-   side face whatever the road's side (art). `ROAD_REACH` stays 3 (the
+4. **One predicate, `served`, for every rule that asks "is there a
+   road?"** The owner, clarifying: *"the 6x6 squares have roads around
+   the whole perimeter, so nothing is more than 3 tiles away"* and then
+   *"i want that rule standardized, including rail and warehouses, and
+   zoos."* So: `fields.served(world, i)` = the road distance of the
+   nearest tile of the thing's FOOTPRINT is ≤ `ROAD_REACH` 3 — a 1×1
+   lot's own tile; any of a zoo's four (and a landmark's nine, when they
+   come); and `doorOf` searches from the whole footprint too. Every rule
+   below reads `served`, and a suite check greps `js/sim` for any other
+   test of a road's nearness (the allow-list: the road's own emission
+   line, the census counts, `reach.hasWay`, the walk layer's step) so a
+   new rule cannot quietly grow its own. The census of what asks today,
+   and what it becomes:
+
+   | rule | today | standard |
+   |---|---|---|
+   | zone growth R / C / I / M (`lotScore`) | `hasAccess` ≤ 3 on the tile | `served` — unchanged in effect |
+   | **industry tier 3** ("warehouses" — the shed / factory / works; there is no warehouse building, and the M cold store is a hall) | `roadDist ≤ 1` (`lots.js:110`, SC2000's frontage rule) | `served` — tier 3 anywhere within 3; the inside of an industrial 6×6 grows as tall as its edge |
+   | **the rail station as a door** | a road tile TOUCHING the platform (`fields.js:492`) | `served` — the platform's door is `doorOf(station)`; the walk layer links platform ↔ door at cost `WALK × roadDist` and the stored path carries the door tile, so a walker crosses the gap on foot as it does to any lot |
+   | **the zoo** (2×2) | jobs need `hasAccess` on the ANCHOR tile (`citizens.js:874`); its LV halo and its +500 on the cap need no road at all | `served` on the footprint gates all three the same way — jobs, halo, cap; a zoo no road reaches within 3 of any of its tiles is a fenced field until one does |
+   | the meat hall (SOLD, the licence, the M valve's reach) | `hasAccess` | `served` |
+   | the pacification centre's bed | `hasAccess` | `served` |
+   | fire / police cover | `roadDist ≤ 3` on the 1×1 | `served` — unchanged in effect |
+   | the park | no road needed (halo, cap +150, mood +10) | unchanged and SAID: a park is a place, not a service; the owner did not list it |
+   | **doors** (job search, walkers, campers, the scout, the station's platform) | `doorOf` = ONE road tile, the first found in N-E-S-W order — every walker of a lot leaves by the same side | **all sides are access points** (the owner: *"the other way to think about it is that all sides have access points"*): `doorsOf(world, i)` = every road tile at the footprint's nearest road distance, any direction; the commute search starts from ALL of a home's doors and ends at ANY of the job's (Dial is multi-source already — free), so a citizen leaves by whichever side its road goes; the walker layer starts each walk at the path's first tile, which is now the right door; the station's platform links to all its doors |
+   | bridges, tunnels | a road tile | unchanged |
+
+   The hash MOVES (interior works rise; stations two and three tiles off
+   a road become doors; an unserved zoo stops counting; commutes take the
+   nearer door, so traffic redistributes round every block) and the
+   commit records before/after on every gate. What stays one-sided and
+   is NOT access: a building's drawn door is on the side face whatever
+   the road's side (art), and SPEC says so. `ROAD_REACH` stays 3 (the
    owner's blocks never need more).
 5. **Verify on the control city.** `tools/accessprobe.mjs` (exit 0; the
    scratchpad probe made real; takes `--save`): zoned lots by `roadDist`
@@ -1174,22 +1193,33 @@ the cause.
    at 4. The rig has 0 at 4 — only the owner's town can show that case.
 
 **Owns.** The one call in `ops.js` (X owns the validation lines — a
-different hunk), `computeRoadDist`'s export, the station-door adjacency
-in `fields.js`'s `dial` (`:492`, one condition; H owns nothing there, A
-nothing), `lots.js:110`, the `access` mode in `render.js`'s
-`drawOverlay` (its own case), the card line in `lots.js`'s `lotReport` +
-`ui.js`'s `cardForTile` (one line each; C owns the card's citizen half, H
-the M block), `tools/accessprobe.mjs`, Part M' checks, SPEC §3, §6, §7.9
-sentences.
+different hunk), `served` / `doorOf` / `computeRoadDist` in `fields.js`
+and the station edge in `dial` (`:492`; H owns nothing there, A nothing),
+every call site in the table (`lots.js:86/:110`, `citizens.js:874`,
+`justice.js:240/:260`, `events.js:489`, `fields.js:169–195` the zoo halo,
+`census.js` the zoo count, `demand.js` the cap — one-line swaps to
+`served`; B's one-liners in `citizens.js`/`justice.js` are other lines),
+the `access` mode in `render.js`'s `drawOverlay` (its own case), the card
+line in `lots.js`'s `lotReport` + `ui.js`'s `cardForTile` (one line each;
+C owns the card's citizen half, H the M block), `tools/accessprobe.mjs`,
+Part M' checks, SPEC §3, §6, §7.9, §9b sentences and the Rules-tab line
+"access = served, one predicate".
 
-**Acceptance.** The staleness probe inverted: after a road op, before any
-tick, `hasAccess` is true, and the hash on every gate is unchanged by R1
-alone (commit R1 first, on its own); then R4 — the rail fixture's station
-two tiles from the road is a door and the commute rides it, an industrial
-lot at `roadDist` 3 reaches tier 3 in the millbelt, and the rail and
-millbelt hashes move with before/after recorded; the overlay's tint table
-has five entries and the audit walks it; the card's line on a tile at 2,
-at 3, at 4; the probe's table in the commit. Half a session, no keel.
+**Acceptance.** Commit R1 first, alone: after a road op, before any tick,
+`served` is true, and the hash on every gate is unchanged. Then R4, one
+commit: the grep check (no road-nearness test in `js/sim` outside the
+allow-list); the rail fixture's station two tiles from the road is a door
+and the commute rides it, three tiles is, four is not; a lot with roads
+on two sides sends a commuter out by the side nearer its job (the path's
+first tile is that side's door) and the suite's "every commuter's path
+tile-equal to `roadPath`" check is re-based on `doorsOf`; an industrial
+lot at `roadDist` 3 reaches tier 3 in the millbelt; a zoo whose only road is 3
+from its far tile has jobs, a halo and its cap, and at 4 has none; the
+rail, millbelt and zoo gate hashes move with before/after recorded and
+the balanced gate (no rail, no zoo, its works on the ring) is unchanged
+or explained; the overlay's tint table has five entries and the audit
+walks it; the card's line on a tile at 2, at 3, at 4; the probe's table
+in the commit. Half a session, no keel.
 
 ### G. Integration — after the parts have merged
 

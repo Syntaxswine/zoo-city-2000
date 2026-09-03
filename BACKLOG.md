@@ -92,10 +92,22 @@ perimeter, so nothing is more than 3 tiles away"* — so the ruling lands on
 the two rules that still want a TOUCHING road: a station is a door only
 with a road touching it (`fields.js:492`) → within ROAD_REACH like a lot's
 door; industry tier 3 only at roadDist ≤ 1 (`lots.js:110`) → anywhere with
-access. Both move the hash. R: recompute at the op (hash-neutral, its own
-commit first), those two, an `access` overlay mode, the card's "road
-access: 2 tiles · door (x,y)", `tools/accessprobe.mjs --save` on the
-control city. ROAD_REACH stays 3.
+access. Then *"i want that rule standardized, including rail and
+warehouses, and zoos"* → ONE predicate `fields.served(world, i)` (the
+nearest tile of the FOOTPRINT within ROAD_REACH 3; a zoo's four, a
+landmark's nine) read by every rule that asks for a road — the plan's
+§4-R table: zone growth, industry tier 3 ("warehouses" = the I tiers),
+the station door (the walk layer links platform ↔ doorOf at WALK ×
+dist), the zoo (jobs AND halo AND cap — today only jobs are gated, on the
+anchor), the hall, the centre, cover; parks stay ungated and SAID; a suite
+grep forbids any other road-nearness test in js/sim. And *"all sides have
+access points"* → `doorsOf` = every road tile at the footprint's nearest
+distance, any side; commutes start from ALL of a home's doors and end at
+ANY of the job's (Dial is multi-source — free), so a citizen leaves by the
+side its road goes and traffic redistributes round every block. Hash moves. R:
+recompute at the op (hash-neutral, its own commit first), `served`, an
+`access` overlay mode, the card's "road access: 2 tiles · door (x,y)",
+`tools/accessprobe.mjs --save` on the control city. ROAD_REACH stays 3.
 
 ## Crime and punishment — SHIPPED 2026-09-02 (SPEC §9c; `js/sim/justice.js`); what is left
 - **Hunger visibility.** The scripted towns run at U 0–4, so the ×20 hunger
