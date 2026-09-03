@@ -45,6 +45,7 @@ import { ZONE, PART, anchorOf, sideOf, footprintOf, capacityOf } from "./world.j
 import { hasAccess } from "./fields.js";
 import { placeHousehold, evictFromLot, fireFromLot } from "./citizens.js";
 import { KIND, remember } from "./life.js";
+import { themeFor } from "./landmarks.js";
 
 /** Can lot j join a block with the tier-3 lot i: same zone, tier 2 or better, a lot of its own, High, on the same line, untroubled, served. */
 function joinable(world, i, j) {
@@ -144,7 +145,15 @@ export function mergeLots(world, win) {
     c.stale = true;
   }
   for (const j of moving) { world.carnAt[anchor] += world.carnAt[j]; world.carnAt[j] = 0; }
-  return win;
+  // A 3×3 is a LANDMARK if the animals now on its anchor are of a kind (landmarks.js): the
+  // theme is chosen once, here, and kept until the block comes apart. A 2×2 has none.
+  let landmark = null;
+  if (side === 3) {
+    const pick = themeFor(world, anchor);
+    world.theme[anchor] = pick.theme;
+    if (pick.theme) landmark = pick;
+  }
+  return { ...win, landmark };
 }
 
 /**
@@ -156,7 +165,7 @@ export function mergeLots(world, win) {
  */
 export function splitLot(world, anchor, { evict = true } = {}) {
   const tiles = footprintOf(world, anchor);
-  for (const j of tiles) world.big[j] = 0;
+  for (const j of tiles) { world.big[j] = 0; world.theme[j] = 0; }
   if (evict) {
     const cap = capacityOf(world, anchor);
     if (world.zone[anchor] === ZONE.R) evictFromLot(world, anchor, cap);

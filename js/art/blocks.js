@@ -118,11 +118,11 @@ const van = (a, b) => [
 
 const mirrorStamps = (stamps) => stamps.map(([s, a, b, c]) => [s, b, a, c]);
 
-function family(name, zoneLetter, side, make, { stamps = [] } = {}) {
+function family(name, zoneLetter, side, make, { stamps = [], tags = [] } = {}) {
   const boxes = make();
   const hub = (A_STEP * side) / 2;
   const n = 16 * side;
-  const opts = (st) => ({ hub, footprint: [side, side], tags: ["building", "block", zoneLetter], extent: stamps.length ? [extentBox(0, n, 0, n, 0, TREE_REACH)] : [], stamps: st });
+  const opts = (st) => ({ hub, footprint: [side, side], tags: ["building", "block", zoneLetter, ...tags], extent: stamps.length ? [extentBox(0, n, 0, n, 0, TREE_REACH)] : [], stamps: st });
   return [
     solidSprite(`${zoneLetter}${side}x${side}-${name}-0`, boxes, opts(stamps)),
     solidSprite(`${zoneLetter}${side}x${side}-${name}-1`, flipPlan(boxes), opts(mirrorStamps(stamps))),
@@ -455,6 +455,13 @@ export const BLOCKS = {
   4: { 2: family("abattoir", "M", 2, abattoir), 3: family("meat-exchange", "M", 3, meatExchange) },
 };
 registerBlocks(BLOCKS);
+
+/**
+ * The kit the LANDMARKS (js/art/landmarks.js, SPEC §3c) are built from — the
+ * same helpers as the eight families, so a landmark reads as its zone's
+ * block with a species' composition on top.
+ */
+export const BLOCK_KIT = Object.freeze({ hipRoof, chimney, gardenWall, FENCE, pen, sawtooth, stack, tank, bench, fountain, van, VAN, WHEEL, mirrorStamps, family });
 
 /** Every block sprite, named, for the audit and the sheet. */
 export function allBlocks() {

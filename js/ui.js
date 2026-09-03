@@ -27,6 +27,7 @@ import { exposure } from "./sim/fields.js";
 import { RULES, KNOBS } from "./sim/rules.js";
 import { yearlyFigures } from "./sim/budget.js";
 import { SPECIES, SPECIES_BY_ID } from "./sim/species.js";
+import { pluralSpecies } from "./sim/landmarks.js";
 import { ageYears, isWorker } from "./sim/census.js";
 import { TOOLS } from "./input.js";
 import { newsRows } from "./news.js";
@@ -332,13 +333,15 @@ export function createUI(app) {
     head.append(el("b", "", `(${rep.part ? `${rep.at.tx},${rep.at.ty}` : `${tx},${ty}`}) ${what}`));
     if (rep.zone !== ZONE.NONE) {
       const t = rep.tier;
-      const name = rep.side > 1 ? `${rep.side}×${rep.side} ${BLOCK_NAME[rep.side][rep.zone - 1]}` : `tier ${t} ${TIER_NAME[t][rep.zone - 1]}`;
+      const name = rep.landmark ? `3×3 ${rep.landmark.name}` : rep.side > 1 ? `${rep.side}×${rep.side} ${BLOCK_NAME[rep.side][rep.zone - 1]}` : `tier ${t} ${TIER_NAME[t][rep.zone - 1]}`;
       head.append(el("span", "dim", t ? `  ${name}` : "  zoned, empty"));
       if (t) {
         const occ = rep.zone === ZONE.R ? `occ ${rep.occupants}/${rep.capacity}` : `jobs ${rep.staff}/${rep.jobs}`;
         head.append(el("span", "", `  ${occ}`));
       }
       if (rep.part) lines.push(el("div", "dim", `part of the block at (${tx},${ty}) — one building on ${rep.side * rep.side} tiles; its animals are counted there`));
+      // A landmark (SPEC §3c): the block the species made, named when it rose and kept until it comes apart.
+      if (rep.landmark) lines.push(el("div", "dim", `a landmark — the block the ${rep.landmark.species.map(pluralSpecies).join(" and ")} made: ${rep.landmark.blurb}`));
     }
     if (rep.civic === CIVIC.ZOO) head.append(el("span", "", `  jobs ${rep.staff}/${rep.jobs}`));
     if (rep.civic === CIVIC.CENTRE) {

@@ -22,6 +22,8 @@ import { rasterize } from "../js/art/format.js";
 import { art } from "../js/art/index.js";
 import { BUILDINGS, PARK, ZOO, FIRE_STATION, POLICE_STATION, PACIFICATION_CENTRE, OVERLAYS } from "../js/art/buildings.js";
 import { BLOCKS } from "../js/art/blocks.js";
+import { LANDMARK_ART } from "../js/art/landmarks.js";
+import { LANDMARKS } from "../js/sim/landmarks.js";
 import { hires } from "../js/art/hires.js";
 import { ROADS, BRIDGES, N, E, S, W, DECK_TOP } from "../js/art/roads.js";
 import { WALLS, TUNNELS } from "../js/art/walls.js";
@@ -157,6 +159,26 @@ function sheets(z) {
       console.log(`  blocks [r${Math.floor(i / cols)} c${i % cols}] ${cell.sprite.name} (${cell.sprite.w}×${cell.sprite.h})`);
     });
     out.push(save("sheet-blocks.png", canvas, z));
+  }
+
+  // The landmarks (SPEC §3c): the eleven 3×3s × 2 variants on grass footprints, four to a row, in roster order — at most 2× so the sheet fits a screen.
+  {
+    const cols = 4, cellW = 300, cellH = 270, groundY = 222;
+    const cells = [];
+    for (const lm of LANDMARKS) if (lm) for (const v of [0, 1]) cells.push({ sprite: LANDMARK_ART[lm.id][v], name: lm.name });
+    const canvas = createCanvas(cols * cellW, Math.ceil(cells.length / cols) * cellH);
+    const ctx = background(canvas);
+    cells.forEach((cell, i) => {
+      const cx = (i % cols) * cellW + cellW / 2;
+      const cy = Math.floor(i / cols) * cellH + groundY;
+      for (let ty = 0; ty < 3; ty++) for (let tx = 0; tx < 3; tx++) {
+        const [dx, dy] = toScreen(tx - 1, ty - 1);
+        blitAt(ctx, GRASS[(tx + ty) % 3], cx + dx, cy + dy);
+      }
+      blitAt(ctx, cell.sprite, cx, cy);
+      console.log(`  landmarks [r${Math.floor(i / cols)} c${i % cols}] ${cell.sprite.name} — ${cell.name} (${cell.sprite.w}×${cell.sprite.h})`);
+    });
+    out.push(save("sheet-landmarks.png", canvas, Math.min(z, 2)));
   }
 
   const c = [

@@ -174,7 +174,7 @@ function snapshot(world, tiles) {
   return tiles.map(({ i }) => ({
     i,
     terrain: world.terrain[i], road: world.road[i], zone: world.zone[i], maxTier: world.maxTier[i],
-    tier: world.tier[i], civic: world.civic[i], rubble: world.rubble[i], wall: world.wall[i], use: world.use[i], rail: world.rail[i], big: world.big[i],
+    tier: world.tier[i], civic: world.civic[i], rubble: world.rubble[i], wall: world.wall[i], use: world.use[i], rail: world.rail[i], big: world.big[i], theme: world.theme[i],
   }));
 }
 
@@ -252,7 +252,7 @@ export function apply(world, op, { log = true } = {}) {
           // footprint and its anchor's people; the rest are plain ground by then.
           const a = anchorOf(world, i);
           const tiles = world.big[i] ? footprintOf(world, a) : [i];
-          for (const j of tiles) { world.tier[j] = 0; world.zone[j] = ZONE.NONE; world.rubble[j] = 0; world.burning[j] = 0; world.maxTier[j] = 3; world.big[j] = 0; }
+          for (const j of tiles) { world.tier[j] = 0; world.zone[j] = ZONE.NONE; world.rubble[j] = 0; world.burning[j] = 0; world.maxTier[j] = 3; world.big[j] = 0; world.theme[j] = 0; }
           clearLot(world, a);
         }
         else if (what === "unzone") { world.zone[i] = ZONE.NONE; world.maxTier[i] = 3; }
@@ -356,7 +356,7 @@ export function undo(world) {
   for (const s of u.snap) {
     if (world.tier[s.i] > 0 && s.tier === 0) continue; // something grew here since; leave it
     world.terrain[s.i] = s.terrain; world.road[s.i] = s.road; world.zone[s.i] = s.zone; world.maxTier[s.i] = s.maxTier;
-    world.tier[s.i] = s.tier; world.civic[s.i] = s.civic; world.rubble[s.i] = s.rubble; world.wall[s.i] = s.wall; world.use[s.i] = s.use; world.rail[s.i] = s.rail; world.big[s.i] = s.big;
+    world.tier[s.i] = s.tier; world.civic[s.i] = s.civic; world.rubble[s.i] = s.rubble; world.wall[s.i] = s.wall; world.use[s.i] = s.use; world.rail[s.i] = s.rail; world.big[s.i] = s.big; world.theme[s.i] = s.theme;
   }
   if (u.roads) { world.roadsDirty = true; invalidatePaths(world); computeOcclusion(world); }
   else if (u.op.kind === "use") invalidatePaths(world);

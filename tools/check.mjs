@@ -1659,6 +1659,116 @@ if (existsSync(artIndex)) {
 }
 function costOfBulldoze(w, x, y) { return (0, costOfOp)(w, { kind: "bulldoze", x0: x, y0: y, x1: x, y1: y }); }
 
+// ---- Part L: the landmarks — a 3×3 takes the name of the species that made it (SPEC §3c; js/sim/landmarks.js, js/art/landmarks.js) ----
+{
+  const L = await import("../js/sim/landmarks.js");
+  const B = await import("../js/sim/blocks.js");
+  const W = await import("../js/sim/world.js");
+  const { SPECIES_BY_ID } = await import("../js/sim/species.js");
+  const { lotScore, REASON, lotReport, lotsTick } = await import("../js/sim/lots.js");
+  const { createHousehold, placeHousehold } = await import("../js/sim/citizens.js");
+  const { recountRosters } = await import("../js/sim/fields.js");
+  const { refreshLast } = await import("../js/sim/tick.js");
+  const { RULES } = await import("../js/sim/rules.js");
+  const { TICKER_GOOD, TICKER_FLASH } = await import("../js/sim/events.js");
+  const { TERRAIN } = W;
+  const { LANDMARKS, LANDMARK_OF, chooseTheme, landmarkLine } = L;
+  const { art } = await import("../js/art/index.js"); // Part C's `art` is scoped to its own block
+
+  // The roster: ids sequential from 1, real species, at most one landmark per species per zone, R/C/I only, unique names and keys.
+  const rows = LANDMARKS.slice(1);
+  const seenPerZone = {};
+  let dup = 0;
+  let unknown = 0;
+  for (const lm of rows) {
+    for (const s of lm.species) {
+      if (!SPECIES_BY_ID[s]) unknown++;
+      const k = `${lm.zone}:${s}`;
+      if (seenPerZone[k]) dup++;
+      seenPerZone[k] = true;
+    }
+  }
+  check("landmarks: the roster — eleven rows with sequential ids, real species, one landmark per species per zone, zones R/C/I, unique names",
+    rows.length === 11 && rows.every((lm, i) => lm.id === i + 1) && unknown === 0 && dup === 0 && rows.every((lm) => lm.zone >= ZONE.R && lm.zone <= ZONE.I) && new Set(rows.map((r) => r.name)).size === rows.length && new Set(rows.map((r) => r.key)).size === rows.length,
+    `rows ${rows.length} unknown ${unknown} dup ${dup}`);
+  check("landmarks: every species that led a block in the measured towns has a landmark in R (cat, fox, pig, beaver, bear, rabbit, mouse)",
+    ["cat", "fox", "pig", "beaver", "bear", "rabbit", "mouse"].every((s) => LANDMARK_OF[ZONE.R][s]));
+
+  // The chooser: kin summed, a tie or an unthemed leader leaves the plain block.
+  check("landmarks: kin count together — rabbit 10 + mouse 9 beats cat 12 for Warren Towers", chooseTheme({ rabbit: 10, mouse: 9, cat: 12 }, ZONE.R).theme === 1);
+  check("landmarks: the leading kin name the block — cat 42 + fox 24 over hawk 13 is the Mews, with the count of both", (() => { const p = chooseTheme({ cat: 42, fox: 24, hawk: 13, mouse: 12 }, ZONE.R); return p.theme === 5 && p.n === 66 && p.total === 91 && p.species.length === 2; })());
+  check("landmarks: a tie at the top leaves the plain block", chooseTheme({ cat: 12, wolf: 12 }, ZONE.R).theme === 0 && chooseTheme({ cat: 12, wolf: 12 }, ZONE.R).tie === true);
+  check("landmarks: a leading species with no landmark in the zone leaves the plain block (tortoise in R; cow in C), and an empty block is plain", chooseTheme({ tortoise: 5, rabbit: 4 }, ZONE.R).theme === 0 && chooseTheme({ cow: 9, fox: 3 }, ZONE.C).theme === 0 && chooseTheme({}, ZONE.R).theme === 0);
+  check("landmarks: the industrial roster — cows raise the Dairy, pigs the Truffle Works, bears the Honey Works, beavers the Sawmill", chooseTheme({ cow: 3, pig: 2 }, ZONE.I).theme === 8 && chooseTheme({ pig: 3 }, ZONE.I).theme === 9 && chooseTheme({ bear: 2, cow: 1 }, ZONE.I).theme === 10 && chooseTheme({ beaver: 4, bear: 3 }, ZONE.I).theme === 11);
+
+  // The fixture of Part N' — a 3×3 R patch under a road — filled with rabbits: the 3×3 rises as Warren Towers.
+  const F = createWorld({ seed: "landmarks" });
+  const at = (x, y) => y * F.w + x;
+  for (let y = 9; y <= 14; y++) for (let x = 9; x <= 14; x++) { F.terrain[at(x, y)] = TERRAIN.GRASS; F.road[at(x, y)] = ROAD.NONE; }
+  apply(F, { kind: "road", tiles: [9, 10, 11, 12, 13].map((x) => at(x, 9)) });
+  apply(F, { kind: "zone", zone: ZONE.R, x0: 10, y0: 10, x1: 12, y1: 12, density: 3 });
+  for (let y = 10; y <= 12; y++) for (let x = 10; x <= 12; x++) F.tier[at(x, y)] = 2;
+  F.tier[at(10, 10)] = 3;
+  F.valves.R = 0.5;
+  F.events.noDisasters = true;
+  computeFields(F);
+  recountRosters(F);
+  const house = (lot, n, species = "rabbit") => { for (let k = 0; k < n; k += 4) placeHousehold(F, createHousehold(F, species, Math.min(4, n - k)), lot); };
+  house(at(10, 10), 20); house(at(11, 10), 8); house(at(10, 11), 8); house(at(11, 11), 4);
+  const a = at(10, 10);
+  const r2 = B.mergeLots(F, lotScore(F, a).merge);
+  check("landmarks: a 2×2 takes no theme", r2.landmark === null && F.theme[a] === 0);
+  house(a, 60); house(at(12, 10), 8); house(at(12, 11), 8); house(at(10, 12), 4);
+  const s3 = lotScore(F, a);
+  const r3 = B.mergeLots(F, s3.merge);
+  check("landmarks: the 3×3 of rabbits rises as Warren Towers — theme 1 on the anchor, the pick counts all 120, the report names it",
+    s3.merge && s3.merge.side === 3 && r3.landmark && r3.landmark.theme === 1 && r3.landmark.n === 120 && r3.landmark.total === 120 && F.theme[a] === 1 && W.footprintOf(F, a).every((j) => j === a || F.theme[j] === 0)
+      && lotReport(F, a).landmark && lotReport(F, a).landmark.name === "Warren Towers" && lotReport(F, at(11, 11)).landmark.name === "Warren Towers",
+    JSON.stringify(r3.landmark));
+  const line = landmarkLine(F, a, r3.landmark);
+  check("landmarks: the ticker line names the landmark, the family and the block's coordinates, and reads as good news that flashes",
+    line === "LANDMARK — Warren Towers: the Burrowes have made a landmark of the block at (10,10); 120 of 120 living there are rabbits." && TICKER_GOOD.test(line) && TICKER_FLASH.test(line), line);
+  check("landmarks: the anchor draws its landmark and a part draws nothing; the plain 3×3 is untouched",
+    art.building(F.zone[a], F.tier[a], F.variant[a] & 1, W.sideOf(F, a), F.theme[a]).name === "R3x3-warren-towers-" + (F.variant[a] & 1) && art.building(1, 3, 0, 3, 0).name === "R3x3-towers-0" && art.building(1, 3, 0, 3).name === "R3x3-towers-0");
+  refreshLast(F);
+  const g6 = RULES.find((r) => r.id === "G6");
+  check("landmarks: the census counts it by name and the Rules tab reads it", F.last.census.landmarks === 1 && F.last.census.landmarkCounts["Warren Towers"] === 1 && g6 && /1 landmark: Warren Towers/.test(g6.live(F)), g6 && g6.live(F));
+
+  // The save contract: theme round-trips; an old save without it loads to zeros and hashes the same; a different theme is a different hash.
+  const G = load(save(F));
+  const plain = toPlain(F);
+  delete plain.theme;
+  const Old = load(JSON.stringify(plain));
+  const H2 = load(save(F));
+  H2.theme[a] = 2;
+  check("landmarks: save → load keeps the theme and hashes equal; a save without the array loads to zeros and hashes as a themeless town; the theme is in the hash",
+    G.theme[a] === 1 && stateHash(G) === stateHash(F) && Old.theme.every((n) => n === 0) && Old.theme.length === F.theme.length && stateHash(Old) !== stateHash(F) && stateHash(H2) !== stateHash(F));
+  const Fresh = createWorld({ seed: "landmarks" });
+  const freshPlain = toPlain(Fresh);
+  const hadTheme = Array.isArray(freshPlain.theme) && freshPlain.theme.length === Fresh.w * Fresh.h;
+  delete freshPlain.theme;
+  check("landmarks: a town with no landmark hashes as it did before the landmarks — the all-zero array is saved but left out of the hash", hadTheme && stateHash(load(JSON.stringify(freshPlain))) === stateHash(Fresh));
+
+  // Coming apart: a split clears the theme with the block; the bulldozer clears the footprint's.
+  const K = load(save(F));
+  B.splitLot(K, a);
+  check("landmarks: a split clears the theme with the block", K.theme[a] === 0 && W.footprintOf(K, a).length === 1);
+  const rb = apply(F, { kind: "bulldoze", x0: 11, y0: 11, x1: 11, y1: 11 });
+  check("landmarks: the bulldozer on a part clears the landmark's theme with its footprint", rb.ok && F.theme[a] === 0 && F.big[a] === 0);
+
+  // The scripted mayor with a market: the seed-7 town raises a 3×3 in month 54 that rises as the Mews (measured: cat 42, fox 24 of 129 on the block).
+  const { createMayor } = await import("./mayor.mjs");
+  const M = createWorld({ seed: "7" });
+  const mayor = createMayor(M, { layout: "balanced", rates: [8, 8, 8], markets: 1 });
+  let seen = null;
+  for (let t = 0; t < 60; t++) { mayor.month(t); const { notices } = tick(M); for (const s of notices) if (/^LANDMARK/.test(s) && !seen) seen = { t, s }; }
+  const logRows = M.events.log.filter((e) => e.id === "landmark");
+  check("landmarks: the seed-7 market town raises the Mews at month 54 — cats and foxes — the line carries the block's coordinates, the log holds it under its own id, the census counts one",
+    seen && seen.t === 54 && /^LANDMARK — the Mews: the Purringtons and the Slyfields have made a landmark of the block at \(18,4\); \d+ of \d+ living there are cats and foxes\.$/.test(seen.s) && logRows.length === 1 && logRows[0].line === seen.s && M.last.census.landmarks === 1 && M.theme[4 * M.w + 18] === 5,
+    seen ? `m${seen.t}: ${seen.s} · log ${logRows.length} same ${logRows[0] && logRows[0].line === seen.s} census ${M.last.census.landmarks} theme ${M.theme[4 * M.w + 18]}` : "no landmark in five years");
+  void lotsTick;
+}
+
 // ---- Part D: the walker layer never writes the sim (SPEC §14) ---------------------
 const walkersPath = path.join(ROOT, "js", "walkers.js");
 if (existsSync(walkersPath)) {

@@ -1,6 +1,7 @@
 // index.js — the registry the renderer calls. SPEC §16.
 //
-//   art.building(zone, tier, variant, side)   zone 1|2|3|4 or 'R'|'C'|'I'|'M', tier 1..3; side 2 | 3 → the zone's block (blocks.js), tier ignored
+//   art.building(zone, tier, variant, side, theme)   zone 1|2|3|4 or 'R'|'C'|'I'|'M', tier 1..3; side 2 | 3 → the zone's block (blocks.js), tier ignored;
+//                                       theme > 0 with side 3 → that landmark (landmarks.js; ids per js/sim/landmarks.js)
 //   art.civic(kind)                     'park' | 'zoo' | 'fire' | 'police' | 'centre'
 //   art.road(mask, busy)                4-bit mask N=1 E=2 S=4 W=8
 //   art.bridge(mask)
@@ -32,6 +33,7 @@
 
 import { buildingSprite, civicSprite, overlaySprite, allBuildings } from "./buildings.js";
 import { allBlocks } from "./blocks.js"; // registers the 2×2 and 3×3 families with buildings.js at load
+import { allLandmarks } from "./landmarks.js"; // registers the eleven landmarks (SPEC §3c)
 import { hires } from "./hires.js";
 import { roadSprite, bridgeSprite, allRoads } from "./roads.js";
 import { wallSprite, tunnelSprite, allWalls } from "./walls.js";
@@ -123,7 +125,7 @@ export const art = Object.freeze({
 
 /** Every sprite the registry can hand out, named — the check.mjs audit walks this. */
 export function allSprites() {
-  const out = [...allBuildings(), ...allBlocks(), ...allRoads(), ...allWalls(), ...allRail(), ...allTerrain(), ...allCitizens()];
+  const out = [...allBuildings(), ...allBlocks(), ...allLandmarks(), ...allRoads(), ...allWalls(), ...allRail(), ...allTerrain(), ...allCitizens()];
   const seen = new Set();
   return out.filter(({ name }) => (seen.has(name) ? false : (seen.add(name), true)));
 }

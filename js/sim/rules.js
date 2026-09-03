@@ -264,6 +264,14 @@ const f1 = (v) => (Math.round(v * 10) / 10).toFixed(1);
  * census.js) and `d` the demand breakdown (demand.js) — both are recomputed
  * every tick and cached on the world as `world.last`.
  */
+/** G6's live line: the landmarks standing, by name (the census names them; rules.js imports nothing of the landmarks — world.js imports rules.js, and landmarks.js imports world.js). */
+function landmarksLive(w) {
+  const c = w.last.census;
+  if (!c.landmarks) return `no landmark yet · ${c.blocks3 || 0} plain 3×3`;
+  const parts = Object.entries(c.landmarkCounts || {}).map(([name, n]) => `${name}${n > 1 ? ` ×${n}` : ""}`);
+  return `${c.landmarks} landmark${c.landmarks === 1 ? "" : "s"}: ${parts.join(" · ")}`;
+}
+
 export const RULES = Object.freeze([
   {
     id: "T1", title: "Neutral tax rate falls with size",
@@ -339,6 +347,11 @@ export const RULES = Object.freeze([
     id: "G5", title: "Blocks: a full High block joins into one building",
     formula: "a tier-3 lot with three lots of its zone at tier ≥ 2 round it in a 2×2, all High, served, untroubled, ≥ 70% full together → p = 0.10·score a month → one 2×2 at tier 3 holding ×1.25 four tier-3 lots (R 120 · C 100 · I 120 · M 80); a 2×2 with five such lots round it → a 3×3 (R 270 · C 225 · I 270 · M 180); a block that would decay splits back into tier-3 lots, and fire, flood or the bulldozer take the whole footprint",
     live: (w) => `${w.last.census.blocks2 || 0} 2×2 · ${w.last.census.blocks3 || 0} 3×3 block${(w.last.census.blocks2 || 0) + (w.last.census.blocks3 || 0) === 1 ? "" : "s"}`,
+  },
+  {
+    id: "G6", title: "Landmarks: a 3×3 takes the name of the species that made it",
+    formula: "when a 3×3 forms, its residents (R) or staff (C, I) are counted by species, kin together (rabbit + mouse; beaver + bear + wolf; owl + hawk; pig + raccoon + skunk; cat + fox); the largest group names the block and chooses its picture — R Warren Towers · the Lodge · the Roost · the Wallows · the Mews; C the Fox & Cat · the Night Market; I the Dairy · the Truffle Works · the Honey Works · the Sawmill — a tie, or a leading species with no landmark, leaves the plain block; the name is kept until the block comes apart. A landmark is a picture and a name, never a bonus",
+    live: (w) => landmarksLive(w),
   },
   {
     id: "G4", title: "Land value permits density",

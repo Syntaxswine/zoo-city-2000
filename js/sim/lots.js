@@ -9,6 +9,7 @@ import { ZONE, CIVIC, idx, inBounds, capacityOf, jobsOf, isPart, anchorOf, sideO
 import { hasAccess } from "./fields.js";
 import { evictFromLot, fireFromLot } from "./citizens.js";
 import { mergeWindow, windowFill, mergeLots, splitLot } from "./blocks.js";
+import { landmarkOf, landmarkLine } from "./landmarks.js";
 
 const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
 
@@ -172,6 +173,7 @@ export function lotsTick(world) {
   let grew = 0;
   let decayed = 0;
   let merged = 0;
+  const landmarks = []; // the lines: a 3×3 that rose as a landmark this month (SPEC §3c)
   const rng = world.rng;
   for (let i = 0; i < n; i++) {
     if (world.zone[i] === ZONE.NONE) continue;
@@ -183,8 +185,13 @@ export function lotsTick(world) {
       }
     } else if (s.merge) {
       if (rng.chance(s.p)) {
-        mergeLots(world, s.merge); // the tiles it claims are parts when the loop reaches them
+        const res = mergeLots(world, s.merge); // the tiles it claims are parts when the loop reaches them
         merged++;
+        if (res.landmark) {
+          const line = landmarkLine(world, res.anchor, res.landmark);
+          landmarks.push(line);
+          world.events.log.push({ t: world.tick, id: "landmark", line });
+        }
       }
     } else if (s.decay) {
       if (rng.chance(s.p)) {
@@ -201,7 +208,7 @@ export function lotsTick(world) {
       }
     }
   }
-  return { grew, decayed, merged };
+  return { grew, decayed, merged, landmarks };
 }
 
 /** Data for the hover card. A block's part reports its ANCHOR's building (`part` names the tile asked about). */
@@ -215,6 +222,8 @@ export function lotReport(world, at) {
     at: { tx: at % world.w, ty: (at / world.w) | 0 },
     part: at !== i,
     side: sideOf(world, i),
+    theme: world.theme[i],
+    landmark: landmarkOf(world.theme[i]), // the roster row a 3×3 rose as, or null (SPEC §3c)
     zone: z,
     tier: world.tier[i],
     maxTier: world.maxTier[i],

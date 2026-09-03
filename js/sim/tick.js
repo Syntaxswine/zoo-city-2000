@@ -41,6 +41,7 @@ export function tick(world) {
   const dem = updateDemand(world, cen);
   // 4. lots
   const lots = lotsTick(world);
+  notices.push(...lots.landmarks); // a landmark rose (SPEC §3c); lotsTick logged it under its own id
   // 5. citizens
   const cit = citizensTick(world, cen, dem);
   notices.push(...cit.zonedOutLines); // use-zoning: households that left under the player's line (SPEC §7.8)
@@ -74,7 +75,7 @@ export function tick(world) {
   if (ms) notices.push(ms);
   // Every line the ticker shows goes into the log too, so a loaded city can
   // show its own history (rolled events already logged themselves).
-  for (const line of notices) if (!evNotices.includes(line) && !jNotices.includes(line)) world.events.log.push({ t: world.tick, id: "notice", line });
+  for (const line of notices) if (!evNotices.includes(line) && !jNotices.includes(line) && !lots.landmarks.includes(line)) world.events.log.push({ t: world.tick, id: "notice", line });
   if (world.events.log.length > 400) world.events.log.splice(0, world.events.log.length - 400);
   world.tick++;
   return { notices, events: evNotices };

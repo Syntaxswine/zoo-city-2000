@@ -583,9 +583,9 @@ for (const zone of [1, 2, 3, 4]) {
   }
 }
 
-export function buildingSprite(zone, tier, variant = 0, side = 1) {
+export function buildingSprite(zone, tier, variant = 0, side = 1, theme = 0) {
   const z = typeof zone === "string" ? { R: 1, C: 2, I: 3, M: 4 }[zone] : zone;
-  if (side > 1) return blockSprite(z, side, variant);
+  if (side > 1) return blockSprite(z, side, variant, theme);
   const fam = BUILDINGS[z] && BUILDINGS[z][tier];
   if (!fam) throw new Error(`buildingSprite: no family for zone ${zone} tier ${tier}`);
   return fam[variant & 1];
@@ -599,9 +599,19 @@ export function buildingSprite(zone, tier, variant = 0, side = 1) {
  * throw — a sim that can merge must be able to draw before the art lands.
  */
 let BLOCKS = null;
+let LANDMARK_ART = null;
 export function registerBlocks(table) { BLOCKS = table; }
-export function blockSprite(zone, side, variant = 0) {
+/** The landmarks (SPEC §3c; js/art/landmarks.js): LANDMARK_ART[theme] = [variant 0, variant 1], a 3×3 per sim/landmarks.js roster row. */
+export function registerLandmarks(table) { LANDMARK_ART = table; }
+/**
+ * The block on `side` tiles — and, for a 3×3 with a `theme`, its landmark:
+ * the species' picture registered under that theme id. An unregistered
+ * theme draws the zone's plain 3×3 (a wrong picture, never a throw), as an
+ * unregistered block draws the tier-3 lot.
+ */
+export function blockSprite(zone, side, variant = 0, theme = 0) {
   const z = typeof zone === "string" ? { R: 1, C: 2, I: 3, M: 4 }[zone] : zone;
+  if (theme && side === 3 && LANDMARK_ART && LANDMARK_ART[theme]) return LANDMARK_ART[theme][variant & 1];
   const fam = BLOCKS && BLOCKS[z] && BLOCKS[z][side];
   if (fam) return fam[variant & 1];
   return BUILDINGS[z][3][variant & 1];

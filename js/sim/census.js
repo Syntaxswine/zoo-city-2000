@@ -5,6 +5,7 @@ import { KNOBS } from "./rules.js";
 import { SPECIES, SPECIES_BY_ID, isPredPrey, isPredatorOf, DIET_OF } from "./species.js";
 import { ZONE, CIVIC, ROAD, jobsOf, jobZone, absent, capacityOf, isPart } from "./world.js";
 import { hasAccess, edgeRoads , commuteTime, rides, fireExposure } from "./fields.js";
+import { landmarkOf } from "./landmarks.js";
 
 export const ageMonths = (world, c) => world.tick - c.born;
 export const ageYears = (world, c) => Math.floor((world.tick - c.born) / 12);
@@ -131,6 +132,8 @@ export function census(world) {
   let burning = 0;
   let blocks2 = 0;
   let blocks3 = 0;
+  let landmarks = 0;
+  const landmarkCounts = {}; // theme id → standing (SPEC §3c)
   let crimeSum = 0;
   let crimeN = 0;
   let maxCrime = 0;
@@ -145,7 +148,7 @@ export function census(world) {
     }
     if (world.zone[i] === ZONE.M && world.tier[i] > 0 && !isPart(world, i)) markets++; // a block is one hall
     if (world.big[i] === 2) blocks2++;
-    else if (world.big[i] === 3) blocks3++;
+    else if (world.big[i] === 3) { blocks3++; const lm = landmarkOf(world.theme[i]); if (lm) { landmarks++; landmarkCounts[lm.name] = (landmarkCounts[lm.name] || 0) + 1; } }
     if (world.dread[i] > maxDread) maxDread = world.dread[i];
     if (world.civic[i] === CIVIC.PARK) parks++;
     else if (world.civic[i] === CIVIC.ZOO) zoos++;
@@ -192,6 +195,7 @@ export function census(world) {
     parks, zoos, lots, roads, walls, tunnels, usePred, usePrey, railTiles, stations, riders, commuteN, meanCommute: commuteN ? commuteSum / commuteN : 0, lotsNoRoad,
     fireStations, policeStations, burning,
     blocks2, blocks3, // the 2×2 and 3×3 blocks standing (anchors; SPEC §3b)
+    landmarks, landmarkCounts, // the 3×3s that rose as a species' landmark, and which by name (SPEC §3c)
     // What covering the town is WORTH: the multiplier on how often a fire is
     // rolled at all, 1 in a town with no cover. The rules tab shows it, and it
     // is the same function the roster weight uses (fields.fireExposure).
