@@ -374,6 +374,13 @@ function scene(z) {
   const chalk = { "4,3": art.chalk(1, false), "3,4": art.chalk(2, true), "8,3": art.chalk(3, true), "11,7": art.chalk(1, true), "11,8": art.chalk(2, false), "11,9": art.chalk(3, false) };
   const rubble = new Set(["11,3", "4,4"]);
 
+  // TWO PASSES, as render.js: the ground (the static layer there) first, in
+  // its own paintScene, then everything that stands or moves. A pull-back
+  // beyond 0.75 (a 3×3's 1.7, painter.js FOOTPRINTS) keys a block BEFORE the
+  // ground of its own front tiles, which is only right because ground is
+  // never in the same scene; one scene here would have drawn the grass
+  // diamond over the block's foot.
+  const groundItems = [];
   const items = [];
   // Ground.
   for (let ty = 0; ty < SIZE; ty++)
@@ -383,10 +390,10 @@ function scene(z) {
       if (isWater(tx, ty)) {
         if (isRoad(tx, ty)) {
           const mask = (isRoad(tx, ty - 1) ? N : 0) | (isRoad(tx + 1, ty) ? E : 0) | (isRoad(tx, ty + 1) ? S : 0) | (isRoad(tx - 1, ty) ? W : 0);
-          items.push({ sprite: WATER_TILE, tx, ty, kind: "ground", tint: waterTint(1) });
+          groundItems.push({ sprite: WATER_TILE, tx, ty, kind: "ground", tint: waterTint(1) });
           sprite = BRIDGES[mask];
         } else sprite = WATER_TILE;
-        items.push({ sprite, tx, ty, kind: "ground", z: sprite === WATER_TILE ? 0 : 1, tint: sprite === WATER_TILE ? waterTint(1) : null });
+        groundItems.push({ sprite, tx, ty, kind: "ground", z: sprite === WATER_TILE ? 0 : 1, tint: sprite === WATER_TILE ? waterTint(1) : null });
         continue;
       }
       if (isRoad(tx, ty)) {
@@ -395,14 +402,15 @@ function scene(z) {
       } else if (rubble.has(k)) sprite = RUBBLE;
       else if (chalk[k]) sprite = chalk[k];
       else sprite = GRASS[(tx * 7 + ty * 3) % 3];
-      items.push({ sprite, tx, ty, kind: "ground" });
+      groundItems.push({ sprite, tx, ty, kind: "ground" });
       // Kerbs on land beside water.
-      if (isWater(tx, ty - 1)) items.push({ sprite: KERB[0], tx, ty, kind: "ground", z: 1 });
-      if (isWater(tx + 1, ty)) items.push({ sprite: KERB[1], tx, ty, kind: "ground", z: 1 });
-      if (isWater(tx, ty + 1)) items.push({ sprite: KERB[2], tx, ty, kind: "ground", z: 1 });
-      if (isWater(tx - 1, ty)) items.push({ sprite: KERB[3], tx, ty, kind: "ground", z: 1 });
+      if (isWater(tx, ty - 1)) groundItems.push({ sprite: KERB[0], tx, ty, kind: "ground", z: 1 });
+      if (isWater(tx + 1, ty)) groundItems.push({ sprite: KERB[1], tx, ty, kind: "ground", z: 1 });
+      if (isWater(tx, ty + 1)) groundItems.push({ sprite: KERB[2], tx, ty, kind: "ground", z: 1 });
+      if (isWater(tx - 1, ty)) groundItems.push({ sprite: KERB[3], tx, ty, kind: "ground", z: 1 });
     }
-  items.push({ sprite: OVERLAYS.flood[0], tx: 3, ty: 8, kind: "ground", z: 2 });
+  groundItems.push({ sprite: OVERLAYS.flood[0], tx: 3, ty: 8, kind: "ground", z: 2 });
+  // The cursor, the ghost and the plaza glyph ride the dynamic pass in render.js too.
   items.push({ sprite: CURSOR, tx: 4, ty: 4, kind: "ground", z: 3 });
   items.push({ sprite: GHOST, tx: 11, ty: 8, kind: "ground", z: 3 });
   items.push({ sprite: PLAZA, tx: 4, ty: 3, kind: "ground", z: 3 });
@@ -476,8 +484,9 @@ function scene(z) {
   const canvas = createCanvas(margin.w, margin.h);
   const ctx = background(canvas, "#101114");
   // dx/dy (lane, lift, hover) are applied by the painter itself.
-  const n = paintScene(items, (sprite, sx, sy, item) => blit(ctx, sprite, sx + margin.left, sy + margin.top, item.tint || null));
-  console.log(`scene: ${n} items painted through painter.js`);
+  const blitItem = (sprite, sx, sy, item) => blit(ctx, sprite, sx + margin.left, sy + margin.top, item.tint || null);
+  const n = paintScene(groundItems, blitItem) + paintScene(items, blitItem);
+  console.log(`scene: ${n} items painted through painter.js (ground pass, then the standing pass)`);
   const out = [save("scene.png", canvas, z)];
   // --focus tx,ty[,tx,ty...]: a zoom-6 crop around each named tile's ground
   // centre, for looking at one occlusion without squinting at the whole block.

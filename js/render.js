@@ -132,6 +132,19 @@ export function createRenderer(canvas, initialWorld, art) {
   const railAt = (tx, ty) => tx >= 0 && ty >= 0 && tx < world.w && ty < world.h && world.rail[ty * world.w + tx] > 0;
   const railMask = (tx, ty) => (railAt(tx, ty - 1) ? 1 : 0) | (railAt(tx + 1, ty) ? 2 : 0) | (railAt(tx, ty + 1) ? 4 : 0) | (railAt(tx - 1, ty) ? 8 : 0);
   const railAxis = (tx, ty) => (railAt(tx, ty - 1) || railAt(tx, ty + 1) ? "ns" : "ew");
+  /** The oblong standing on (tx, ty), as { tx, ty, side } of its origin, or null: the zoo's 2×2 (anchor + parts). */
+  function footprintAt(tx, ty) {
+    const i = ty * world.w + tx;
+    const c = world.civic[i];
+    if (c === CIVIC.ZOO) return { tx, ty, side: 2 };
+    if (c === CIVIC.ZOO_PART) {
+      for (let dy = -1; dy <= 0; dy++) for (let dx = -1; dx <= 0; dx++) {
+        const ax = tx + dx, ay = ty + dy;
+        if (ax >= 0 && ay >= 0 && world.civic[ay * world.w + ax] === CIVIC.ZOO) return { tx: ax, ty: ay, side: 2 };
+      }
+    }
+    return null;
+  }
 
   // ---- the static ground layer ---------------------------------------------------------
   function rebuildGround() {
@@ -338,7 +351,12 @@ export function createRenderer(canvas, initialWorld, art) {
         if (gh.sprite) items.push({ sprite: gh.sprite, tx: gh.tx, ty: gh.ty, kind: "building", z: Z_BUILDING + 3, alpha: gh.ok ? 0.55 : 0.3 });
       }
       if (hover.tx != null && hover.tx >= 0 && hover.tx < world.w && hover.ty >= 0 && hover.ty < world.h) {
-        items.push({ sprite: art.overlay("cursor"), tx: hover.tx, ty: hover.ty, kind: "ground", z: 4, tint: hover.pinned ? RED_TINT : null });
+        // On a tile of an oblong (the zoo, a block) the cursor is keyed as
+        // that building, a hair under it (painter.js FOOTPRINTS): keyed as
+        // its own tile it would poke through the wall of a block keyed
+        // 1.7 cells back, or vanish under the ground it stands on.
+        const fp = footprintAt(hover.tx, hover.ty);
+        items.push({ sprite: art.overlay("cursor"), tx: hover.tx, ty: hover.ty, kind: "ground", z: fp ? Z_BUILDING - 1 : 4, tint: hover.pinned ? RED_TINT : null, keyAt: fp ? [fp.tx, fp.ty] : undefined, footprint: fp ? [fp.side, fp.side] : undefined });
       }
     }
     // Walkers, tents, meeting glyphs.

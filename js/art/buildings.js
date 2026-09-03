@@ -124,12 +124,30 @@ const flipPlan = (boxes) => boxes.map((bx) => box(bx.b0, bx.b1, bx.a0, bx.a1, bx
  * first round's park trees were the bottom four canopy rows on a trunk.
  * Now a plan that stamps anything declares how tall the stamps reach.
  */
-function solidSprite(name, boxes, { hub = A_STEP / 2, footprint = [1, 1], tags = [], extent = [], stamps = [] } = {}) {
-  const r = render([...boxes, ...extent], { hub });
-  r.name = name;
-  for (const [sprite, a, b, c] of stamps) stampAtWorld(r, sprite, a, b, c);
+export function solidSprite(name, boxes, { hub = A_STEP / 2, footprint = [1, 1], tags = [], extent = [], stamps = [] } = {}) {
+  const recipe = { name, boxes, hub, footprint, extent, stamps };
+  const r = renderRecipe(recipe, 1);
   PLANS.push({ name, footprint, boxes });
-  return defineSprite({ name, rows: toRows(r.grid), anchor: r.anchor, footprint, tags });
+  const sprite = defineSprite({ name, rows: toRows(r.grid), anchor: r.anchor, footprint, tags });
+  RECIPES.set(sprite, recipe);
+  return sprite;
+}
+
+/**
+ * THE RECIPE of every solid — boxes, hub, extent, stamps — kept beside the
+ * sprite it made, so the same plan can be rasterised again: at scale 2 for
+ * the hi-res set (js/art/hires.js), or with its z-buffer for the depth
+ * audit (tools/depthaudit.mjs). A sprite is frozen rows; a recipe is how
+ * the rows were made.
+ */
+export const RECIPES = new Map();
+
+/** Rasterise a recipe at `scale`: { grid, zbuf, anchor, ox, oy, scale, name }. Stamps go through the z-buffer as in `solidSprite`. */
+export function renderRecipe(recipe, scale = 1) {
+  const r = render([...recipe.boxes, ...recipe.extent], { hub: recipe.hub, scale });
+  r.name = recipe.name;
+  for (const [sprite, a, b, c] of recipe.stamps) stampAtWorld(r, sprite, a, b, c, scale);
+  return r;
 }
 
 /**
@@ -164,9 +182,12 @@ export const STAMP_LOG = [];
  * Throws if any opaque pixel lands outside the grid: a cropped part is a
  * silently wrong sprite, and a plan that stamps declares its `extent`.
  */
-function stampAtWorld(r, sprite, a, b, c = 0) {
-  const gx = Math.round(TO_X(a, b)) + r.ox - sprite.anchor[0];
-  const gy = Math.round(TO_Y(a, b, c)) + r.oy - sprite.anchor[1];
+function stampAtWorld(r, sprite, a, b, c = 0, scale = 1) {
+  // At scale s a hand-drawn part (a tree) is nearest-neighbour: every one of
+  // its pixels becomes an s×s block at the same depth, so the 2× set keeps
+  // the 1× tree exactly, twice as big — the organic exception stays drawn.
+  const gx = Math.round(TO_X(a, b) * scale) + r.ox - sprite.anchor[0] * scale;
+  const gy = Math.round(TO_Y(a, b, c) * scale) + r.oy - sprite.anchor[1] * scale;
   const H = r.grid.length, W = r.grid[0].length;
   const base = a + b + 2 * c;
   let dropped = 0;
@@ -176,16 +197,18 @@ function stampAtWorld(r, sprite, a, b, c = 0) {
     for (let x = 0; x < row.length; x++) {
       const ch = row[x];
       if (ch === T) continue;
-      const px = gx + x, py = gy + y;
-      if (px < 0 || py < 0 || px >= W || py >= H) { dropped++; continue; }
-      const i = py * W + px;
-      if (depth <= r.zbuf[i]) continue;
-      r.zbuf[i] = depth;
-      r.grid[py][px] = ch;
+      for (let sy = 0; sy < scale; sy++) for (let sx = 0; sx < scale; sx++) {
+        const px = gx + x * scale + sx, py = gy + y * scale + sy;
+        if (px < 0 || py < 0 || px >= W || py >= H) { dropped++; continue; }
+        const i = py * W + px;
+        if (depth <= r.zbuf[i]) continue;
+        r.zbuf[i] = depth;
+        r.grid[py][px] = ch;
+      }
     }
   }
-  STAMP_LOG.push({ sprite: r.name, part: sprite.name, at: [a, b, c], dropped });
-  if (dropped) throw new Error(`buildings: '${sprite.name}' stamped into '${r.name}' at (${a}, ${b}, ${c}) loses ${dropped} px outside the grid — grow the plan's extent`);
+  if (scale === 1) STAMP_LOG.push({ sprite: r.name, part: sprite.name, at: [a, b, c], dropped });
+  if (dropped) throw new Error(`buildings: '${sprite.name}' stamped into '${r.name}' at (${a}, ${b}, ${c}) ×${scale} loses ${dropped} px outside the grid — grow the plan's extent`);
 }
 
 // ------------------------------------------------------------ residential

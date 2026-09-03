@@ -38,6 +38,39 @@
 // four sides). A per-tile column-clipped split would be exact; this is the
 // patch that is right for every walker on a road beside a 2×2.
 //
+// AND IT GROWS ONE TILE PER TILE OF SIDE (session 9, derived then audited).
+// The convention first: an item at (tx, ty) stands at the POINT
+// (tx + ½, ty + ½) — `placeAt` adds HALF_H, so a walker at (2, 4.0) has its
+// feet on the centre of tile (2, 4), and a road's walkers run at integer
+// ty along it. A footprint of side s at (ox, oy) is keyed at
+// ox + oy + 2s − 2 − back + 0.75; a walker paints over it when
+// tx + ty + 0.5 passes that. Two things constrain `back`:
+//   IN FRONT   a walker on the east road (tx = ox + s) beside the block's
+//              BACK row (ty = oy) has its top four rows over the end face's
+//              bottom four, 48 units nearer than the wall it covers; it must
+//              be OVER, so back > s − 1.75. (The south road at tx = ox is
+//              the same face turned round.)
+//   BEHIND     a walker on the north road (ty = oy − 1) at tx ≤ ox + s −
+//              0.81 has its picture on the end face and is behind it; it
+//              must be UNDER, so back < s − 0.44.
+// So back ∈ (s − 1.75, s − 0.44): the zoo's 0.7 sits in (0.25, 1.56), and
+// back = 0.7 + (s − 2) keeps the zoo's two margins (0.45 tile in front,
+// 0.86 behind) at every side — 1.7 for a 3×3. The flat 0.7 on a 3×3 is
+// 0.55 tile short in front: a walker on the east road beside the back row
+// loses its head under the wall's foot for half a tile of every crossing
+// (tools/depthaudit.mjs `--probe 3 --pullback 0.7` counts the pixels).
+// What a pull-back beyond 0.75 gives up is ORDER AGAINST THE GROUND OF ITS
+// OWN FOOTPRINT — the front tile keys at ox + oy + 2s − 2, past the block —
+// and that is fine because ground is never in the building's scene:
+// render.js paints it in the static layer and tools/shots.mjs --scene in
+// its own pass first; only the cursor stands on a footprint tile in the
+// dynamic pass, and it borrows the block's key (`keyAt`, `footprint` below).
+// The first draft of this session got 1.7 from a derivation that forgot
+// the +½ convention, then talked itself back to 0.7 from a second one that
+// forgot it too and worried about the ground; the audit with the convention
+// fixed decided it. The suite runs that audit over the zoo, a bare 3×3 and
+// every block sprite.
+//
 // THIS IS A DEVIATION FROM SPEC §13 AS WRITTEN, AND IT IS THE RIGHT ONE.
 // §13 says "building 768" keyed by the front-most tile; an oblong here is
 // keyed at (front cell − 0.7)·1024 + 768, i.e. as if it stood at z ≈ 51 in
@@ -89,11 +122,15 @@ export function placeAt(sprite, tx, ty, dx = 0, dy = 0) {
 }
 
 /**
- * The key of an item: {sprite, tx, ty, z?, kind?}. `z` wins when given;
- * otherwise kind 'walker' → walkerZ, kind 'ground' → 0, anything else → 768.
+ * The key of an item: {sprite, tx, ty, z?, kind?, keyAt?, footprint?}. `z`
+ * wins when given; otherwise kind 'walker' → walkerZ, kind 'ground' → 0,
+ * anything else → 768. `keyAt: [tx, ty]` and `footprint: [w, h]` let an item
+ * be keyed as ANOTHER footprint while it is drawn at its own tile — the
+ * cursor on a tile of a 2×2 or 3×3 is keyed as that building, a hair under
+ * it, so it neither pokes through the wall nor hides under the ground.
  */
 export function keyOf(item) {
-  const fp = (item.sprite && item.sprite.footprint) || [1, 1];
+  const fp = item.footprint || (item.sprite && item.sprite.footprint) || [1, 1];
   let z = item.z;
   if (z === undefined) {
     if (item.kind === "walker") z = walkerZ(item.tx, item.ty);
@@ -103,11 +140,18 @@ export function keyOf(item) {
   // depthOf keys a footprint by its front-most tile; add the fractional part
   // of the origin back so movers stay continuous; pull an oblong back (see
   // FOOTPRINTS above).
-  const fx = item.tx - Math.floor(item.tx);
-  const fy = item.ty - Math.floor(item.ty);
-  const cell = depthOf(Math.floor(item.tx), Math.floor(item.ty), fp[0], fp[1]);
-  const back = fp[0] * fp[1] > 1 ? OBLONG_PULLBACK : 0;
+  const kx = item.keyAt ? item.keyAt[0] : item.tx;
+  const ky = item.keyAt ? item.keyAt[1] : item.ty;
+  const fx = kx - Math.floor(kx);
+  const fy = ky - Math.floor(ky);
+  const cell = depthOf(Math.floor(kx), Math.floor(ky), fp[0], fp[1]);
+  const back = pullbackOf(fp[0], fp[1]);
   return sortKey(cell + fx + fy - back, 0, z);
+}
+
+/** The pull-back a footprint is keyed with: 0 for a 1×1, OBLONG_PULLBACK + (side − 2) for an oblong (FOOTPRINTS above) — spelled once. */
+export function pullbackOf(fw, fh = fw) {
+  return fw * fh > 1 ? OBLONG_PULLBACK + (Math.max(fw, fh) - 2) : 0;
 }
 
 /**

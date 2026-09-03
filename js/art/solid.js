@@ -57,12 +57,21 @@ export function box(a0, a1, b0, b1, c0, c1, faces) {
  * `hub` defaults to the centre of a 1×1 plan; a 2×2 building passes A_STEP.
  * `zbuf` may be shared across passes so a later pass (a sign, a tree in the
  * yard) resolves depth against the building it stands beside.
+ *
+ * `scale` is the HI-RES SET (SPEC §12.6): the same plan sampled at `scale`
+ * pixels per 1× pixel — a 2× grid is 128 px to the tile, every face edge
+ * lands where the 1× edge landed, and a skin keyed on world units (a door,
+ * a window, a storey) is the same door at twice the resolution, while a
+ * skin keyed on screen pixels (brick grain, the meat stripe) gets finer,
+ * which is the point. At scale 1 the output is byte-identical to the
+ * pre-scale rasteriser (the suite hashes every 1× sprite against a dump
+ * taken before this parameter existed).
  */
-export function render(boxes, { hub = A_STEP / 2, pad = 1 } = {}) {
+export function render(boxes, { hub = A_STEP / 2, pad = 1, scale = 1 } = {}) {
   let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
   for (const bx of boxes) {
     for (const a of [bx.a0, bx.a1]) for (const b of [bx.b0, bx.b1]) for (const c of [bx.c0, bx.c1]) {
-      const x = TO_X(a, b), y = TO_Y(a, b, c);
+      const x = TO_X(a, b) * scale, y = TO_Y(a, b, c) * scale;
       if (x < minX) minX = x;
       if (x > maxX) maxX = x;
       if (y < minY) minY = y;
@@ -77,12 +86,12 @@ export function render(boxes, { hub = A_STEP / 2, pad = 1 } = {}) {
   const H = maxY - minY + 1;
   const g = Array.from({ length: H }, () => new Array(W).fill(T));
   const zbuf = new Float64Array(W * H).fill(-Infinity);
-  rasterInto(g, zbuf, boxes, -minX, -minY);
-  return { rows: g.map((r) => r.join("")), grid: g, zbuf, anchor: [TO_X(hub, hub) - minX, TO_Y(hub, hub, 0) - minY], ox: -minX, oy: -minY };
+  rasterInto(g, zbuf, boxes, -minX, -minY, scale);
+  return { rows: g.map((r) => r.join("")), grid: g, zbuf, anchor: [TO_X(hub, hub) * scale - minX, TO_Y(hub, hub, 0) * scale - minY], ox: -minX, oy: -minY, scale };
 }
 
-/** Rasterise boxes into an existing grid with offset (ox, oy) and shared z-buffer. */
-export function rasterInto(g, zbuf, boxes, ox, oy) {
+/** Rasterise boxes into an existing grid with offset (ox, oy) and shared z-buffer, at `scale` px per 1× px. */
+export function rasterInto(g, zbuf, boxes, ox, oy, scale = 1) {
   const H = g.length;
   const W = g[0].length;
   const put = (x, y, depth, key) => {
@@ -99,32 +108,33 @@ export function rasterInto(g, zbuf, boxes, ox, oy) {
     const { a0, a1, b0, b1, c0, c1, faces } = bx;
     let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
     for (const a of [a0, a1]) for (const b of [b0, b1]) for (const c of [c0, c1]) {
-      const x = TO_X(a, b), y = TO_Y(a, b, c);
+      const x = TO_X(a, b) * scale, y = TO_Y(a, b, c) * scale;
       if (x < minX) minX = x;
       if (x > maxX) maxX = x;
       if (y < minY) minY = y;
       if (y > maxY) maxY = y;
     }
     for (let y = Math.floor(minY); y <= Math.ceil(maxY); y++) {
+      const Y = y / scale;
       for (let x = Math.floor(minX); x <= Math.ceil(maxX); x++) {
-        const h = x / 2;
+        const h = x / (2 * scale);
         if (faces.top) {
-          const a = (h + y + c1) / 2;
-          const b = (y + c1 - h) / 2;
+          const a = (h + Y + c1) / 2;
+          const b = (Y + c1 - h) / 2;
           if (a >= a0 - EPS && a <= a1 + EPS && b >= b0 - EPS && b <= b1 + EPS) {
             put(x, y, depthOf(a, b, c1), faces.top(a - a0, b - b0, x, y));
           }
         }
         if (faces.side) {
           const a = h + b1;
-          const c = a + b1 - y;
+          const c = a + b1 - Y;
           if (a >= a0 - EPS && a <= a1 + EPS && c >= c0 - EPS && c <= c1 + EPS) {
             put(x, y, depthOf(a, b1, c), faces.side(a - a0, c1 - c, x, y));
           }
         }
         if (faces.end) {
           const b = a1 - h;
-          const c = a1 + b - y;
+          const c = a1 + b - Y;
           if (b >= b0 - EPS && b <= b1 + EPS && c >= c0 - EPS && c <= c1 + EPS) {
             put(x, y, depthOf(a1, b, c), faces.end(b - b0, c1 - c, x, y));
           }

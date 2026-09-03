@@ -1136,6 +1136,46 @@ if (existsSync(artIndex)) {
     for (const [tx, ty] of [[0, 4], [1, 4], [0, 5], [1, 5]]) if (!(keyOf(ground(tx, ty)) < keyOf(zoo))) behind = false;
     check("painter: everything behind or under a 2×2 paints before it", behind);
     check("painter: keyOf agrees with sortKey for a 1×1", keyOf({ sprite: art.building(1, 1, 0), tx: 3, ty: 4, kind: "building" }) === sortKey(3, 4, Z_BUILDING));
+    // THE RAY AUDIT (tools/depthaudit.mjs): every oblong solid against walkers
+    // ringing it on the four roads, pixel by pixel through the view ray. The
+    // 2×2 zoo reproduces round 2's result (0 mis-ordered); a bare 3×3 probe
+    // and every 3×3 block prove the size-aware pull-back (painter.js
+    // FOOTPRINTS) — the flat 0.7 left a 3×3 with a 0.05-tile margin.
+    {
+      const { auditDepth, probeSolid, auditWalkers } = await import("./depthaudit.mjs");
+      const { pullbackOf } = await import("../js/iso/painter.js");
+      const { RECIPES } = await import("../js/art/buildings.js");
+      const walkers = await auditWalkers();
+      const oblongs = [];
+      for (const { sprite } of allSprites()) { const [fw, fh] = sprite.footprint || [1, 1]; if (fw * fh > 1 && RECIPES.has(sprite)) oblongs.push(sprite); }
+      oblongs.push(await probeSolid(3, 48), await probeSolid(2, 48));
+      const audited = [];
+      const misordered = [];
+      for (const sprite of oblongs) {
+        const res = auditDepth(sprite, walkers);
+        audited.push(`${sprite.name} ${res.overlaps}px`);
+        if (res.bad) misordered.push(`${sprite.name}: ${res.bad} px at (${res.worst.wx.toFixed(2)}, ${res.worst.wy.toFixed(2)})`);
+      }
+      check("painter: the ray audit — no oblong paints a pixel on the wrong side of a walker on its roads", oblongs.length >= 3 && misordered.length === 0, misordered.join("; ") || audited.join(", "));
+      // painter.js FOOTPRINTS: back ∈ (s − 1.75, s − 0.44), kept at the zoo's margins by 0.7 + (s − 2).
+      check("painter: the pull-back is 0 for a 1×1, 0.7 for a 2×2, 1.7 for a 3×3", pullbackOf(1) === 0 && pullbackOf(2) === 0.7 && Math.abs(pullbackOf(3) - 1.7) < 1e-9);
+      // The 3×3 band, the 2×2 band's shape on the walkers' own convention (a
+      // walker at (tx, ty) stands on the centre of that tile): a walker on the
+      // east road (tx = 3) beside ANY row of the block, or on the south road
+      // (ty = 7) beside any column, paints over it; one on the north or west
+      // road paints before. Ground is not asserted: it is never in the
+      // building's scene (render.js static layer; shots.mjs's own pass).
+      const p3 = oblongs.find((s) => s.name === "probe-3x3");
+      const blk = { sprite: p3, tx: 0, ty: 4, kind: "building" };
+      let over = true, under = true;
+      for (const ty of [4, 4.1, 4.5, 5, 6, 6.9]) if (!(keyOf(walker(3, ty)) > keyOf(blk))) over = false;
+      for (const tx of [0, 0.1, 1, 2.9]) if (!(keyOf(walker(tx, 7)) > keyOf(blk))) over = false;
+      for (const [tx, ty] of [[0, 3], [1, 3], [2, 3], [2.9, 3], [-1, 4], [-1, 5], [-1, 6.9]]) if (!(keyOf(walker(tx, ty)) < keyOf(blk))) under = false;
+      check("painter: a walker on the road beside a 3×3 paints over it; one behind it paints before", over && under);
+      // The cursor on a footprint tile borrows the building's key and sits a hair under it, wherever on the footprint it is drawn.
+      const cursorOn = (tx, ty) => keyOf({ sprite: art.overlay("cursor"), tx, ty, kind: "ground", z: Z_BUILDING - 1, keyAt: [0, 4], footprint: [3, 3] });
+      check("painter: the cursor on any tile of a 3×3 keys just under the block", [[0, 4], [2, 6], [1, 5]].every(([tx, ty]) => cursorOn(tx, ty) < keyOf(blk) && cursorOn(tx, ty) > keyOf(blk) - 2));
+    }
   }
   // Species parity: every roster row has kit art, an arrival weight and a
   // character-line noun. A missing weight once made every arrival the last
