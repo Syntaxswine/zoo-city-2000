@@ -4,6 +4,26 @@ Open work, ranked. The design record is `SPEC.md`; the numbers are in
 `js/sim/rules.js` (KNOBS). Later layers were labelled at design time so v1
 could ship whole.
 
+## The People — PLANNED 2026-09-02 (`docs/PLAN-THE-PEOPLE-2026-09-02.md`); nothing built
+The owner: *"a master plan for how to really improve zoo city … one part i'd
+like is to be able to see the residents thoughts when they walk around. a
+larger goal of relating more strongly with the individual citizens. i think
+more character and variety in the building sprites might help."* Seven parts
+for parallel agents: **K** the keel (`moodTerms`, `life.js` API,
+`world.majority`, `storyTick` stub, reserved art names — lands FIRST, ½
+session) then **A** thoughts (bubbles from the mood's largest term or the
+newest life event; the walkers' stream decides who speaks) · **B** lives (a
+12-entry ring per citizen + the graveyard; the save compaction pays for it —
+citizens are 732 KB of a 906 KB year-30 save, mostly default fields) · **C**
+follow and favourites (a citizen-pinned card, F to follow, S to star, a
+People tab) · **D** looks and faces (4 looks per species, portraits, an idle
+pose) · **E** buildings with character (4 plans per family, windows lit by
+fill, a species mark on the socket) · **F** the story channel (obituaries,
+litters, a people chip, clickable names) · **G** integration. The plan's §5
+is the file-ownership table; K7 copies it here when the keel lands.
+Measured for it: mean friends per citizen 0.67 — the graph is thin; the
+plan makes that visible and does not touch the knob.
+
 ## Crime and punishment — SHIPPED 2026-09-02 (SPEC §9c; `js/sim/justice.js`); what is left
 - **Hunger visibility.** The scripted towns run at U 0–4, so the ×20 hunger
   term only bites in dormitory / over-taxed towns (measured: one killing per
