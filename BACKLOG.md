@@ -75,6 +75,12 @@ walks any road tile, rides any rail tile, meets only at a station) — v1's
 rule is two straight runs on different axes, not on a wall/water/station,
 a crossing stays straight, bulldoze takes the rail first; `art.crossing`.
 The rail line below ("level crossings … the graph allows both ways") is X.
+And *"citizens traveling on the rails should move 50% faster"* → X2:
+measured first, a rider moves at ×3.07 a walker on the map today, so read
+as ×4.5; WALK 10 → 9, RAIL_COST 3 → 2 (9/2 = 4.5 exactly), RIDE_SPEED
+DERIVED = WALK/RAIL_COST so the eye and the Rules tab are one number; the
+hash moves on rail towns only. Plan §8 q8 asks whether ×1.5 of walking was
+meant instead.
 
 ## Crime and punishment — SHIPPED 2026-09-02 (SPEC §9c; `js/sim/justice.js`); what is left
 - **Hunger visibility.** The scripted towns run at U 0–4, so the ×20 hunger

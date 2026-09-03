@@ -31,7 +31,9 @@ top"* → Part S (a saves menu with named slots) and Part P (the palette),
 and the control city becomes the suite's real-save fixture (§4-G).
 
 And: *"railroads and roads should be able to cross over each other
-perpendicularly."* → Part X, the level crossing (§4-X).
+perpendicularly."* → Part X, the level crossing (§4-X). And: *"citizens
+traveling on the rails should move 50% faster"* → X2, the ride speed
+(§4-X), read as 50% faster than they ride now (measured ×3.07 → ×4.5).
 
 Plan only. Nothing here is built. Each part is sized for one agent-session,
 owns its own files, and codes against contracts written down in §3 so the
@@ -86,6 +88,7 @@ throwaway — part G writes the real instrument):
 | walkers on screen | ≤ 150 | eight bubbles is the readable cap; a bubble per walker is noise — which is why bubbles live under the Inspect tool |
 | the meat economy (2 markets, stations, a centre, 30 y) | halls 11 · killings **4** · sold **2** · cut **§38,931** | the halls earned §38.9k from `CUT_PER_JOB` (§25 per filled job a year) and §300 from bodies. Meat is not a quantity today — a killing near a hall posts §50 and a line, a convict §100. The owner's real game: 20 sold, 15 in cells, out of 2,800 animals. Part H |
 | deaths in 30 years | ≈ 712 (3,220 ids − 1,732 alive − 776 left) | ≈ 24 a year of natural death — the supply the hall never buys (BACKLOG's "the market buys the dead") |
+| a rider's speed on the map (the suite's rail fixture, one commuter, `scratchpad/ridespeed.mjs`) | walk **0.97** tiles/s · ride **2.99** tiles/s · ratio **3.07** | `RIDE_SPEED` 3 is real on the map; the felt commute says 0.3 of a walk (`RAIL_COST` 3 / `WALK` 10 = 3.33×) — two numbers for one fact, off by a tenth. X2 ties them |
 | **the rig's scale vs the owner's** | the scripted mayor builds `BLOCK` 7 (a 6×6 interior in a shared road ring) with the meat row IN the grid; the owner: *"I build city blocks as 6x6 blocks, sometimes larger. so there are probably going to be at least 30 tiles between residential and meat"* | **every radius-gated rule in the meat arc was tuned on the rig and is dead at the owner's scale** — see §1b. Every "units/yr" figure above is a rig figure until `meatprobe` runs on an owner-scale layout or the owner's own save |
 | building families | 12 × 2 variants, `variant & 1` in `render.js:311` | `world.variant[i]` is a saved Uint8 — bits 1–7 are free, and keying by the TILE's byte is already the identity law |
 | suite | 167 checks | every part adds its checks to the same file, in its own Part letter |
@@ -1083,6 +1086,32 @@ crossing; say so in SPEC rather than forbid it.
 **Size.** ≈ 80 ops + 60 art + 10 render + 60 checks; half a session; no
 keel needed.
 
+**X2. The ride speed** — *"citizens traveling on the rails should move
+50% faster."* Measured first (§1): a rider moves at 3.07× a walker on the
+map today, so the ruling is read as 50% faster than NOW: **×4.5**. (If
+the owner meant ×1.5 of walking — slower than today — it is one knob the
+other way; §8 q8 asks.) Two numbers describe one fact tonight and
+disagree by a tenth: the eye's `RIDE_SPEED` 3 and the commute rule's
+`RAIL_COST / WALK` = 0.3 (3.33×). X2 makes them one: `WALK` 10 → **9**
+and `RAIL_COST` 3 → **2** (9 / 2 = 4.5 exactly, both integers for Dial's
+buckets), and `RIDE_SPEED` becomes DERIVED, `WALK / RAIL_COST`, so the
+Rules tab's "a ride is 0.22 of a walk" and the train on the map can never
+drift apart again (Law 6). Consequences, all stated: the trespass step
+becomes 6 × 9 = 54 (the same 6× preference); Dial's bucket count is `max
+× WALK` — fewer buckets, the same order (the BFS equivalence holds for
+any uniform `WALK`, and the suite's "every commuter's path tile-equal to
+`roadPath`" check is the proof); `commuteTime` counts a ride segment at
+0.22, so riders with long lines gain the mood's commute +10 sooner — the
+hash MOVES on the rail gates and the commit records before/after; the
+ride-time check in the suite (`commuteTime … 0.3 of a walk`) is rewritten
+to read the knobs, not the literal. Owned by X (the two knobs in
+`rules.js`, the derived `RIDE_SPEED`, the Rules-tab line, the suite line,
+SPEC §7.9's three numbers); `walkers.js:556` is unchanged — it reads the
+knob. Acceptance: `ridespeed` re-run prints ratio 4.5 ± 0.05; the fixture's
+ride cost is `10 + 13·2 + 10`… in the new units `9 + 13·2 + 9`; the
+mayor's balanced hash (no rail) is unchanged — only rail towns move.
+An hour.
+
 ### G. Integration — after the parts have merged
 
 One agent, after A–F, H, P, S and X are on `main`:
@@ -1238,3 +1267,6 @@ X+A, then H+E, then B+D, then C+F; K before A/B/H.
 7. ~~**Use-zoning (`U`)**~~ Decided under the same ruling: it stays on the
    top strip beside density as a modifier, on `U`. A seventeenth button
    is a one-row change to `TOOLS` if the owner wants it later.
+8. **"50% faster" than what?** Riders move at ×3.07 today (measured). The
+   plan reads the ruling as ×4.5 (50% more than now). If it meant ×1.5 of
+   walking speed, say so — that is `RAIL_COST` 6 with `WALK` 9 instead.
