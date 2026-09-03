@@ -14,6 +14,7 @@
 
 import { ZONE, idx } from "./sim/world.js";
 import { costOf, roadL } from "./sim/ops.js";
+import { pinTarget } from "./follow.js";
 
 export const TOOLS = [
   { id: "R", key: "1", label: "R", hint: "zone residential (drag)" },
@@ -46,7 +47,7 @@ export function createInput(canvas, app) {
     use: 0, // the Use brush: 0 mixed · 1 predator-only · 2 prey-only
     hover: null, // [tx, ty] | null
     pinned: null, // tile index | null
-    pinnedWalker: null,
+    pinnedCitizen: null, // stable citizen id; never a short-lived walker object
     drag: null, // { ax, ay, bx, by, shift }
     pan: null, // { sx, sy, cx, cy }
     mouse: { x: 0, y: 0, inside: false },
@@ -58,7 +59,8 @@ export function createInput(canvas, app) {
 
   const USE_LABEL = ["mixed — everyone", "predator-only — the hunters", "prey-only — everyone but a hunter"];
   function syncThoughts(tile = state.hover) {
-    app.walkers.setCursor(state.tool === "inspect" && state.mouse.inside ? tile : null, state.pinnedWalker?.citizen ?? null);
+    const inspecting = state.tool === "inspect";
+    app.walkers.setCursor(inspecting && state.mouse.inside ? tile : null, inspecting ? state.pinnedCitizen : null);
   }
   function repickAfterCameraMove() {
     const tile = state.mouse.inside ? app.renderer.pick(state.mouse.x, state.mouse.y, app.camera) : null;
@@ -69,7 +71,7 @@ export function createInput(canvas, app) {
   }
   function clearPins() {
     state.pinned = null;
-    state.pinnedWalker = null;
+    state.pinnedCitizen = null;
     syncThoughts();
   }
   function setTool(id) {
@@ -220,11 +222,14 @@ export function createInput(canvas, app) {
       state.pan = null;
       if (!p.moved && p.pinTile) {
         // Inspect click: pin (or unpin) the card.
-        if (p.pinWalker) { state.pinnedWalker = p.pinWalker; state.pinned = null; }
+        if (p.pinWalker?.citizen != null && pinTarget(world(), app.walkers.list(), p.pinWalker.citizen)) {
+          state.pinnedCitizen = p.pinWalker.citizen;
+          state.pinned = null;
+        }
         else {
           const i = idx(world(), p.pinTile[0], p.pinTile[1]);
           state.pinned = state.pinned === i ? null : i;
-          state.pinnedWalker = null;
+          state.pinnedCitizen = null;
         }
         syncThoughts();
       }
@@ -247,7 +252,7 @@ export function createInput(canvas, app) {
 
   function onLeave() {
     state.mouse.inside = false;
-    app.walkers.setCursor(null);
+    syncThoughts(null); // a pinned citizen still speaks beside its walker while the pointer is over the card
     if (!state.drag) { state.hover = null; app.ui.setCost(""); state.cost = null; }
   }
 
@@ -291,7 +296,7 @@ export function createInput(canvas, app) {
       case "n": case "N": app.ui.openNewCity(); break;
       case "Escape":
         // Two-step: a drag or a pinned card is cleared first; a clean map opens the title menu.
-        if (state.drag || state.pinned != null || state.pinnedWalker) { state.drag = null; clearPins(); state.cost = null; app.ui.setCost(""); }
+        if (state.drag || state.pinned != null || state.pinnedCitizen != null) { state.drag = null; clearPins(); state.cost = null; app.ui.setCost(""); }
         else app.title.open();
         break;
       default:
@@ -384,14 +389,18 @@ export function createInput(canvas, app) {
   /** For the hover card: the pinned or hovered thing. */
   function hoverInfo() {
     const w = world();
-    if (state.pinnedWalker) {
-      const alive = app.walkers.list().includes(state.pinnedWalker);
-      if (alive) return { walker: state.pinnedWalker, pinned: true };
-      clearPins();
+    if (state.pinnedCitizen != null) {
+      const target = pinTarget(w, app.walkers.list(), state.pinnedCitizen);
+      if (target) return { citizen: state.pinnedCitizen, walker: target.walker, target, pinned: true };
+      clearPins(); // invalid imported/corrupt id only; ending a walk is not an unpin
     }
     if (state.pinned != null) return { tile: state.pinned, pinned: true };
     if (!state.mouse.inside || state.drag) return state.hover ? { tile: idx(w, state.hover[0], state.hover[1]), pinned: false } : null;
     const wk = app.renderer.pickWalker(state.mouse.x, state.mouse.y, app.walkers.list());
+    if (wk?.citizen != null) {
+      const target = pinTarget(w, app.walkers.list(), wk.citizen);
+      if (target) return { citizen: wk.citizen, walker: wk, target, pinned: false };
+    }
     if (wk) return { walker: wk, pinned: false };
     if (!state.hover) return null;
     return { tile: idx(w, state.hover[0], state.hover[1]), pinned: false };
@@ -416,6 +425,15 @@ export function createInput(canvas, app) {
     hover: hoverForRenderer,
     hoverInfo,
     refreshCost,
+    pinCitizen(id) {
+      const target = pinTarget(world(), app.walkers.list(), id);
+      if (!target) return false;
+      state.pinnedCitizen = Number(id);
+      state.pinned = null;
+      setTool("inspect");
+      syncThoughts();
+      return true;
+    },
     get tool() { return state.tool; },
     get density() { return state.density; },
     unpin() { clearPins(); },

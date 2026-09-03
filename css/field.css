@@ -111,10 +111,19 @@ main { flex: 1; display: flex; min-height: 0; }
 /* ---- hover card ---- */
 #card { min-height: 96px; max-height: 190px; overflow: auto; flex: none; }
 #card .head b { font-weight: 600; }
+#card .head.personhead { display: flex; align-items: flex-start; gap: 7px; }
+#card canvas.portrait { width: 32px; height: 32px; flex: none; image-rendering: pixelated; border: 1px solid var(--border); background: #fffdf6; }
+#card .personname { min-width: 0; }
 #card .dim { color: var(--dim); }
 #card .warn { color: var(--warn); }
 #card .why b { font-weight: 600; letter-spacing: 1px; }
 #card .pin { color: var(--accent); }
+#card button.personlink { border: 0; padding: 0; background: transparent; color: var(--accent); font: inherit; text-decoration: underline; text-decoration-style: dotted; }
+#card .want { margin: 3px 0; }
+#card .doing, #card .epitaph { color: var(--dim); font-style: italic; }
+#card .life { margin-top: 4px; border-top: 1px dotted var(--border); padding-top: 3px; }
+#card details { margin: 1px 0; }
+#card summary { cursor: pointer; }
 
 /* ---- tabs ---- */
 #tabs { display: flex; gap: 0; border-bottom: 1px solid var(--border); flex: none; }

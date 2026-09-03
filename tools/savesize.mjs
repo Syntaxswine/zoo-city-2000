@@ -6,6 +6,7 @@ import { createWorld } from "../js/sim/world.js";
 import { tick } from "../js/sim/tick.js";
 import { toPlain } from "../js/sim/save.js";
 import { createMayor } from "./mayor.mjs";
+import { legacyStats } from "../js/sim/legacy.js";
 
 const argv = process.argv.slice(2);
 const arg = (key, fallback) => { const i = argv.indexOf(key); return i >= 0 ? argv[i + 1] : fallback; };
@@ -28,7 +29,14 @@ console.log(`year 30 · ${world.citizens.length} citizens · ${bytes(plain)} byt
 for (const [name, size] of sections) console.log(`${name.padEnd(18)} ${String(size).padStart(8)} bytes`);
 const citizenBytes = bytes(plain.citizens);
 console.log(`citizens: ${citizenBytes} / ${LIMIT} bytes (${(citizenBytes / BASELINE_CITIZEN_BYTES * 100).toFixed(1)}% of the 732 KB baseline)`);
+const archive = legacyStats(world);
+const archiveJson = bytes(plain.legacy || []);
+console.log(`legacy: ${archive.records} permanent records · ${archive.bytes} shorthand bytes · ${archive.mean.toFixed(2)} mean · ${archiveJson} JSON bytes`);
 if (citizenBytes > LIMIT) {
   console.error("FAIL: citizen section exceeds Part B's 60% budget");
+  process.exitCode = 1;
+}
+if (archive.mean > 45) {
+  console.error("FAIL: permanent citizen shorthand exceeds the 45-byte mean budget");
   process.exitCode = 1;
 }

@@ -11,7 +11,8 @@ import { SPECIES, SPECIES_BY_ID, NAME_PARTS, affinity, ARRIVING, PREY_OF, DIET_O
 import { ZONE, CIVIC, TERRAIN, ROAD, idx, inBounds, capacityOf, jobsOf, jobZone, absent, USE_NAME } from "./world.js";
 import { doorOf, edgeRoads, hasAccess, commutePath, dial, WALK, nodePath, commuteTime } from "./fields.js";
 import { ageYears, ageMonths, isWorker } from "./census.js";
-import { DEATHS_MAX, KIND, NAMES_YEARS, remember } from "./life.js";
+import { DEATHS_MAX, KIND, remember } from "./life.js";
+import { archiveCitizen } from "./legacy.js";
 
 const SURNAMES = {
   rabbit: ["Burrowes", "Bramblefoot", "Clovermere", "Thistlewood"],
@@ -141,10 +142,11 @@ export function releaseJob(world, c) {
 // Removal — the dangling-id law
 // ---------------------------------------------------------------------------
 
-export function removeCitizen(world, c, cause) {
+export function removeCitizen(world, c, cause, lastHome = c.home) {
   if (c.dead) return;
   c.dead = true;
   c.cause = cause;
+  archiveCitizen(world, lastHome === c.home ? c : { ...c, home: lastHome }, cause);
   for (const f of c.friends) {
     const o = world.byId.get(f);
     if (o && !o.dead) {
@@ -153,9 +155,7 @@ export function removeCitizen(world, c, cause) {
       if (k >= 0) o.friends.splice(k, 1);
     }
   }
-  if (!world.names) world.names = {};
   if (!world.deaths) world.deaths = [];
-  world.names[c.id] = { n: `${c.name} ${c.surname}`, s: c.species, a: ageYears(world, c), c: cause, t: world.tick };
   if (cause === "died" || cause === "killed" || cause === "sold") {
     world.deaths.push([world.tick, c.id]);
     if (world.deaths.length > DEATHS_MAX) world.deaths.splice(0, world.deaths.length - DEATHS_MAX);
@@ -179,7 +179,7 @@ export function removeCitizen(world, c, cause) {
   world._removed = (world._removed || 0) + 1;
 }
 
-export function removeHousehold(world, hh, cause) {
+export function removeHousehold(world, hh, cause, lastHome = hh.home) {
   let removed = 0;
   for (const id of hh.members.slice()) {
     const c = world.byId.get(id);
@@ -188,7 +188,7 @@ export function removeHousehold(world, hh, cause) {
     // remove everybody else, but the hall keeps the animal until release or
     // its exact sixteenth birthday.
     if (c && !c.pen) {
-      removeCitizen(world, c, cause);
+      removeCitizen(world, c, cause, lastHome);
       removed++;
     }
   }
@@ -202,17 +202,8 @@ export function compact(world) {
     world.households = world.households.filter((h) => !h.gone);
     world._removed = 0;
   }
-  const referenced = new Set();
-  for (const c of world.citizens) for (const [, kind, arg] of c.life || []) {
-    if (kind === KIND.FRIEND || kind === KIND.KILLED || kind === KIND.LOST_CHILD) referenced.add(String(arg));
-    else if (kind === KIND.LOST_FRIEND && Array.isArray(arg)) referenced.add(String(arg[0]));
-  }
-  const cutoff = world.tick - NAMES_YEARS * 12;
-  for (const [id, kept] of Object.entries(world.names || {})) {
-    // A still-displayed life must never acquire a dangling name merely because
-    // its subject died twenty years ago; all other old names expire here.
-    if ((kept.t ?? kept.tick ?? world.tick) < cutoff && !referenced.has(id)) delete world.names[id];
-  }
+  // Cold citizen records and imported pre-C names are permanent civic memory.
+  // Only the small trailing death-index is bounded; it points into the archive.
   world.deaths = (world.deaths || []).filter((entry) => (Array.isArray(entry) ? entry[0] : entry.tick) >= world.tick - 12);
 }
 
@@ -413,7 +404,7 @@ export function evictFromLot(world, i, newCap) {
     if (!allowed) allowed = lotsWithinRoad(world, i, KNOBS.REHOME_RADIUS);
     const to = bestHome(world, moving.species, moving.members.length, false, allowed);
     if (to >= 0) { placeHousehold(world, moving, to); if (to !== i) for (const id of moving.members) remember(world, world.byId.get(id), KIND.MOVED, to); }
-    else removeHousehold(world, moving, "evicted");
+    else removeHousehold(world, moving, "evicted", i);
   }
 }
 
@@ -443,7 +434,7 @@ export function clearLot(world, i) {
     moving.home = -1;
     const to = bestHome(world, moving.species, moving.members.length, false);
     if (to >= 0) { placeHousehold(world, moving, to); for (const id of moving.members) remember(world, world.byId.get(id), KIND.MOVED, to); }
-    else removeHousehold(world, moving, "bulldozed");
+    else removeHousehold(world, moving, "bulldozed", i);
   }
   for (const c of world.citizens) if (c.job === i && !c.dead) releaseJob(world, c);
 }
@@ -551,7 +542,7 @@ export function citizensTick(world, cen, dem) {
     moving.home = -1;
     const to = bestHome(world, moving.species, moving.members.length, false);
     if (to >= 0) { placeHousehold(world, moving, to); for (const id of moving.members) remember(world, world.byId.get(id), KIND.MOVED, to); }
-    else removeHousehold(world, moving, "homeless");
+    else removeHousehold(world, moving, "homeless", i);
   }
 
   // 0b. The player's line (use-zoning, SPEC §7.8): a household whose lot no
@@ -580,7 +571,7 @@ export function citizensTick(world, cen, dem) {
       out.zonedOut += n;
       world.departures.push({ species: moving.species, surname: moving.surname, n, from });
       out.zonedOutLines.push(`ZONED OUT — the ${moving.surname}s (${n === 1 ? moving.species : `${n} ${moving.species}s`}) left (${from % world.w},${(from / world.w) | 0}): the lot is ${USE_NAME[world.use[from]]}-only land now, and nothing within twelve road tiles would have them.`);
-      removeHousehold(world, moving, "zonedOut");
+      removeHousehold(world, moving, "zonedOut", from);
     }
   }
 

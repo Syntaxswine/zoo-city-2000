@@ -551,15 +551,22 @@ sentence writer: years begin at 2000, lots are coordinates with the family
 living there now, and citizen ids resolve through the living roster before
 the graveyard.
 
-`world.names` receives a compact name/species/age/cause record whenever a
-citizen leaves the roster. `compact()` alone expires unreferenced records
-after twenty years; records named by a living biography remain until that
-reference rolls off, preserving the dangling-id law. `world.deaths` is a
-bounded `[tick,id]` ring for the trailing year, and `memorial(world)` joins it
-to the graveyard. Saves omit default-valued citizen fields and restore them
-from the same defaults used at creation; the canonical state hash retains the
-expanded citizen shape so storage compaction does not redefine simulation
-identity.
+Every citizen who leaves the roster is reduced once to a permanent, versioned
+shorthand row in `world.legacy`:
+`version|id|first|surname|species|born|end|cause|origin|lastHome|household|flags`.
+Numbers use base 36, common causes and species have frozen compact codes, and
+names/unknown causes are URI-escaped. `legacyOf` is the one decoder/resolver;
+it also migrates old object-shaped `world.names` graveyards at load without
+duplicates. `compact()` never expires or rewrites civic memory. A seed-7
+30-year town keeps 1,653 former citizens in 70,103 shorthand bytes (42.41
+bytes each; 75,063 bytes including JSON syntax), while its live citizens use
+375,871 bytes and the whole save 760,099 bytes. A 10,000-record stress archive
+is 482 KB of JSON and builds in about 30 ms on the check host.
+
+`world.deaths` remains a bounded `[tick,id]` ring for the trailing year, and
+`memorial(world)` joins it to the permanent archive. Saves omit default-valued
+citizen fields and restore them from the same defaults used at creation; the
+canonical state hash retains the expanded citizen shape and non-empty archive.
 
 ## 8. Budget (`js/sim/budget.js`), integer §, monthly slice of yearly figures
 
@@ -898,6 +905,32 @@ The `O` overlay cycle is off → LV → pollution → crime (an open file is a r
 - **Screen layout:** the map viewport fills the window; a 300 px field-guide
   panel on the right; the tool strip along the top; bars top-left over the
   map. Integer zoom ×1 / ×2. Minimap is L1.
+
+---
+
+## 11c. Citizen Inspect (`js/follow.js`, `js/input.js`, `js/ui.js`)
+
+Inspect binds to a stable citizen id, never to the temporary walker picture.
+`pinTarget(world, walkers, id)` is DOM-free and read-only: a visible walker is
+`walking`, a resident between walks is `home`, custody, a market pen, bear
+winter and an unsettled citizen are `away`, and a removed citizen is `gone` at
+the last recorded home with the archive epitaph. Duplicate walker inputs use a
+stable semantic order. Clicking a walker or a linked name pins that citizen;
+clicking bare land still pins the lot; Esc, world replacement, or the next
+selection clears the prior pin. The existing canvas thought bubbles remain
+screen-space pop-outs beside walkers and still appear only under Inspect.
+When a linked name is clicked in the side card, its walking citizen alone
+keeps that in-world pop-out even while the pointer is over the card.
+
+The citizen card paints the stable 16×16 portrait through
+`render.paintPortrait`, then shows name/species/age, household, home, job,
+mood, current state/activity, the exact `needOf` want with `voice.line` and its
+`ACT` remedy, linked living friends, and the latest four `lifeLines`; a native
+`details` disclosure reveals earlier retained chapters without rebuilding
+inside a tick. House cards link every resident and show the household's leading
+need. The Census recent memorial links each trailing-year death to its record.
+If the citizen later dies or departs, the same pinned id becomes a
+permanent civic-record card rather than disappearing.
 
 ---
 

@@ -220,7 +220,7 @@ lifeLines(world, c) → string[]     // the sentences (stub returns [])
 KIND = { BORN, ARRIVED, MOVED, HIRED, LOST_JOB, FRIEND, LOST_FRIEND, LITTER, LEFT_HOME, RETIRED, ARRESTED, FIXED, EXONERATED, KILLED, CENTENARY, ZONED_OUT }
 ```
 `tick.js` resets `world.lifeEvents = []` beside `predations`; `newCitizen`
-gains `life: []`; `save.js` writes `life` and `world.names` (the graveyard,
+gains `life: []`; `save.js` writes `life` and `world.legacy` (the permanent archive,
 `{ id: "Name Surname·species" }`, empty tonight) and tolerates both absent.
 No call sites yet — Part B adds them.
 
@@ -403,7 +403,7 @@ its dead by name.
   the parents get `LITTER`, n), the 16-year split (`LEFT_HOME`), rehome
   (`MOVED`), retirement month (`RETIRED`), `befriend` (`FRIEND`, id — both
   sides), `removeCitizen` (`LOST_FRIEND`, id + cause, to every friend; and
-  the graveyard write `world.names[id]`); job search hire (`HIRED`, lot),
+  the permanent shorthand archive write); job search hire (`HIRED`, lot),
   `releaseJob` when the lot dies (`LOST_JOB`); `justice.js` — arrest
   (`ARRESTED`, cause), `fixed`, `exonerated`, the killing (`KILLED`,
   victim id, on the killer); `events.js` — the centenary; the zoned-out
@@ -411,11 +411,12 @@ its dead by name.
 - `c.life` is a ring of `LIFE_MAX` 12 triples `[tick, kindId, arg]` — the
   first two entries (birth/arrival, first home) are PINNED and never roll
   off; the ring is the last ten.
-- `world.names`: written on every removal, pruned to `NAMES_YEARS` 20 by
-  death tick in `compact()`. ~45 KB at year 30.
+- `world.legacy`: one versioned shorthand row on every removal, permanent.
+  The shipped seed-7 year-30 run stores 1,653 records / 70,103 raw bytes /
+  42.41 bytes each; 10,000 representative records occupy 482 KB JSON.
 - `lifeLines(world, c)` — the one writer of sentences (Law 6): dates in the
   game's year, lots as `(tx,ty)` plus the family name that lives there NOW
-  if any, names through `byId` then `names` then "someone".
+  if any, names through `byId` then `legacyOf` then "someone".
 - **The save pays for it:** first commit, before any call site — `save.js`
   omits a citizen's DEFAULT fields (`false`, `0`, `-1`, `null`, `[]`) and
   `load` restores them from `newCitizen`'s defaults. Prove: an old save
@@ -423,7 +424,7 @@ its dead by name.
   of citizens). Then the ledger's +~150 KB is a net saving.
 - The Census tab gains a **Memorial** line (F/C render; B provides
   `memorial(world) → [{ name, species, age, cause, tick }]` for the last
-  12 months from `names` + a small `world.deaths` ring).
+  12 months from the archive + a small `world.deaths` ring).
 
 **Owns.** `js/sim/life.js`, `js/sim/save.js`, the call-site lines in
 `js/sim/citizens.js` / `justice.js` / `events.js` (one-liners only — A
@@ -431,12 +432,12 @@ never edits these files after K, F never edits them at all), the Part F'
 checks, SPEC §7.10, `tools/savesize.mjs` (the throwaway made real: prints
 the year-30 save's size by section; exit 0).
 
-**Contract exposed.** `c.life`, `world.lifeEvents` (per tick), `world.names`,
-`lifeLines`, `memorial`, `KIND`.
+**Contract exposed.** `c.life`, `world.lifeEvents` (per tick),
+`world.legacy`, `legacyOf`, `lifeLines`, `memorial`, `KIND`.
 
 **Acceptance.**
 - The dangling-id law extends: every `FRIEND`/`LOST_FRIEND`/`KILLED` arg
-  resolves through `byId` or `names`; the ring never exceeds 12; the
+  resolves through `byId` or `legacyOf`; the ring never exceeds 12; the
   pinned two survive 20 events.
 - **Every KIND is observed at least once** in the 30-year forced run (the
   suite already forces a killing, an arrest, a centenary — reuse those
@@ -452,7 +453,8 @@ the year-30 save's size by section; exit 0).
 **Traps.** `removeCitizen` runs in the same tick as the friend's `moods()`
 — record `LOST_FRIEND` BEFORE the splice, or the friend list is already
 empty. `compact()` renumbers nothing (ids are stable) — but check
-`world.names` is pruned there and nowhere else. A `MOVED` at arrival is not
+`removeCitizen` appends the archive at its one removal boundary; `compact`
+never prunes it. A `MOVED` at arrival is not
 a move — `ARRIVED` only. The centenary is logged in `events.js` since
 session 8 (`say(id, line)`); hook the same place.
 
@@ -460,6 +462,13 @@ session 8 (`say(id, line)`); hook the same place.
 compaction first as its own commit.
 
 ### C. Inspect, extended — *"reuse the inspect button"*
+
+**SHIPPED 2026-09-03.** The stable-id pin, pure walking/home/away/gone
+resolver, portrait/want/remedy/life/friend card, linked household roster and
+permanent gone-person epitaph are live. Canvas thought bubbles remain pop-outs
+beside walkers. The optional follow/star stretch remains open. The canonical
+suite has 391 checks after the level-crossing merge; the archive measurements
+are recorded under Part B.
 
 **Goal.** The Inspect tool (9) already pins a card. Make the pin a CITIZEN
 (not a walker, not a tile), so the card outlives the walk, and make the

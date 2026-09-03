@@ -4,7 +4,18 @@ Open work, ranked. The design record is `SPEC.md`; the numbers are in
 `js/sim/rules.js` (KNOBS). Later layers were labelled at design time so v1
 could ship whole.
 
-## The People — IN PROGRESS 2026-09-03 (`docs/PLAN-THE-PEOPLE-2026-09-02.md`); Parts K, A, D, H and S shipped
+## The People — IN PROGRESS 2026-09-03 (`docs/PLAN-THE-PEOPLE-2026-09-02.md`); Parts K, A, C, D, H and S shipped
+
+**Part C SHIPPED 2026-09-03:** Inspect now pins a permanent citizen id rather
+than a walker. The card survives the end of a walk, reports home/custody/bear
+winter truthfully, and becomes a last-home epitaph after death or departure;
+portraits, exact actionable wants/remedies, the retained life chapters, linked
+friends and linked household rosters make it the citizen surface. Canvas talk
+bubbles remain pop-outs by the walkers. Every former citizen now has one
+versioned shorthand record forever: seed 7 at year 30 stores 1,653 records in
+70,103 bytes (42.41 bytes each), and a 10,000-person archive is 482 KB JSON and
+builds in ~30 ms. Old object graveyards migrate once. SPEC §§7.10, 11c;
+`tools/savesize.mjs`; 391 canonical checks pass after the level-crossing merge.
 
 **Part H SHIPPED 2026-09-03:** halls now hold conserved stock from dead
 bought at the door, killings, convicted sales and livestock raised to
@@ -58,10 +69,10 @@ town wants") · **H** meat on hand (`world.meat` per hall; inflows = the
 killing's sack walks INTO the hall, the hall BUYS the town's ~24 natural
 deaths a year, SOLD as ruled; outflow = carnivores eat; measured first:
 11 halls made §38.9k of cut with 4 killings and 2 sold in 30 y — meat is
-not a quantity today) · **B** lives (a 12-entry ring per citizen + the
-graveyard; the save compaction pays for it — citizens are 732 KB of a 906
-KB year-30 save, mostly default fields) · **C** Inspect extended (the pin
-is a CITIZEN; follow/star a stretch) · **D** looks and faces (4 looks per
+not a quantity today) · **B** lives (a 12-entry ring per living citizen + a
+permanent shorthand record after removal; save compaction pays for it) ·
+**C** Inspect extended (SHIPPED: the pin is a CITIZEN; follow/star remains a
+stretch) · **D** looks and faces (4 looks per
 species, portraits, an idle pose) · **E** buildings with character (4
 plans per family, windows lit by fill, a species mark on the socket) ·
 **F** the story channel (obituaries, litters, a people chip, clickable

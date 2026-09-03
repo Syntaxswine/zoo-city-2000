@@ -700,15 +700,15 @@ export function createWalkers(initialWorld) {
     if (sig === needSig) return;
     needSig = sig;
     for (const w of active) w.need = null;
-    if (!needCursor) return;
-    const [cx, cy] = needCursor;
+    if (!needCursor && pinnedNeed == null) return;
+    const [cx, cy] = needCursor || [0, 0];
     const eligible = [];
     for (const w of active) {
       if (w.citizen == null || !world.byId?.has(w.citizen)) continue;
       const dx = w.tx - (cx + 0.5);
       const dy = w.ty - (cy + 0.5);
       const d = Math.max(Math.abs(dx), Math.abs(dy));
-      if (d <= NEED_REACH || w.citizen === pinnedNeed) eligible.push({ w, d, d2: dx * dx + dy * dy });
+      if ((needCursor && d <= NEED_REACH) || w.citizen === pinnedNeed) eligible.push({ w, d, d2: dx * dx + dy * dy });
     }
     eligible.sort((a, b) => a.d2 - b.d2 || a.w.id - b.w.id);
     let chosen = eligible.slice(0, BUBBLES_MAX);

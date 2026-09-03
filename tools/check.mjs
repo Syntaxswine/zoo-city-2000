@@ -1338,9 +1338,10 @@ check("no Math.random under js/", mathRandom.length === 0, mathRandom.join(", ")
 
 // ---- Part B'': lives, graveyard, memorial, and the call-site mutation run ---
 {
-  const { KIND, LIFE_MAX, NAMES_YEARS, lifeLines, memorial, remember } = await import("../js/sim/life.js");
+  const { KIND, LIFE_MAX, lifeLines, memorial, remember } = await import("../js/sim/life.js");
   const { compact, createHousehold, placeHousehold, removeCitizen } = await import("../js/sim/citizens.js");
   const { DIET_OF } = await import("../js/sim/species.js");
+  const { archiveCitizen, decodeLegacy, epitaph, legacyCode, legacyOf, legacyStats } = await import("../js/sim/legacy.js");
 
   const Z = createWorld({ seed: "life-zoo-job", w: 8, h: 8 });
   for (const i of [9, 10, 17, 18]) {
@@ -1376,34 +1377,63 @@ check("no Math.random under js/", mathRandom.length === 0, mathRandom.join(", ")
   L.tick = 50;
   const goneName = `${gone.name} ${gone.surname}`;
   removeCitizen(L, gone, "killed");
+  const grave = legacyOf(L, gone.id);
   const lost = witness.life.find((e) => e[1] === KIND.LOST_FRIEND);
   const prose = lifeLines(L, witness).join(" ");
-  check("lives: removal records LOST_FRIEND before the splice and graves the stable id",
+  check("lives: removal records LOST_FRIEND before the splice and archives the stable id once",
     !!lost && lost[2][0] === gone.id && lost[2][1] === "killed"
-      && !witness.friends.includes(gone.id) && L.names[gone.id]?.n === goneName);
-  check("lives: prose resolves graveyard names and describes a lot's current family",
+      && !witness.friends.includes(gone.id) && grave?.name === goneName && L.legacy.length === 1);
+  removeCitizen(L, gone, "died");
+  check("lives: the one removal boundary cannot duplicate or rewrite a legacy record",
+    L.legacy.length === 1 && legacyOf(L, gone.id)?.cause === "killed");
+  check("lives: prose resolves permanent names and describes a lot's current family",
     prose.includes(goneName) && prose.includes("(1,1)") && prose.includes(`now home to the ${lh.surname} family`), prose);
   const recent = memorial(L);
   check("lives: the memorial returns the trailing removal with its public fields",
-    recent.length === 1 && recent[0].name === goneName && recent[0].species === gone.species
-      && recent[0].age === L.names[gone.id].a && recent[0].cause === "killed" && recent[0].tick === 50,
+    recent.length === 1 && recent[0].id === gone.id && recent[0].name === goneName && recent[0].species === gone.species
+      && recent[0].age === grave.age && recent[0].cause === "killed" && recent[0].tick === 50,
     JSON.stringify(recent));
   const leavers = createHousehold(L, "owl", 2);
   const leaverId = leavers.members[0];
   removeCitizen(L, L.byId.get(leaverId), "left");
-  check("lives: emigrants enter the name index but not the memorial's death ring",
-    !!L.names[leaverId] && memorial(L).length === 1);
+  check("lives: emigrants enter the archive but not the memorial's death ring",
+    !!legacyOf(L, leaverId) && memorial(L).length === 1);
   const recentLoaded = load(save(L));
-  check("lives: lives, names, and the death ring survive save/load hash-equal",
+  check("lives: lives, shorthand records, and the death ring survive save/load hash-equal",
     stateHash(L) === stateHash(recentLoaded) && memorial(recentLoaded)[0]?.name === goneName);
-  L.names[99999] = { name: "Old Unreferenced", species: "owl", age: 80, cause: "died", tick: 0 };
-  L.tick = 50 + NAMES_YEARS * 12 + 1;
-  check("lives: an expired graveyard name exists until compact runs", !!L.names[99999]);
+  const beforeCode = L.legacy[0];
+  L.tick = 50 + 80 * 12 + 1;
   compact(L);
-  check("lives: compact prunes expired names but retains any name a live biography references",
-    !L.names[99999] && !!L.names[gone.id]);
-  check("lives: retained graveyard references survive save/load hash-equal",
-    stateHash(L) === stateHash(load(save(L))));
+  check("lives: compact never expires or rewrites the permanent citizen archive",
+    L.legacy[0] === beforeCode && legacyOf(L, gone.id)?.name === goneName && epitaph(L, gone.id).includes(goneName));
+
+  const oldPlain = toPlain(L);
+  delete oldPlain.legacy;
+  oldPlain.names = {
+    99998: { n: "Old Pipe|Percent% Owl", s: "owl", a: 80, c: "died", t: 12, home: 9 },
+    99999: { name: "Old Unreferenced", species: "owl", age: 81, cause: "mystery|cause", tick: 13 },
+  };
+  const oldMigrated = load(JSON.stringify(oldPlain));
+  check("lives: object-shaped graveyards migrate once to delimiter-safe shorthand",
+    !Object.keys(oldMigrated.names).length && oldMigrated.legacy.length === 2
+      && legacyOf(oldMigrated, 99998)?.name === "Old Pipe|Percent% Owl"
+      && legacyOf(oldMigrated, 99999)?.cause === "mystery|cause");
+  check("lives: migrated object records re-save canonically and hash-equal",
+    !Object.hasOwn(JSON.parse(save(oldMigrated)), "names") && stateHash(oldMigrated) === stateHash(load(save(oldMigrated))));
+  const malformedPlain = toPlain(L);
+  malformedPlain.names = { bad: "do not discard imported data" };
+  const malformedLoaded = load(JSON.stringify(malformedPlain));
+  check("lives: malformed legacy objects are preserved rather than silently discarded",
+    malformedLoaded.names.bad === "do not discard imported data" && JSON.parse(save(malformedLoaded)).names.bad === "do not discard imported data");
+
+  const odd = { id: 77, name: "A|B%", surname: "Line Break", species: "skunk", born: -91, home: 17, household: 4, life: [[-91, KIND.ARRIVED, 3]], native: true, fixed: true, centenary: true, wrongful: true, exonerated: true, record: 2 };
+  const oddDecoded = decodeLegacy(legacyCode(odd, "unknown|why%", 321));
+  check("lives: shorthand reverses arbitrary supported punctuation, negative ticks, flags and unknown causes",
+    oddDecoded?.id === 77 && oddDecoded.first === odd.name && oddDecoded.surname === odd.surname
+      && oddDecoded.born === -91 && oddDecoded.origin === 3 && oddDecoded.home === 17
+      && oddDecoded.cause === "unknown|why%" && oddDecoded.flags === 63 && oddDecoded.recorded);
+  check("lives: malformed and future-version shorthand fail closed",
+    decodeLegacy(null) === null && decodeLegacy("1|bad") === null && decodeLegacy("2|1|A|B|0|0|0|d|0|0|0|0") === null);
 
   // The real mayor runs thirty years. The last missing deterministic branches
   // are forced in-world: a use line matures for three months, then a wrongful
@@ -1437,7 +1467,7 @@ check("no Math.random under js/", mathRandom.length === 0, mathRandom.join(", ")
   for (const c of Y.citizens) for (const [, kind, arg] of c.life || []) {
     const id = kind === KIND.LOST_FRIEND && Array.isArray(arg) ? arg[0]
       : kind === KIND.FRIEND || kind === KIND.KILLED ? arg : null;
-    if (id != null && !Y.byId.has(id) && !Y.names[id]) dangling.push(`${c.id}:${kind}:${id}`);
+    if (id != null && !Y.byId.has(id) && !legacyOf(Y, id)) dangling.push(`${c.id}:${kind}:${id}`);
   }
   check("lives: every stored friend, lost-friend, and killed id still resolves", dangling.length === 0, dangling.slice(0, 8).join(", "));
   const S = createWorld({ seed: "7" });
@@ -1446,6 +1476,25 @@ check("no Math.random under js/", mathRandom.length === 0, mathRandom.join(", ")
   const citizenBytes = Buffer.byteLength(JSON.stringify(toPlain(S).citizens));
   check("lives: year-30 citizens use no more than 60% of the 732 KB baseline",
     citizenBytes <= 732_000 * 0.60, `${citizenBytes} bytes`);
+  const archive = legacyStats(S);
+  check("lives: the permanent year-30 archive averages at most 45 shorthand bytes",
+    archive.records > 0 && archive.mean <= 45, `${archive.records} records · ${archive.bytes} bytes · ${archive.mean.toFixed(2)} mean`);
+
+  const tenK = createWorld({ seed: "legacy-10k", w: 8, h: 8 });
+  const firsts = ["Pip", "Nibmie", "Grabrose", "Titmb", "Old|Pipe%"];
+  const surnames = ["Burrowes", "Whiskerton", "Slowcombe", "Greyback"];
+  const species = ["rabbit", "mouse", "fox", "beaver", "owl", "bear", "tortoise", "raccoon", "pig", "cow", "wolf", "cat", "hawk", "skunk"];
+  const archiveStarted = performance.now();
+  for (let id = 1; id <= 10_000; id++) {
+    tenK.tick = id * 3;
+    archiveCitizen(tenK, { id, name: firsts[id % firsts.length], surname: surnames[id % surnames.length], species: species[id % species.length], born: id * 3 - 240, home: id % 64, household: id >> 1, life: [[id * 3 - 240, KIND.BORN, id % 64]], native: id % 5 === 0, fixed: false, centenary: false, wrongful: false, exonerated: false }, id % 3 ? "died" : "left");
+  }
+  const archiveMs = performance.now() - archiveStarted;
+  const archiveJsonBytes = Buffer.byteLength(JSON.stringify(tenK.legacy));
+  check("lives: ten thousand permanent citizen records fit in 500 KB of actual save JSON",
+    archiveJsonBytes <= 500_000 && tenK.legacy.length === 10_000, `${archiveJsonBytes} bytes`);
+  check("lives: archive insertion is linear and ten thousand records complete under one second",
+    archiveMs < 1000, `${archiveMs.toFixed(1)} ms`);
   check("lives: year-30 save/load with biographies continues hash-equal",
     stateHash(Y) === stateHash(load(save(Y))));
 }
@@ -1455,7 +1504,7 @@ check("no Math.random under js/", mathRandom.length === 0, mathRandom.join(", ")
   const { ACT, LINES, NEED_CODES, line } = await import("../js/sim/voice.js");
   const { BUBBLES_MAX, needOf, needsContext } = await import("../js/sim/needs.js");
   const { needCensus } = await import("../js/sim/census.js");
-  const { homeScore, homeTerms } = await import("../js/sim/citizens.js");
+  const { homeScore, homeTerms, removeCitizen } = await import("../js/sim/citizens.js");
   const { SPECIES } = await import("../js/sim/species.js");
   const { refreshLast } = await import("../js/sim/tick.js");
   const { createWalkers } = await import("../js/walkers.js");
@@ -1569,13 +1618,17 @@ check("no Math.random under js/", mathRandom.length === 0, mathRandom.join(", ")
   const pinned = W.list().filter((x) => x.need);
   check("needs: a pinned citizen's walker stays in the eight even beyond the cursor reach",
     !!first && pinned.length <= BUBBLES_MAX && pinned.some((x) => x.citizen === first.citizen));
+  if (first) W.setCursor(null, first.citizen);
+  const linkedPin = W.list().filter((x) => x.need);
+  check("needs: a linked citizen pin keeps its in-world pop-out when the pointer is over the card",
+    !!first && linkedPin.length === 1 && linkedPin[0].citizen === first.citizen);
   W.setCursor(null);
   check("needs: leaving Inspect clears every bubble and the walker layer never writes the sim",
     W.list().every((x) => x.need == null) && stateHash(A.world) === hashBefore);
 
   // The input regression is event-driven: pan under a stationary pointer,
-  // change tools, and clear a pinned walker through both exits that used to
-  // leave walkers.pinnedNeed behind.
+  // change tools, and prove the citizen-id pin survives walker teardown while
+  // every real unpin path still clears the thought layer.
   const oldWindow = globalThis.window;
   const windowEvents = {};
   globalThis.window = { addEventListener: (type, fn) => { windowEvents[type] = fn; } };
@@ -1616,6 +1669,8 @@ check("no Math.random under js/", mathRandom.length === 0, mathRandom.join(", ")
   canvasEvents.pointerdown(pe(10, 10));
   canvasEvents.pointerup(pe(10, 10));
   const pinAttached = cursorCalls.at(-1)?.pin === pinnedWalker.citizen && cursorCalls.at(-1)?.tile != null;
+  canvasEvents.pointerleave({});
+  const panelBubbleKept = cursorCalls.at(-1)?.pin === pinnedWalker.citizen && cursorCalls.at(-1)?.tile == null;
   windowEvents.keydown({ key: "Escape", code: "Escape", preventDefault() {} });
   const escapeCleared = cursorCalls.at(-1)?.pin == null;
   canvasEvents.pointerdown(pe(10, 10));
@@ -1638,17 +1693,27 @@ check("no Math.random under js/", mathRandom.length === 0, mathRandom.join(", ")
   canvasEvents.pointerup(pe(30, 10, 1));
   const costRepicked = costRefreshes > costBeforePan;
   input.setTool("road");
-  const roadCleared = cursorCalls.at(-1)?.tile == null;
+  const roadCleared = cursorCalls.at(-1)?.tile == null && cursorCalls.at(-1)?.pin == null;
   input.setTool("inspect");
   canvasEvents.pointerdown(pe(10, 10));
   canvasEvents.pointerup(pe(10, 10));
   walkerAlive = false;
-  input.hoverInfo();
-  const staleCleared = cursorCalls.at(-1)?.pin == null;
+  const betweenWalks = input.hoverInfo();
+  const citizenPinKept = betweenWalks?.citizen === pinnedWalker.citizen
+    && betweenWalks.target?.state === "home" && cursorCalls.at(-1)?.pin === pinnedWalker.citizen;
+  const pinnedRecord = A.world.byId.get(pinnedWalker.citizen);
+  removeCitizen(A.world, pinnedRecord, "left");
+  const afterDeparture = input.hoverInfo();
+  const epitaphKept = afterDeparture?.citizen === pinnedWalker.citizen
+    && afterDeparture.target?.state === "gone" && afterDeparture.target.line.includes(pinnedRecord.name);
+  const linkedId = A.world.citizens.find((c) => !c.dead && c.id !== pinnedWalker.citizen)?.id;
+  const linkRepinned = input.pinCitizen(linkedId) && input.hoverInfo()?.citizen === linkedId;
+  input.unpin();
+  const explicitUnpinCleared = cursorCalls.at(-1)?.pin == null;
   globalThis.window = oldWindow;
-  check("needs: camera pans repick Inspect; road and every unpin path synchronize the bubble layer",
-    pinAttached && escapeCleared && dragRepicked && keyRepicked && zoomRepicked && clampRepicked && costRepicked && roadCleared && staleCleared,
-    JSON.stringify({ pinAttached, escapeCleared, dragRepicked, keyRepicked, zoomRepicked, clampRepicked, costRepicked, roadCleared, staleCleared }));
+  check("needs: camera repicks Inspect; a citizen pin survives its walker; explicit unpin synchronizes bubbles",
+    pinAttached && panelBubbleKept && escapeCleared && dragRepicked && keyRepicked && zoomRepicked && clampRepicked && costRepicked && roadCleared && citizenPinKept && epitaphKept && linkRepinned && explicitUnpinCleared,
+    JSON.stringify({ pinAttached, panelBubbleKept, escapeCleared, dragRepicked, keyRepicked, zoomRepicked, clampRepicked, costRepicked, roadCleared, citizenPinKept, epitaphKept, linkRepinned, explicitUnpinCleared }));
 
   const b1 = art.bubble(90, 15), b2 = art.bubble(90, 15);
   check("needs: bubble art is cached, palette-keyed, and includes its three-pixel tail",
@@ -2084,6 +2149,66 @@ if (existsSync(artIndex)) {
   console.log(`art: ${list.length} sprites audited · ${SPECIES.length} species checked`);
 } else {
   console.log("art: js/art/index.js not present yet — Part C skipped");
+}
+
+// ---- Part C': durable citizen Inspect targets --------------------------------
+{
+  const { pinTarget } = await import("../js/follow.js");
+  const { clearLot, createHousehold, placeHousehold, removeCitizen } = await import("../js/sim/citizens.js");
+  const { legacyOf } = await import("../js/sim/legacy.js");
+  const P = createWorld({ seed: "citizen-pin", w: 8, h: 8 });
+  P.zone[9] = ZONE.R; P.tier[9] = 1;
+  const hh = createHousehold(P, "rabbit", 2);
+  placeHousehold(P, hh, 9);
+  const c = P.byId.get(hh.members[0]);
+  const before = stateHash(P);
+  const walkers = [
+    { id: c.id, citizen: c.id, kind: "stroller", leg: 1, seg: 2, tx: 6.5, ty: 5.5, done: false },
+    { id: c.id, citizen: c.id, kind: "commuter", leg: 0, seg: 1, tx: 3.5, ty: 2.5, done: false },
+  ];
+  const walkingA = pinTarget(P, walkers, c.id), walkingB = pinTarget(P, walkers.slice().reverse(), c.id);
+  check("inspect: pinTarget follows the same deterministic live walker independent of list order",
+    walkingA?.state === "walking" && walkingA.walker.kind === "commuter"
+      && walkingA.tx === walkingB.tx && walkingA.ty === walkingB.ty && stateHash(P) === before);
+  const home = pinTarget(P, [], c.id);
+  check("inspect: between walks a citizen-id pin returns to the current home",
+    home?.state === "home" && home.tile === 9 && home.tx === 1 && home.ty === 1);
+  c.held = P.tick + 6; c.heldAt = 18;
+  const away = pinTarget(P, walkers, c.id);
+  check("inspect: custody overrides a stale walker and resolves as away",
+    away?.state === "away" && away.tile === 18 && away.walker === null);
+  c.held = 0; c.heldAt = -1;
+  const bearHh = createHousehold(P, "bear", 2), bear = P.byId.get(bearHh.members[0]);
+  placeHousehold(P, bearHh, 9);
+  P.events.active.push({ id: "bearWinter", until: P.tick + 3 });
+  check("inspect: bear winter is an honest away state", pinTarget(P, [], bear.id)?.line.includes("bear winter"));
+  const oldHome = c.home;
+  removeCitizen(P, c, "left");
+  const gone = pinTarget(P, [], c.id);
+  check("inspect: a departure keeps the pin as a gone epitaph at the last home",
+    gone?.state === "gone" && gone.tile === oldHome && gone.line.includes("left town") && gone.line.includes(c.name));
+  const E = createWorld({ seed: "citizen-pin-eviction", w: 8, h: 8 });
+  E.zone[9] = ZONE.R; E.tier[9] = 1;
+  const eh = createHousehold(E, "owl", 2);
+  placeHousehold(E, eh, 9);
+  const evictedId = eh.members[0];
+  E.zone[9] = ZONE.NONE; E.tier[9] = 0;
+  clearLot(E, 9);
+  const evicted = pinTarget(E, [], evictedId);
+  check("inspect: a real cleared-lot departure archives and targets its last occupied home",
+    legacyOf(E, evictedId)?.home === 9 && evicted?.state === "gone" && evicted.tile === 9,
+    JSON.stringify(legacyOf(E, evictedId)));
+  check("inspect: malformed or unknown ids fail safely", pinTarget(P, [], -1) === null && pinTarget(P, [], 999999) === null);
+
+  const inputSource = readFileSync(path.join(ROOT, "js/input.js"), "utf8");
+  const uiSource = readFileSync(path.join(ROOT, "js/ui.js"), "utf8");
+  check("inspect: input stores a citizen id, never a walker object",
+    /pinnedCitizen/.test(inputSource) && !/pinnedWalker/.test(inputSource));
+  check("inspect: the citizen card consumes portrait, need, voice, biography, friend and household links",
+    /paintPortrait/.test(uiSource) && /needOf/.test(uiSource) && /needLine/.test(uiSource)
+      && /lifeLines/.test(uiSource) && /memorial/.test(uiSource) && /personLink/.test(uiSource) && /householdPeople/.test(uiSource));
+  const simPinLeak = files.filter((f) => /[\\/]sim[\\/]/.test(f) && /pinnedCitizen|pinTarget|zoo\.pref|\.stars\b/.test(readFileSync(f, "utf8"))).map((f) => path.relative(ROOT, f));
+  check("inspect: simulation modules never read UI pins or browser preferences", simPinLeak.length === 0, simPinLeak.join(", "));
 }
 
 // ---- Part D: stable looks, faces and the fourth (idle) pose -----------------

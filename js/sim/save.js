@@ -11,6 +11,7 @@ import { makeRng } from "./rng.js";
 import { computeFields, recountRosters, commutePath, doorOf } from "./fields.js";
 import { citizenDefaults, rebuildMaps } from "./citizens.js";
 import { refreshLast } from "./tick.js";
+import { migrateLegacyNames } from "./legacy.js";
 
 const TILE_ARRAYS = ["terrain", "road", "zone", "maxTier", "tier", "civic", "burning", "rubble", "variant", "flooded", "wall", "use", "rail", "meat", "big", "theme"];
 
@@ -57,7 +58,6 @@ export function toPlain(world) {
     cash: world.cash, rates: { ...world.rates }, start: world.start,
     valves: { ...world.valves }, festivalBonus: world.festivalBonus,
     citizens: world.citizens.filter((c) => !c.dead).map(plainCitizen),
-    names: { ...(world.names || {}) },
     deaths: (world.deaths || []).map((entry) => Array.isArray(entry) ? entry.slice() : { ...entry }),
     households: world.households.filter((h) => !h.gone).map((h) => ({ id: h.id, members: h.members.slice(), home: h.home, species: h.species, surname: h.surname, arrived: h.arrived, notice: h.notice || 0 })),
     campers: world.campers.map((c) => ({ ...c })),
@@ -72,6 +72,8 @@ export function toPlain(world) {
     jobCursor: world._jobCursor || 0,
   };
   if (world.meatStats) o.meatStats = JSON.parse(JSON.stringify(world.meatStats));
+  if (world.legacy?.length) o.legacy = world.legacy.slice();
+  if (Object.keys(world.names || {}).length) o.names = { ...world.names };
   for (const k of TILE_ARRAYS) o[k] = Array.from(world[k]);
   return o;
 }
@@ -95,6 +97,8 @@ export function fromPlain(o) {
   }));
   world.households = o.households.map((h) => ({ ...h, members: h.members.slice() }));
   world.names = { ...(o.names || {}) };
+  world.legacy = Array.isArray(o.legacy) ? o.legacy.filter((row) => typeof row === "string") : [];
+  migrateLegacyNames(world);
   world.deaths = (o.deaths || []).map((entry) => Array.isArray(entry) ? entry.slice() : { ...entry });
   world.campers = o.campers.map((c) => ({ ...c }));
   world.nextId = o.nextId;
@@ -147,7 +151,7 @@ export function stateHash(world) {
   delete o.history;
   // Part K adds empty, backward-compatible save fields without changing the
   // standing simulation hash. Once Parts B/H put state in them, it is hashed.
-  if (!Object.keys(o.names).length) delete o.names;
+  if (!Object.keys(o.names || {}).length) delete o.names;
   if (!o.deaths.length) delete o.deaths;
   if (o.meat.every((n) => n === 0)) delete o.meat;
   if (o.meatStats) {

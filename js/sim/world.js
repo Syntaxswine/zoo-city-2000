@@ -75,8 +75,9 @@ export function createWorld({ seed = "zoo", w = 64, h = 64 } = {}) {
     citizens: [],
     households: [],
     campers: [],
-    names: {}, // removed citizens by stable id; Part B fills the graveyard
-    deaths: [], // compact [tick, id] ring; details live in names
+    names: {}, // compatibility-only: old object records migrate to `legacy` at load
+    legacy: [], // permanent shorthand citizen records; derived lookup is not saved
+    deaths: [], // compact [tick, id] ring; details live in the permanent archive
     lifeEvents: [], // this tick only; storyTick is the sole bridge to news
     nextId: 1,
     nextHouseholdId: 1,

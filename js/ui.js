@@ -32,6 +32,11 @@ import { ageYears, isWorker } from "./sim/census.js";
 import { TOOLS } from "./input.js";
 import { newsRows } from "./news.js";
 import { hallStock, hallYear } from "./sim/meat.js";
+import { needOf } from "./sim/needs.js";
+import { ACT, line as needLine } from "./sim/voice.js";
+import { lifeLines, memorial } from "./sim/life.js";
+import { legacyOf } from "./sim/legacy.js";
+import { paintPortrait } from "./render.js";
 
 const $ = (sel, root = document) => root.querySelector(sel);
 const el = (tag, cls, text) => {
@@ -297,16 +302,31 @@ export function createUI(app) {
   const TIER_NAME = { 1: ["cottage", "shop", "shed", "stall"], 2: ["two-storey", "store", "factory", "meat hall"], 3: ["apartment", "tower", "works", "cold store"] };
   // The blocks (SPEC §3b): one building on 2×2 or 3×3 tiles, named by zone and side.
   const BLOCK_NAME = { 2: ["terrace court", "arcade", "mill", "abattoir"], 3: ["the towers", "emporium", "foundry", "meat exchange"] };
-  function speciesList(members, w) {
-    const counts = {};
-    for (const c of members) counts[c.species] = (counts[c.species] || 0) + 1;
-    return Object.entries(counts).map(([s, n]) => (n === 1 ? s : plural(n, s))).join(", ");
+  function personLink(c, label = `${c.name} ${c.surname}`) {
+    const b = el("button", "personlink", label);
+    b.type = "button";
+    b.title = `Inspect ${label}`;
+    b.addEventListener("click", () => {
+      if (app.input?.pinCitizen(c.id)) updateHover(app.input.hoverInfo());
+    });
+    return b;
   }
-  function householdLine(h, w) {
-    const n = h.members.length;
-    const one = new Set(h.members.map((c) => c.species)).size === 1;
-    if (one) return `the ${h.surname} ${n === 1 ? "household" : "family"} (${n === 1 ? h.members[0].species : plural(n, h.members[0].species)})`;
-    return `the ${h.surname} household (${speciesList(h.members, w)})`;
+
+  function householdPeople(h, w) {
+    const box = el("div", "household");
+    box.append(el("span", "dim", `${h.surname}: `));
+    h.members.forEach((c, k) => {
+      if (k) box.append(document.createTextNode(" · "));
+      box.append(personLink(c, `${c.name} (${c.species})`));
+    });
+    const needs = h.members.map((c) => needOf(w, c)).filter((n) => n.code !== "CONTENT");
+    if (needs.length) {
+      const count = new Map();
+      for (const n of needs) count.set(n.code, (count.get(n.code) || 0) + 1);
+      const code = [...count].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0][0];
+      box.append(el("span", "want", `  wants ${code} — ${ACT[code]}`));
+    }
+    return box;
   }
 
   function cardForTile(i, pinned) {
@@ -397,7 +417,7 @@ export function createUI(app) {
       lines.push(el("div", f.closed ? "dim" : "warn", `a ${f.cause} here, ${w.tick - f.opened} month${w.tick - f.opened === 1 ? "" : "s"} ago — crime +${f.crime} within ${f.radius} for ${f.until - w.tick} more${f.closed ? "" : `; the file is open${culprit ? ` on ${culprit.name} ${culprit.surname} (${culprit.species})` : ""}`}`));
     }
     if (rep.households.length) {
-      lines.push(el("div", "", rep.households.map((h) => householdLine(h, w)).join(" · ")));
+      for (const h of rep.households) lines.push(householdPeople(h, w));
       const jobless = rep.households.flatMap((h) => h.members).filter((c) => isWorker(w, c) && c.job < 0);
       if (jobless.length) lines.push(el("div", "warn", `${jobless.length} looking for work: ${jobless.slice(0, 4).map((c) => c.name).join(", ")}${jobless.length > 4 ? "…" : ""}`));
     }
@@ -446,44 +466,99 @@ export function createUI(app) {
     }
   }
 
-  function cardForWalker(wk) {
+  function doingOf(wk) {
+    if (!wk) return "between walks";
+    return wk.riding ? "on the train"
+      : wk.kind === "predation" ? (wk.carry ? `${wk.leg < wk.legs.length - 1 ? "taking" : "walking home from the hall with"} a heavy sack — ${wk.preyName} did not come home` : `calling on ${wk.preyName}`)
+        : { commuter: "commuting", stroller: "out for a stroll", cub: "off to the park", arrival: "just arrived — walking home", meeting: "meeting a new friend", cart: wk.leg ? "bringing the hall cart home" : "taking the hall cart to a door", penned: "standing in the market pen", departure: "leaving town for the edge road" }[wk.kind] || wk.kind;
+  }
+
+  function portraitFor(id, species, years, mood = 50) {
+    const canvas = el("canvas", "portrait");
+    const sp = SPECIES_BY_ID[species];
+    const age = years < KNOBS.ADULT_AGE ? "cub" : years >= sp.retire ? "elder" : "adult";
+    const expression = mood >= 65 ? "glad" : mood < 40 ? "low" : "flat";
+    paintPortrait(canvas, app.art.portrait(species, { age, ...app.art.look(id), expression }), 2);
+    canvas.setAttribute("aria-label", `${species} portrait`);
+    return canvas;
+  }
+
+  function cardForCitizen(id, wk, pinned, target) {
     const w = world();
     const lines = [];
-    const c = wk.citizen != null && w.byId ? w.byId.get(wk.citizen) : null;
+    const c = w.byId?.get(id);
+    const kept = c ? null : legacyOf(w, id);
     const head = el("div", "head");
+    head.classList.add("personhead");
     if (c) {
       const y = ageYears(w, c);
       const sp = SPECIES_BY_ID[c.species];
-      head.append(el("b", "", `${c.name} ${c.surname}`), el("span", "dim", `  ${c.species}, ${y}${y >= sp.retire ? " (retired)" : y < KNOBS.ADULT_AGE ? " (cub)" : ""}`));
+      const title = el("div", "personname");
+      title.append(el("b", "", `${c.name} ${c.surname}`), el("span", "dim", `  ${c.species}, ${y}${y >= sp.retire ? " (retired)" : y < KNOBS.ADULT_AGE ? " (cub)" : ""}`));
+      if (pinned) title.append(el("span", "pin", "  pinned (Esc)"));
+      head.append(portraitFor(id, c.species, y, c.mood), title);
       lines.push(head);
       const homeS = c.home >= 0 ? `(${c.home % w.w},${(c.home / w.w) | 0})` : "none";
       const jobS = c.job >= 0 ? `(${c.job % w.w},${(c.job / w.w) | 0})` : isWorker(w, c) ? `none${c.jobless ? ` — ${c.jobless} months looking` : ""}` : "—";
-      lines.push(el("div", "", `home ${homeS} · job ${jobS} · mood ${Math.round(c.mood)}`));
+      const hh = w.hhById?.get(c.household);
+      lines.push(el("div", "", `${hh ? `the ${hh.surname} household · ` : ""}home ${homeS} · job ${jobS} · mood ${Math.round(c.mood)}`));
       const status = [];
       if (c.pen) status.push(`in the market pen until ${dateOf(w, c.held).label}`);
       else if ((c.held || 0) > w.tick) status.push(c.heldAt >= 0 ? `at the Pacification Centre until ${dateOf(w, c.held).label}` : `in the cells until ${dateOf(w, c.held).label}`);
       if (c.fixed) status.push(`fixed${c.wrongful ? " — the wrong animal" : ""}${c.exonerated ? ", exonerated" : ""}`);
       if (c.record) status.push(`record ${c.record}`);
       if (status.length) lines.push(el("div", "warn", status.join(" · ")));
+      const targetLine = target?.line || (wk ? doingOf(wk) : "between walks");
+      lines.push(el("div", "doing", `${target?.state || "walking"}: ${targetLine}${wk ? ` · ${doingOf(wk)}` : ""}${c.centenary ? " · wears the centenary hat" : ""}`));
+      const need = needOf(w, c);
+      const want = el("div", "want");
+      want.append(el("b", "", `wants ${need.code}: `), document.createTextNode(`“${needLine(w, c, need)}”`), el("span", "dim", ` — ${need.act}`));
+      lines.push(want);
       const x = exposure(w, c);
       if (x.e) lines.push(el("div", "warn", `trespass: ${x.e} forbidden tile${x.e === 1 ? "" : "s"} on the commute — ${x.p ? `${Math.round(x.p * 100)}% a month under this cover` : "no police cover, no stop"}`));
       const friends = c.friends.map((f) => w.byId.get(f)).filter(Boolean);
-      lines.push(el("div", "dim", friends.length ? `friends: ${friends.map((f) => `${f.name} ${f.surname} (${f.species})`).join(", ")}` : "no friends yet"));
-      const doing = wk.riding ? "on the train"
-        : wk.kind === "predation" ? (wk.carry ? `${wk.leg < wk.legs.length - 1 ? "taking" : "walking home from the hall with"} a heavy sack — ${wk.preyName} did not come home` : `calling on ${wk.preyName}`)
-        : { commuter: "commuting", stroller: "out for a stroll", cub: "off to the park", arrival: "just arrived — walking home", meeting: "meeting a new friend", cart: wk.leg ? "bringing the hall cart home" : "taking the hall cart to a door", penned: "standing in the market pen" }[wk.kind] || wk.kind;
-      lines.push(el("div", "dim", doing + (c.centenary ? " · wears the centenary hat" : "")));
-    } else {
-      head.append(el("b", "", wk.name || cap(wk.species)), el("span", "dim", `  ${wk.species}`));
+      const friendLine = el("div", "friends");
+      friendLine.append(el("span", "dim", friends.length ? "friends: " : "no friends yet"));
+      friends.forEach((f, k) => { if (k) friendLine.append(document.createTextNode(" · ")); friendLine.append(personLink(f)); });
+      lines.push(friendLine);
+      const biography = lifeLines(w, c);
+      if (biography.length) {
+        const life = el("div", "life");
+        life.append(el("b", "", "life"));
+        const earlier = biography.slice(0, -4), recent = biography.slice(-4);
+        if (earlier.length) {
+          const details = el("details", "");
+          details.append(el("summary", "dim", `${earlier.length} earlier`));
+          for (const text of earlier) details.append(el("div", "dim", text));
+          life.append(details);
+        }
+        for (const text of recent) life.append(el("div", "dim", text));
+        lines.push(life);
+      }
+    } else if (kept) {
+      const title = el("div", "personname");
+      title.append(el("b", "", kept.name), el("span", "dim", `  ${kept.species}, ${kept.age} · permanent civic record`));
+      if (pinned) title.append(el("span", "pin", "  pinned (Esc)"));
+      head.append(portraitFor(id, kept.species, kept.age, 30), title);
       lines.push(head);
-      const doing = { departure: "leaving town for the edge road", camper: "camping by the edge road — wants a home the town has not built", scout: "a scout: this species would come if the town suited it" }[wk.kind] || wk.kind;
-      lines.push(el("div", "dim", doing));
+      lines.push(el("div", "epitaph", target?.line || "This citizen has left the living city."));
+      const bornYear = 2000 + Math.floor(kept.born / 12), endYear = 2000 + Math.floor(kept.end / 12);
+      lines.push(el("div", "dim", `born ${bornYear} · record ended ${endYear} · origin ${kept.origin >= 0 ? `(${kept.origin % w.w},${(kept.origin / w.w) | 0})` : "unknown"} · last home ${kept.home >= 0 ? `(${kept.home % w.w},${(kept.home / w.w) | 0})` : "unknown"} · household ${kept.household}`));
+      const distinctions = [[kept.native, "native"], [kept.fixed, "fixed"], [kept.centenary, "centenarian"], [kept.recorded, "recorded offence"], [kept.wrongful, "wrongfully arrested"], [kept.exonerated, "exonerated"]].filter(([yes]) => yes).map(([, text]) => text);
+      if (distinctions.length) lines.push(el("div", "dim", `distinctions: ${distinctions.join(" · ")}`));
     }
     return lines;
   }
 
+  function cardForWalker(wk) {
+    const head = el("div", "head");
+    head.append(el("b", "", wk.name || cap(wk.species)), el("span", "dim", `  ${wk.species}`));
+    const doing = { departure: "leaving town for the edge road", camper: "camping by the edge road — wants a home the town has not built", scout: "a scout: this species would come if the town suited it" }[wk.kind] || wk.kind;
+    return [head, el("div", "dim", doing)];
+  }
+
   function updateHover(info) {
-    const key = !info ? "" : info.walker ? `w${info.walker.id}` : `t${info.tile}`;
+    const key = !info ? "" : info.citizen != null ? `c${info.citizen}` : info.walker ? `w${info.walker.id}` : `t${info.tile}`;
     const w = world();
     // Cheap change detection: rebuild on a new target or on a tick.
     const stamp = `${key}|${w.tick}|${w.cash}|${info && info.pinned ? 1 : 0}`;
@@ -491,7 +566,8 @@ export function createUI(app) {
     lastHoverKey = stamp;
     dom.card.innerHTML = "";
     if (!info) { dom.card.append(el("div", "dim", "hover the map · Inspect (9) pins a card · click an animal for its life")); return; }
-    const lines = info.walker ? cardForWalker(info.walker) : cardForTile(info.tile, info.pinned);
+    const lines = info.citizen != null ? cardForCitizen(info.citizen, info.walker, info.pinned, info.target)
+      : info.walker ? cardForWalker(info.walker) : cardForTile(info.tile, info.pinned);
     for (const l of lines) dom.card.append(l);
   }
 
@@ -629,6 +705,15 @@ export function createUI(app) {
     tr("mean LV / Pol", `${c.meanLV.toFixed(0)} / ${c.meanPol.toFixed(0)}`);
     if (w.campers.length) tr("camping by the road", `${w.campers.filter((x) => x.kind === "camper").length}`);
     body.append(grid);
+    const remembered = memorial(w);
+    if (remembered.length) {
+      body.append(el("h3", "", "recent memorial"));
+      for (const rec of remembered) {
+        const row = el("div", "memorial");
+        row.append(personLink(rec, rec.name), el("span", "dim", ` · ${rec.species}, ${rec.age} · ${rec.cause} · ${dateOf(w, rec.tick).label}`));
+        body.append(row);
+      }
+    }
     body.append(el("h3", "", "species"));
     const hist = el("div", "hist");
     const maxShare = Math.max(0.01, ...SPECIES.map((s) => c.shares[s.id]));

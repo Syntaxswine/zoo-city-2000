@@ -1,10 +1,12 @@
 // life.js — the compact biography contract. PLAN-THE-PEOPLE §3 K2.
 //
 // Part K owns the stable event ids and the bounded write path. Part B adds
-// the call sites and turns the stored triples into sentences.
+// the call sites and turns the stored triples into sentences. Part C resolves
+// departed ids through the permanent shorthand archive.
+
+import { legacyOf, personName } from "./legacy.js";
 
 export const LIFE_MAX = 12;
-export const NAMES_YEARS = 20;
 export const DEATHS_MAX = 256;
 
 export const KIND = Object.freeze({
@@ -45,10 +47,7 @@ export function remember(world, c, kind, arg = null) {
 const yearAt = (tick) => 2000 + Math.floor(tick / 12);
 
 function nameById(world, id) {
-  const living = world.byId?.get(Number(id));
-  if (living) return `${living.name} ${living.surname}`;
-  const kept = world.names?.[id];
-  return kept?.n || kept?.name || (kept ? `${kept.first || ""} ${kept.surname || ""}`.trim() : "") || "someone";
+  return personName(world, id);
 }
 
 function lotNow(world, lot) {
@@ -101,9 +100,9 @@ export function memorial(world) {
     const tick = Array.isArray(entry) ? entry[0] : entry.tick;
     const id = Array.isArray(entry) ? entry[1] : entry.id;
     if (tick < from) continue;
-    const kept = world.names?.[id];
+    const kept = legacyOf(world, id);
     if (!kept) continue;
-    out.push({ name: kept.n ?? kept.name, species: kept.s ?? kept.species, age: kept.a ?? kept.age, cause: kept.c ?? kept.cause, tick });
+    out.push({ id, name: kept.name, species: kept.species, age: kept.age, cause: kept.cause, tick });
   }
   return out;
 }
