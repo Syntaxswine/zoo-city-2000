@@ -70,9 +70,56 @@ throwaway — part G writes the real instrument):
 | walkers on screen | ≤ 150 | eight bubbles is the readable cap; a bubble per walker is noise — which is why bubbles live under the Inspect tool |
 | the meat economy (2 markets, stations, a centre, 30 y) | halls 11 · killings **4** · sold **2** · cut **§38,931** | the halls earned §38.9k from `CUT_PER_JOB` (§25 per filled job a year) and §300 from bodies. Meat is not a quantity today — a killing near a hall posts §50 and a line, a convict §100. The owner's real game: 20 sold, 15 in cells, out of 2,800 animals. Part H |
 | deaths in 30 years | ≈ 712 (3,220 ids − 1,732 alive − 776 left) | ≈ 24 a year of natural death — the supply the hall never buys (BACKLOG's "the market buys the dead") |
+| **the rig's scale vs the owner's** | the scripted mayor builds `BLOCK` 7 (a 6×6 interior in a shared road ring) with the meat row IN the grid; the owner: *"I build city blocks as 6x6 blocks, sometimes larger. so there are probably going to be at least 30 tiles between residential and meat"* | **every radius-gated rule in the meat arc was tuned on the rig and is dead at the owner's scale** — see §1b. Every "units/yr" figure above is a rig figure until `meatprobe` runs on an owner-scale layout or the owner's own save |
 | building families | 12 × 2 variants, `variant & 1` in `render.js:311` | `world.variant[i]` is a saved Uint8 — bits 1–7 are free, and keying by the TILE's byte is already the identity law |
 | suite | 167 checks | every part adds its checks to the same file, in its own Part letter |
 | the hover card today | name · species · age · home/job/mood · custody/record · trespass · friends · doing | this is the whole relationship surface; C rebuilds it around a citizen, not a tile |
+
+### 1b. Scale — the meat arc's reach rules at 30 tiles
+
+The owner, on the first draft of H: *"i dont think you and i are building
+in the same way. i think some of it is scale. I build city blocks as 6x6
+blocks, sometimes larger. so there are probably going to be at least 30
+tiles between residential and meat."* The scripted mayor puts a meat block
+in the same spiral as the houses, so a hall is always inside a few tiles of
+someone. The rules as they stand tonight, read at the owner's distance:
+
+| rule (code) | reach today | at 30 tiles |
+|---|---|---|
+| the dread field (`DREAD_RADIUS` 2/3/4 by tier) — herbivore fear, LV shadow, the rehome, carnivores' +5 | 4 tiles round the hall | **touches nobody's home**; `herbivores within the smell` is 0 in the owner's town |
+| the killing's ×3 (`KILL_MARKET`: "a buyer within the smell") | `dread[home] > 0` → 4 tiles | **never fires** — the owner's killings are all fed-town killings at ×1 |
+| the hall's §50 from a killing (`hallNear(killer.home, 6)`) | 6 tiles, and only if `dread[home] > 0` | **never**; a killing never reaches a hall — the owner has seen `SOLD` 20 times and a hall "had rabbit on Tuesday" never |
+| SOLD (`hallWithAccess`) | town-wide, nearest by Chebyshev | works — which is why the owner's 20 exist at all |
+| H's first draft: buy the dead / buy a cub "within 6" | 6 tiles | would have been the same mistake a fourth time |
+
+**The law this plan adopts for H: meat travels by ROAD, town-wide.** A hall
+has a reach that is the commute graph's, not a radius: `lotsWithinRoad`
+already walks the road network to `maxRoad` 40 for job search, and
+`fields.dial` already prices every step (and the rail). A hall's "buyers'
+round" is the set of lots within `MEAT_ROAD` 60 walk-steps (a ride counts
+0.3, like the commute), nearest hall wins a body, and the visible form is a
+**cart walker** from the hall to the door and back — the sack already
+proves the shape. The dread field stays a SMELL (4 tiles; that is what a
+smell is); the mood and LV effects of a hall on its own block are right as
+they are. `KILL_MARKET` and the hall's cut from a killing move onto the
+same road reach, so a hungry wolf 30 tiles from a hall with a road to it
+is "within the smell" for the weight's purpose — the plan says so in the
+commit and expects the playtest's killings column to rise in the owner's
+kind of town and not in the rig's.
+
+**The rig must be the owner's town.** Two instruments before any knob:
+- `tools/mayor.mjs` gains a layout `--layout estate` — `BLOCK` 8 (6×6
+  interiors), residential quarters on one side, a commercial spine, an
+  industrial quarter, and the meat row ≥ 30 road tiles from the nearest
+  house, rail between — the owner's shape, in the sim's own mayor.
+  `playtest` / `play` / `meatprobe` all take it (one mayor, SPEC §17).
+- `tools/meatprobe.mjs --save <file>` runs the hall arithmetic on a REAL
+  exported city (the LOAD panel exports one; `docs/fixtures/` can hold
+  the owner's, with their say-so). A number from the owner's 2,854-animal
+  town is the only number that counts; the rig's are for the curve's shape.
+
+Every figure in this document that says "units/yr" or "within N" is a rig
+figure until one of those two has run.
 
 ---
 
@@ -622,20 +669,34 @@ dead — v2" since session 3).
 
 **Design.**
 - `world.meat[i]` (K6b): units on hand per M lot. One unit = one body.
-- **Inflows**, each ONE unit to a hall with road access:
-  1. **The killing** → the killer's nearest hall within `KILL_HALL_R` 6
-     (today that hall only earns the mayor §50 and a line); the sack walks
-     INTO the hall when one is in reach (the walker-layer item BACKLOG
-     already lists — the killer's leg 1 goes to the hall's door, then
-     home).
+- **Reach is by road (§1b), never a radius.** `hallReach(world, lot) →
+  { hall, steps }`: the nearest built hall with road access within
+  `MEAT_ROAD` 60 walk-steps of the lot's door on the commute graph (a
+  ride 0.3 of a walk, like `commuteTime`), or none. Computed once a tick
+  for the lots that need it (a death, a killing, a full livestock lot —
+  dozens, not thousands); `lotsWithinRoad` is the precedent. The dread
+  field keeps its 4-tile smell; `KILL_MARKET` and the hall's cut from a
+  killing move from `dread[home] > 0` to `hallReach(home).hall >= 0`.
+- **Inflows**, each ONE unit to the hall `hallReach` names:
+  1. **The killing** → the killer's hall by road (today only a hall inside
+     the 4-tile smell earns the mayor §50 and a line — at the owner's
+     scale, never); the sack walks INTO the hall when one is in reach (the
+     walker-layer item BACKLOG already lists — the killer's leg 1 goes to
+     the hall's door by `roadPath`, however far, then home).
   2. **The dead** (the owner: *"natural deaths is a good option"*) →
-     `buyTick`: a natural death whose home is within `MEAT_BUY_R` 6 of a
-     hall is BOUGHT with p `MEAT_BUY_P` 0.6, any species — the Beastars
-     rule; the family's household gets nothing (there is no household
-     cash) but the mayor's cut gets `MEAT_PRICE` §50 as it does for a
-     killing, and the line says so (*"…and the hall at (30,12) paid the
-     family"*). ≈ 14 units/yr in the scripted town — the supply the owner
-     is asking for, without a single extra killing.
+     `buyTick`: a natural death whose home has a hall in road reach is
+     BOUGHT with p `MEAT_BUY_P` 0.6, any species — the Beastars rule; the
+     family's household gets nothing (there is no household cash) but the
+     mayor's cut gets `MEAT_PRICE` §50 as it does for a killing, and the
+     line says so (*"…and the cart from the hall at (30,12) called at the
+     house"*). The visible form: a **cart walker** (`w.kind = "cart"`, a
+     hall staffer with a handcart sprite — D authors the cart as a carry
+     variant like the sack) from the hall to the door and back, on the
+     roads; in a town like the owner's that is a 30-tile round trip the
+     player will see. ≈ 24 deaths/yr in the rig, and in the owner's town
+     of 2,854 more — with p 0.6 and every house on a road to a hall, the
+     hall buys most of them. **The knob to set on the owner's layout is
+     `MEAT_BUY_P`, not a radius.**
   3. **The sentence** — SOLD as ruled, unchanged. The lever for volume, if
      the owner wants more sold and fewer in cells, is `RECORD_HARD` 3 → 2
      (a second trespass meets the table) — a knob, named, not moved.
@@ -643,10 +704,11 @@ dead — v2" since session 3).
      right, although i think the meat vendors would grow them to adulthood
      for best return on investment"*). Pigs and cows are the livestock
      species. `penTick`: a hall with a free pen place buys a CUB (age <
-     `ADULT_AGE` 16) from a livestock household within `MEAT_BUY_R` whose
-     lot is FULL (the crowding push that already halves births — the
+     `ADULT_AGE` 16) from a livestock household with a hall in road reach
+     whose lot is FULL (the crowding push that already halves births — the
      farm sells what it cannot house) with p `PEN_BUY_P` 0.25 per eligible
-     household-month; the mayor's cut gets `PEN_PRICE` §30. The cub moves
+     household-month; the mayor's cut gets `PEN_PRICE` §30; the cart
+     walker fetches it (the cub walks beside the cart). The cub moves
      to the hall: `c.heldAt = hall`, `c.held = tick + monthsToAdult`,
      `c.pen = true` — so every existing reader (`absent()`: no job, no
      friendship sample, no mood, no investigation, no prey flight from it)
@@ -667,8 +729,10 @@ dead — v2" since session 3).
      befriended, cannot be killed by a predator (they are `absent()`), and
      a bulldozed hall frees them home (like the centre) — a check for each.
 - **Outflow**: `eatTick` per hall per month: `demand = MEAT_EAT ×
-  carnivores within reach(6)` (0.05 → a 40-carnivore neighbourhood eats 2
-  units a month); `sold = min(stock, demand)`; the till `MEAT_SALE` §20 ×
+  carnivores whose home names this hall by road reach` (0.05 → 40
+  carnivores eat 2 units a month; the customer walkers BACKLOG lists are
+  the visible form — a stroller's goal list gains the hall for
+  carnivores); `sold = min(stock, demand)`; the till `MEAT_SALE` §20 ×
   sold → the C rate's tax when licensed, else the mayor's cut (the
   licence's existing split). `ev.justice.sold` stays the CONVICT count;
   the census gains `meatSold` (units) and `meatOnHand` (Σ stock).
@@ -682,13 +746,20 @@ dead — v2" since session 3).
   HOOKS — the hall at (30,12) has nothing on the hooks` (once per hall per
   dry spell, `TICKER_FLASH`) and a yearly `THE MARKET — 118 units, 96 of
   them bought at the door`; the Rules tab entries M4–M6.
-- **Measure first, like session 8:** `tools/meatprobe.mjs` (exit 0) prints,
-  per seed × layout, inflow by source, the stock curve, units sold per
-  hall-year, and the cut — BEFORE the knobs are chosen, then after. The
-  target: a two-hall town holds 5–20 units and sells most of what it buys;
-  a hall in a herbivore block runs dry and prints.
+- **Measure first, like session 8, and on the owner's shape (§1b):**
+  `tools/mayor.mjs --layout estate` (6×6 blocks, the meat row ≥ 30 road
+  tiles from the houses, rail between) and `tools/meatprobe.mjs` (exit 0;
+  `--save <file>` takes an exported real city) print, per seed × layout,
+  inflow by source, the stock curve, units sold per hall-year, cart trips
+  and their mean length, and the cut — BEFORE the knobs are chosen, then
+  after. The target, on `estate`: a two-hall town holds 5–20 units and
+  sells most of what it buys; a hall with no road to any house runs dry
+  and prints. The balanced rig is the curve's shape only.
 
-**Owns.** `js/sim/meat.js` (buy/eat/readouts), the hall lines in
+**Owns.** `js/sim/meat.js` (`hallReach`, buy/pen/eat/readouts),
+`tools/mayor.mjs`'s `estate` layout (one new layout branch — playtest and
+play take it unchanged), the cart walker (`w.kind = "cart"`, one spawn
+function in `walkers.js` beside `hallLeg`), the hall lines in
 `justice.js`'s `kill()` and `arrest()` (the two `post(world, "cut", …)`
 sites — B's one-liners are elsewhere in those functions; merge by hunk),
 `budget.js`'s till line, the M-zone local term in `lots.js`, the dread
@@ -713,9 +784,15 @@ in the ledger; B's `LOST_FRIEND` cause `"sold"` already exists).
   slaughtered on the exact month it reaches 16 and yields 2; the pen never
   exceeds its cap; a bulldozed hall sends its pen home alive; the parents'
   household carries `LOST_CHILD` and no `grief`.
-- Monotone: buy radius 0/3/6/9 → units bought rises; `MEAT_EAT` 0/0.05/0.1
-  → units sold rises and stock falls — the service-curve rule; all three
-  columns printed.
+- Monotone: `MEAT_ROAD` 0/20/40/60/∞ → units bought rises on `estate`
+  and is FLAT on `balanced` past 20 (the rig cannot test reach — "the
+  easy case cannot test"); `MEAT_BUY_P` 0/0.3/0.6/1 → bought rises;
+  `MEAT_EAT` 0/0.05/0.1 → sold rises and stock falls — the service-curve
+  rule; every column printed.
+- The killing reaches the hall on `estate`: force one (the suite's recipe)
+  with the killer 30 road tiles from the hall — the stock ticks and the
+  sack's leg goes to the hall door; and `KILL_MARKET` fires there
+  (`killWeight` ×3 with a hall in road reach, ×1 with the road cut).
 - Mutation: cut the buy → stock stays at the killing count; cut the eat →
   stock climbs to the cap.
 - Old saves load with `meat` absent (zeros) and hash-equal for the
@@ -858,3 +935,7 @@ then F; K still first.
 4. **The save compaction** (B's first commit) changes the save format's
    bytes but not its meaning; old saves load. Fine to ship, or keep the
    verbose form?
+5. **Your city as the rig.** The LOAD panel exports a city as text. If you
+   paste one into the repo under `docs/fixtures/`, `meatprobe --save`
+   measures H on the town you actually build, and the `estate` layout is
+   calibrated against it rather than against my guess at your shape.

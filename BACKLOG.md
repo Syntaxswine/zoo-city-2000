@@ -37,8 +37,17 @@ not touch the knob. Ruled on H: *"natural deaths is a good option. selling
 cubs sounds right, although i think the meat vendors would grow them to
 adulthood for best return on investment."* → the hall buys the dead, and
 buys livestock cubs into a PEN (`held`/`heldAt` + `c.pen`; slaughtered at
-16 for 2 units; the card lists the pen by name and date). §8 still asks:
-`RECORD_HARD` 3 → 2, the save compaction, a weaner age for the pen.
+16 for 2 units; the card lists the pen by name and date). **Scale (plan
+§1b):** the owner builds 6×6+ blocks with ≥ 30 tiles between residential
+and meat; the scripted mayor's BLOCK 7 puts the hall next door — so the
+dread smell (4 tiles), KILL_MARKET (`dread[home] > 0`) and the hall's §50
+from a killing (`hallNear(…, 6)`) NEVER fire in the owner's town, and my
+first draft of H ("within 6") repeated the mistake. H's law: meat travels
+by ROAD, town-wide (`hallReach` on the commute graph, MEAT_ROAD 60
+walk-steps; a cart walker fetches the dead and the cubs); the rig gains
+`--layout estate` and `meatprobe --save` takes a real exported city. §8
+still asks: `RECORD_HARD` 3 → 2, the save compaction, a weaner age, and
+the owner's own save as a fixture.
 
 ## Crime and punishment — SHIPPED 2026-09-02 (SPEC §9c; `js/sim/justice.js`); what is left
 - **Hunger visibility.** The scripted towns run at U 0–4, so the ×20 hunger
