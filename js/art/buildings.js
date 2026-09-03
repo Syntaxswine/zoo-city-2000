@@ -32,6 +32,7 @@ import { box, render, litSkin, flatSkin, A_STEP, TO_X, TO_Y, RECIPES } from "./s
 import { defineSprite, part, toRows, T } from "./format.js";
 import { keysOf } from "./palette.js";
 import { TREE_ROUND, TREE_TALL, TREE_WILLOW, RUBBLE, groundSprite, hash } from "./terrain.js";
+import { shopKind } from "../sim/shops.js";
 
 const BRICK = keysOf("brick"); // ! @ # $
 const CONC = keysOf("concrete"); // % ^ & * (
@@ -586,6 +587,8 @@ for (const zone of [1, 2, 3, 4]) {
 export function buildingSprite(zone, tier, variant = 0, side = 1, theme = 0) {
   const z = typeof zone === "string" ? { R: 1, C: 2, I: 3, M: 4 }[zone] : zone;
   if (side > 1) return blockSprite(z, side, variant, theme);
+  // The shop pool (SPEC §12.2d, js/art/shops.js): a tier-1 C lot is one of eleven, by the whole variant byte — `>> 1` the kind, `& 1` the mirror.
+  if (z === 2 && tier === 1 && SHOP_ART) return SHOP_ART[shopKind(variant)][variant & 1];
   const fam = BUILDINGS[z] && BUILDINGS[z][tier];
   if (!fam) throw new Error(`buildingSprite: no family for zone ${zone} tier ${tier}`);
   return fam[variant & 1];
@@ -600,6 +603,9 @@ export function buildingSprite(zone, tier, variant = 0, side = 1, theme = 0) {
  */
 let BLOCKS = null;
 let LANDMARK_ART = null;
+let SHOP_ART = null;
+/** The shops (SPEC §12.2d; js/art/shops.js): SHOP_ART[kind] = [variant 0, variant 1] per js/sim/shops.js's pool; until it registers, every tier-1 C lot is the corner shop. */
+export function registerShops(table) { SHOP_ART = table; }
 export function registerBlocks(table) { BLOCKS = table; }
 /** The landmarks (SPEC §3c; js/art/landmarks.js): LANDMARK_ART[theme] = [variant 0, variant 1], a 3×3 per sim/landmarks.js roster row. */
 export function registerLandmarks(table) { LANDMARK_ART = table; }

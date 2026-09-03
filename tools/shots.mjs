@@ -23,6 +23,8 @@ import { art } from "../js/art/index.js";
 import { BUILDINGS, PARK, ZOO, FIRE_STATION, POLICE_STATION, PACIFICATION_CENTRE, OVERLAYS } from "../js/art/buildings.js";
 import { BLOCKS } from "../js/art/blocks.js";
 import { LANDMARK_ART } from "../js/art/landmarks.js";
+import { SHOP_ART } from "../js/art/shops.js";
+import { SHOPS } from "../js/sim/shops.js";
 import { LANDMARKS } from "../js/sim/landmarks.js";
 import { hires } from "../js/art/hires.js";
 import { ROADS, BRIDGES, N, E, S, W, DECK_TOP } from "../js/art/roads.js";
@@ -159,6 +161,13 @@ function sheets(z) {
       console.log(`  blocks [r${Math.floor(i / cols)} c${i % cols}] ${cell.sprite.name} (${cell.sprite.w}×${cell.sprite.h})`);
     });
     out.push(save("sheet-blocks.png", canvas, z));
+  }
+
+  // The shops (SPEC §12.2d): the pool of eleven × 2 variants on a tile, in kind order, the corner shop first.
+  {
+    const cells = [];
+    for (const s of SHOPS) for (const v of [0, 1]) cells.push({ sprite: SHOP_ART[s.kind][v], label: `${s.name} ${v}`, onTile: true });
+    out.push(sheet("sheet-shops.png", cells, { cols: 6, cellW: 80, cellH: 100, groundY: 84, z }));
   }
 
   // The landmarks (SPEC §3c): the eleven 3×3s × 2 variants on grass footprints, four to a row, in roster order — at most 2× so the sheet fits a screen.

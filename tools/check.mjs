@@ -1769,6 +1769,61 @@ function costOfBulldoze(w, x, y) { return (0, costOfOp)(w, { kind: "bulldoze", x
   void lotsTick;
 }
 
+// ---- Part S: the shop pool — a tier-1 C lot is one of eleven small businesses, by its variant byte (SPEC §12.2d; js/sim/shops.js, js/art/shops.js) ----
+{
+  const S = await import("../js/sim/shops.js");
+  const { art } = await import("../js/art/index.js");
+  const { SHOP_ART } = await import("../js/art/shops.js");
+  const { lotReport } = await import("../js/sim/lots.js");
+  const { createHousehold, placeHousehold } = await import("../js/sim/citizens.js");
+  const { recountRosters } = await import("../js/sim/fields.js");
+  const { SPECIES_BY_ID } = await import("../js/sim/species.js");
+  const { TERRAIN } = await import("../js/sim/world.js");
+  const { SHOPS, shopKind, shopOfVariant, shopOf } = S;
+
+  check("shops: the pool — eleven kinds with sequential ids, unique keys and names, the corner shop first",
+    SHOPS.length === 11 && SHOPS.every((s, i) => s.kind === i) && new Set(SHOPS.map((s) => s.key)).size === 11 && new Set(SHOPS.map((s) => s.name)).size === 11 && SHOPS[0].key === "corner-shop");
+  // Every variant byte lands on a kind, both mirrors of every kind occur, and no kind is starved.
+  const hits = SHOPS.map(() => [0, 0]);
+  for (let v = 0; v < 256; v++) hits[shopKind(v)][v & 1]++;
+  check("shops: all 256 variant bytes spread over the eleven kinds, both mirrors each, none under 10 of 128", hits.every(([a, b]) => a >= 10 && b >= 10), JSON.stringify(hits));
+  // The art follows the byte: kind by >> 1, mirror by & 1, a 1×1 footprint; the corner shop keeps variants 0 and 1 as they were.
+  let wrong = [];
+  for (let v = 0; v < 256; v++) {
+    const s = art.building(2, 1, v);
+    const k = shopKind(v);
+    const want = k ? `C1-${SHOPS[k].key}-${v & 1}` : `C1-shop-${v & 1}`;
+    if (s !== SHOP_ART[k][v & 1] || s.name !== want || s.footprint[0] !== 1 || s.footprint[1] !== 1) wrong.push(`${v}:${s.name}`);
+  }
+  check("shops: art.building(2, 1, variant) is the pool's sprite for every byte — the kind by >> 1, the mirror by & 1 — on a 1×1 footprint", wrong.length === 0, wrong.slice(0, 5).join(" "));
+  check("shops: variants 0 and 1 are still the corner shop, and no other tier or zone reads the high bits",
+    art.building(2, 1, 0).name === "C1-shop-0" && art.building(2, 1, 1).name === "C1-shop-1" && art.building(2, 2, 37).name === "C2-store-1" && art.building(1, 1, 37).name === "R1-cottage-1" && art.building(3, 1, 200).name === "I1-shed-0");
+  check("shops: every kind but the corner shop is its own pair of solids in the registry, tagged shop, with a hi-res twin",
+    SHOPS.slice(1).every((s) => SHOP_ART[s.kind].length === 2 && SHOP_ART[s.kind].every((sp) => sp.tags.includes("shop") && art.hires(sp))));
+
+  // The card: a Low C lot at variant 9 is a mirrored bookshop; nobody's until someone works there, then its keepers' by the staff's plurality species.
+  const F = createWorld({ seed: "shops" });
+  const at = (x, y) => y * F.w + x;
+  for (let y = 9; y <= 12; y++) for (let x = 9; x <= 13; x++) { F.terrain[at(x, y)] = TERRAIN.GRASS; F.road[at(x, y)] = ROAD.NONE; }
+  apply(F, { kind: "road", tiles: [9, 10, 11, 12, 13].map((x) => at(x, 9)) });
+  apply(F, { kind: "zone", zone: ZONE.C, x0: 10, y0: 10, x1: 10, y1: 10, density: 1 });
+  apply(F, { kind: "zone", zone: ZONE.R, x0: 12, y0: 10, x1: 12, y1: 10, density: 3 });
+  const shopLot = at(10, 10), homeLot = at(12, 10);
+  F.tier[shopLot] = 1; F.tier[homeLot] = 1; F.variant[shopLot] = 9;
+  computeFields(F); recountRosters(F); census(F);
+  const r0 = lotReport(F, shopLot);
+  check("shops: the report names the kind by the tile (variant 9 → a bookshop, mirrored) and says nobody keeps it yet",
+    r0.shop && r0.shop.name === "bookshop" && r0.shop.keeper === null && r0.shop.title === "a bookshop, nobody's yet" && art.building(2, 1, 9).name === "C1-bookshop-1" && shopOfVariant(9).kind === 4, JSON.stringify(r0.shop));
+  const hh = createHousehold(F, "fox", 2);
+  placeHousehold(F, hh, homeLot);
+  for (const id of hh.members) { const c = F.byId.get(id); c.job = shopLot; F.staff[shopLot]++; }
+  census(F);
+  const r1 = lotReport(F, shopLot);
+  check("shops: once foxes staff it the card reads the Slyfields' bookshop, from the staff's plurality species — derived, never saved",
+    r1.shop.keeper === "fox" && r1.shop.title === "the Slyfields' bookshop" && SPECIES_BY_ID.fox.surname === "Slyfield", r1.shop && r1.shop.title);
+  check("shops: a tier-2 store and an R lot report no shop", (F.tier[shopLot] = 2, lotReport(F, shopLot).shop === null) && lotReport(F, homeLot).shop === null && shopOf(F, homeLot) === null);
+  F.tier[shopLot] = 1;
+}
 // ---- Part D: the walker layer never writes the sim (SPEC §14) ---------------------
 const walkersPath = path.join(ROOT, "js", "walkers.js");
 if (existsSync(walkersPath)) {

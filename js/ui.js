@@ -333,13 +333,15 @@ export function createUI(app) {
     head.append(el("b", "", `(${rep.part ? `${rep.at.tx},${rep.at.ty}` : `${tx},${ty}`}) ${what}`));
     if (rep.zone !== ZONE.NONE) {
       const t = rep.tier;
-      const name = rep.landmark ? `3×3 ${rep.landmark.name}` : rep.side > 1 ? `${rep.side}×${rep.side} ${BLOCK_NAME[rep.side][rep.zone - 1]}` : `tier ${t} ${TIER_NAME[t][rep.zone - 1]}`;
+      const name = rep.landmark ? `3×3 ${rep.landmark.name}` : rep.side > 1 ? `${rep.side}×${rep.side} ${BLOCK_NAME[rep.side][rep.zone - 1]}` : rep.shop ? `tier 1 ${rep.shop.name}` : `tier ${t} ${TIER_NAME[t][rep.zone - 1]}`;
       head.append(el("span", "dim", t ? `  ${name}` : "  zoned, empty"));
       if (t) {
         const occ = rep.zone === ZONE.R ? `occ ${rep.occupants}/${rep.capacity}` : `jobs ${rep.staff}/${rep.jobs}`;
         head.append(el("span", "", `  ${occ}`));
       }
       if (rep.part) lines.push(el("div", "dim", `part of the block at (${tx},${ty}) — one building on ${rep.side * rep.side} tiles; its animals are counted there`));
+      // A shop of the pool (SPEC §12.2d): its kind by the tile, its keepers by whoever works there now.
+      if (rep.shop) lines.push(el("div", "dim", `${rep.shop.title}${rep.shop.keeper ? ` (${rep.shop.keeper})` : ""} — ${rep.shop.blurb}`));
       // A landmark (SPEC §3c): the block the species made, named when it rose and kept until it comes apart.
       if (rep.landmark) lines.push(el("div", "dim", `a landmark — the block the ${rep.landmark.species.map(pluralSpecies).join(" and ")} made: ${rep.landmark.blurb}`));
     }

@@ -10,6 +10,7 @@ import { hasAccess } from "./fields.js";
 import { evictFromLot, fireFromLot } from "./citizens.js";
 import { mergeWindow, windowFill, mergeLots, splitLot } from "./blocks.js";
 import { landmarkOf, landmarkLine } from "./landmarks.js";
+import { shopOf } from "./shops.js";
 
 const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
 
@@ -224,6 +225,7 @@ export function lotReport(world, at) {
     side: sideOf(world, i),
     theme: world.theme[i],
     landmark: landmarkOf(world.theme[i]), // the roster row a 3×3 rose as, or null (SPEC §3c)
+    shop: shopOf(world, i), // a tier-1 C lot's kind and keeper, or null (SPEC §12.2d)
     zone: z,
     tier: world.tier[i],
     maxTier: world.maxTier[i],

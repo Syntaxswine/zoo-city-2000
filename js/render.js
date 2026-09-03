@@ -367,7 +367,7 @@ export function createRenderer(canvas, initialWorld, art) {
           standing = art.tree(nearWater && v & 1 ? "willow" : v % 3 === 2 ? "tall" : "round");
         } else if (world.tier[i] > 0 && world.zone[i] !== ZONE.NONE) {
           // A block stands on its anchor and its parts stand for nothing (the sprite's footprint keys it; painter.js).
-          if (!isPart(world, i)) standing = art.building(world.zone[i], world.tier[i], world.variant[i] & 1, sideOf(world, i), world.theme[i]); // a 3×3 with a theme draws its landmark (SPEC §3c)
+          if (!isPart(world, i)) standing = art.building(world.zone[i], world.tier[i], world.variant[i], sideOf(world, i), world.theme[i]); // the whole variant byte: & 1 the mirror, >> 1 the shop of the pool for C tier 1 (SPEC §12.2d); a 3×3 with a theme draws its landmark (§3c)
         } else if (world.civic[i] === CIVIC.PARK) standing = art.civic("park");
         else if (world.civic[i] === CIVIC.ZOO) standing = art.civic("zoo");
         else if (world.civic[i] === CIVIC.FIRE) standing = art.civic("fire");
