@@ -80,7 +80,22 @@ measured first, a rider moves at ×3.07 a walker on the map today, so read
 as ×4.5; WALK 10 → 9, RAIL_COST 3 → 2 (9/2 = 4.5 exactly), RIDE_SPEED
 DERIVED = WALK/RAIL_COST so the eye and the Rules tab are one number; the
 hash moves on rail towns only. Plan §8 q8 asks whether ×1.5 of walking was
-meant instead.
+meant instead. And *"road access should not be limited to one side of a
+tile, as long as a tile is within 1-3 tiles of the road it has road
+access"* → **R** (plan §4-R): the code ALREADY says so (`computeRoadDist`
+= a BFS through any tile, any direction, ≤ ROAD_REACH 3; only a bare wall
+blocks) — but `roadDist` is STALE between a road op and the next tick
+(`ops.js:287` recomputes occlusion at once and leaves roadDist for the
+tick; a paused city shows "no road within 3" beside a new road until
+Space — probed). The owner: *"the 6x6 squares have roads around the whole
+perimeter, so nothing is more than 3 tiles away"* — so the ruling lands on
+the two rules that still want a TOUCHING road: a station is a door only
+with a road touching it (`fields.js:492`) → within ROAD_REACH like a lot's
+door; industry tier 3 only at roadDist ≤ 1 (`lots.js:110`) → anywhere with
+access. Both move the hash. R: recompute at the op (hash-neutral, its own
+commit first), those two, an `access` overlay mode, the card's "road
+access: 2 tiles · door (x,y)", `tools/accessprobe.mjs --save` on the
+control city. ROAD_REACH stays 3.
 
 ## Crime and punishment — SHIPPED 2026-09-02 (SPEC §9c; `js/sim/justice.js`); what is left
 - **Hunger visibility.** The scripted towns run at U 0–4, so the ×20 hunger

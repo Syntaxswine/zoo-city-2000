@@ -34,6 +34,10 @@ And: *"railroads and roads should be able to cross over each other
 perpendicularly."* → Part X, the level crossing (§4-X). And: *"citizens
 traveling on the rails should move 50% faster"* → X2, the ride speed
 (§4-X), read as 50% faster than they ride now (measured ×3.07 → ×4.5).
+And: *"road access should not be limited to one side of a tile, as long as
+a tile is within 1-3 tiles of the road it has road access."* → Part R
+(§4-R): the law already reads that way in the code — so R makes access
+VISIBLE, fixes the one staleness the probe found, and asks what was seen.
 
 Plan only. Nothing here is built. Each part is sized for one agent-session,
 owns its own files, and codes against contracts written down in §3 so the
@@ -61,7 +65,8 @@ Plus four parts that are not about relating but were in the same breath:
 **H. Meat on hand** — the hall's stock, its inflows and its till; **P. The
 palette** — the build tools as a remote control on the left; **S. Saves** —
 a menu of named slots instead of one checkpoint; **X. The level crossing**
-— rail across a road, square-on.
+— rail across a road, square-on; **R. Road access, seen** — the access
+field on the overlay and the card, recomputed the moment a road is laid.
 
 Then **G. Integration** — the suite, the docs, the browser round — after
 the parts have merged.
@@ -89,6 +94,8 @@ throwaway — part G writes the real instrument):
 | the meat economy (2 markets, stations, a centre, 30 y) | halls 11 · killings **4** · sold **2** · cut **§38,931** | the halls earned §38.9k from `CUT_PER_JOB` (§25 per filled job a year) and §300 from bodies. Meat is not a quantity today — a killing near a hall posts §50 and a line, a convict §100. The owner's real game: 20 sold, 15 in cells, out of 2,800 animals. Part H |
 | deaths in 30 years | ≈ 712 (3,220 ids − 1,732 alive − 776 left) | ≈ 24 a year of natural death — the supply the hall never buys (BACKLOG's "the market buys the dead") |
 | a rider's speed on the map (the suite's rail fixture, one commuter, `scratchpad/ridespeed.mjs`) | walk **0.97** tiles/s · ride **2.99** tiles/s · ratio **3.07** | `RIDE_SPEED` 3 is real on the map; the felt commute says 0.3 of a walk (`RAIL_COST` 3 / `WALK` 10 = 3.33×) — two numbers for one fact, off by a tenth. X2 ties them |
+| road access (`fields.computeRoadDist`, `hasAccess`; `scratchpad/accessprobe.mjs`) | a multi-source BFS from every road tile through ANY tile, 4-neighbour, any direction; access = distance ≤ `ROAD_REACH` **3** (SPEC §6: "SC2000, exact"); only a bare wall blocks it | **the law is already what the owner asked for.** Zone a tile, lay a road two tiles from it: before the next tick `roadDist` reads 4 and `hasAccess` is false; after the tick, 2 and true — **stale between an op and the tick**, which a PAUSED city (every loaded city opens paused) shows on the card until Space |
+| the mayor's zoned lots by road distance, year 30 | 1: 325 · 2: 184 · 3: 60 · 4: **0** | the rig never zones past reach, and neither does the owner (*"roads around the whole perimeter, so nothing is more than 3 tiles away"*) — the growth rule sees every tile of both towns; what still demands a TOUCHING road is the station door and industrial tier 3 (R4) |
 | **the rig's scale vs the owner's** | the scripted mayor builds `BLOCK` 7 (a 6×6 interior in a shared road ring) with the meat row IN the grid; the owner: *"I build city blocks as 6x6 blocks, sometimes larger. so there are probably going to be at least 30 tiles between residential and meat"* | **every radius-gated rule in the meat arc was tuned on the rig and is dead at the owner's scale** — see §1b. Every "units/yr" figure above is a rig figure until `meatprobe` runs on an owner-scale layout or the owner's own save |
 | building families | 12 × 2 variants, `variant & 1` in `render.js:311` | `world.variant[i]` is a saved Uint8 — bits 1–7 are free, and keying by the TILE's byte is already the identity law |
 | suite | 167 checks | every part adds its checks to the same file, in its own Part letter |
@@ -1112,9 +1119,81 @@ ride cost is `10 + 13·2 + 10`… in the new units `9 + 13·2 + 9`; the
 mayor's balanced hash (no rail) is unchanged — only rail towns move.
 An hour.
 
+### R. Road access, seen — *"as long as a tile is within 1-3 tiles of the road it has road access"*
+
+**What the code says tonight (§1).** `computeRoadDist` is a breadth-first
+distance from every road tile through any tile, in all four directions,
+and `hasAccess` is that distance ≤ `ROAD_REACH` 3. Nothing about sides;
+nothing about which face the door is on; only a bare wall stops it. A
+tile three in from the ring of a 6×6 block has access. The owner's
+sentence is the law as written — so the part is not a rule change; it is
+(1) the one defect the probe found, (2) making the field visible so what
+the owner saw can be named, and (3) the knob if their larger blocks are
+the cause.
+
+**Design.**
+1. **Recompute at the op, not the tick.** `ops.js:287` marks
+   `roadsDirty` and recomputes occlusion at once "so wallCount reads
+   live", but leaves `roadDist` for the tick. A road laid in a paused city
+   (every loaded city opens paused, BACKLOG) leaves every lot beside it
+   reading "no road within 3" on the card until Space. Fix: call
+   `computeRoadDist` there too (a 4,096-tile BFS, well under a
+   millisecond). Hash-neutral — the tick recomputes the same field before
+   anything in the sim reads it; the suite proves it on every gate.
+2. **The access overlay.** The `O` overlay gains a mode `access`:
+   distance 0 (road) untinted, 1–3 in three greens, 4 in the zot red —
+   the field the growth rule reads, painted. With it the owner can point
+   at a tile and say "this one".
+3. **The card says it.** Every zoned tile's card: `road access: 2 tiles ·
+   door (30,12)` from `lotReport.roadDist` and `doorOf`; at 4, `no road
+   within 3 — the nearest is 5 tiles at (28,9)` (a second BFS to 8, only
+   for the card).
+4. **One law for every rule that asks "is there a road?"** The owner,
+   clarifying: *"the 6x6 squares have roads around the whole perimeter,
+   so nothing is more than 3 tiles away"* — so the growth rule already
+   sees every tile of theirs, and the sentence is a RULING on the two
+   places that still demand a road TOUCHING the tile: (a) **a station is
+   a door only when a road tile touches it** (SPEC §7.9, `fields.js:492`
+   the walk layer's "a road, or a platform" adjacency) — becomes: a
+   station is a door when a road is within `ROAD_REACH`, the same BFS as
+   a lot's `doorOf`, walkers crossing the gap on foot as they do to any
+   lot; (b) **industry reaches tier 3 only at `roadDist ≤ 1`**
+   (`lots.js:110`, SC2000's frontage rule) — becomes tier 3 anywhere with
+   access, so the inside of an industrial 6×6 grows as tall as its edge.
+   Both move the hash (more stations are doors; interior works rise) and
+   the commit records before/after on the rail and millbelt gates. What
+   stays one-sided and is not access: `doorOf` picks ONE road tile (the
+   first in N-E-S-W order) so a lot's walkers always leave by the same
+   side — cosmetic, and SPEC says so; a building's drawn door is on the
+   side face whatever the road's side (art). `ROAD_REACH` stays 3 (the
+   owner's blocks never need more).
+5. **Verify on the control city.** `tools/accessprobe.mjs` (exit 0; the
+   scratchpad probe made real; takes `--save`): zoned lots by `roadDist`
+   0–4, stations that are doors before and after (a), industrial lots at
+   tier 2 with access that (b) frees, and the WHY NOT reason on every lot
+   at 4. The rig has 0 at 4 — only the owner's town can show that case.
+
+**Owns.** The one call in `ops.js` (X owns the validation lines — a
+different hunk), `computeRoadDist`'s export, the station-door adjacency
+in `fields.js`'s `dial` (`:492`, one condition; H owns nothing there, A
+nothing), `lots.js:110`, the `access` mode in `render.js`'s
+`drawOverlay` (its own case), the card line in `lots.js`'s `lotReport` +
+`ui.js`'s `cardForTile` (one line each; C owns the card's citizen half, H
+the M block), `tools/accessprobe.mjs`, Part M' checks, SPEC §3, §6, §7.9
+sentences.
+
+**Acceptance.** The staleness probe inverted: after a road op, before any
+tick, `hasAccess` is true, and the hash on every gate is unchanged by R1
+alone (commit R1 first, on its own); then R4 — the rail fixture's station
+two tiles from the road is a door and the commute rides it, an industrial
+lot at `roadDist` 3 reaches tier 3 in the millbelt, and the rail and
+millbelt hashes move with before/after recorded; the overlay's tint table
+has five entries and the audit walks it; the card's line on a tile at 2,
+at 3, at 4; the probe's table in the commit. Half a session, no keel.
+
 ### G. Integration — after the parts have merged
 
-One agent, after A–F, H, P, S and X are on `main`:
+One agent, after A–F, H, P, S, X and R are on `main`:
 - **The control city** (the owner: *"i will build one for you soon"*):
   when it arrives, `docs/fixtures/control-city.json` — loaded by the
   suite (`load` → `rebuildDerived` → 12 months → a recorded hash, the
@@ -1193,6 +1272,9 @@ The two UI parts, by file:
 And X, the crossing: `js/sim/ops.js` (validation lines — nobody else),
 `js/art/rail.js`, `art.crossing` in `index.js`, one ground line in
 `render.js`, the rail sheet in `shots.mjs`, Part L', SPEC §7.9 / §12.4c.
+And R, access: one call in `ops.js:287` (a different hunk from X's), the
+`access` case in `render.js`'s `drawOverlay`, one line each in `lots.js`
+`lotReport` and `ui.js` `cardForTile`, `tools/accessprobe.mjs`, Part M'.
 
 Files touched by two parts are touched in DIFFERENT hunks (`render.js`,
 `walkers.js`, `index.js`, `census.js`, `check.mjs`, `shots.mjs`,
@@ -1209,6 +1291,7 @@ day 0   K (½ session)  ─┬─ A needs ────────────�
                         ├─ P palette (½) ───────┤
                         ├─ S saves (½) ─────────┤
                         ├─ X crossing (½) ──────┤
+                        ├─ R access seen (½) ───┤
                         ├─ B lives ─────────────┤   G integration (1 session)
                         ├─ C inspect (stubs) ───┤   + the control city when it lands
                         ├─ D looks ─────────────┤
@@ -1270,3 +1353,10 @@ X+A, then H+E, then B+D, then C+F; K before A/B/H.
 8. **"50% faster" than what?** Riders move at ×3.07 today (measured). The
    plan reads the ruling as ×4.5 (50% more than now). If it meant ×1.5 of
    walking speed, say so — that is `RAIL_COST` 6 with `WALK` 9 instead.
+9. **What did "one side" look like?** Growth access is already
+   any-direction to 3 in the code, and with the perimeter roads every
+   tile of the owner's blocks has it (§4-R). The plan applies the ruling
+   to the two rules that still want a TOUCHING road (a station's door,
+   industrial tier 3) and fixes the stale card in a paused city. If what
+   was seen was something else — a tile coordinate and the card's WHY NOT
+   line would settle it, or the control city will.
