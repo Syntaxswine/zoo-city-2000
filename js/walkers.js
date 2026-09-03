@@ -212,6 +212,7 @@ export function createWalkers(initialWorld) {
       t: 0,
       dist: 0,
       standUntil: opts.standFirst || 0,
+      idle: 0, // seconds continuously standing; >1 selects Part D's fourth pose
       speed: speedOf(species, age),
       lane: (hash01(id | 0, 7, 0x1a2b) - 0.5) * 0.36,
       tx: 0,
@@ -220,7 +221,7 @@ export function createWalkers(initialWorld) {
       frame: 0,
       release: false,
       riding: false, // on a rail segment: ×RIDE_SPEED and drawn up on the train
-      prey: null, // predation: { species, age, name, tx, ty, facing } — the neighbour at the door
+      prey: null, // predation: { species, age, look, name, tx, ty, facing } — the neighbour at the door
       bag: null, // predation: 0..1 through the stand at the door (null when not standing there)
       carry: null, // 'sack' once the killer turns for home
       preyName: "", // predation: who is in the sack (the card)
@@ -337,7 +338,9 @@ export function createWalkers(initialWorld) {
     const age = v.age < ADULT ? "cub" : v.age >= SPECIES_BY_ID[v.species].retire ? "elder" : "adult";
     // The neighbour faces the killer: the opposite of the facing the last step gives the killer.
     const facing = dx > 0 ? "nw" : dx < 0 ? "se" : dy > 0 ? "ne" : "sw";
-    w.prey = { species: v.species, age, name: v.name, tx: bx + dx * PREY_STEP, ty: by + dy * PREY_STEP, facing };
+    // `v` is a compact record because justice has already removed the victim;
+    // the pure id hash preserves the exact coat that stood here while alive.
+    w.prey = { species: v.species, age, look: art.look(v.id), name: v.name, tx: bx + dx * PREY_STEP, ty: by + dy * PREY_STEP, facing };
     w.preyName = v.name; // outlives w.prey: the card names who is in the sack all the way home
     return add(w) ? "ok" : "drop";
   }
@@ -532,7 +535,8 @@ export function createWalkers(initialWorld) {
     if (!leg) { w.done = true; return; }
     if (w.standUntil > 0) {
       w.standUntil -= dt;
-      w.frame = 0;
+      w.idle += dt;
+      w.frame = w.idle > 1 ? 3 : 0;
       if (w.kind === "predation" && w.leg === 0) w.bag = Math.min(1, Math.max(0, 1 - w.standUntil / BAG_STAND));
       if (w.standUntil > 0) return;
       // Stand over: next leg, or done.
@@ -546,6 +550,7 @@ export function createWalkers(initialWorld) {
       w.leg++;
       w.seg = 0;
       w.t = 0;
+      w.idle = 0;
       if (w.kind === "predation" && w.leg === 1) {
         // The sack is tied: it goes over the shoulder, the neighbour is not drawn again.
         w.bag = null;
@@ -557,7 +562,8 @@ export function createWalkers(initialWorld) {
       return;
     }
     const path = leg.path;
-    if (path.length < 2) { w.standUntil = leg.stand || 0.01; return; }
+    if (path.length < 2) { w.standUntil = leg.stand || 0.01; w.idle = 0; return; }
+    w.idle = 0;
     const rd = leg.ride;
     const onRail = !!(rd && (rd[w.seg] || rd[w.seg + 1])); // a segment touching a ridden tile is a ride
     let d = w.speed * dt * (onRail ? KNOBS.RIDE_SPEED : 1);
@@ -575,6 +581,7 @@ export function createWalkers(initialWorld) {
           [w.tx, w.ty] = centre(path[path.length - 1]);
           w.standUntil = Math.max(leg.stand, 0.01);
           w.frame = 0;
+          w.idle = 0;
           if (w.kind === "scout") w.standUntil = 0.4;
           return;
         }
@@ -598,7 +605,7 @@ export function createWalkers(initialWorld) {
     if (!(dt > 0)) dt = 0;
     const vp = viewport || { x0: 0, y0: 0, x1: world.w, y1: world.h };
     for (const w of active) {
-      if (w.kind === "camper") { w.frame = 0; continue; }
+      if (w.kind === "camper") { w.idle += dt; w.frame = w.idle > 1 ? 3 : 0; continue; }
       step(w, dt);
     }
     for (let k = active.length - 1; k >= 0; k--) if (active[k].done) remove(k);

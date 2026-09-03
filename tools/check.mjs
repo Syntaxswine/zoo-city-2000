@@ -1595,6 +1595,184 @@ if (existsSync(artIndex)) {
   console.log("art: js/art/index.js not present yet — Part C skipped");
 }
 
+// ---- Part D: stable looks, faces and the fourth (idle) pose -----------------
+{
+  const { art, allSprites } = await import("../js/art/index.js");
+  const { SPECIES_IDS, AGES, FACINGS, LOOK_MARKS, allCitizens } = await import("../js/art/citizens.js");
+  const { rampOf, hasKey } = await import("../js/art/palette.js");
+  const pairs = (ids) => new Set(ids.map((id) => JSON.stringify(art.look(id))));
+  const sampleIds = Array.from({ length: 401 }, (_, i) => i - 200);
+  const stable = sampleIds.every((id) => JSON.stringify(art.look(id)) === JSON.stringify(art.look(id)));
+  check("looks: the pure id hash is stable for positive and negative ids and reaches all four bit pairs",
+    stable && pairs(sampleIds).size === 4, [...pairs(sampleIds)].join(" · "));
+  let badLookInput = false;
+  try { art.look(NaN); } catch { badLookInput = true; }
+  check("looks: a non-finite identity is rejected instead of becoming everybody's default", badLookInput);
+
+  const markNames = {
+    rabbit: "lop ear", mouse: "notched ear", fox: "white tail-tip", beaver: "pale chest",
+    owl: "brow tufts", bear: "muzzle patch", tortoise: "shell scute", raccoon: "lighter mask",
+    pig: "cheek spot", cow: "Holstein patch", wolf: "grey saddle", cat: "tabby stripe",
+    hawk: "chest bars", skunk: "double stripe",
+  };
+  check("looks: all fourteen declared motifs are the promised species details",
+    SPECIES_IDS.every((species) => LOOK_MARKS[species] && LOOK_MARKS[species].name === markNames[species]),
+    SPECIES_IDS.filter((species) => !LOOK_MARKS[species] || LOOK_MARKS[species].name !== markNames[species]).join(", "));
+
+  let pairwise = true, anchors = true, markBoxes = true, markSeen = true, shadeRamp = true, cubShadeOnly = true, idleDistinct = true, glassesByHash = true;
+  const lookFailures = [];
+  for (const species of SPECIES_IDS) for (const age of AGES) {
+    for (let shade = 0; shade < 2; shade++) for (let mark = 0; mark < 2; mark++) {
+      const look = { shade, mark };
+      for (const facing of FACINGS) for (let frame = 0; frame < 4; frame++) {
+        const s = art.citizen(species, facing, frame, age, { look });
+        const want = age === "cub" ? [4, s.h - 1] : [6, s.h - 1];
+        if (s.anchor[0] !== want[0] || s.anchor[1] !== want[1]) anchors = false;
+      }
+    }
+    for (const facing of FACINGS) for (let frame = 0; frame < 4; frame++) {
+      const four = [];
+      for (let shade = 0; shade < 2; shade++) for (let mark = 0; mark < 2; mark++)
+        four.push(art.citizen(species, facing, frame, age, { look: { shade, mark } }).rows.join("\n"));
+      if (new Set(four).size !== 4) {
+        pairwise = false;
+        lookFailures.push(`${species} ${age} ${facing} f${frame}: ${new Set(four).size}/4`);
+      }
+    }
+    for (const facing of FACINGS) {
+      const base = art.citizen(species, facing, 0, age, { look: { shade: 0, mark: 0 } });
+      const idle = art.citizen(species, facing, 3, age, { look: { shade: 0, mark: 0 } });
+      if (base.rows.join("\n") === idle.rows.join("\n")) idleDistinct = false;
+      for (let shade = 0; shade < 2; shade++) {
+        const wears = art.citizen(species, facing, 0, age, { look: { shade, mark: 1 } }).rows.join("").includes("=");
+        if (wears !== (age === "elder" && shade === 1)) glassesByHash = false;
+      }
+    }
+    if (age !== "cub") for (const facing of FACINGS) for (let frame = 0; frame < 4; frame++) for (let shade = 0; shade < 2; shade++) {
+      const a = art.citizen(species, facing, frame, age, { look: { shade, mark: 0 } });
+      const b = art.citizen(species, facing, frame, age, { look: { shade, mark: 1 } });
+      const authored = facing === "sw" ? "se" : facing === "nw" ? "ne" : facing;
+      const box = LOOK_MARKS[species][authored].box;
+      const x0 = facing === "sw" || facing === "nw" ? 12 - box[0] - box[2] : box[0];
+      let changed = 0;
+      for (let y = 0; y < a.h; y++) for (let x = 0; x < a.w; x++) if (a.rows[y][x] !== b.rows[y][x]) {
+        changed++;
+        if (x < x0 || x >= x0 + box[2] || y < box[1] || y >= box[1] + box[3]) markBoxes = false;
+      }
+      if (!changed) markSeen = false;
+      if (box[2] > 6 || box[3] > 6) markBoxes = false;
+    }
+
+    // Adult shade changes are exactly one darker rung and never a silhouette,
+    // accent, shell or clothing change. Elder glasses intentionally compose
+    // with that hash bit, so this isolates the coat law on adults.
+    if (age === "adult") for (const facing of FACINGS) for (let frame = 0; frame < 4; frame++) for (let mark = 0; mark < 2; mark++) {
+      const light = art.citizen(species, facing, frame, "adult", { look: { shade: 0, mark } });
+      const dark = art.citizen(species, facing, frame, "adult", { look: { shade: 1, mark } });
+      let shadeChanged = 0;
+      for (let y = 0; y < light.h; y++) for (let x = 0; x < light.w; x++) if (light.rows[y][x] !== dark.rows[y][x]) {
+        shadeChanged++;
+        const ra = rampOf(light.rows[y][x]), rb = rampOf(dark.rows[y][x]);
+        if (!ra || !rb || ra.name !== rb.name || ra.index - rb.index !== 1) shadeRamp = false;
+      }
+      if (!shadeChanged) shadeRamp = false;
+    }
+
+    // The cub's second identity treatment may change coat value only: no
+    // adult motif, no outline or silhouette pixel, and no cross-ramp colour.
+    if (age === "cub") for (const facing of FACINGS) for (let frame = 0; frame < 4; frame++) for (let shade = 0; shade < 2; shade++) {
+      const ca = art.citizen(species, facing, frame, "cub", { look: { shade, mark: 0 } });
+      const cb = art.citizen(species, facing, frame, "cub", { look: { shade, mark: 1 } });
+      let cubChanged = 0;
+      for (let y = 0; y < ca.h; y++) for (let x = 0; x < ca.w; x++) if (ca.rows[y][x] !== cb.rows[y][x]) {
+        cubChanged++;
+        const ra = rampOf(ca.rows[y][x]), rb = rampOf(cb.rows[y][x]);
+        if (!ra || !rb || ra.name !== rb.name) cubShadeOnly = false;
+      }
+      if (cubChanged < 4) cubShadeOnly = false;
+    }
+  }
+  check("looks: all four looks differ for every species and age, including shade-only cub treatments", pairwise, lookFailures.join("; "));
+  check("looks: every walk and idle pose keeps its anchor on the feet", anchors);
+  check("looks: every species and age has a visible fourth pose, and exactly shade-1 elders wear glasses", idleDistinct && glassesByHash);
+  check("looks: each adult/elder mark changes pixels only inside its declared mirrored <=6x6 box", markBoxes && markSeen);
+  check("looks: shade darkens only fur, exactly one ramp rung where it can move", shadeRamp);
+  check("looks: cub identity four-way resolution changes local coat value only", cubShadeOnly);
+
+  let carryBody = true;
+  for (const species of SPECIES_IDS) for (const age of ["adult", "elder"]) for (const facing of FACINGS) for (let frame = 0; frame < 4; frame++)
+    for (let shade = 0; shade < 2; shade++) for (let mark = 0; mark < 2; mark++) {
+      const look = { shade, mark };
+      const plain = art.citizen(species, facing, frame, age, { look });
+      const carry = art.citizen(species, facing, frame, age, { look, carry: "sack" });
+      const bare = (r) => species === "tortoise" ? r.replace(/\+/g, ".") : r;
+      for (let k = 1; k <= 12; k++) if (bare(carry.rows[carry.h - k].slice(3, 15)) !== bare(plain.rows[plain.h - k])) carryBody = false;
+      if (carry.anchor[0] !== plain.anchor[0] + 3 || carry.anchor[1] !== carry.h - 1) carryBody = false;
+    }
+  check("looks: a carried sack preserves every marked and shaded body row across the full matrix", carryBody);
+
+  let portraits = true, expressions = true, portraitLooks = true, portraitSpecies = new Set(), invalidPortrait = false;
+  let portraitCount = 0;
+  for (const species of SPECIES_IDS) for (const age of AGES) for (let shade = 0; shade < 2; shade++) for (let mark = 0; mark < 2; mark++) {
+    const made = ["glad", "flat", "low"].map((expression) => art.portrait(species, { age, shade, mark, expression }));
+    portraitCount += made.length;
+    if (new Set(made.map((p) => p.rows.join("\n"))).size !== 3) expressions = false;
+    for (let i = 0; i < made.length; i++) {
+      const p = made[i];
+      if (p.w !== 16 || p.h !== 16 || p.rows.some((r) => [...r].some((key) => !hasKey(key)))) portraits = false;
+      if (p.rows.join("").includes("=") !== (age === "elder" && shade === 1)) portraits = false;
+      if (p !== art.portrait(species, { age, shade, mark, expression: ["glad", "flat", "low"][i] })) portraits = false;
+    }
+    if (age === "adult" && shade === 0 && mark === 0) portraitSpecies.add(made[1].rows.join("\n"));
+  }
+  for (const species of SPECIES_IDS) for (const age of AGES) {
+    const four = [];
+    for (let shade = 0; shade < 2; shade++) for (let mark = 0; mark < 2; mark++)
+      four.push(art.portrait(species, { age, shade, mark, expression: "flat" }).rows.join("\n"));
+    if (new Set(four).size !== 4) portraitLooks = false;
+  }
+  try { art.portrait("rabbit", { expression: "furious" }); } catch { invalidPortrait = true; }
+  check("portraits: 14 species x 3 ages x 4 looks x 3 expressions are 16x16 valid cached sprites",
+    portraits && portraitCount === 504, `${portraitCount}`);
+  check("portraits: all four looks and all expressions differ, every species reads differently, and invalid expressions throw",
+    portraitLooks && expressions && portraitSpecies.size === SPECIES_IDS.length && invalidPortrait, `${portraitSpecies.size}/${SPECIES_IDS.length} species`);
+
+  const registered = allCitizens(), registeredNames = new Set(registered.map((x) => x.name));
+  const registeredPortraits = registered.filter(({ sprite }) => sprite.tags.includes("portrait"));
+  check("looks: allCitizens walks the exact full matrix without duplicate cache names",
+    registered.length === 3224 && registeredNames.size === registered.length && registeredPortraits.length === 504,
+    `${registered.length} entries · ${registeredNames.size} names · ${registeredPortraits.length} portraits`);
+  check("looks: the global art registry keeps every look and portrait after name de-duplication",
+    allSprites().filter(({ sprite }) => sprite.tags.includes("portrait")).length === 504);
+  const lookSheet = path.join(ROOT, "docs", "shots", "sheet-looks.png");
+  const portraitSheet = path.join(ROOT, "docs", "shots", "sheet-portraits.png");
+  check("looks: both PNG critic sheets exist and are non-empty",
+    existsSync(lookSheet) && existsSync(portraitSheet) && statSync(lookSheet).size > 1000 && statSync(portraitSheet).size > 1000);
+
+  const HC = await import("./headless-canvas.mjs");
+  HC.installCanvas();
+  const { paintPortrait } = await import("../js/render.js");
+  const pc = HC.createCanvas(1, 1), ps = art.portrait("fox", { shade: 1, mark: 1, expression: "glad" });
+  paintPortrait(pc, ps, 3);
+  let nearest = pc.width === 48 && pc.height === 48;
+  for (let sy = 0; sy < 16; sy++) for (let sx = 0; sx < 16; sx++) {
+    const first = ((sy * 3) * pc.width + sx * 3) * 4;
+    for (let dy = 0; dy < 3; dy++) for (let dx = 0; dx < 3; dx++) {
+      const at = (((sy * 3 + dy) * pc.width) + sx * 3 + dx) * 4;
+      for (let c = 0; c < 4; c++) if (pc._data[at + c] !== pc._data[first + c]) nearest = false;
+    }
+  }
+  check("portraits: paintPortrait produces an exact nearest-neighbour integer scale", nearest);
+
+  const renderSrcD = readFileSync(path.join(ROOT, "js", "render.js"), "utf8");
+  const citizenCalls = renderSrcD.match(/art\.citizen\(/g) || [];
+  const lookArgs = renderSrcD.match(/art\.citizen\([^\n]+look:/g) || [];
+  check("looks: normal, tent, prey and picking render paths all pass their stored look",
+    citizenCalls.length === 4 && lookArgs.length === 4, `${lookArgs.length}/${citizenCalls.length} look-bearing calls`);
+  const specD = readFileSync(path.join(ROOT, "SPEC.md"), "utf8");
+  check("looks: SPEC records the cub-resolution, portrait and idle contracts", /### 12\.3b/.test(specD) && /shade-only/i.test(specD) && /paintPortrait/.test(specD));
+}
+
 // ---- Part C2: the play camera (tools/play.mjs photographs the REAL renderer) ----
 {
   const HC = await import("./headless-canvas.mjs");
@@ -2099,6 +2277,7 @@ function costOfBulldoze(w, x, y) { return (0, costOfOp)(w, { kind: "bulldoze", x
 const walkersPath = path.join(ROOT, "js", "walkers.js");
 if (existsSync(walkersPath)) {
   const { createWalkers } = await import("../js/walkers.js");
+  const { art } = await import("../js/art/index.js");
   const w1 = createWorld({ seed: SEED });
   const w2 = createWorld({ seed: SEED });
   const sx = w1.start.tx;
@@ -2115,7 +2294,7 @@ if (existsSync(walkersPath)) {
   // walker is followed frame by frame: the fall, the tied sack, the carry home, the end.
   const { killTotal: killTotalD } = await import("../js/sim/justice.js");
   const savePD = KNOBS.KILL_P;
-  let rec = null, pred = null, sawFall = false, sawTied = false, sawCarry = false, gone = false, stoodAtDoor = false;
+  let rec = null, pred = null, sawFall = false, sawTied = false, sawCarry = false, gone = false, stoodAtDoor = false, sawIdle = false, sawPreyLook = false;
   for (let t = 0; t < 60; t++) {
     const force = t >= 30 && !rec;
     if (force) KNOBS.KILL_P = 1 / Math.max(1e-9, killTotalD(w1));
@@ -2129,6 +2308,8 @@ if (existsSync(walkersPath)) {
       const p = walkers.list().find((x) => x.kind === "predation");
       if (p) {
         pred = p;
+        if (p.frame === 3 && p.idle > 1) sawIdle = true;
+        if (p.prey && rec && JSON.stringify(p.prey.look) === JSON.stringify(art.look(rec.victim.id))) sawPreyLook = true;
         if (p.bag != null && p.prey && p.bag < 0.45) sawFall = true;
         if (p.bag != null && p.bag >= 0.45) {
           sawTied = true;
@@ -2142,6 +2323,8 @@ if (existsSync(walkersPath)) {
   }
   const list60 = walkers.list();
   check("walkers carry real citizen ids", list60.every((x) => x.citizen == null || w2.byId.has(x.citizen) || x.kind !== "commuter"), `${list60.length} walkers`);
+  check("looks: every walker carries the pure look of its identity and the removed prey keeps theirs",
+    list60.every((x) => JSON.stringify(x.look) === JSON.stringify(art.look(x.id))) && sawPreyLook);
   // Continue to year 30 with the visual side actively selecting and resolving
   // Inspect needs every month. The twin never constructs a walker layer.
   for (let t = 60; t < 30 * 12; t++) {
@@ -2155,6 +2338,7 @@ if (existsSync(walkersPath)) {
   KNOBS.KILL_P = savePD;
   check("a forced killing publishes a record and the walker layer takes it: the killer's own walker, the neighbour named in the sack", !!rec && !!pred && pred.citizen === rec.killer && pred.preyName === rec.victim.name, rec ? (pred ? `${pred.citizen} vs ${rec.killer}` : "no predation walker") : "no killing landed in 30 forced months");
   check("the sack falls, is tied at the door, goes home over the shoulder, and the walker finishes", sawFall && sawTied && stoodAtDoor && sawCarry && gone, `fall ${sawFall} tied ${sawTied} door ${stoodAtDoor} carry ${sawCarry} gone ${gone}`);
+  check("walkers standing longer than one second select the species idle frame", sawIdle);
   check("walkers never write the sim: 30 years with Inspect needs on and off hash-equal", stateHash(w1) === stateHash(w2), `${stateHash(w1)} vs ${stateHash(w2)}`);
   const list = walkers.list();
   console.log(`walkers: ${list.length} active after 360 ticks`);

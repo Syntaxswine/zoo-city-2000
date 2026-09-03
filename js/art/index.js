@@ -15,7 +15,7 @@
 //                                       | 'kerb' side 0..3 (N E S W)
 //   art.chalk(zone, high)               the same, spelled out
 //   art.tree(kind)                      'round' | 'tall' | 'willow' or 0..2
-//   art.citizen(species, facing, frame, age, opts)   opts.hat, opts.carry 'sack'
+//   art.citizen(species, facing, frame, age, opts)   opts.look, opts.hat, opts.carry 'sack'
 //   art.overlay(kind, frame)            'scaffold' | 'fire' 0..1 | 'flood' | 'rubble'
 //                                       | 'tent' | 'hat' | 'meeting' | 'plaza' | 'cursor' | 'ghost'
 //                                       | 'sack' 0 open (falling) | 1 tied | 2 tied, wriggling
@@ -23,9 +23,9 @@
 //   art.waterTint(frame)                key map for the water cycle, frame mod WATER_FRAMES (4)
 //   art.hires(sprite)                   the sprite's 2× twin from its recipe (hires.js), or null for a hand-drawn one; the renderer uses it at zoom 2
 //   art.bubble(w, h)                    reserved for Part A
-//   art.portrait(species, opts)         reserved for Part D
+//   art.portrait(species, opts)         16×16 face; opts.age/look/expression
 //   art.mark(species)                   reserved for Part E
-//   art.look(id)                        stable citizen look; neutral until Part D
+//   art.look(id)                        stable { shade, mark } citizen look
 //   art.crossing(axis, busy)            reserved for Part X
 //   allSprites()                        [{ name, sprite }] for the audit
 //
@@ -41,7 +41,7 @@ import { roadSprite, bridgeSprite, allRoads } from "./roads.js";
 import { wallSprite, tunnelSprite, allWalls } from "./walls.js";
 import { railSprite, stationSprite, allRail } from "./rail.js";
 import { GRASS, CHALK, RUBBLE, WATER_TILE, KERB, TREES, TREE_LIST, ZOTS, PLAZA, CURSOR, GHOST, waterTint, WATER_FRAMES, allTerrain } from "./terrain.js";
-import { citizenSprite, TENT, HAT, MEETING, SACKS, allCitizens } from "./citizens.js";
+import { citizenSprite, portraitSprite, TENT, HAT, MEETING, SACKS, allCitizens } from "./citizens.js";
 import { bubbleSprite, BUBBLE_SAMPLES } from "./bubbles.js";
 
 const EXTRA = { tent: TENT, hat: HAT, meeting: MEETING, plaza: PLAZA, cursor: CURSOR, ghost: GHOST };
@@ -96,9 +96,18 @@ function notBuilt(name) {
 }
 
 export const bubble = bubbleSprite;
-export function portrait(_species, _opts = {}) { return notBuilt("portrait"); }
+export const portrait = portraitSprite;
 export function mark(_species) { return notBuilt("mark"); }
-export function look(_id) { return { shade: 0, mark: 0 }; }
+export function look(id) {
+  if (!Number.isFinite(id)) throw new Error("art.look: id must be a finite number");
+  let h = Math.imul(id | 0, 0x9e3779b1) >>> 0;
+  h ^= h >>> 16;
+  h = Math.imul(h, 0x7feb352d) >>> 0;
+  h ^= h >>> 15;
+  h = Math.imul(h, 0x846ca68b) >>> 0;
+  h ^= h >>> 16;
+  return Object.freeze({ shade: h & 1, mark: (h >>> 1) & 1 });
+}
 export function crossing(_axis, _busy = false) { return notBuilt("crossing"); }
 
 export const art = Object.freeze({

@@ -4,7 +4,16 @@ Open work, ranked. The design record is `SPEC.md`; the numbers are in
 `js/sim/rules.js` (KNOBS). Later layers were labelled at design time so v1
 could ship whole.
 
-## The People — IN PROGRESS 2026-09-03 (`docs/PLAN-THE-PEOPLE-2026-09-02.md`); Parts K, A and S shipped
+## The People — IN PROGRESS 2026-09-03 (`docs/PLAN-THE-PEOPLE-2026-09-02.md`); Parts K, A, D and S shipped
+
+**Part D SHIPPED 2026-09-03:** every citizen id now hashes to one of four
+stable appearances, with a darker coat bit and one ≤6×6 species motif; cubs
+keep motifs off their bodies and use a four-way coat-only treatment. The same
+look follows walkers, tents, picking, carried sacks and predation victims.
+Every species also has a cached 16×16 bust in three readable expressions,
+half of elders wear glasses, and a fourth anchored frame animates after a
+walker stands for a second. The 3,224-entry art audit includes 504 portraits;
+293 checks and both independent PNG critics pass. SPEC §12.3b.
 
 **Part A SHIPPED 2026-09-03:** Inspect now makes the nearest eight walking
 citizens say one actionable need from the simulation's own mood, home, lot,

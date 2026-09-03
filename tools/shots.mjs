@@ -384,6 +384,45 @@ function sheets(z) {
     console.log("sheet-citizens-close: row 0 adult se | ne on grass; row 1 elder se | adult sw on road; row 2 cub se | cub sw on grass");
     out.push(save("sheet-citizens-close.png", canvas, Math.max(z, 6)));
   }
+  // Part D looks: one species per band, the four stable shade/mark pairs
+  // across adult, elder and cub. Each pair shows SE and its mirrored SW so a
+  // critic can catch a mark that jumps to the wrong side or loses its light.
+  {
+    const cellW = 38, bandH = 70;
+    const canvas = createCanvas(4 * cellW + 8, SPECIES_IDS.length * bandH + 4);
+    const ctx = background(canvas, "#4d5a30");
+    SPECIES_IDS.forEach((species, row) => {
+      let col = 0;
+      for (let shade = 0; shade < 2; shade++) for (let mark = 0; mark < 2; mark++) {
+        const look = { shade, mark }, x = 6 + col * cellW;
+        blitAt(ctx, citizenSprite(species, "se", 0, "adult", { look }), x + 8, row * bandH + 24);
+        blitAt(ctx, citizenSprite(species, "sw", 0, "adult", { look }), x + 24, row * bandH + 24);
+        blitAt(ctx, citizenSprite(species, "se", 0, "elder", { look }), x + 8, row * bandH + 47);
+        blitAt(ctx, citizenSprite(species, "sw", 0, "cub", { look }), x + 25, row * bandH + 63);
+        col++;
+      }
+    });
+    console.log("sheet-looks: rows " + SPECIES_IDS.join(", ") + "; columns s0m0, s0m1, s1m0, s1m1; each adult se|sw, elder se, cub sw");
+    out.push(save("sheet-looks.png", canvas, Math.max(z, 4)));
+  }
+  // Part D portraits: rows are species; each four-look block is glad, flat,
+  // low. The street uses age too; the sheet holds adult constant so the
+  // critic compares expression and identity rather than three variables.
+  {
+    const expressions = ["glad", "flat", "low"], cell = 18;
+    const canvas = createCanvas(12 * cell + 4, SPECIES_IDS.length * cell + 4);
+    const ctx = background(canvas, "#1c1d22");
+    SPECIES_IDS.forEach((species, row) => {
+      let col = 0;
+      for (let shade = 0; shade < 2; shade++) for (let mark = 0; mark < 2; mark++)
+        for (const expression of expressions) {
+          blitAt(ctx, art.portrait(species, { age: "adult", shade, mark, expression }), 2 + col * cell + 8, 2 + row * cell + 15);
+          col++;
+        }
+    });
+    console.log("sheet-portraits: rows " + SPECIES_IDS.join(", ") + "; four look blocks s0m0..s1m1, each glad|flat|low");
+    out.push(save("sheet-portraits.png", canvas, Math.max(z, 4)));
+  }
   // Predation (SPEC §14): the carry on both builds, four facings, three
   // frames; the fall over the neighbour at four heights, the tied sack and
   // its wriggle, the elder tortoise with hat and sack; and the two moments at

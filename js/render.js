@@ -58,6 +58,33 @@ const RED_TINT = { "=": "0", "(": "0" };
 // tint table doing what it is for until then.
 const R_CHALK_TINT = { m: "q" };
 
+/**
+ * Paint a 16×16 art portrait at an integer nearest-neighbour scale. This is
+ * intentionally the only canvas bridge the person-card UI needs: palette
+ * lookup remains in the art/render boundary and never leaks into ui.js.
+ */
+export function paintPortrait(canvas, sprite, scale = 1) {
+  if (!canvas || typeof canvas.getContext !== "function") throw new Error("paintPortrait: canvas required");
+  if (!sprite || sprite.w !== 16 || sprite.h !== 16) throw new Error("paintPortrait: expected a 16x16 portrait sprite");
+  if (!Number.isInteger(scale) || scale < 1) throw new Error("paintPortrait: scale must be a positive integer");
+  const raw = rasterize(sprite.rows);
+  canvas.width = raw.w * scale;
+  canvas.height = raw.h * scale;
+  const ctx = canvas.getContext("2d");
+  ctx.imageSmoothingEnabled = false;
+  const img = ctx.createImageData(canvas.width, canvas.height);
+  for (let y = 0; y < canvas.height; y++) for (let x = 0; x < canvas.width; x++) {
+    const si = (((y / scale) | 0) * raw.w + ((x / scale) | 0)) * 4;
+    const di = (y * canvas.width + x) * 4;
+    img.data[di] = raw.data[si];
+    img.data[di + 1] = raw.data[si + 1];
+    img.data[di + 2] = raw.data[si + 2];
+    img.data[di + 3] = raw.data[si + 3];
+  }
+  ctx.putImageData(img, 0, 0);
+  return canvas;
+}
+
 export function createRenderer(canvas, initialWorld, art) {
   let world = initialWorld;
   const ctx = canvas.getContext("2d", { alpha: false });
@@ -458,13 +485,13 @@ export function createRenderer(canvas, initialWorld, art) {
       if (w.tent) {
         const ttx = Math.floor(w.tx), tty = Math.floor(w.ty);
         items.push({ sprite: tent, tx: ttx, ty: tty, kind: "building" });
-        items.push({ sprite: art.citizen(w.species, w.facing, 0, w.age), tx: ttx + 0.82, ty: tty + 0.55, kind: "walker" });
+        items.push({ sprite: art.citizen(w.species, w.facing, w.frame, w.age, { look: w.look }), tx: ttx + 0.82, ty: tty + 0.55, kind: "walker" });
         continue;
       }
       // On a bridge the deck sits DECK_TOP px above the water plane (roads.js);
       // shots.mjs lifted its walkers, the renderer did not — they stood in the river.
       const onBridge = world.road[Math.floor(w.ty) * world.w + Math.floor(w.tx)] === ROAD.BRIDGE;
-      items.push({ sprite: art.citizen(w.species, w.facing, w.frame, w.age, { hat: w.hat, carry: w.carry }), tx: w.tx, ty: w.ty, kind: "walker", walker: w, dy: onBridge ? -DECK_TOP : w.riding ? -3 : 0 }); // a rider sits up on the train
+      items.push({ sprite: art.citizen(w.species, w.facing, w.frame, w.age, { look: w.look, hat: w.hat, carry: w.carry }), tx: w.tx, ty: w.ty, kind: "walker", walker: w, dy: onBridge ? -DECK_TOP : w.riding ? -3 : 0 }); // a rider sits up on the train
       if (w.glyph === "meeting" && w.standUntil > 0) items.push({ sprite: meet, tx: w.tx, ty: w.ty, kind: "walker", z: 1000, dy: -24 });
       if (w.kind === "predation" && w.bag != null && w.prey) {
         // The neighbour at the door. First the open sack falls over it (a
@@ -473,7 +500,7 @@ export function createRenderer(canvas, initialWorld, art) {
         const p = w.prey;
         if (w.bag < BAG_FALL) {
           const u = w.bag / BAG_FALL;
-          items.push({ sprite: art.citizen(p.species, p.facing, 0, p.age), tx: p.tx, ty: p.ty, kind: "walker" });
+          items.push({ sprite: art.citizen(p.species, p.facing, 0, p.age, { look: p.look }), tx: p.tx, ty: p.ty, kind: "walker" });
           items.push({ sprite: art.overlay("sack", 0), tx: p.tx, ty: p.ty, kind: "walker", z: 999, dy: -Math.round(22 * (1 - u * u)) });
         } else {
           items.push({ sprite: art.overlay("sack", 1 + (Math.floor(w.bag * 8) & 1)), tx: p.tx, ty: p.ty, kind: "walker" });
@@ -508,7 +535,7 @@ export function createRenderer(canvas, initialWorld, art) {
     let bd = Infinity;
     for (const w of list || []) {
       if (w.tent) continue;
-      const sp = art.citizen(w.species, w.facing, w.frame, w.age, { hat: w.hat, carry: w.carry });
+      const sp = art.citizen(w.species, w.facing, w.frame, w.age, { look: w.look, hat: w.hat, carry: w.carry });
       const [nx, ny] = toScreen(w.tx, w.ty);
       const fx = nx, fy = ny + HALF_H; // feet on the ground centre
       const left = fx - sp.anchor[0], top = fy - sp.anchor[1];

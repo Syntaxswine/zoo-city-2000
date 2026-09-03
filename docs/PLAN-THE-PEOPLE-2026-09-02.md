@@ -513,6 +513,19 @@ a session for the core, a session with the stretch.
 
 ### D. Looks and faces — one rabbit is not another rabbit
 
+**Status (2026-09-03, session 10): SHIPPED.** `art.look(id)` now gives all
+four stable shade/mark pairs; every species has its declared ≤6×6 motif,
+shade composes with elder lightening, half of elders wear glasses, and cubs
+resolve the draft's contradiction with a four-way shade-only coat treatment.
+The same look follows walkers, tents, picking, sacks, and the removed prey
+record. Cached 16×16 bust portraits carry age, look, and three high-contrast
+expressions through `render.paintPortrait`; frame 3 gives every species an
+anchored idle pose after one second standing. `allCitizens` audits 3,224
+entries including 504 portraits; 293 checks pass. Two independent readers of
+the committed looks/portrait sheets rejected the first art pass, then passed
+the corrected pig cheek, bear muzzle, dark-coat rims, fitted busts, and larger
+expression shapes. SPEC §12.3b.
+
 **Goal.** Four looks per species per age, a face for the card, and an idle
 pose — so the player can pick their rabbit out of the crowd and the card
 has eyes.

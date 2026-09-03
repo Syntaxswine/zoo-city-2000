@@ -60,7 +60,7 @@ import { keysOf, colourOf } from "./palette.js";
 import { SPECIES_BY_ID } from "../sim/species.js";
 
 export const FACINGS = Object.freeze(["se", "ne", "sw", "nw"]);
-export const FRAMES = Object.freeze(["stand", "stepA", "stepB"]);
+export const FRAMES = Object.freeze(["stand", "stepA", "stepB", "idle"]);
 export const AGES = Object.freeze(["adult", "elder", "cub"]);
 /**
  * The species the KIT covers — those with a head overlay below — not every
@@ -307,7 +307,7 @@ const HEAD = {
     se: part([
       "............",
       "............",
-      ".yyy...yyy..",
+      ".zzy...yyy..",
       ".yzyyyyyyyx.",
       ".yzzyyyyyyx.",
       ".zzyy+yy+yx.",
@@ -318,7 +318,7 @@ const HEAD = {
     ne: part([
       "............",
       "............",
-      ".yyy...yyy..",
+      ".zzy...yyy..",
       ".yxyyyyyyyx.",
       ".yzyyyyyyyx.",
       ".zyyyyyyyyx.",
@@ -354,7 +354,7 @@ const HEAD = {
   raccoon: {
     se: part([
       "............",
-      "..yy...yy...",
+      "..zz...yy...",
       "..yzy.yzy...",
       "..yzyyyyyx..",
       "..zzyyyyyx..",
@@ -365,7 +365,7 @@ const HEAD = {
     ]),
     ne: part([
       "............",
-      "..yy...yy...",
+      "..zz...yy...",
       "..yxy.yxy...",
       "..yyyyyyyx..",
       "..zyyyyyyx..",
@@ -485,7 +485,7 @@ const HEAD = {
       "............",
       "............",
       "............",
-      "...yyyyy....",
+      "...zzyyy....",
       "..zyywyywx..",
       "..zyy+yy+x..",
       "..yyy--yyx..",
@@ -496,7 +496,7 @@ const HEAD = {
       "............",
       "............",
       "............",
-      "...yyyyy....",
+      "...zzyyy....",
       "..zyyyyyyx..",
       "..zyyyyyyx..",
       "..yyyyyyyx..",
@@ -725,6 +725,96 @@ const CUB_MARK = {
 };
 
 // =========================================================================
+// LOOK MARKS — one small, authored motif per adult species.
+//
+// A piece row uses `.` for "leave the composed sprite alone" and `_` for an
+// intentional hole. Every other character is a palette key. Coordinates are
+// in the 12×20 authored SE/NE frame, before a west-facing sprite is mirrored;
+// carrying and hats merely translate the same piece with the figure. Keeping
+// a literal box beside every piece lets the audit prove that a look cannot
+// leak into some unrelated part of the animal.
+// =========================================================================
+
+function lookPiece(name, x, y, rows, { inkOnly = false } = {}) {
+  const h = rows.length, w = rows[0].length;
+  if (w > 6 || h > 6 || rows.some((r) => r.length !== w)) throw new Error(`citizens: bad look piece '${name}'`);
+  return Object.freeze({ name, box: Object.freeze([x, y, w, h]), rows: Object.freeze(rows.slice()), inkOnly });
+}
+
+export const LOOK_MARKS = Object.freeze({
+  fox: Object.freeze({
+    name: "white tail-tip",
+    se: lookPiece("fox tail-tip se", 1, 15, [".ZZ.", ".ZZ."]),
+    ne: lookPiece("fox tail-tip ne", 6, 16, [".ZZ.", ".ZZ."]),
+  }),
+  rabbit: Object.freeze({
+    name: "lop ear",
+    se: lookPiece("rabbit lop se", 6, 0, ["__..", "_y..", ".yy.", "..yx", "..xx"]),
+    ne: lookPiece("rabbit lop ne", 6, 0, ["__..", "_y..", ".yy.", "..yx", "..xx"]),
+  }),
+  mouse: Object.freeze({
+    name: "notched ear",
+    se: lookPiece("mouse notch se", 7, 1, ["....", "..__", ".__."]),
+    ne: lookPiece("mouse notch ne", 7, 1, ["....", "..__", ".__."]),
+  }),
+  beaver: Object.freeze({
+    name: "pale chest",
+    se: lookPiece("beaver chest se", 4, 9, ["zz..", "zzz.", "zzz.", ".zz."]),
+    ne: lookPiece("beaver chest ne", 4, 9, ["zz..", "zzz.", "zzz.", ".zz."]),
+  }),
+  owl: Object.freeze({
+    name: "brow tufts",
+    se: lookPiece("owl tufts se", 2, 0, ["+....+", ".+..+.", "+....+"]),
+    ne: lookPiece("owl tufts ne", 2, 0, ["+....+", ".+..+.", "+....+"]),
+  }),
+  bear: Object.freeze({
+    name: "muzzle patch",
+    se: lookPiece("bear muzzle se", 5, 5, [".+.", ".Y.", "Y.Z", ".Y."]),
+    ne: lookPiece("bear nape ne", 5, 5, [".+.", ".Y.", "Y.Z", ".Y."]),
+  }),
+  tortoise: Object.freeze({
+    name: "shell scute",
+    se: lookPiece("tortoise scute se", 0, 5, [".u.", "ur.", "uru"], { inkOnly: true }),
+    ne: lookPiece("tortoise scute ne", 3, 9, [".r..", "rur.", ".rr.", "..r."], { inkOnly: true }),
+  }),
+  raccoon: Object.freeze({
+    name: "lighter mask",
+    se: lookPiece("raccoon mask se", 3, 5, ["ZZZZZZ", ".Z..Z."]),
+    ne: lookPiece("raccoon mask ne", 3, 5, ["ZZZZZZ", ".Z..Z."]),
+  }),
+  pig: Object.freeze({
+    name: "cheek spot",
+    se: lookPiece("pig spot se", 2, 4, [".+", "++"]),
+    ne: lookPiece("pig spot ne", 2, 4, [".+", "++"]),
+  }),
+  cow: Object.freeze({
+    name: "Holstein patch",
+    se: lookPiece("cow patch se", 5, 3, ["++..", "+++.", ".++."]),
+    ne: lookPiece("cow patch ne", 5, 3, ["++..", "+++.", ".++."]),
+  }),
+  wolf: Object.freeze({
+    name: "grey saddle",
+    se: lookPiece("wolf saddle se", 2, 9, ["XXXX..", "XXXXX.", "XXXXX.", ".XXX.."]),
+    ne: lookPiece("wolf saddle ne", 2, 9, ["XXXX..", "XXXXX.", "XXXXX.", ".XXX.."]),
+  }),
+  cat: Object.freeze({
+    name: "tabby stripe",
+    se: lookPiece("cat stripe se", 4, 3, [".w.", "www", ".w.", ".w."]),
+    ne: lookPiece("cat stripe ne", 4, 3, [".w.", "www", ".w.", ".w."]),
+  }),
+  hawk: Object.freeze({
+    name: "chest bars",
+    se: lookPiece("hawk bars se", 4, 10, ["w..w", ".ww.", "....", ".ww."]),
+    ne: lookPiece("hawk bars ne", 4, 10, ["w..w", ".ww.", "....", ".ww."]),
+  }),
+  skunk: Object.freeze({
+    name: "double stripe",
+    se: lookPiece("skunk stripe se", 5, 3, ["Z.Z.", "Z.Z.", "Z.Z.", "Z.Z.", "Z.Z."]),
+    ne: lookPiece("skunk stripe ne", 4, 3, ["Z.ZZ.", "Z.ZZ.", "Z.ZZ.", "Z.ZZ.", "Z.ZZ.", "Z.ZZ."]),
+  }),
+});
+
+// =========================================================================
 // Extras: the tent, the centenary hat, the meeting glyph, the sack.
 // =========================================================================
 
@@ -881,7 +971,7 @@ const SKIN = { tortoise: { fur: "furWarm", furShift: 0 } };
  * every elder keeps two body values and the light law survives. Age on
  * those coats is carried by the ELDER marks instead.
  */
-function furMap(species, elder) {
+function furMap(species, elder, shade = 0) {
   const sp = SPECIES_BY_ID[species];
   if (!sp) throw new Error(`citizens: unknown species '${species}'`);
   const skin = SKIN[species] || sp;
@@ -891,7 +981,7 @@ function furMap(species, elder) {
   const up = elder && idx(2) < n ? 1 : 0;
   const map = {};
   AUTHOR_KEYS.forEach((k, i) => {
-    map[k] = ramp[Math.min(n, idx(i) + up)];
+    map[k] = ramp[Math.max(0, Math.min(n, idx(i) + up - shade))];
   });
   return map;
 }
@@ -908,7 +998,7 @@ function lumOf(key) {
  * authoring ramp, so the species remap leaves them alone.
  */
 function elderMarkKey(species) {
-  return lumOf(furMap(species, true).y) > 190 ? "Y" : "Z";
+  return lumOf(furMap(species, true, 0).y) > 190 ? "Y" : "Z";
 }
 
 /**
@@ -939,6 +1029,104 @@ function stampElderMarks(g, head, facing, key, lift, ox = 0) {
   } else {
     // Nape: the two middle columns of rows 6–7.
     for (const y of [6, 7]) for (const x of [5, 6]) at(x, y);
+  }
+}
+
+const FACE_EYES = Object.freeze({
+  rabbit: [5, 8, 6], mouse: [5, 8, 6], fox: [5, 8, 5], beaver: [5, 8, 5],
+  owl: [4, 7, 4], bear: [5, 8, 5], tortoise: [5, 7, 5], raccoon: [6, 9, 5],
+  pig: [5, 8, 5], cow: [5, 8, 5], wolf: [5, 8, 5], cat: [5, 8, 5],
+  hawk: [5, 8, 5], skunk: [6, 9, 5],
+});
+
+/** Half of elders wear one tiny pair; the side view keeps its temple arm. */
+function stampGlasses(g, species, facing, lift, ox = 0, mirrored = false) {
+  const put = (x, y, key) => {
+    x = mirrored ? g[0].length - 1 - (x + ox) : x + ox;
+    y += lift;
+    if (y >= 0 && y < g.length && x >= 0 && x < g[0].length && g[y][x] !== T) g[y][x] = key;
+  };
+  const [a, b, y] = FACE_EYES[species];
+  if (facing === "se") {
+    put(a - 1, y, "="); put(a + 1, y, "=");
+    put(b - 1, y, "="); put(b + 1, y, "=");
+    put(Math.floor((a + b) / 2), y, "+");
+  } else {
+    for (let x = a - 1; x <= b + 1; x++) put(x, y, x === a - 1 || x === b + 1 ? "+" : "=");
+  }
+}
+
+function stampLookMark(g, species, facing, lift, ox = 0, mirrored = false) {
+  const mark = LOOK_MARKS[species];
+  const p = mark && mark[facing];
+  if (!p) return;
+  const [x0, y0, pw] = p.box;
+  for (let y = 0; y < p.rows.length; y++) for (let x = 0; x < p.rows[y].length; x++) {
+    let key = p.rows[y][mirrored ? pw - 1 - x : x];
+    if (key === ".") continue;
+    if (mirrored && key !== "_") key = MIRROR_KEYS[key] || key;
+    const gx = (mirrored ? g[0].length - (x0 + ox + pw) : x0 + ox) + x, gy = y0 + y + lift;
+    if (gx < 0 || gx >= g[0].length || gy < 0 || gy >= g.length) continue;
+    if (key === "_") g[gy][gx] = T;
+    else if (!p.inkOnly || g[gy][gx] !== T) g[gy][gx] = key;
+  }
+}
+
+/**
+ * The fourth frame is deliberately a small, species-specific pause rather
+ * than a fourth walk cycle. The feet never move: only the silhouette above
+ * them changes, so entering idle cannot make a walker hop on its tile.
+ */
+function stampIdlePose(g, species, facing, lift, ox = 0) {
+  const put = (x, y, key) => {
+    x += ox; y += lift;
+    if (y >= 0 && y < g.length && x >= 0 && x < g[0].length) g[y][x] = key;
+  };
+  const clear = (x, y) => put(x, y, T);
+  switch (species) {
+    case "rabbit": // sits up on broad haunches
+      put(1, 18, "y"); put(10, 18, "x"); put(1, 19, "y"); put(10, 19, "x"); clear(5, 19); clear(6, 19);
+      break;
+    case "mouse": // leans forward to sniff
+      put(10, 7, "y"); put(11, 7, "x"); put(10, 8, "x");
+      break;
+    case "fox": // curls the tail-tip upward
+      put(0, 15, "y"); put(0, 16, "z"); put(1, 17, "z");
+      break;
+    case "beaver": // checks the famous teeth
+      put(6, 7, "("); put(7, 7, "("); put(6, 8, "x");
+      break;
+    case "owl": // turns its head while its body stays put
+      stamp(g, HEAD.owl[facing === "se" ? "ne" : "se"], ox, lift);
+      break;
+    case "bear": // scratches beside one ear
+      put(10, 5, "y"); put(10, 6, "y"); put(9, 7, "x"); put(9, 8, "x");
+      break;
+    case "tortoise": // withdraws into the shell
+      for (let y = 3; y <= 7; y++) for (let x = 3; x <= 8; x++) clear(x, y);
+      put(5, 7, "w"); put(6, 7, "+"); put(5, 8, "x"); put(6, 8, "x");
+      break;
+    case "raccoon": // paws together, rummaging
+      put(4, 11, "w"); put(5, 12, "w"); put(6, 12, "w"); put(7, 11, "w");
+      break;
+    case "pig": // drops the ring snout to root
+      put(7, 8, "x"); put(8, 8, "+"); put(9, 8, "+"); put(8, 9, "x");
+      break;
+    case "cow": // chews sideways
+      put(9, 7, "("); put(10, 7, "x"); put(9, 8, "x");
+      break;
+    case "wolf": // raises a paw to one ear
+      put(10, 6, "X"); put(10, 7, "X"); put(9, 8, "W");
+      break;
+    case "cat": // washes its cheek
+      put(8, 4, "y"); put(9, 5, "y"); put(8, 6, "x"); put(7, 7, "x");
+      break;
+    case "hawk": // folds a wing across its breast to preen
+      put(4, 10, "w"); put(5, 11, "w"); put(6, 12, "w"); put(7, 13, "w");
+      break;
+    case "skunk": // twitches the white plume clear of the crown
+      put(1, 1, "Z"); put(2, 2, "Z"); put(2, 3, "W");
+      break;
   }
 }
 
@@ -1015,7 +1203,7 @@ function normFrame(frame) {
     if (i < 0) throw new Error(`citizens: unknown frame '${frame}'`);
     return i;
   }
-  return ((frame % 3) + 3) % 3;
+  return ((frame % 4) + 4) % 4;
 }
 /** 'cub' | 'adult' | 'elder', or an age in YEARS resolved by the species table. */
 function normAge(species, age) {
@@ -1029,12 +1217,21 @@ function normAge(species, age) {
   return age;
 }
 
+function normLook(opts = {}) {
+  const value = opts.look || opts;
+  const shade = value.shade == null ? 0 : value.shade;
+  const mark = value.mark == null ? 0 : value.mark;
+  if ((shade !== 0 && shade !== 1) || (mark !== 0 && mark !== 1)) throw new Error("citizens: look shade and mark must be 0 or 1");
+  return { shade, mark };
+}
+
 function composeAdult(species, facing, frame, elder, hat, carry = false) {
   const lift = (hat ? 4 : 0) + (carry ? CARRY_LIFT : 0);
   const ox = carry ? CARRY_OX : 0;
   const H = 20 + lift;
   const g = blank(12 + 2 * ox, H);
-  const body = BODY[BUILD[species]][facing][frame];
+  const idle = frame === 3;
+  const body = BODY[BUILD[species]][facing][idle ? 0 : frame];
   const tail = TAIL[species] && TAIL[species][facing];
   const put = (rows, x, y) => stamp(g, rows, x + ox, y + lift);
   // The sack over the shoulder: BEHIND the figure when we see its face (SE),
@@ -1048,7 +1245,7 @@ function composeAdult(species, facing, frame, elder, hat, carry = false) {
   if (shellBehind) put(SHELL.se[0], SHELL.se[1], SHELL.se[2]);
   put(body, 0, 8);
   if (species === "hawk") put(WINGS, 0, 9);
-  if (PATCHES[species]) for (const [x, y, w, h] of PATCHES[species]) patchFur(g, x, y + lift, w, h, "+");
+  if (PATCHES[species]) for (const [x, y, w, h] of PATCHES[species]) patchFur(g, x + ox, y + lift, w, h, "+");
   if (tail && !tail[3]) put(tail[0], tail[1], tail[2]);
   const head = HEAD[species][facing];
   if (shellBehind) {
@@ -1060,6 +1257,7 @@ function composeAdult(species, facing, frame, elder, hat, carry = false) {
   } else {
     put(head, 0, 0);
   }
+  if (idle) stampIdlePose(g, species, facing, lift, ox);
   if (elder) stampElderMarks(g, head, facing, elderMarkKey(species), lift, ox);
   if (hat) {
     let top = 0;
@@ -1072,14 +1270,49 @@ function composeAdult(species, facing, frame, elder, hat, carry = false) {
 
 function composeCub(species, facing, frame) {
   const g = blank(8, 12);
-  stamp(g, CUB_BODY_SE[frame], 0, 7);
+  const idle = frame === 3;
+  stamp(g, CUB_BODY_SE[idle ? 0 : frame], 0, 7);
   stamp(g, CUB_HEAD[facing], 0, 2);
   const mark = CUB_MARK[species];
   if (mark) stamp(g, mark[0], mark[1], mark[2]);
+  if (idle) { g[8][1] = "y"; g[9][6] = "x"; }
+  return toRows(g);
+}
+
+/**
+ * Cubs have no adult motif; their second bit is an eight-pixel coat-value
+ * treatment. Apply it AFTER mirrorLit so a notch or ear does not make the
+ * west-facing pass frame collapse back onto one of the two shade-only rows.
+ * Reverse scan order on west starts the treatment from the corresponding
+ * outer coat edges after that facing's positional re-lighting.
+ */
+function cubCoatTreatment(rows, mirrored) {
+  const g = rows.map((r) => r.split(""));
+  const fur = [];
+  for (let y = 0; y < g.length; y++) {
+    if (mirrored) {
+      for (let x = g[y].length - 1; x >= 0; x--) if (CLASS_OF[g[y][x]] === "fur") fur.push([x, y]);
+    } else {
+      for (let x = 0; x < g[y].length; x++) if (CLASS_OF[g[y][x]] === "fur") fur.push([x, y]);
+    }
+  }
+  const used = new Set();
+  for (const [x, y] of fur) {
+    if (g[y][x] === "w") continue;
+    g[y][x] = "w"; used.add(`${x},${y}`);
+    if (used.size === 4) break;
+  }
+  let light = 0;
+  for (let i = fur.length - 1; i >= 0 && light < 4; i--) {
+    const [x, y] = fur[i], k = `${x},${y}`;
+    if (used.has(k) || g[y][x] === "z") continue;
+    g[y][x] = "z"; light++;
+  }
   return toRows(g);
 }
 
 const CACHE = new Map();
+const PORTRAIT_CACHE = new Map();
 
 /**
  * The composed, cached citizen sprite. `facing` 'se'|'ne'|'sw'|'nw' (or an
@@ -1094,16 +1327,34 @@ export function citizenSprite(species, facing = "se", frame = 0, age = "adult", 
   const f = normFacing(facing);
   const fr = normFrame(frame);
   const ag = normAge(species, age);
+  const look = normLook(opts);
   const hat = !!opts.hat && ag !== "cub";
   const carry = opts.carry === "sack" && ag !== "cub";
-  const key = `${species}|${f}|${fr}|${ag}|${hat ? "h" : ""}${carry ? "c" : ""}`;
+  // Shade is itself a stable hash bit, so tying glasses to it gives exactly
+  // half of elder looks glasses without making a mark toggle change pixels
+  // outside that species' declared mark box.
+  const glasses = ag === "elder" && look.shade === 1;
+  const key = `${species}|${f}|${fr}|${ag}|s${look.shade}m${look.mark}g${glasses ? 1 : 0}|${hat ? "h" : ""}${carry ? "c" : ""}`;
   let s = CACHE.get(key);
   if (s) return s;
   const authored = f === "sw" ? "se" : f === "nw" ? "ne" : f;
   let rows = ag === "cub" ? composeCub(species, authored, fr) : composeAdult(species, authored, fr, ag === "elder", hat, carry);
   // Mirror the AUTHORED grid (so the light stays upper-left), THEN skin it.
   if (f === "sw" || f === "nw") rows = mirrorLit(rows);
-  rows = remap(rows, furMap(species, ag === "elder"));
+  if (ag === "cub" && look.mark) rows = cubCoatTreatment(rows, f === "sw" || f === "nw");
+  if (ag !== "cub" && look.mark) {
+    const g = rows.map((r) => r.split(""));
+    const lift = (hat ? 4 : 0) + (carry ? CARRY_LIFT : 0);
+    stampLookMark(g, species, authored, lift, carry ? CARRY_OX : 0, f === "sw" || f === "nw");
+    rows = toRows(g);
+  }
+  if (glasses) {
+    const g = rows.map((r) => r.split(""));
+    const lift = (hat ? 4 : 0) + (carry ? CARRY_LIFT : 0);
+    stampGlasses(g, species, authored, lift, carry ? CARRY_OX : 0, f === "sw" || f === "nw");
+    rows = toRows(g);
+  }
+  rows = remap(rows, furMap(species, ag === "elder", look.shade));
   if (species === "tortoise") rows = outline(rows, "+");
   const h = rows.length;
   const anchor = ag === "cub" ? [4, 11] : [6 + (carry ? CARRY_OX : 0), h - 1];
@@ -1112,15 +1363,134 @@ export function citizenSprite(species, facing = "se", frame = 0, age = "adult", 
   return s;
 }
 
-/** Every citizen sprite, named, for the audit: 14 species × 4 facings × 3 frames × 3 ages (+ one hat). */
+const EXPRESSIONS = Object.freeze(["glad", "flat", "low"]);
+
+/** A framed 16×16 SE head carrying the citizen's age and stable look. */
+export function portraitSprite(species, opts = {}) {
+  if (!(species in HEAD_SPECIES)) throw new Error(`portrait: unknown species '${species}'`);
+  const ag = normAge(species, opts.age == null ? "adult" : opts.age);
+  const look = normLook(opts);
+  const expression = opts.expression == null ? "flat" : String(opts.expression).toLowerCase();
+  if (!EXPRESSIONS.includes(expression)) throw new Error(`portrait: unknown expression '${opts.expression}'`);
+  const glasses = ag === "elder" && look.shade === 1;
+  const key = `${species}|${ag}|s${look.shade}m${look.mark}g${glasses ? 1 : 0}|${expression}`;
+  let sprite = PORTRAIT_CACHE.get(key);
+  if (sprite) return sprite;
+
+  // Compose a head-only bust. Cropping the street sprite made the tortoise's
+  // shell and the skunk's raised tail dominate a 16px card; here the SAME
+  // authored head, coat map, age marks and look piece are deliberately fitted
+  // to a common eye line instead.
+  const head = ag === "cub" ? CUB_HEAD.se : HEAD[species].se;
+  const hg = blank(ag === "cub" ? 8 : 12, ag === "cub" ? 10 : 9);
+  if (ag === "cub") {
+    stamp(hg, head, 0, 2);
+    const cub = CUB_MARK[species];
+    if (cub) stamp(hg, cub[0], cub[1], cub[2]);
+    if (look.mark) {
+      const fur = [];
+      for (let y = 0; y < hg.length; y++) for (let x = 0; x < hg[y].length; x++) if (hg[y][x] === "y") fur.push([x, y]);
+      const n = Math.min(4, Math.floor(fur.length / 2));
+      for (let i = 0; i < n; i++) hg[fur[i][1]][fur[i][0]] = "w";
+      for (let i = 0; i < n; i++) { const at = fur[fur.length - 1 - i]; hg[at[1]][at[0]] = "z"; }
+    }
+  } else {
+    stamp(hg, head, 0, 0);
+    if (ag === "elder") stampElderMarks(hg, head, "se", elderMarkKey(species), 0, 0);
+    if (look.mark) stampLookMark(hg, species, "se", 0, 0, false);
+    if (glasses) stampGlasses(hg, species, "se", 0, 0, false);
+  }
+  let headRows = remap(toRows(hg), furMap(species, ag === "elder", look.shade));
+  if (species === "tortoise") headRows = outline(headRows, "+");
+  const coat = furMap(species, ag === "elder", look.shade);
+  // Remove the street-sized eye/teeth punctuation; the enlarged expression
+  // below owns one uncluttered face zone. Species silhouettes and fixed coat
+  // markings remain untouched.
+  headRows = headRows.map((r) => r.replace(/[+(=]/g, coat.y));
+  let bx0 = headRows[0].length, by0 = headRows.length, bx1 = -1, by1 = -1;
+  for (let y = 0; y < headRows.length; y++) for (let x = 0; x < headRows[y].length; x++) if (headRows[y][x] !== T) {
+    bx0 = Math.min(bx0, x); by0 = Math.min(by0, y); bx1 = Math.max(bx1, x); by1 = Math.max(by1, y);
+  }
+  const bw = bx1 - bx0 + 1, bh = by1 - by0 + 1;
+  const fit = Math.min(12 / bw, 10 / bh);
+  const dw = Math.max(1, Math.round(bw * fit)), dh = Math.max(1, Math.round(bh * fit));
+  const g = blank(16, 16);
+  for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) g[y][x] = x === 0 || x === 15 || y === 0 || y === 15 ? "<" : "&";
+  // Shoulders turn the head into a portrait rather than a floating crop.
+  for (let x = 5; x <= 10; x++) g[12][x] = coat.y;
+  for (let x = 4; x <= 11; x++) g[13][x] = x < 8 ? coat.y : coat.x;
+  for (let x = 3; x <= 12; x++) g[14][x] = x < 8 ? coat.y : coat.x;
+  const dx0 = 2 + Math.floor((12 - dw) / 2), dy0 = 2;
+  for (let y = 0; y < dh; y++) for (let x = 0; x < dw; x++) {
+    const key = headRows[by0 + Math.min(bh - 1, Math.floor(y * bh / dh))][bx0 + Math.min(bw - 1, Math.floor(x * bw / dw))];
+    if (key !== T) g[dy0 + y][dx0 + x] = key;
+  }
+
+  // Translate body/tail marks into the visible bust when their street piece
+  // falls below the head crop. Head marks above were fitted with the head.
+  if (look.mark) switch (species) {
+    case "fox": g[11][4] = g[11][5] = g[12][5] = "Z"; break; // white tail-tip as a white ruff
+    case "beaver": for (let x = 5; x <= 10; x++) g[12][x] = coat.z; break;
+    case "owl": g[5][4] = g[5][11] = "+"; break;
+    case "tortoise": g[12][5] = g[12][8] = "r"; g[13][6] = g[13][9] = "r"; break;
+    case "pig": g[6][4] = g[7][4] = "+"; break;
+    case "cow": g[5][4] = g[5][5] = g[6][4] = "+"; break;
+    case "wolf": for (let x = 4; x <= 10; x++) g[13][x] = x & 1 ? "X" : "Y"; break;
+    case "hawk": for (const y of [12, 14]) for (let x = 5; x <= 10; x++) g[y][x] = "w"; break;
+  }
+  if (ag === "cub" && look.mark) {
+    g[13][4] = g[13][5] = coat.w;
+    g[13][10] = g[13][11] = coat.z;
+  }
+
+  // One reserved, high-contrast face zone. Four pixels form a clear U, bar,
+  // or cap; low adds brows. This survives dark coats at native 16×16.
+  const face = coat.z, ink = lumOf(face) > 145 ? "+" : "Z";
+  for (let x = 6; x <= 9; x++) { g[8][x] = face; g[9][x] = face; g[10][x] = face; }
+  g[7][6] = ink; g[7][9] = ink;
+  if (expression === "glad") { g[9][5] = ink; g[10][6] = ink; g[10][9] = ink; g[9][10] = ink; }
+  else if (expression === "flat") { for (let x = 6; x <= 9; x++) g[10][x] = ink; }
+  else {
+    g[7][5] = ink; g[7][10] = ink; g[9][6] = ink; g[9][9] = ink; g[10][5] = ink; g[10][10] = ink;
+  }
+
+  // Portrait-scale signatures that need more room than the street face.
+  if (species === "beaver") { g[11][7] = "("; g[11][8] = "("; }
+  if (species === "tortoise") { for (let x = 4; x <= 11; x++) g[13][x] = x % 3 === 0 ? "r" : "t"; }
+  if (species === "hawk") { g[7][10] = "w"; g[8][10] = "-"; g[8][11] = "-"; g[9][11] = "-"; g[10][10] = "-"; }
+  if (species === "skunk") { g[2][7] = g[3][7] = g[4][8] = g[5][8] = "Z"; }
+  if (glasses) {
+    g[7][5] = g[7][7] = g[7][8] = g[7][10] = "=";
+    g[7][6] = g[7][9] = ink;
+  }
+
+  sprite = defineSprite({ name: `portrait-${key}`, rows: toRows(g), anchor: [8, 15], tags: ["portrait", species, ag, expression] });
+  PORTRAIT_CACHE.set(key, sprite);
+  return sprite;
+}
+
+/** Every look, facing, walk frame, idle and portrait, named for the audit. */
 export function allCitizens() {
   const out = [];
   for (const species of SPECIES_IDS)
     for (const age of AGES)
-      for (const facing of FACINGS)
-        for (let frame = 0; frame < 3; frame++) {
-          const s = citizenSprite(species, facing, frame, age);
-          out.push({ name: s.name, sprite: s });
+      for (let shade = 0; shade < 2; shade++)
+        for (let mark = 0; mark < 2; mark++) {
+          const look = { shade, mark };
+          for (const facing of FACINGS)
+            for (let frame = 0; frame < 3; frame++) {
+              const s = citizenSprite(species, facing, frame, age, { look });
+              out.push({ name: s.name, sprite: s });
+            }
+          // Idle is a fourth pose but not a fourth walk frame.
+          for (const facing of FACINGS) {
+            const idle = citizenSprite(species, facing, 3, age, { look });
+            out.push({ name: idle.name, sprite: idle });
+          }
+          for (const expression of EXPRESSIONS) {
+            const p = portraitSprite(species, { age, ...look, expression });
+            out.push({ name: p.name, sprite: p });
+          }
         }
   const hat = citizenSprite("tortoise", "se", 0, "elder", { hat: true });
   out.push({ name: hat.name, sprite: hat });

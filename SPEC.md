@@ -978,6 +978,43 @@ body → composed at boot and cached. Fur ramp per species (warm: rabbit, fox,
 beaver, bear, raccoon; cool: mouse, owl; olive: tortoise); elder = one step
 lighter. Centenary hat = 1 piece. Anchor = feet at the tile centre.
 
+### 12.3b Looks, portraits and the idle pose
+
+Appearance is cosmetic and derived, never save state. `art.look(citizenId)`
+pure-hashes the signed integer id to `{ shade, mark }`, two bits and therefore
+four stable looks. Shade 1 moves fur exactly one rung darker; elder lightening
+then composes with it and both clamp inside the species ramp. Mark 1 selects
+one authored piece, at most 6×6, on the adult/elder composer: rabbit lop ear,
+mouse ear notch, fox white tail-tip, beaver pale chest, owl brow tufts, bear
+muzzle, tortoise shell scute, raccoon lighter mask, pig cheek spot, cow
+Holstein patch, wolf grey saddle, cat tabby stripe, hawk chest bars, or skunk
+double stripe. The piece is applied after west-facing re-lighting, then
+mirrored into its declared box, so a notch cannot change the light on the
+opposite side. Half the elders — shade bit 1 — wear glasses.
+
+Cubs carry no adult motif. The plan also requires all four cub rasters to be
+distinct, so their mark bit is resolved as a second **shade-only** treatment:
+two local four-pixel groups take opposite authored fur values. It changes no
+silhouette, accent, or ramp and survives every walk frame and mirrored facing,
+giving four identities without putting a Holstein patch or tail-tip on a cub.
+This is the explicit resolution of the draft's “cubs: shade only” / “four
+looks of every age differ” conflict.
+
+`art.portrait(species, { age, shade, mark, expression })` returns a cached,
+fully palette-keyed 16×16 bust composed from the same authored SE head, coat
+map, age marks and look piece that walk the street, fitted to a common eye
+line so small heads remain legible. Expression is `glad`, `flat`, or `low`;
+its high-contrast eyes and four-pixel mouth shape differ. `render.paintPortrait`
+`(canvas, sprite, scale)` is the sole UI canvas bridge and expands only by
+integer nearest-neighbour pixels.
+
+Frame 3 is the non-walking `idle` pose. A walker continuously standing for
+more than one second selects it; each species has its own pause (among them a
+sitting rabbit, head-turning owl, scratching bear, washing cat and withdrawn
+tortoise), while its feet keep the same anchor. Every render path — ordinary,
+tent, hit-test, carried sack, and the removed predation victim's compact
+record — passes the stored look made from that citizen's id.
+
 ### 12.4 Roads, ground, water, trees
 Roads: 16 tiles from the 4-bit mask, composed from 3 authored strips
 (straight, corner, stub) + busy variant. Bridge: deck box + 2 piers, road
