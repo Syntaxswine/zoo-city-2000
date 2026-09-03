@@ -919,7 +919,10 @@ at a 12-px sprite to decide is how you see what you expected.
   the current city JSON in the panel's export textarea for recovery.
 - On boot, `migrate(store)` copies legacy `zoo.city:<city>`,
   `zoo.save:<city>` and `zoo.auto:<city>` values into slots idempotently;
-  it never deletes the old keys.
+  it never deletes the old keys. Migration markers live in the city index,
+  not the migrated row, so deleting or overwriting that row cannot resurrect
+  it. If the store is too full to copy an old value, the old key appears as a
+  directly loadable/exportable recovery row instead of disappearing.
 - `zoo.pref` — this browser's preferences (the cheat switch, §8): not a
   city, not saved with one, never read by the sim (the suite greps for it).
 

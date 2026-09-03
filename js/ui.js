@@ -830,6 +830,7 @@ export function createUI(app) {
       box.append(row);
     }
     box.append(el("h2", "", "Named saves"));
+    if (app.storageWarning) box.append(el("p", "note", app.storageWarning));
     savesList(box, done, again, exportJson);
     const usage = app.storageUsage();
     const free = Math.max(0, usage.limit - usage.used);

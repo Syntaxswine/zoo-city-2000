@@ -61,13 +61,14 @@ const app = {
   acc: 0,
   sinceSave: 0,
   unsavedExport: null,
+  storageWarning: null,
 };
 
 // ---- storage (guarded: private windows throw) ---------------------------------
 const store = {
   get(k) { try { return localStorage.getItem(k); } catch { return null; } },
   set(k, v) { try { localStorage.setItem(k, v); return true; } catch { return false; } },
-  del(k) { try { localStorage.removeItem(k); } catch { /* ignore */ } },
+  del(k) { try { localStorage.removeItem(k); return true; } catch { return false; } },
   keys() { try { return Object.keys(localStorage); } catch { return []; } },
 };
 
@@ -307,7 +308,8 @@ function frame(now) {
 
 // ---- boot ----------------------------------------------------------------------------------
 function boot() {
-  migrate(store);
+  const migration = migrate(store);
+  if (!migration.ok) app.storageWarning = `Legacy saves could not be copied: ${migration.reason}. They remain available directly below.`;
   const lastName = store.get(LAST);
   let slot = null;
   let what = null; // the named slot the title's CONTINUE names

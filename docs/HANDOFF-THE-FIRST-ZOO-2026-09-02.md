@@ -1305,10 +1305,12 @@ slot estimate. If a write is refused, the attempted JSON remains in the export
 textarea with a recovery notice. CONTINUE opens the newest manual or automatic
 slot belonging to the last city, paused as before.
 
-Verification on the landing tree: `node tools/check.mjs` is **174 checks,
-0 failures** (seven new Part J' checks cover plain-Map ordering and punctuation,
-one-slot deletion, capped-store rollback, legacy migration across a later
-autosave, autosave cardinality and the shared panel route). Node syntax checks
+Verification after hostile review: `node tools/check.mjs` is **177 checks,
+0 failures**. Part J' covers plain-Map ordering and punctuation, one-slot
+deletion, both new-slot and overwrite rollback after the value write succeeds,
+a full-store legacy recovery row, durable deletion of a migrated row, legacy
+migration across a later autosave, autosave cardinality and the shared panel
+route. Node syntax checks
 pass, the balanced 30-year hash remains **292e7fa1**, and the local server
 returns 200 for the page, `main.js` and `slots.js`.
 The required interactive browser round remains to be repeated: this Codex
@@ -1316,3 +1318,15 @@ session's installed Browser plugin rejected its own `browser-service.mjs` as
 outside the configured trusted path before it could open localhost; reconnect
 and a fresh browser session failed the same way. No alternate browser driver
 was substituted.
+
+The hostile review caught two P1s in the first landing and both were real.
+Migration originally kept its idempotence marker on the migrated row, so
+deleting that row let the untouched old key recreate it at next boot. And if
+the old JSON could not be duplicated into an already-full store, only the new
+index was listed, making the old city invisible. Markers now outlive rows in
+the index; unmarked old keys are virtual recovery rows that boot, LOAD and
+EXPORT can read directly (and an explicit delete can remove). The review also
+caught that the first quota test failed on the value write and never reached
+the claimed index rollback. Two cap fixtures now force the value to fit and
+the index to fail, for both insert and overwrite, and assert byte/index/value
+restoration.

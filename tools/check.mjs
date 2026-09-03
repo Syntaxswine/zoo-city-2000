@@ -35,7 +35,7 @@ import { post } from "../js/sim/budget.js";
 import { doorOf, hasAccess, computeFields, commuteTime } from "../js/sim/fields.js";
 import { census } from "../js/sim/census.js";
 import { CIVIC } from "../js/sim/world.js";
-import { listSlots, writeSlot, readSlot, deleteSlot, bytesUsed, migrate } from "../js/slots.js";
+import { listSlots, listAllSlots, writeSlot, readSlot, deleteSlot, bytesUsed, migrate } from "../js/slots.js";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const argv = process.argv.slice(2);
@@ -867,11 +867,36 @@ check("no Math.random under js/", mathRandom.length === 0, mathRandom.join(", ")
   const capped = memoryStore();
   for (let i = 1; i <= 3; i++) writeSlot(capped, "cap", `slot ${i}`, cityJson(i));
   const beforeCap = listSlots(capped, "cap").map((s) => s.name).join(",");
-  capped.limit = bytesUsed(capped) + 32;
-  const refused = writeSlot(capped, "cap", "slot 4", cityJson(4, 0, "x".repeat(200)));
-  check("slots: a capped store refuses a fourth write without harming the first three",
-    !refused.ok && /full|unavailable/.test(refused.reason)
-      && listSlots(capped, "cap").map((s) => s.name).join(",") === beforeCap);
+  const beforeCapBytes = bytesUsed(capped);
+  const fourthJson = cityJson(4, 0, "x".repeat(200));
+  capped.limit = beforeCapBytes + new TextEncoder().encode(`zoo.slot:cap:4${fourthJson}`).length;
+  const refused = writeSlot(capped, "cap", "slot 4", fourthJson);
+  check("slots: a failed new-slot index write rolls its value back and preserves the first three",
+    !refused.ok && /full|unavailable/.test(refused.reason) && capped.get("zoo.slot:cap:4") == null
+      && bytesUsed(capped) === beforeCapBytes && listSlots(capped, "cap").map((s) => s.name).join(",") === beforeCap);
+
+  const cappedOverwrite = memoryStore();
+  const originalJson = cityJson(5, 1);
+  const original = writeSlot(cappedOverwrite, "over", "original", originalJson);
+  const originalIndex = cappedOverwrite.get("zoo.slots:over");
+  const replacementJson = cityJson(6, 2, "y".repeat(120));
+  const valueGrowth = new TextEncoder().encode(replacementJson).length - new TextEncoder().encode(originalJson).length;
+  cappedOverwrite.limit = bytesUsed(cappedOverwrite) + Math.max(0, valueGrowth);
+  const overwriteRefused = writeSlot(cappedOverwrite, "over", "a much longer replacement name", replacementJson, "manual", original.id);
+  check("slots: a failed overwrite index write restores the prior value and index",
+    !overwriteRefused.ok && cappedOverwrite.get("zoo.slot:over:1") === originalJson
+      && cappedOverwrite.get("zoo.slots:over") === originalIndex
+      && listSlots(cappedOverwrite, "over")[0].name === "original");
+
+  const fullLegacy = memoryStore();
+  const fullJson = cityJson(30, 4);
+  fullLegacy.set("zoo.city:full old town", fullJson);
+  fullLegacy.limit = bytesUsed(fullLegacy);
+  const fullMove = migrate(fullLegacy);
+  const recovery = listSlots(fullLegacy, "full old town")[0];
+  check("slots: a full store keeps an unmigrated legacy city visible, loadable and exportable",
+    !fullMove.ok && recovery?.legacy === true && readSlot(fullLegacy, "full old town", recovery.id)?.json === fullJson
+      && listAllSlots(fullLegacy).some((s) => s.city === "full old town" && s.id === recovery.id));
 
   const old = memoryStore();
   const checkpoint = cityJson(12, 2);
@@ -889,6 +914,13 @@ check("no Math.random under js/", mathRandom.length === 0, mathRandom.join(", ")
       && old.get("zoo.city:actual old key") === checkpoint && listSlots(old, "actual old key").length === 1
       && freshAuto.ok && freshAuto.id === movedAuto.id && listSlots(old, "old town").length === 2
       && readSlot(old, "old town", freshAuto.id).tick === 24);
+
+  const migratedManual = listSlots(old, "actual old key")[0];
+  const deletedMigrated = deleteSlot(old, "actual old key", migratedManual.id);
+  const afterDeleteMigration = migrate(old);
+  check("slots: deleting a migrated slot is durable even while its old key remains",
+    deletedMigrated.ok && afterDeleteMigration.ok && afterDeleteMigration.migrated === 0
+      && old.get("zoo.city:actual old key") === checkpoint && listSlots(old, "actual old key").length === 0);
 
   const auto = memoryStore();
   const auto1 = writeSlot(auto, "one-auto", "Autosave", cityJson(1), "auto");
