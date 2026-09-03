@@ -25,7 +25,7 @@
 import { toScreen, toWorld, pickTile, HALF_H, HALF_W, TILE_W, TILE_H } from "./iso/iso.js";
 import { paintScene, Z_BUILDING } from "./iso/painter.js";
 import { rasterize } from "./art/format.js";
-import { ZONE, CIVIC, TERRAIN, ROAD } from "./sim/world.js";
+import { ZONE, CIVIC, TERRAIN, ROAD, isPart, anchorOf, sideOf } from "./sim/world.js";
 import { DECK_TOP } from "./art/roads.js";
 import { lotScore, REASON } from "./sim/lots.js";
 import { tunnelAxis } from "./sim/reach.js";
@@ -132,9 +132,10 @@ export function createRenderer(canvas, initialWorld, art) {
   const railAt = (tx, ty) => tx >= 0 && ty >= 0 && tx < world.w && ty < world.h && world.rail[ty * world.w + tx] > 0;
   const railMask = (tx, ty) => (railAt(tx, ty - 1) ? 1 : 0) | (railAt(tx + 1, ty) ? 2 : 0) | (railAt(tx, ty + 1) ? 4 : 0) | (railAt(tx - 1, ty) ? 8 : 0);
   const railAxis = (tx, ty) => (railAt(tx, ty - 1) || railAt(tx, ty + 1) ? "ns" : "ew");
-  /** The oblong standing on (tx, ty), as { tx, ty, side } of its origin, or null: the zoo's 2×2 (anchor + parts). */
+  /** The oblong standing on (tx, ty), as { tx, ty, side } of its origin, or null: a block (anchor + parts) or the zoo's 2×2. */
   function footprintAt(tx, ty) {
     const i = ty * world.w + tx;
+    if (world.big[i]) { const a = anchorOf(world, i); return { tx: a % world.w, ty: (a / world.w) | 0, side: sideOf(world, a) }; }
     const c = world.civic[i];
     if (c === CIVIC.ZOO) return { tx, ty, side: 2 };
     if (c === CIVIC.ZOO_PART) {
@@ -321,7 +322,8 @@ export function createRenderer(canvas, initialWorld, art) {
           const nearWater = waterAt(tx + 1, ty) || waterAt(tx - 1, ty) || waterAt(tx, ty + 1) || waterAt(tx, ty - 1);
           standing = art.tree(nearWater && v & 1 ? "willow" : v % 3 === 2 ? "tall" : "round");
         } else if (world.tier[i] > 0 && world.zone[i] !== ZONE.NONE) {
-          standing = art.building(world.zone[i], world.tier[i], world.variant[i] & 1);
+          // A block stands on its anchor and its parts stand for nothing (the sprite's footprint keys it; painter.js).
+          if (!isPart(world, i)) standing = art.building(world.zone[i], world.tier[i], world.variant[i] & 1, sideOf(world, i));
         } else if (world.civic[i] === CIVIC.PARK) standing = art.civic("park");
         else if (world.civic[i] === CIVIC.ZOO) standing = art.civic("zoo");
         else if (world.civic[i] === CIVIC.FIRE) standing = art.civic("fire");

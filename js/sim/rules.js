@@ -47,6 +47,9 @@ export const KNOBS = {
   FILL_TO_GROW: 0.7,
   R_FILL_TO_DECAY: 0.5,
   LV_TIER: [30, 60],        // LV < 30 → tier 1 max, < 60 → 2, else 3 (R and C)
+  // Blocks (SPEC §3b, sim/blocks.js): a tier-3 High lot with three High lots of its zone at tier ≥ 2 round it, ≥ 70% full together, may join them into a 2×2; a 2×2 with five such round it into a 3×3.
+  BIG_BONUS: 1.25,          // a block holds side² × 1.25 of a tier-3 lot: R 120 / 270 · C 100 / 225 · I 120 / 270 · M 80 / 180
+  BIG_P: 0.10,              // p = BIG_P · score a month for a window that qualifies (GROW_P's number; FILL_TO_GROW is its fill gate)
   // fields
   // Pollution: SC4-style additive sources with linear falloff over a radius
   // (a single works stinks next door; a block interior saturates). No wind.
@@ -331,6 +334,11 @@ export const RULES = Object.freeze([
     id: "G3", title: "Grow and decay",
     formula: "score = V + local ; grow if score > 0.05 and (empty or 70% full): p = (0.25 | 0.10)·score /month ; decay if score < −0.15: p = 0.10·(−score)",
     live: (w) => `last tick: ${w.last.grew} grew · ${w.last.decayed} decayed`,
+  },
+  {
+    id: "G5", title: "Blocks: a full High block joins into one building",
+    formula: "a tier-3 lot with three lots of its zone at tier ≥ 2 round it in a 2×2, all High, served, untroubled, ≥ 70% full together → p = 0.10·score a month → one 2×2 at tier 3 holding ×1.25 four tier-3 lots (R 120 · C 100 · I 120 · M 80); a 2×2 with five such lots round it → a 3×3 (R 270 · C 225 · I 270 · M 180); a block that would decay splits back into tier-3 lots, and fire, flood or the bulldozer take the whole footprint",
+    live: (w) => `${w.last.census.blocks2 || 0} 2×2 · ${w.last.census.blocks3 || 0} 3×3 block${(w.last.census.blocks2 || 0) + (w.last.census.blocks3 || 0) === 1 ? "" : "s"}`,
   },
   {
     id: "G4", title: "Land value permits density",

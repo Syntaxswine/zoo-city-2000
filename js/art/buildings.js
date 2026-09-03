@@ -582,11 +582,28 @@ for (const zone of [1, 2, 3, 4]) {
   }
 }
 
-export function buildingSprite(zone, tier, variant = 0) {
+export function buildingSprite(zone, tier, variant = 0, side = 1) {
   const z = typeof zone === "string" ? { R: 1, C: 2, I: 3, M: 4 }[zone] : zone;
+  if (side > 1) return blockSprite(z, side, variant);
   const fam = BUILDINGS[z] && BUILDINGS[z][tier];
   if (!fam) throw new Error(`buildingSprite: no family for zone ${zone} tier ${tier}`);
   return fam[variant & 1];
+}
+
+/**
+ * The blocks — 2×2 and 3×3 buildings per zone (SPEC §3b). Their plans live
+ * in js/art/blocks.js, which registers here at load (`registerBlocks`) so
+ * buildings.js need not import a file that imports it. Until it has, a
+ * block draws its zone's tier-3 lot on the anchor: a wrong picture, never a
+ * throw — a sim that can merge must be able to draw before the art lands.
+ */
+let BLOCKS = null;
+export function registerBlocks(table) { BLOCKS = table; }
+export function blockSprite(zone, side, variant = 0) {
+  const z = typeof zone === "string" ? { R: 1, C: 2, I: 3, M: 4 }[zone] : zone;
+  const fam = BLOCKS && BLOCKS[z] && BLOCKS[z][side];
+  if (fam) return fam[variant & 1];
+  return BUILDINGS[z][3][variant & 1];
 }
 
 // ------------------------------------------------------------------ civics

@@ -26,7 +26,7 @@
 // Every line names the animals and uses no pronoun — the sim has no sex.
 
 import { KNOBS } from "./rules.js";
-import { ZONE, CIVIC, inBounds, absent, USE_NAME } from "./world.js";
+import { ZONE, CIVIC, inBounds, absent, USE_NAME, isPart } from "./world.js";
 import { DIET_OF, isPredatorOf } from "./species.js";
 import { post } from "./budget.js";
 import { removeCitizen, holdFuneral, releaseJob } from "./citizens.js";
@@ -111,7 +111,7 @@ function hallNear(world, tile, r) {
   let best = -1;
   let bestD = r + 1;
   forEachWithin(world, tile, r, (j, d) => {
-    if (world.zone[j] !== ZONE.M || world.tier[j] === 0) return;
+    if (world.zone[j] !== ZONE.M || world.tier[j] === 0 || isPart(world, j)) return; // a block's hall is its anchor
     if (d < bestD || (d === bestD && j < best)) { bestD = d; best = j; }
   });
   return best;
@@ -237,7 +237,7 @@ function hallWithAccess(world, from) {
   let best = -1;
   let bestD = Infinity;
   for (let i = 0; i < n; i++) {
-    if (world.zone[i] !== ZONE.M || world.tier[i] === 0 || world.rubble[i] || world.burning[i] || !hasAccess(world, i)) continue;
+    if (world.zone[i] !== ZONE.M || world.tier[i] === 0 || world.rubble[i] || world.burning[i] || !hasAccess(world, i) || isPart(world, i)) continue; // a block's hall is its anchor
     const d = from >= 0 ? cheb(world, from, i) : 0;
     if (d < bestD) { bestD = d; best = i; }
   }

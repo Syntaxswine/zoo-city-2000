@@ -5,7 +5,7 @@
 // radius²)); 4,096 tiles is microseconds.
 
 import { KNOBS } from "./rules.js";
-import { TERRAIN, ROAD, ZONE, CIVIC, idx, inBounds, N4, isStation, absent } from "./world.js";
+import { TERRAIN, ROAD, ZONE, CIVIC, idx, inBounds, N4, isStation, absent, occAt } from "./world.js";
 import { SPECIES_BY_ID, DIET_OF, admits } from "./species.js";
 import { forEachWithin, computeOcclusion, isBarrier } from "./reach.js";
 
@@ -305,7 +305,7 @@ export function computeCrime(world) {
     for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
       const xx = tx + dx;
       const yy = ty + dy;
-      if (inBounds(world, xx, yy)) { dens += world.occupants[yy * w + xx]; jobless += unempAt[yy * w + xx]; }
+      if (inBounds(world, xx, yy)) { dens += occAt(world, yy * w + xx); jobless += unempAt[yy * w + xx]; } // a block's people are spread over its footprint, not piled on its anchor
     }
     if (!dens && world.zone[i] === ZONE.NONE && !near[i]) { world.crime[i] = 0; continue; }
     const v = KNOBS.CRIME_BASE - KNOBS.CRIME_LV * world.lv[i] + KNOBS.CRIME_DENSITY * dens + KNOBS.CRIME_UNEMP_LOCAL * jobless + KNOBS.CRIME_UNEMP * unemp + near[i] - world.policeCov[i];

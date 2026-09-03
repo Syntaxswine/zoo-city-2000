@@ -12,7 +12,7 @@ import { computeFields, recountRosters, commutePath, doorOf } from "./fields.js"
 import { rebuildMaps } from "./citizens.js";
 import { refreshLast } from "./tick.js";
 
-const TILE_ARRAYS = ["terrain", "road", "zone", "maxTier", "tier", "civic", "burning", "rubble", "variant", "flooded", "wall", "use", "rail", "meat"];
+const TILE_ARRAYS = ["terrain", "road", "zone", "maxTier", "tier", "civic", "burning", "rubble", "variant", "flooded", "wall", "use", "rail", "meat", "big"];
 
 function plainCitizen(c) {
   return {
@@ -120,6 +120,8 @@ export function stateHash(world) {
   // standing simulation hash. Once Parts B/H put state in them, it is hashed.
   if (!Object.keys(o.names).length) delete o.names;
   if (o.meat.every((n) => n === 0)) delete o.meat;
+  if (o.big.every((n) => n === 0)) delete o.big; // a town with no block yet hashes as it did before the blocks
+
   for (const c of o.citizens) if (!c.life.length) delete c.life;
   const s = JSON.stringify(o);
   let h = 0x811c9dc5;

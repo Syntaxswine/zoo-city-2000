@@ -50,6 +50,7 @@ export function createWorld({ seed = "zoo", w = 64, h = 64 } = {}) {
     use: new Uint8Array(n), // the player's line: 0 mixed · 1 predator-only · 2 prey-only, on lots AND roads (SPEC §7.8)
     rail: new Uint8Array(n), // 0 none · 1 rail · 2 station (SPEC §7.9); a station is a door only beside a road
     meat: new Uint16Array(n), // units on hand at a meat hall; Part H supplies the flows
+    big: new Uint8Array(n), // a BLOCK (SPEC §3b, sim/blocks.js): 0 a lot of its own · 2 | 3 the anchor of a 2×2 | 3×3 · PART | dx | dy << 2 a part pointing at its anchor
     // derived
     roadDist: new Uint8Array(n),
     pol: new Uint8Array(n),
@@ -59,9 +60,9 @@ export function createWorld({ seed = "zoo", w = 64, h = 64 } = {}) {
     fireCov: new Uint8Array(n),
     policeCov: new Uint8Array(n),
     dread: new Uint8Array(n),
-    carnAt: new Uint8Array(n),
-    occupants: new Uint8Array(n),
-    staff: new Uint8Array(n),
+    carnAt: new Uint16Array(n), // Uint16 since the blocks: a 3×3 R block keeps 270 animals on its anchor
+    occupants: new Uint16Array(n),
+    staff: new Uint16Array(n),
     majority: new Uint8Array(n), // majority resident/staff species index + 1; 0 means none
     occl: new Uint8Array(n), // reach.js: the eight directions influence may cross a tile (derived)
     roadsDirty: true,
@@ -276,25 +277,72 @@ export function isLot(world, i) {
   return world.zone[i] !== ZONE.NONE;
 }
 
+// ---------------------------------------------------------------------------
+// Blocks (SPEC §3b; the mechanics are in sim/blocks.js). `big[i]` is 0 for a
+// lot of its own, the side (2 or 3) on a block's anchor, and PART | dx |
+// (dy << 2) on a part. A part keeps its zone and tier, holds nobody, and
+// offers nothing; the anchor holds the block's people and offers its jobs.
+// ---------------------------------------------------------------------------
+
+export const PART = 0x80;
+export const isPart = (world, i) => (world.big[i] & PART) !== 0;
+/** The anchor of the block tile i is in — i itself for a lot of its own or an anchor. */
+export function anchorOf(world, i) {
+  const b = world.big[i];
+  if (!(b & PART)) return i;
+  return i - (b & 3) - ((b >> 2) & 3) * world.w;
+}
+/** 1 for a lot of its own; the side of the block tile i is in. */
+export function sideOf(world, i) {
+  const b = world.big[anchorOf(world, i)];
+  return b === 2 || b === 3 ? b : 1;
+}
+/** The tiles of the block anchored at `anchor` (just [anchor] for a lot of its own), raster order. */
+export function footprintOf(world, anchor) {
+  const s = sideOf(world, anchor);
+  const out = [];
+  for (let dy = 0; dy < s; dy++) for (let dx = 0; dx < s; dx++) out.push(anchor + dx + dy * world.w);
+  return out;
+}
+/** What a block holds over what its lots held: side² × BIG_BONUS (1 for a lot of its own). */
+export const blockMultiplier = (side) => (side > 1 ? side * side * KNOBS.BIG_BONUS : 1);
+/** People housed on tile j for readers that want them per TILE (crime's density, a shop's customers): a block's are spread over its footprint. */
+export function occAt(world, j) {
+  const a = anchorOf(world, j);
+  const s = sideOf(world, a);
+  return s > 1 ? world.occupants[a] / (s * s) : world.occupants[j];
+}
+export function carnAtOf(world, j) {
+  const a = anchorOf(world, j);
+  const s = sideOf(world, a);
+  return s > 1 ? world.carnAt[a] / (s * s) : world.carnAt[j];
+}
+
 export function capacityOf(world, i) {
   const z = world.zone[i];
   const t = world.tier[i];
-  if (z === ZONE.R) return KNOBS.R_CAP[t];
-  if (z === ZONE.C) return KNOBS.C_JOBS[t];
-  if (z === ZONE.I) return KNOBS.I_JOBS[t];
-  if (z === ZONE.M) return KNOBS.M_JOBS[t];
+  const b = world.big[i];
+  if (b & PART) return 0;
+  const m = blockMultiplier(b);
+  if (z === ZONE.R) return Math.round(KNOBS.R_CAP[t] * m);
+  if (z === ZONE.C) return Math.round(KNOBS.C_JOBS[t] * m);
+  if (z === ZONE.I) return Math.round(KNOBS.I_JOBS[t] * m);
+  if (z === ZONE.M) return Math.round(KNOBS.M_JOBS[t] * m);
   if (world.civic[i] === CIVIC.ZOO) return KNOBS.ZOO_JOBS;
   if (world.civic[i] === CIVIC.CENTRE) return KNOBS.CENTRE_JOBS;
   if (isStation(world.civic[i])) return KNOBS.STATION_JOBS;
   return 0;
 }
 
-/** Jobs offered by a tile (C, I, M, a zoo anchor, a fire or police station, the centre). */
+/** Jobs offered by a tile (C, I, M, a zoo anchor, a fire or police station, the centre); a block's part offers none. */
 export function jobsOf(world, i) {
   const z = world.zone[i];
-  if (z === ZONE.C) return KNOBS.C_JOBS[world.tier[i]];
-  if (z === ZONE.I) return KNOBS.I_JOBS[world.tier[i]];
-  if (z === ZONE.M) return KNOBS.M_JOBS[world.tier[i]];
+  const b = world.big[i];
+  if (b & PART) return 0;
+  const m = blockMultiplier(b);
+  if (z === ZONE.C) return Math.round(KNOBS.C_JOBS[world.tier[i]] * m);
+  if (z === ZONE.I) return Math.round(KNOBS.I_JOBS[world.tier[i]] * m);
+  if (z === ZONE.M) return Math.round(KNOBS.M_JOBS[world.tier[i]] * m);
   if (world.civic[i] === CIVIC.ZOO) return KNOBS.ZOO_JOBS;
   if (isCivicEmployer(world.civic[i])) return world.civic[i] === CIVIC.CENTRE ? KNOBS.CENTRE_JOBS : KNOBS.STATION_JOBS;
   return 0;

@@ -3,7 +3,7 @@
 
 import { KNOBS } from "./rules.js";
 import { SPECIES, SPECIES_BY_ID, isPredPrey, isPredatorOf, DIET_OF } from "./species.js";
-import { ZONE, CIVIC, ROAD, jobsOf, jobZone, absent } from "./world.js";
+import { ZONE, CIVIC, ROAD, jobsOf, jobZone, absent, capacityOf, isPart } from "./world.js";
 import { hasAccess, edgeRoads , commuteTime, rides, fireExposure } from "./fields.js";
 
 export const ageMonths = (world, c) => world.tick - c.born;
@@ -129,6 +129,8 @@ export function census(world) {
   let fireStations = 0;
   let policeStations = 0;
   let burning = 0;
+  let blocks2 = 0;
+  let blocks3 = 0;
   let crimeSum = 0;
   let crimeN = 0;
   let maxCrime = 0;
@@ -141,7 +143,9 @@ export function census(world) {
       else if (jz === ZONE.M) Jm += jobs;
       else Ji += jobs;
     }
-    if (world.zone[i] === ZONE.M && world.tier[i] > 0) markets++;
+    if (world.zone[i] === ZONE.M && world.tier[i] > 0 && !isPart(world, i)) markets++; // a block is one hall
+    if (world.big[i] === 2) blocks2++;
+    else if (world.big[i] === 3) blocks3++;
     if (world.dread[i] > maxDread) maxDread = world.dread[i];
     if (world.civic[i] === CIVIC.PARK) parks++;
     else if (world.civic[i] === CIVIC.ZOO) zoos++;
@@ -153,7 +157,7 @@ export function census(world) {
     if (world.zone[i] !== ZONE.NONE) {
       lots++;
       if (!hasAccess(world, i)) lotsNoRoad++;
-      if (world.zone[i] === ZONE.R) rCap += KNOBS.R_CAP[world.tier[i]];
+      if (world.zone[i] === ZONE.R) rCap += capacityOf(world, i); // a block's anchor holds ×1.25 its lots; its parts hold nobody
     }
     if (world.road[i] !== ROAD.NONE) roads++;
     if (world.rail[i] === 1) railTiles++;
@@ -187,6 +191,7 @@ export function census(world) {
     native: P ? native / P : 0,
     parks, zoos, lots, roads, walls, tunnels, usePred, usePrey, railTiles, stations, riders, commuteN, meanCommute: commuteN ? commuteSum / commuteN : 0, lotsNoRoad,
     fireStations, policeStations, burning,
+    blocks2, blocks3, // the 2×2 and 3×3 blocks standing (anchors; SPEC §3b)
     // What covering the town is WORTH: the multiplier on how often a fire is
     // rolled at all, 1 in a town with no cover. The rules tab shows it, and it
     // is the same function the roster weight uses (fields.fireExposure).

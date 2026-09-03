@@ -28,7 +28,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { createWorld, ZONE, ROAD, capacityOf, jobsOf } from "../js/sim/world.js";
 import { tick } from "../js/sim/tick.js";
-import { apply, replay, undo } from "../js/sim/ops.js";
+import { apply, replay, undo, costOf as costOfOp } from "../js/sim/ops.js";
 import { save, load, stateHash, toPlain } from "../js/sim/save.js";
 import { KNOBS } from "../js/sim/rules.js";
 import { post } from "../js/sim/budget.js";
@@ -1320,6 +1320,129 @@ if (existsSync(artIndex)) {
   check("play: the camera photographs js/render.js itself, not a second drawing",
     /import\("\.\.\/js\/render\.js"\)/.test(playSrc) && !/paintScene/.test(playSrc));
 }
+
+// ---- Part N': the blocks — 2×2 and 3×3 buildings that grow (SPEC §3b; js/sim/blocks.js) ----
+{
+  const B = await import("../js/sim/blocks.js");
+  const W = await import("../js/sim/world.js");
+  const { lotScore, REASON, lotReport } = await import("../js/sim/lots.js");
+  const { createHousehold, placeHousehold } = await import("../js/sim/citizens.js");
+  const { recountRosters } = await import("../js/sim/fields.js");
+  const { TERRAIN } = W;
+
+  check("blocks: capacities are side² × 1.25 of a tier-3 lot — R 24/120/270 · C 20/100/225 · I 24/120/270 · M 16/80/180",
+    JSON.stringify(B.blockCapacities()) === JSON.stringify({ R: { 1: 24, 2: 120, 3: 270 }, C: { 1: 20, 2: 100, 3: 225 }, I: { 1: 24, 2: 120, 3: 270 }, M: { 1: 16, 2: 80, 3: 180 } }), JSON.stringify(B.blockCapacities()));
+
+  // A fixture: a dry 6×6, a road along its north edge, a 3×3 R patch zoned
+  // High under it — tier 3 at its north corner, tier 2 on the other eight —
+  // and households placed to three quarters of the four north-west lots.
+  const F = createWorld({ seed: "blocks" });
+  const at = (x, y) => y * F.w + x;
+  for (let y = 9; y <= 14; y++) for (let x = 9; x <= 14; x++) { F.terrain[at(x, y)] = TERRAIN.GRASS; F.road[at(x, y)] = ROAD.NONE; }
+  apply(F, { kind: "road", tiles: [9, 10, 11, 12, 13].map((x) => at(x, 9)) });
+  apply(F, { kind: "zone", zone: ZONE.R, x0: 10, y0: 10, x1: 12, y1: 12, density: 3 });
+  for (let y = 10; y <= 12; y++) for (let x = 10; x <= 12; x++) F.tier[at(x, y)] = 2;
+  F.tier[at(10, 10)] = 3;
+  F.valves.R = 0.5;
+  F.events.noDisasters = true;
+  computeFields(F);
+  recountRosters(F);
+  const house = (lot, n) => { for (let k = 0; k < n; k += 4) placeHousehold(F, createHousehold(F, "rabbit", Math.min(4, n - k)), lot); };
+  house(at(10, 10), 20); house(at(11, 10), 8); house(at(10, 11), 8); house(at(11, 11), 4); // 40 of 54
+  const a = at(10, 10);
+  const s2 = lotScore(F, a);
+  const fillOK = s2.window && Math.abs(s2.window.fill - 40 / 54) < 1e-9;
+  check("blocks: a tier-3 lot with three tier-2 High neighbours in its 2×2, 74% full together, reads MERGING with the window on its report",
+    s2.reason === REASON.MERGING && !!s2.merge && s2.merge.side === 2 && s2.merge.anchor === a && fillOK && s2.p > 0 && Math.abs(s2.p - KNOBS.BIG_P * s2.score) < 1e-9,
+    `${s2.reason} · window ${JSON.stringify(s2.window)} · p ${s2.p}`);
+  const under = lotScore(F, at(12, 12)); // a tier-2 lot: no window of its own, and it is not a part
+  check("blocks: a tier-2 lot does not start a block", under.reason !== REASON.MERGING && !under.merge && under.reason !== REASON.PART);
+
+  B.mergeLots(F, s2.merge);
+  const parts2 = [at(11, 10), at(10, 11), at(11, 11)];
+  const homesOnAnchor = F.citizens.every((c) => c.dead || c.home === a) && F.households.every((h) => h.gone || h.home === a);
+  check("blocks: the 2×2 — the anchor is big 2 at tier 3, the three parts point at it at tier 3, every animal and household is on the anchor, the parts hold nobody",
+    F.big[a] === 2 && parts2.every((j) => W.isPart(F, j) && W.anchorOf(F, j) === a && F.tier[j] === 3 && F.occupants[j] === 0) && homesOnAnchor && F.occupants[a] === 40 && capacityOf(F, a) === 120 && W.sideOf(F, at(11, 11)) === 2,
+    `big ${F.big[a]} occ ${F.occupants[a]} cap ${capacityOf(F, a)}`);
+  const spread = [a, ...parts2].reduce((s, j) => s + W.occAt(F, j), 0);
+  check("blocks: occAt spreads the anchor's 40 evenly over the footprint and sums back to 40", Math.abs(spread - 40) < 1e-9 && Math.abs(W.occAt(F, at(11, 11)) - 10) < 1e-9);
+  const rep = lotReport(F, at(11, 11));
+  check("blocks: a part's report is its anchor's building, naming the tile asked about", rep.part && rep.tx === 10 && rep.ty === 10 && rep.at.tx === 11 && rep.side === 2 && rep.occupants === 40 && rep.capacity === 120 && lotScore(F, at(11, 11)).reason === REASON.PART);
+  check("blocks: a part offers no jobs and holds no capacity", capacityOf(F, at(11, 10)) === 0 && jobsOf(F, at(11, 10)) === 0);
+
+  // To the 3×3: the five lots round the 2×2 are tier 2; fill the window to 70% of 120 + 5·10 = 170.
+  house(a, 60); house(at(12, 10), 8); house(at(12, 11), 8); house(at(10, 12), 4); // 40 + 80 = 120 of 170
+  const s3 = lotScore(F, a);
+  check("blocks: a 2×2 with five tier-2 High lots round it, 70% full together, reads MERGING to a 3×3 anchored at its own north corner",
+    s3.reason === REASON.MERGING && s3.merge && s3.merge.side === 3 && s3.merge.anchor === a && s3.merge.tiles.length === 9 && Math.abs(s3.window.fill - 120 / 170) < 1e-9,
+    `${s3.reason} · ${JSON.stringify(s3.window)}`);
+  B.mergeLots(F, s3.merge);
+  const nine = W.footprintOf(F, a);
+  check("blocks: the 3×3 — nine tiles at tier 3, eight parts on the anchor, 120 animals in 270", nine.length === 9 && F.big[a] === 3 && nine.every((j) => F.tier[j] === 3 && (j === a || W.isPart(F, j))) && F.occupants[a] === 120 && capacityOf(F, a) === 270 && lotScore(F, a).reason !== REASON.MERGING);
+
+  // The save contract: `big` round-trips; a loaded block keeps its people on its anchor; the two towns hash-equal after six months.
+  const G = load(save(F));
+  const eq = nine.every((j) => G.big[j] === F.big[j]) && G.occupants[a] === 120;
+  for (let t = 0; t < 6; t++) { tick(F); tick(G); }
+  check("blocks: save → load keeps the block and its people, and six ticks later the two towns hash-equal", eq && stateHash(F) === stateHash(G), `${stateHash(F)} vs ${stateHash(G)}`);
+  const anyOnPart = F.citizens.some((c) => !c.dead && (W.isPart(F, c.home) || (c.job >= 0 && W.isPart(F, c.job))));
+  check("blocks: after six ticks nobody lives or works on a part", !anyOnPart);
+
+  // The split: everyone stays housed — nine tier-3 lots hold 216 — and the anchor keeps one lot's worth.
+  const before = F.citizens.filter((c) => !c.dead).length;
+  const tiles = B.splitLot(F, a);
+  let housed = 0;
+  for (const j of tiles) housed += F.occupants[j];
+  check("blocks: a split leaves nine tier-3 lots of their own, the anchor at or under 24, everyone rehomed on the block's own tiles, nobody on a part",
+    tiles.length === 9 && tiles.every((j) => F.big[j] === 0 && F.tier[j] === 3) && F.occupants[a] <= 24 && housed === before && F.citizens.every((c) => c.dead || c.home >= 0),
+    `anchor ${F.occupants[a]} · housed ${housed} of ${before}`);
+
+  // The bulldozer on a PART of an occupied block: the whole footprint, one building, not undoable.
+  B.mergeLots(F, { side: 2, anchor: a, tiles: [a, at(11, 10), at(10, 11), at(11, 11)] });
+  recountRosters(F);
+  const occBefore = F.occupants[a];
+  const plan = costOfBulldoze(F, 11, 11);
+  const rb = apply(F, { kind: "bulldoze", x0: 11, y0: 11, x1: 11, y1: 11 });
+  const cleared = [a, at(11, 10), at(10, 11), at(11, 11)].every((j) => F.zone[j] === ZONE.NONE && F.tier[j] === 0 && F.big[j] === 0);
+  check("blocks: bulldozing one part clears the whole 2×2 at §2 a tile, evicts once, and is not undoable",
+    occBefore > 0 && plan.tiles.length === 4 && plan.cost === 4 * KNOBS.COST.bulldoze && plan.evicts === 1 && rb.ok && !rb.undoable && cleared && F.citizens.every((c) => c.dead || ![a, at(11, 10), at(10, 11), at(11, 11)].includes(c.home)),
+    `tiles ${plan.tiles.length} cost ${plan.cost} evicts ${plan.evicts} undoable ${rb.undoable}`);
+  // An EMPTY block: the same bulldoze undoes, tiles and all.
+  apply(F, { kind: "zone", zone: ZONE.R, x0: 10, y0: 10, x1: 11, y1: 11, density: 3 });
+  for (const j of [a, at(11, 10), at(10, 11), at(11, 11)]) F.tier[j] = 3;
+  B.mergeLots(F, { side: 2, anchor: a, tiles: [a, at(11, 10), at(10, 11), at(11, 11)] });
+  const rb2 = apply(F, { kind: "bulldoze", x0: 10, y0: 11, x1: 10, y1: 11 });
+  const gone = F.big[a] === 0 && F.tier[a] === 0;
+  const ru = undo(F);
+  check("blocks: an empty block bulldozed by one of its parts comes back whole on undo", rb2.ok && rb2.undoable && gone && ru.ok && F.big[a] === 2 && F.tier[at(11, 11)] === 3 && W.isPart(F, at(11, 11)));
+
+  // Fire: a part catches, the whole block burns, and burnt out it is rubble on every tile — one building.
+  B.ignite(F, at(11, 11), 1);
+  const allBurning = [a, at(11, 10), at(10, 11), at(11, 11)].every((j) => F.burning[j] === 1);
+  tick(F);
+  const allRubble = [a, at(11, 10), at(10, 11), at(11, 11)].every((j) => F.rubble[j] > 0 && F.tier[j] === 0 && F.big[j] === 0 && F.zone[j] === ZONE.R);
+  check("blocks: fire takes the whole footprint — every tile burns together and every tile is rubble after", allBurning && allRubble, `burning ${allBurning} rubble ${allRubble}`);
+
+  // The scripted mayor: the balanced town raises its first 2×2 in year 3; every block obeys the invariants.
+  const M = createWorld({ seed: SEED });
+  const { createMayor } = await import("./mayor.mjs");
+  const mayor = createMayor(M, { layout: "balanced" });
+  for (let t = 0; t < 48; t++) { mayor.month(t); tick(M); }
+  const cen = M.last.census;
+  let badParts = 0, onParts = 0, overCap = 0, anchors = 0;
+  for (let i = 0; i < M.w * M.h; i++) {
+    const b = M.big[i];
+    if (b === 2 || b === 3) { anchors++; for (const j of W.footprintOf(M, i)) if (M.zone[j] !== M.zone[i] || M.tier[j] !== 3 || (j !== i && (!W.isPart(M, j) || W.anchorOf(M, j) !== i))) badParts++; }
+    else if (b & W.PART) { const an = W.anchorOf(M, i); if (!(M.big[an] === 2 || M.big[an] === 3)) badParts++; }
+    if (W.isPart(M, i) && (M.occupants[i] || M.staff[i])) onParts++;
+    if (M.zone[i] === ZONE.R && M.occupants[i] > capacityOf(M, i)) overCap++;
+  }
+  check("blocks: the balanced mayor raises a 2×2 within four years, every part points at a live anchor of its zone at tier 3, nobody is on a part, nobody over capacity",
+    cen.blocks2 + cen.blocks3 >= 1 && anchors === cen.blocks2 + cen.blocks3 && badParts === 0 && onParts === 0 && overCap === 0,
+    `2×2 ${cen.blocks2} · 3×3 ${cen.blocks3} · bad ${badParts} · on parts ${onParts} · over ${overCap}`);
+  check("blocks: the Rules tab has the block rule and reads the census", (await import("../js/sim/rules.js")).RULES.some((r) => r.id === "G5" && /2×2/.test(r.live(M))));
+}
+function costOfBulldoze(w, x, y) { return (0, costOfOp)(w, { kind: "bulldoze", x0: x, y0: y, x1: x, y1: y }); }
 
 // ---- Part D: the walker layer never writes the sim (SPEC §14) ---------------------
 const walkersPath = path.join(ROOT, "js", "walkers.js");

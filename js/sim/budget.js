@@ -7,7 +7,7 @@
 // posts under "cheat", so the ledger always says how much came that way.
 
 import { KNOBS } from "./rules.js";
-import { ZONE, CIVIC, ROAD, isStation } from "./world.js";
+import { ZONE, CIVIC, ROAD, isStation, isPart } from "./world.js";
 
 export function post(world, kind, amount) {
   const a = Math.round(amount);
@@ -62,7 +62,7 @@ export function yearlyFigures(world) {
     if (world.road[i] === ROAD.ROAD) roads++;
     else if (world.road[i] === ROAD.BRIDGE) bridges++;
     tiers += world.tier[i];
-    if (world.zone[i] === ZONE.M && world.tier[i] > 0) markets++;
+    if (world.zone[i] === ZONE.M && world.tier[i] > 0 && !isPart(world, i)) markets++; // the licence inspects a hall, not its tiles
     if (world.civic[i] === CIVIC.PARK) parks++;
     else if (world.civic[i] === CIVIC.ZOO) zoos++;
     else if (world.civic[i] === CIVIC.FIRE) fireStations++;

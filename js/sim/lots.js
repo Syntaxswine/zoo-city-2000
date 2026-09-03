@@ -5,9 +5,10 @@
 // ever say what the rule did (SPEC §0.6).
 
 import { KNOBS } from "./rules.js";
-import { ZONE, CIVIC, idx, inBounds, capacityOf, jobsOf } from "./world.js";
+import { ZONE, CIVIC, idx, inBounds, capacityOf, jobsOf, isPart, anchorOf, sideOf, occAt, carnAtOf } from "./world.js";
 import { hasAccess } from "./fields.js";
 import { evictFromLot, fireFromLot } from "./citizens.js";
+import { mergeWindow, windowFill, mergeLots, splitLot } from "./blocks.js";
 
 const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
 
@@ -20,15 +21,17 @@ export const REASON = Object.freeze({
   WAITING_FILL: "waiting to fill up",
   CAPPED: "the city is at capacity — build a park or a Zoo",
   GROWING: "growing",
+  MERGING: "joining the block",
   DECAYING: "decaying",
   STABLE: "stable",
   RUBBLE: "rubble — it clears itself, or bulldoze it",
   BURNING: "on fire",
   FLOODED: "flooded",
   EMPTY: "zoned, waiting for demand",
+  PART: "part of the block",
 });
 
-/** Citizens housed within Chebyshev 5 (shops want customers). */
+/** Citizens housed within Chebyshev 5 (shops want customers); a block's are spread over its footprint. */
 function residentsNear(world, i, r = 5) {
   const { w } = world;
   const tx = i % w;
@@ -40,13 +43,13 @@ function residentsNear(world, i, r = 5) {
       const yy = ty + dy;
       if (!inBounds(world, xx, yy)) continue;
       const j = yy * w + xx;
-      if (world.zone[j] === ZONE.R) sum += world.occupants[j];
+      if (world.zone[j] === ZONE.R) sum += occAt(world, j);
     }
   }
   return sum;
 }
 
-/** Carnivores housed within Chebyshev r (a meat hall's customers). */
+/** Carnivores housed within Chebyshev r (a meat hall's customers); a block's are spread over its footprint. */
 function carnivoresNear(world, i, r = 5) {
   const { w } = world;
   const tx = i % w;
@@ -57,7 +60,7 @@ function carnivoresNear(world, i, r = 5) {
       const xx = tx + dx;
       const yy = ty + dy;
       if (!inBounds(world, xx, yy)) continue;
-      sum += world.carnAt[yy * w + xx];
+      sum += carnAtOf(world, yy * w + xx);
     }
   }
   return sum;
@@ -80,6 +83,8 @@ export function lotScore(world, i) {
   const tier = world.tier[i];
   const out = { score: -1, reason: REASON.EMPTY, p: 0, parts: { valve: 0, local: 0 }, access: false, maxTier: 0, fill: 0 };
   if (z === ZONE.NONE) return out;
+  // A block's part: the building is on the anchor; this tile grows, decays and burns with it (blocks.js).
+  if (isPart(world, i)) { out.reason = REASON.PART; out.anchor = anchorOf(world, i); return out; }
   if (world.rubble[i]) { out.reason = REASON.RUBBLE; return out; }
   if (world.burning[i]) { out.reason = REASON.BURNING; return out; }
   if (world.flooded[i]) { out.reason = REASON.FLOODED; return out; }
@@ -139,15 +144,34 @@ export function lotScore(world, i) {
     out.reason = world.maxTier[i] < byLV ? REASON.DENSITY_CAP : REASON.LV_CAP;
     return out;
   }
+  // Tier 3 and wanted: the block (SPEC §3b, blocks.js). A lot of its own with
+  // three joinable neighbours in a 2×2 round it, or a 2×2 with five round it,
+  // joins them when the window is FILL_TO_GROW full together — the same fill
+  // gate as a storey, the same p as growth. The window is on the report
+  // either way, so the card can say what the block is waiting for.
+  if (tier === 3 && world.big[i] !== 3) {
+    const win = mergeWindow(world, i);
+    if (win) {
+      const fill = windowFill(world, win.tiles);
+      out.window = { side: win.side, fill };
+      if (score > KNOBS.GROW_THRESH && fill >= KNOBS.FILL_TO_GROW) {
+        out.reason = REASON.MERGING;
+        out.p = KNOBS.BIG_P * score;
+        out.merge = win;
+        return out;
+      }
+    }
+  }
   out.reason = REASON.STABLE;
   return out;
 }
 
-/** One tick of growth and decay over every lot, raster order. */
+/** One tick of growth, decay and the blocks over every lot, raster order. */
 export function lotsTick(world) {
   const n = world.w * world.h;
   let grew = 0;
   let decayed = 0;
+  let merged = 0;
   const rng = world.rng;
   for (let i = 0; i < n; i++) {
     if (world.zone[i] === ZONE.NONE) continue;
@@ -157,8 +181,18 @@ export function lotsTick(world) {
         world.tier[i]++;
         grew++;
       }
+    } else if (s.merge) {
+      if (rng.chance(s.p)) {
+        mergeLots(world, s.merge); // the tiles it claims are parts when the loop reaches them
+        merged++;
+      }
     } else if (s.decay) {
       if (rng.chance(s.p)) {
+        if (sideOf(world, i) > 1) {
+          splitLot(world, i); // a block does not lose a storey; it comes apart into its lots
+          decayed++;
+          continue;
+        }
         world.tier[i]--;
         decayed++;
         const cap = capacityOf(world, i);
@@ -167,16 +201,20 @@ export function lotsTick(world) {
       }
     }
   }
-  return { grew, decayed };
+  return { grew, decayed, merged };
 }
 
-/** Data for the hover card. */
-export function lotReport(world, i) {
+/** Data for the hover card. A block's part reports its ANCHOR's building (`part` names the tile asked about). */
+export function lotReport(world, at) {
+  const i = anchorOf(world, at);
   const z = world.zone[i];
   const s = lotScore(world, i);
   const rep = {
     tx: i % world.w,
     ty: (i / world.w) | 0,
+    at: { tx: at % world.w, ty: (at / world.w) | 0 },
+    part: at !== i,
+    side: sideOf(world, i),
     zone: z,
     tier: world.tier[i],
     maxTier: world.maxTier[i],

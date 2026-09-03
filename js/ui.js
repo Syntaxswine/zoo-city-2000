@@ -293,6 +293,8 @@ export function createUI(app) {
 
   // ---- hover card --------------------------------------------------------------------------------------
   const TIER_NAME = { 1: ["cottage", "shop", "shed", "stall"], 2: ["two-storey", "store", "factory", "meat hall"], 3: ["apartment", "tower", "works", "cold store"] };
+  // The blocks (SPEC §3b): one building on 2×2 or 3×3 tiles, named by zone and side.
+  const BLOCK_NAME = { 2: ["terrace court", "arcade", "mill", "abattoir"], 3: ["the towers", "emporium", "foundry", "meat exchange"] };
   function speciesList(members, w) {
     const counts = {};
     for (const c of members) counts[c.species] = (counts[c.species] || 0) + 1;
@@ -327,14 +329,16 @@ export function createUI(app) {
     else if (w.terrain[i] === TERRAIN.WATER) what = "Water";
     else if (w.terrain[i] === TERRAIN.TREE) what = "Trees";
     else what = "Grass";
-    head.append(el("b", "", `(${tx},${ty}) ${what}`));
+    head.append(el("b", "", `(${rep.part ? `${rep.at.tx},${rep.at.ty}` : `${tx},${ty}`}) ${what}`));
     if (rep.zone !== ZONE.NONE) {
       const t = rep.tier;
-      head.append(el("span", "dim", t ? `  tier ${t} ${TIER_NAME[t][rep.zone - 1]}` : "  zoned, empty"));
+      const name = rep.side > 1 ? `${rep.side}×${rep.side} ${BLOCK_NAME[rep.side][rep.zone - 1]}` : `tier ${t} ${TIER_NAME[t][rep.zone - 1]}`;
+      head.append(el("span", "dim", t ? `  ${name}` : "  zoned, empty"));
       if (t) {
         const occ = rep.zone === ZONE.R ? `occ ${rep.occupants}/${rep.capacity}` : `jobs ${rep.staff}/${rep.jobs}`;
         head.append(el("span", "", `  ${occ}`));
       }
+      if (rep.part) lines.push(el("div", "dim", `part of the block at (${tx},${ty}) — one building on ${rep.side * rep.side} tiles; its animals are counted there`));
     }
     if (rep.civic === CIVIC.ZOO) head.append(el("span", "", `  jobs ${rep.staff}/${rep.jobs}`));
     if (rep.civic === CIVIC.CENTRE) {
@@ -357,6 +361,9 @@ export function createUI(app) {
       const ls = Math.round((tot - vs) * 100) / 100;
       const parts = s.access ? `V_${ZONE_NAME[rep.zone]} ${f2(vs)} + local ${f2(ls)} = ${f2(tot)}` : "no road access → score −1";
       lines.push(el("div", "", `${arrow} ${s.reason} (${parts}${p})`));
+      // The block it could join (SPEC §3b): what it is waiting for, from the same window the rule reads.
+      if (s.window && s.reason !== REASON.MERGING) lines.push(el("div", "dim", `a ${s.window.side}×${s.window.side} block forms here when its ${s.window.side * s.window.side} lots are ${Math.round(KNOBS.FILL_TO_GROW * 100)}% full together — now ${Math.round(s.window.fill * 100)}%${s.score > KNOBS.GROW_THRESH ? "" : " — and demand is positive"}`));
+      else if (s.merge) lines.push(el("div", "dim", `joining ${s.merge.side * s.merge.side} lots into one ${s.merge.side}×${s.merge.side} building holding ×${KNOBS.BIG_BONUS} what they hold`));
     }
     const env = el("div", "dim");
     env.textContent = `LV ${rep.lv}  Pol ${rep.pol}  crime ${rep.crime}  road ${rep.roadDist > KNOBS.ROAD_REACH ? "—" : rep.roadDist}` + (w.road[i] ? `  traffic ${rep.traffic}` : "")
@@ -407,7 +414,8 @@ export function createUI(app) {
     const n = neutralOf(w);
     const z = ZONE_NAME[rep.zone];
     switch (s.reason) {
-      case REASON.GROWING: case REASON.STABLE: return "—";
+      case REASON.GROWING: case REASON.STABLE: case REASON.MERGING: return "—";
+      case REASON.PART: return `part of the block at (${rep.tx},${rep.ty})`;
       case REASON.NO_ROAD: return "no road within 3 tiles";
       case REASON.SMOG: return `smog ${rep.pol} > ${KNOBS.SMOG_REFUSE}`;
       case REASON.NO_DEMAND: case REASON.EMPTY: {

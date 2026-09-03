@@ -7,7 +7,7 @@
 // a lump posted under its own ledger key, logged, replayed, never undone.
 
 import { KNOBS } from "./rules.js";
-import { TERRAIN, ROAD, ZONE, CIVIC, idx, inBounds } from "./world.js";
+import { TERRAIN, ROAD, ZONE, CIVIC, idx, inBounds, anchorOf, footprintOf } from "./world.js";
 import { post, canSpend, exitReceivership } from "./budget.js";
 import { clearLot, invalidatePaths, releaseJob } from "./citizens.js";
 import { resolveChoice } from "./events.js";
@@ -60,7 +60,9 @@ export function costOf(world, op) {
       break;
     }
     case "bulldoze": {
+      const taken = new Set(); // a block's tiles, listed once however many the rect touches
       for (const i of rect(world, op)) {
+        if (taken.has(i)) continue;
         if (world.terrain[i] === TERRAIN.WATER && !world.road[i]) continue;
         if (world.wall[i]) { add(i, C.bulldoze, "wall"); continue; } // a tunnel's wall comes down first; the road stays
         if (world.rail[i]) { add(i, C.bulldoze, world.rail[i] === 2 ? "station" : "rail"); continue; }
@@ -69,6 +71,13 @@ export function costOf(world, op) {
           add(i, C.bulldoze, "civic");
           // A centre with animals in its beds: releasing them is not undoable (tiles, never people).
           if (world.civic[i] === CIVIC.CENTRE) for (const cz of world.citizens) if (cz.heldAt === i && !cz.dead) evicts++;
+          continue;
+        }
+        if (world.big[i]) {
+          // A block goes as one building: every tile of its footprint, §2 each; its people are on the anchor.
+          const a = anchorOf(world, i);
+          for (const j of footprintOf(world, a)) { taken.add(j); add(j, C.bulldoze, "building"); }
+          if (world.occupants[a] || world.staff[a]) evicts++;
           continue;
         }
         if (isBuilt(world, i)) { add(i, C.bulldoze, "building"); if (world.occupants[i] || world.staff[i]) evicts++; continue; }
@@ -106,10 +115,17 @@ export function costOf(world, op) {
       // mixed / predator-only / prey-only, §1 a changed tile. Grass, water,
       // civics and chalk-less ground take no line.
       const v = Math.max(0, Math.min(2, op.use | 0));
+      const painted = new Set();
       for (const i of rect(world, op)) {
+        if (painted.has(i)) continue;
         if (world.zone[i] === ZONE.NONE && world.road[i] === ROAD.NONE && !(world.rail && world.rail[i])) continue;
-        if (world.use[i] === v) continue;
-        add(i, C.use, "use");
+        // A block takes one line over its whole footprint (its tiles must agree for the merge and stay agreed after).
+        const tiles = world.big[i] ? footprintOf(world, anchorOf(world, i)) : [i];
+        for (const j of tiles) {
+          painted.add(j);
+          if (world.use[j] === v) continue;
+          add(j, C.use, "use");
+        }
       }
       break;
     }
@@ -158,7 +174,7 @@ function snapshot(world, tiles) {
   return tiles.map(({ i }) => ({
     i,
     terrain: world.terrain[i], road: world.road[i], zone: world.zone[i], maxTier: world.maxTier[i],
-    tier: world.tier[i], civic: world.civic[i], rubble: world.rubble[i], wall: world.wall[i], use: world.use[i], rail: world.rail[i],
+    tier: world.tier[i], civic: world.civic[i], rubble: world.rubble[i], wall: world.wall[i], use: world.use[i], rail: world.rail[i], big: world.big[i],
   }));
 }
 
@@ -232,8 +248,12 @@ export function apply(world, op, { log = true } = {}) {
           // Unzone FIRST: clearLot rehomes the family by bestHome(), which
           // would otherwise see this very lot as a freshly vacated R lot and
           // move them straight back in (the play-tester's ghost residents).
-          world.tier[i] = 0; world.zone[i] = ZONE.NONE; world.rubble[i] = 0; world.burning[i] = 0; world.maxTier[i] = 3;
-          clearLot(world, i);
+          // A block: the first of its tiles the loop meets clears the whole
+          // footprint and its anchor's people; the rest are plain ground by then.
+          const a = anchorOf(world, i);
+          const tiles = world.big[i] ? footprintOf(world, a) : [i];
+          for (const j of tiles) { world.tier[j] = 0; world.zone[j] = ZONE.NONE; world.rubble[j] = 0; world.burning[j] = 0; world.maxTier[j] = 3; world.big[j] = 0; }
+          clearLot(world, a);
         }
         else if (what === "unzone") { world.zone[i] = ZONE.NONE; world.maxTier[i] = 3; }
         else if (what === "tree") world.terrain[i] = TERRAIN.GRASS;
@@ -336,7 +356,7 @@ export function undo(world) {
   for (const s of u.snap) {
     if (world.tier[s.i] > 0 && s.tier === 0) continue; // something grew here since; leave it
     world.terrain[s.i] = s.terrain; world.road[s.i] = s.road; world.zone[s.i] = s.zone; world.maxTier[s.i] = s.maxTier;
-    world.tier[s.i] = s.tier; world.civic[s.i] = s.civic; world.rubble[s.i] = s.rubble; world.wall[s.i] = s.wall; world.use[s.i] = s.use; world.rail[s.i] = s.rail;
+    world.tier[s.i] = s.tier; world.civic[s.i] = s.civic; world.rubble[s.i] = s.rubble; world.wall[s.i] = s.wall; world.use[s.i] = s.use; world.rail[s.i] = s.rail; world.big[s.i] = s.big;
   }
   if (u.roads) { world.roadsDirty = true; invalidatePaths(world); computeOcclusion(world); }
   else if (u.op.kind === "use") invalidatePaths(world);

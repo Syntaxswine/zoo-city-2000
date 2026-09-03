@@ -16,6 +16,7 @@ import { ageYears } from "./census.js";
 import { SPECIES_BY_ID, SPECIES } from "./species.js";
 import { thiefPool, openFile } from "./justice.js";
 import { hasAccess, builtLots, fireExposure } from "./fields.js";
+import { dissolve, ignite as igniteTile } from "./blocks.js"; // `ignite` is eventsTick's list of tiles the fire spreads to
 
 const DISASTER = "disaster";
 const BOON = "boon";
@@ -27,6 +28,7 @@ function anyWater(world) {
 
 function lowerTier(world, i) {
   if (world.tier[i] <= 0) return;
+  dissolve(world, i); // a block comes apart before one of its tiles loses a storey (blocks.js)
   world.tier[i]--;
   const cap = capacityOf(world, i);
   if (world.zone[i] === ZONE.R) evictFromLot(world, i, cap);
@@ -42,8 +44,12 @@ function lowerTier(world, i) {
  */
 function toRubble(world, i) {
   if (world.zone[i] === ZONE.NONE || world.tier[i] === 0) return;
-  while (world.tier[i] > 0) lowerTier(world, i);
-  world.rubble[i] = KNOBS.RUBBLE_MONTHS;
+  // A block is razed whole: its footprint comes apart without the split's
+  // rehoming (everyone is about to be evicted by the storeys going anyway).
+  for (const j of dissolve(world, i, { evict: false })) {
+    while (world.tier[j] > 0) lowerTier(world, j);
+    world.rubble[j] = KNOBS.RUBBLE_MONTHS;
+  }
 }
 
 /**
@@ -75,7 +81,7 @@ export const ROSTER = [
       let r = w.rng.next() * total;
       let i = lots[lots.length - 1];
       for (const l of lots) { r -= w.fireCov[l] ? KNOBS.FIRE_START_COVERED : 1; if (r <= 0) { i = l; break; } }
-      w.burning[i] = w.fireCov[i] ? 1 : 2;
+      igniteTile(w, i, w.fireCov[i] ? 1 : 2); // the whole block, if it is one
       return `FIRE at (${i % w.w},${(i / w.w) | 0})${w.fireCov[i] ? " — the fire station is on it." : " — bulldoze a firebreak."}`;
     },
   },
@@ -450,7 +456,7 @@ export function eventsTick(world, cen, dem) {
   // burning tier-1 lot to tier 0 looks exactly the same.
   world.fires = { saved, razed };
   if (saved) say("saved", `SAVED — the engine reached ${saved === 1 ? `the fire at (${savedAt % w},${(savedAt / w) | 0})` : `${saved} of this month's fires`}; the walls stand and a storey is gone.${razed ? ` ${razed} beyond the beat went to rubble.` : ""}`);
-  for (const j of ignite) if (!world.burning[j] && world.tier[j] > 0) world.burning[j] = world.fireCov[j] ? 1 : 2;
+  for (const j of ignite) if (!world.burning[j] && world.tier[j] > 0) igniteTile(world, j, world.fireCov[j] ? 1 : 2);
   // Flood recedes.
   for (let i = 0; i < n; i++) if (world.flooded[i]) world.flooded[i]--;
   // Expire timed effects.
