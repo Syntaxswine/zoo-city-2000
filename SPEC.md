@@ -142,6 +142,50 @@ block (terrace court · arcade · mill · abattoir; the towers · emporium ·
 foundry · meat exchange), a part says whose it is, and a tier-3 lot says what
 its block is waiting for.
 
+### 3c. Landmarks — a 3×3 takes the name of the species that made it (`js/sim/landmarks.js`; session 12, 2026-09-03)
+
+The owner (2026-09-02): *"themed commercial shops, an industrial dairy, or
+a residential apartment building."* A landmark is not placed and not bought:
+it is what a 3×3 block IS when the animals who fill it are of a kind. When a
+3×3 forms (`mergeLots`), its residents (R) or its staff (C, I) are counted
+by species, KIN TOGETHER — a landmark lists the species it is for and their
+counts are summed against every other species on its own — and the largest
+group names the block and chooses its picture; a tie at the top, or a top
+group with no landmark in the zone, leaves the plain block (the towers, the
+emporium, the foundry). "Majority" means plurality: measured on five
+scripted towns, the leading species on a block holds 16–37% and never half.
+The theme is chosen ONCE, when the block rises, and kept until it comes
+apart (a building does not re-skin when its tenants change); one saved byte
+per tile, `theme[anchor]` (0 the plain block), cleared by `splitLot` and by
+the bulldozer with `big`. A 2×2 has none; M has none (the proposal's ruling).
+
+| id | zone | kin | landmark |
+|---|---|---|---|
+| 1 | R | rabbit, mouse | **Warren Towers** — three honeycomb drums of round doors and round windows under sod roofs, a burrow mound |
+| 2 | R | beaver, bear, wolf | **the Lodge** — log halls on a dam-stone plinth round a pond, the great lodge at the back |
+| 3 | R | owl, hawk | **the Roost** — three timber towers on stilts, round windows high up, perch beams |
+| 4 | R | pig, raccoon, skunk | **the Wallows** — brick ranges round a mud court with two wallow pools and a row of bins |
+| 5 | R | cat, fox | **the Mews** — a cobbled mews of tall townhouses with arched carriage doors and lamps |
+| 6 | C | fox, cat | **the Fox & Cat** — a coaching inn round a yard: a gallery, a hanging sign, lanterns |
+| 7 | C | raccoon, owl, skunk | **the Night Market** — a lit hall and two rows of stalls under gold-and-dark awnings |
+| 8 | I | cow | **the Dairy** — a whitewashed churn hall, two silos, the tanker, churns on the step |
+| 9 | I | pig | **the Truffle Works** — three beehive kilns in a mud yard under an oak |
+| 10 | I | bear | **the Honey Works** — a weatherboard packing hall, a honey tank, nine hives in rows |
+| 11 | I | beaver | **the Sawmill** — a saw shed open to the log pond, a waterwheel, a log stack |
+
+Cow and tortoise in R, and every M staff, have no landmark yet and raise the
+plain block. **A landmark is a picture and a name, never a bonus**: no gate,
+no weight, no income term (the proposal's per-theme effects are not built;
+they would change every town's hash for a flavour whose EV nobody computed).
+A town with no landmark hashes as it did before them (an all-zero `theme`
+is left out of the hash, §15). When one rises the ticker says so and the log
+keeps it under its own id — *LANDMARK — the Mews: the Purringtons and the
+Slyfields have made a landmark of the block at (18,4); 65 of 129 living
+there are cats and foxes.* — with the block's coordinates in the line, so
+`play.mjs --when "^LANDMARK"` points the camera at it. The card names the
+landmark and who made it; the census counts `landmarks` and
+`landmarkCounts` by name; Rules G6 reads them.
+
 ---
 
 ## 4. Demand — the five equations (`js/sim/demand.js`)
@@ -212,6 +256,8 @@ MERGE (§3b, blocks.js): a tier-3 High lot of its own with three High lots of it
       The first draft asked for all four at tier 3: 14 of 281 R lots in the scripted town, none touching.
 SPLIT a block whose anchor would DECAY comes apart into tier-3 lots of its own; the excess rehome within 12
       road tiles (the singles it made are the nearest vacant lots) or, for C/I/M, lose the job.
+LANDMARK (§3c, landmarks.js): when a 3×3 forms, the largest kin group among those now on its anchor (residents
+      for R, staff for C/I) sets theme[anchor] once — kept until SPLIT — no roll, no RNG, no effect but the name and the picture.
 ```
 Reason codes returned by `lotScore()` (priority order): `PART` (a block's
 part — the report is the anchor's), `NO_ROAD`, `SMOG`, `NO_DEMAND`,
@@ -861,9 +907,28 @@ Built from buildings.js's `KIT` (the same ramps, skins, grains, `walled`,
 `flipPlan`) so a block reads as its zone; hub at the footprint's centre;
 variant 1 the plan and its stamps mirrored across a = b. The footprint
 gate holds (every box in [0, 16·side]²) and the ray audit (§13) runs over
-all sixteen. `art.building(zone, tier, variant, side)` — side 2 | 3 returns
-the block, tier ignored; until blocks.js registers, a block draws its
-zone's tier-3 lot (a wrong picture, never a throw).
+all sixteen. `art.building(zone, tier, variant, side, theme)` — side 2 | 3
+returns the block, tier ignored; theme > 0 with side 3 returns that
+landmark (§12.2c); until blocks.js registers, a block draws its zone's
+tier-3 lot (a wrong picture, never a throw), and an unregistered theme
+draws the zone's plain 3×3.
+
+### 12.2c The landmarks — eleven 3×3s, one per roster row (`js/art/landmarks.js`; §3c has the table)
+
+Each is its zone's block with the species' composition on top, built from
+buildings.js's `KIT` and blocks.js's `BLOCK_KIT` (the eight families'
+helpers: `hipRoof`, `chimney`, `pen`, `sawtooth`, `tank`, `bench`,
+`fountain`, `van`, `family`) plus this file's own: still WATER (a pond, a
+pool, a trough — the water ramp's middle keys, held still), MUD, COBBLE, a
+whitewash (the concrete ramp without its darkest rung), rubble stone, log
+courses (`logSkin`: three-unit courses with a dark seam), timber framing
+(`framed`: plaster between studs), a round hole (`inRound`), a lamp, a
+hive, a bin, a crate, a log, a stepped pyramid cap, a beehive kiln. Nothing
+draws a face: the species is in what the animals BUILT. Two variants each
+(mirrored), tags `building block <zone> landmark`, names
+`<Z>3x3-<key>-<v>`; the footprint gate, the ray audit and the hi-res set
+cover all twenty-two. `sheet-landmarks.png` is the contact sheet (roster
+order, four to a row).
 
 ### 12.3 Citizens — hand-authored kit, the organic exception
 12×20 px adults, 8×12 cubs; facings SE and NE authored, SW/NW mirrored and
@@ -1054,6 +1119,9 @@ scaled ×2 beside their twins.
   the hash (as the keel's empty fields are), so a town with no block hashes
   as it did before the blocks. `occupants`, `staff`, `carnAt` are Uint16
   (derived): a 3×3 R block keeps 270 on its anchor.
+- `theme` (§3c) is the sixteenth; an all-zero `theme` is omitted from the
+  hash the same way, so a town with no landmark hashes as it did before the
+  landmarks, and a save without the array loads to zeros (plain blocks).
 - `zoo.pref` — this browser's preferences (the cheat switch, §8): not a
   city, not saved with one, never read by the sim (the suite greps for it).
 
@@ -1084,7 +1152,7 @@ createWalkers(world) → { update(dtSeconds, viewport), list() → [{ id, citize
 // js/render.js
 createRenderer(canvas, world, art) → { draw(camera, hover, walkers, overlays), invalidate(), pick(sx, sy) → [tx, ty]|null }
 // js/art/index.js
-art.building(zone, tier, variant) / art.civic(kind) / art.road(mask, busy) / art.ground(kind, variant) / art.tree(kind)
+art.building(zone, tier, variant, side = 1, theme = 0) / art.civic(kind) / art.road(mask, busy) / art.ground(kind, variant) / art.tree(kind)
 art.citizen(species, facing, frame, age) / art.overlay(kind, frame)   // each → { rows, anchor } (rasterised lazily by the renderer)
 ```
 

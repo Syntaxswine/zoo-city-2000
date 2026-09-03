@@ -1,5 +1,13 @@
 # PROPOSAL — 3×3 themed landmarks
 
+> **Status 2026-09-03: SHIPPED in two halves.** The merge mechanic shipped as
+> the blocks (SPEC §3b, session 11: 2×2 and 3×3, all four zones, absorbing
+> tier-2 neighbours rather than requiring nine tier-3 lots). The theme
+> shipped as the landmarks (SPEC §3c, session 12): eleven rows, kin counted
+> together, chosen once when the 3×3 rises, `world.theme` saved. NOT built:
+> the per-theme effects in the table below (a landmark is a picture and a
+> name, never a bonus) and the sawmill's water requirement; M has no theme.
+
 The owner (2026-09-02): *"lets also think about adding more specialized 3x3
 tile sprites for some special themed buildings. things like themed
 commercial shops, an industrial dairy, or a residential apartment building."*

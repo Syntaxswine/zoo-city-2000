@@ -578,7 +578,7 @@ variants); `js/art/hires.js` (SPEC §12.6). What remains of E as drafted
 below — variants 2 → 4, lit windows by fill, species marks on a socket,
 wear — is still open and still E's; blocks.js is a second file beside
 buildings.js exactly as the trap paragraph asked, and the block families
-would take marks and lit windows through the same `KIT`.
+would take marks and lit windows through the same `KIT`. **Session 12:** the landmarks (SPEC §3c; handoff §19) are E's second act — eleven species-themed 3×3s on the same kit, chosen once when a block rises; variants, lit windows and marks still E's, now over nineteen block-scale families.
 
 **Goal.** Four plans per family instead of two mirrored ones; windows that
 light with the people inside; a mark on the outside that says who lives

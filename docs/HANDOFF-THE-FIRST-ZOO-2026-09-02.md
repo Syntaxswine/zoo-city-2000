@@ -1397,3 +1397,98 @@ Suite 167 → 204. SPEC §3b, §5, §12.2b, §12.5, §12.6, §13, §15 carry it.
 - The hi-res set makes a zoom 3 or 4 cheap: `HI_SCALE` is one number, the
   renderer's S the other; the animals would want a 2× kit drawn by hand
   before that reads as an upgrade.
+
+---
+
+## 19. Session 12 — the landmarks: a 3×3 takes the name of the species that made it (2026-09-03)
+
+The owner: *"lets keep going with the backlogged handoff 18 for themed
+landmarks that are species specific."* §18's ammunition said the merge was
+the block and what remained was a skin by `world.majority` — "no new sim
+state". Half right. One commit of code and one of docs:
+
+| commit | what | proof |
+|---|---|---|
+| b042d0d | `js/sim/landmarks.js` (the roster, `chooseTheme`, the ticker line), `world.theme` (one saved byte, all-zero left out of the hash), the merge/split/bulldoze/undo/save wiring, census + Rules G6, the card; `js/art/landmarks.js` — eleven 3×3s × two variants on `BLOCK_KIT` + `KIT`; `blockSprite(zone, side, variant, theme)`; Part L (17 checks); `sheet-landmarks.png`, `landmark-mews.png` | suite 204 → 221, 0 failures; seed 7 balanced plain 30 y ee47f999 UNCHANGED; seed 7 + markets raises the Mews at month 54 (65 of 129 cats and foxes); the browser at zoom 2 on the imported ten-year town: the Mews at (18,4), G6's live line, the News row, and the hover card on a PART of it |
+| (docs) | SPEC §3c, §5 LANDMARK, §12.2c, §15, §16; BACKLOG; the proposal's status; the plan's Part E; this section | — |
+
+### What was measured before the rule was written
+
+Five scripted towns × thirty years (balanced seeds 3, 5, 7; balanced +
+markets 7; millbelt 7): 37 merges. The leading species on a block holds
+**16–37%, never a majority** — so "majority" means plurality here, as the
+census's `majority` field always has. A 3×3 rose in **2 of 5 runs**, cats
+leading both (42 of 135; 35 of 137). C blocks were led by fox (28%, 23%),
+I blocks by bear (3 of 4) and beaver. The proposal's roster (rabbit, cow,
+beaver, fox/cat, raccoon/owl/skunk, pig) would have made BOTH observed 3×3s
+plain. The shipped roster covers who leads: R Warren Towers (rabbit, mouse)
+· the Lodge (beaver, bear, wolf) · the Roost (owl, hawk) · the Wallows (pig,
+raccoon, skunk) · the Mews (cat, fox); C the Fox & Cat (fox, cat) · the
+Night Market (raccoon, owl, skunk); I the Dairy (cow) · the Truffle Works
+(pig) · the Honey Works (bear) · the Sawmill (beaver). Cow and tortoise in
+R, and every M staff, raise the plain block.
+
+### The three design calls, and why
+
+- **Kin count together.** rabbit 10 + mouse 9 beats cat 12 for Warren
+  Towers; cat 42 + fox 24 is the Mews. A landmark is FOR a group; counting
+  species alone would hand the picture to whichever cousin happened to
+  outnumber the other. A tie at the top, or a top group with no landmark
+  in the zone, leaves the plain block.
+- **Chosen once, kept until the block comes apart.** A derived skin by the
+  live majority would flicker whenever two close species traded places,
+  and a save→load would forget which way it had been leaning. So `theme`
+  IS new sim state — one byte per tile, set in `mergeLots` for a 3×3,
+  cleared by `splitLot` and the bulldozer, carried by undo and the save.
+  Hash-neutral until the first landmark (the all-zero array is dropped
+  from the hash like `big` and `meat`), and a save without the array
+  loads to zeros: an old town's 3×3 stays the plain towers.
+- **A picture and a name, never a bonus.** The proposal's per-theme
+  effects (births ×1.25 in the warren, I income ×1.15 at the dairy, the
+  night market's mess, the sawmill's water) are NOT built. Each would be a
+  weight in a different module and a measured change to every town's
+  hash, for a flavour whose EV nobody has computed (compute the gamble's
+  EV first; flavour lies). The city's character builds the building; it
+  does not yet pay for it.
+
+### What the instruments caught (symptom-keyed)
+
+| what it looked like | what it was | the rule |
+|---|---|---|
+| a patch script found its needle 0× on a line that grep printed byte-for-byte | the working tree is CRLF for files git checked out after the rebase (autocrlf true) and LF for files the Write tool made last session; a needle ending "\n" fails on "\r\n" | a patch script normalises to LF, edits, and restores the file's own ending; `git ls-files --eol` says which is which |
+| a check failed with every clause it printed reading true | the regex `\(18,4\); \d+ of \d+` written through String.raw and a heredoc'd patch reached the file as `(18,4); d+ of d+` — a valid regex that matches nothing | when a check's DETAIL says pass and the check says fail, print the regex source from the file; the third fix was a plain split/join, no escaping layer at all |
+| `TypeError: crate is not iterable` | `crate()` returns one box; two others in the same list were spread | helpers that return one box and helpers that return a list look the same at the call site — the rasteriser's `.flat()` at the end of a plan forgives a nested array but not a spread object |
+| the burrow mound was not on the sheet | grass banks on a grass lawn (the plinth's lesson from §18, again) | earth banks, grass top |
+| the great lodge read as a sand pyramid; the waterwheel as one dark line; an oak standing in a wallow | the top rung of the earth ramp on a 24-unit mound; a slate disc's end face; a stamp placed by number without a look | look at the sheet before the commit — all four fixed there |
+| the hover in the pane raised a card for (23,7), not the block | `computer` coordinates are in the SCREENSHOT frame (800×450), not the viewport's 1280×720 — the first screenshot line says so | read the coordinate frame line; the second hover, at the block's centre in that frame, raised the card — a PART's card, with the landmark line, the one §18 could not raise |
+
+### What I distrust in what I left
+
+- **Landmarks are rare in the scripted towns** — a 3×3 in two of five
+  thirty-year runs. On the owner's scale (6×6+ blocks, ≥ 30 tiles) they
+  should be common; the roster's spread (which species lead C and I) was
+  read off 2×2 merges, not 3×3s. Measure on the control city when it lands.
+- The count is taken on the ANCHOR after `mergeLots` moved everyone, so
+  it counts who was housed or employed in the window at that tick, not who
+  is loyal to the block. Right for a building; say so if it surprises.
+- `landmarkLine` pluralises surnames by appending "s" unless the name ends
+  in one (the Burrowes, the Slyfields, the Cudworths) — fourteen names,
+  all checked by eye, none by a test beyond the Burrowes and the two in the
+  Mews line.
+- `BLOCK_KIT` is exported from blocks.js and imported by landmarks.js,
+  which imports `LANDMARKS` from `../sim/landmarks.js` — art reading a sim
+  table, as citizens.js reads species.js. Fine, and the only art→sim edge
+  besides that one; do not let the sim read art.
+
+### Ammunition for the next arc
+
+- **The twelfth row**: cow + tortoise in R ("the Meadows" — long low
+  ranges round a big lawn, the allied pastoral pair); an M theme for a
+  carnivore staff (the proposal's abattoir ruling). Each is a roster row
+  and one `family()` — the chooser, the card, the census and G6 need no
+  change; Part L's roster check counts eleven and would want twelve.
+- **Effects, if the owner wants them**: one weight per landmark in one
+  module, each a measured hash change on the scripted towns; compute the
+  EV before the first.
+- **Part E** (variants 2 → 4, lit windows by fill, species marks) now has
+  nineteen block-scale families to apply to through the same kit.

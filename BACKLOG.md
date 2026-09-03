@@ -169,6 +169,26 @@ another's. Git merges those. `citizens.js`, `justice.js` and `events.js`
 are the risk: B adds one-liners at call sites; A adds one function; H
 edits two `post` sites; F edits one advisor function; D never opens them.
 
+## The landmarks — SHIPPED 2026-09-03 (SPEC §3c, §5, §12.2c, §15; handoff §19; 17 checks)
+The proposal's other half: a 3×3 block takes the name and the picture of
+the species that made it (`js/sim/landmarks.js` chooses the theme once, when
+the block rises, kin counted together, ties and unthemed leaders → the plain
+block; `world.theme` saved, hash-neutral until the first landmark;
+`js/art/landmarks.js` — eleven 3×3s × two variants). What is left:
+- **The proposal's per-theme effects** (births ×1.25 in the warren, I income
+  ×1.15 at the dairy, the night market's mess, the sawmill's water) are NOT
+  built — a landmark is a picture and a name. If the owner wants them, each
+  is a weight in one module and a measured hash change; compute the EV
+  before the first.
+- **Cow and tortoise in R** (the pastoral pair, allied) have no landmark —
+  "the Meadows" is the obvious twelfth row; every M staff raises the plain
+  meat exchange (the proposal's ruling; a carnivore hall is the M theme).
+- **Landmarks are rare in the scripted towns**: a 3×3 rose in two of five
+  thirty-year runs (both the Mews). On the owner's scale (6×6+ blocks) they
+  should be common; measure on the control city.
+- **A part's hover card** and a landmark's card were verified in Node; the
+  landmark's card was seen in the browser this session (handoff §19).
+
 ## The building redux — SHIPPED 2026-09-03 (SPEC §3b, §5, §12.2b, §12.6, §13; handoff §18; 37 checks)
 The owner: *"some of commercial, industrial, residential, and meat
 buildings to be 2x2 and 3x3 tile sizes. these should be the buildings that
@@ -182,9 +202,7 @@ eight families × two variants (`js/art/blocks.js`); the hi-res set
 (`js/art/hires.js` — every solid and ground diamond at 2× from its recipe,
 drawn 1:1 at zoom 2); the ray audit (`tools/depthaudit.mjs`) and the
 size-aware pull-back. What is left:
-- **Themed landmarks** (`docs/PROPOSAL-LANDMARKS.md`, half shipped): the
-  merge IS the block; the theme by majority species (`world.majority`) is a
-  skin on the block families through `KIT` — no new sim state.
+- ~~**Themed landmarks**~~ SHIPPED 2026-09-03 — see the section above.
 - **Part E as drafted** (variants 2 → 4, lit windows by fill, species marks)
   now applies to eight more families.
 - **Blocks are all residential in the scripted towns** — C waits on LV ≥ 60,
