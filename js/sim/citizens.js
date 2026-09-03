@@ -47,30 +47,47 @@ export function surname(world, species) {
 // Creation
 // ---------------------------------------------------------------------------
 
+/** Shared persisted defaults: creation and save migration must never drift. */
+export function citizenDefaults() {
+  return {
+    home: -1,
+    job: -1,
+    household: -1,
+    friends: [],
+    life: [],
+    mood: 50,
+    jobless: 0,
+    path: null,
+    native: false,
+    onLeave: false,
+    hired: -1,
+    grief: 0,
+    centenary: false,
+    held: 0,
+    heldAt: -1,
+    fixed: false,
+    record: 0,
+    wrongful: false,
+    wrongedBy: 0,
+    exonerated: false,
+    moodPenalty: 0,
+    moodPenaltyUntil: 0,
+  };
+}
+
 function newCitizen(world, species, ageMonthsNow, household, surnameStr, native) {
   const sp = SPECIES_BY_ID[species];
   const u = world.rng.next();
   const c = {
+    ...citizenDefaults(),
     id: world.nextId++,
     name: firstName(world, species),
     surname: surnameStr,
     species,
     born: world.tick - ageMonthsNow,
     deathAge: Math.round(sp.life * 12 * (0.8 + 0.4 * u)),
-    home: -1,
-    job: -1,
     household,
-    friends: [],
-    life: [],
-    mood: 50,
-    jobless: 0,
-    path: null,
     native: !!native,
-    onLeave: false,
-    hired: -1,
-    // crime and punishment (justice.js): custody clock, the record, the knife
-    held: 0, heldAt: -1, fixed: false, record: 0, wrongful: false, wrongedBy: 0, exonerated: false,
-    moodPenalty: 0, moodPenaltyUntil: 0,
   };
   return c;
 }

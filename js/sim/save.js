@@ -9,12 +9,14 @@
 import { createWorld } from "./world.js";
 import { makeRng } from "./rng.js";
 import { computeFields, recountRosters, commutePath, doorOf } from "./fields.js";
-import { rebuildMaps } from "./citizens.js";
+import { citizenDefaults, rebuildMaps } from "./citizens.js";
 import { refreshLast } from "./tick.js";
 
 const TILE_ARRAYS = ["terrain", "road", "zone", "maxTier", "tier", "civic", "burning", "rubble", "variant", "flooded", "wall", "use", "rail", "meat", "big"];
 
-function plainCitizen(c) {
+// This expanded shape is the pre-Part-B save shape. stateHash deliberately
+// keeps using it: storage compaction must not redefine simulation identity.
+function canonicalCitizen(c) {
   return {
     id: c.id, name: c.name, surname: c.surname, species: c.species, born: c.born, deathAge: c.deathAge,
     home: c.home, job: c.job, household: c.household, friends: c.friends.slice(), life: (c.life || []).map((e) => e.slice()), mood: c.mood,
@@ -24,6 +26,25 @@ function plainCitizen(c) {
     held: c.held || 0, heldAt: c.heldAt ?? -1, fixed: !!c.fixed, record: c.record || 0, wrongful: !!c.wrongful, wrongedBy: c.wrongedBy || 0, exonerated: !!c.exonerated,
     moodPenalty: c.moodPenalty || 0, moodPenaltyUntil: c.moodPenaltyUntil || 0,
   };
+}
+
+function plainCitizen(c) {
+  const full = canonicalCitizen(c);
+  const defaults = citizenDefaults();
+  const o = {
+    id: full.id, name: full.name, surname: full.surname, species: full.species,
+    born: full.born, deathAge: full.deathAge, household: full.household,
+  };
+  for (const [key, value] of Object.entries(full)) {
+    if (key in o || !(key in defaults)) continue;
+    const fallback = defaults[key];
+    if (Array.isArray(value)) {
+      if (value.length) o[key] = value;
+    } else if (value !== fallback) {
+      o[key] = value;
+    }
+  }
+  return o;
 }
 
 export function toPlain(world) {
@@ -62,10 +83,9 @@ export function fromPlain(o) {
   world.valves = { ...world.valves, ...o.valves }; // an old save without M keeps the default 0
   world.festivalBonus = o.festivalBonus;
   for (const k of TILE_ARRAYS) if (o[k]) world[k].set(o[k]); // an old save without walls keeps its zeros
-  world.citizens = o.citizens.map((c) => ({
-    ...c, friends: c.friends.slice(), life: (c.life || []).map((e) => e.slice()), path: null, stale: false,
-    held: c.held || 0, heldAt: c.heldAt ?? -1, fixed: !!c.fixed, record: c.record || 0, wrongful: !!c.wrongful, wrongedBy: c.wrongedBy || 0, exonerated: !!c.exonerated,
-    moodPenalty: c.moodPenalty || 0, moodPenaltyUntil: c.moodPenaltyUntil || 0,
+  world.citizens = (o.citizens || []).map((c) => ({
+    ...citizenDefaults(), ...c,
+    friends: (c.friends || []).slice(), life: (c.life || []).map((e) => e.slice()), path: null, stale: false,
   }));
   world.households = o.households.map((h) => ({ ...h, members: h.members.slice() }));
   world.names = { ...(o.names || {}) };
@@ -114,6 +134,7 @@ export function rebuildDerived(world) {
 /** FNV-1a over the canonical state (everything but the input log and history). */
 export function stateHash(world) {
   const o = toPlain(world);
+  o.citizens = world.citizens.filter((c) => !c.dead).map(canonicalCitizen);
   delete o.log;
   delete o.history;
   // Part K adds empty, backward-compatible save fields without changing the
@@ -121,8 +142,7 @@ export function stateHash(world) {
   if (!Object.keys(o.names).length) delete o.names;
   if (o.meat.every((n) => n === 0)) delete o.meat;
   if (o.big.every((n) => n === 0)) delete o.big; // a town with no block yet hashes as it did before the blocks
-
-  for (const c of o.citizens) if (!c.life.length) delete c.life;
+  for (const c of o.citizens) if (!c.life?.length) delete c.life;
   const s = JSON.stringify(o);
   let h = 0x811c9dc5;
   for (let i = 0; i < s.length; i++) {

@@ -823,6 +823,28 @@ check("budget.post is the only cash mutator", cashMut.length === 0, cashMut.join
 check("every import is relative", absImports.length === 0, absImports.join(", "));
 check("no Math.random under js/", mathRandom.length === 0, mathRandom.join(", "));
 
+// ---- Part B': compact saves and old-save migration --------------------------
+{
+  const fixture = readFileSync(path.join(ROOT, "docs/fixtures/save-v1-plain.json"), "utf8");
+  const oldBytes = Buffer.byteLength(fixture);
+  const migrated = load(fixture);
+  const compactJson = save(migrated);
+  const compact = JSON.parse(compactJson);
+  const sample = compact.citizens[0];
+  check("lives: old plain citizen save restores omitted defaults",
+    migrated.citizens[0].job === -1 && migrated.citizens[0].mood === 50
+      && migrated.citizens[0].heldAt === -1 && Array.isArray(migrated.citizens[0].life));
+  check("lives: compact save omits default-valued citizen fields",
+    !("job" in sample) && !("life" in sample) && !("mood" in sample)
+      && !("fixed" in sample) && Buffer.byteLength(compactJson) < oldBytes,
+    `${Buffer.byteLength(compactJson)} compact vs ${oldBytes} old bytes`);
+  check("lives: compact save round-trips without changing canonical state",
+    stateHash(migrated) === stateHash(load(compactJson)));
+  for (let t = 0; t < 10 * 12; t++) tick(migrated);
+  check("lives: v1 plain fixture continues ten years at its pre-Part-B hash",
+    stateHash(migrated) === "688bc6ed", stateHash(migrated));
+}
+
 // ---- Part J': named save slots (SPEC §15) -----------------------------------
 {
   const memoryStore = () => {
