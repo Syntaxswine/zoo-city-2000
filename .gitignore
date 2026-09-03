@@ -2,3 +2,5 @@ Thumbs.db
 .DS_Store
 out/
 node_modules/
+docs/play/
+docs/play-*/

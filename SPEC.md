@@ -828,18 +828,37 @@ the renderer. `check.mjs`: every pixel a palette key; every anchor inside the
 sprite; 16/16 road masks defined; a box solid emits no pixel outside its
 projected footprint + height.
 
+`tools/play.mjs` is the third eye: the scripted mayor of `tools/mayor.mjs`
+builds a town in the real sim and **`js/render.js` itself** photographs it
+through `tools/headless-canvas.mjs` — the browser's own renderer, in Node,
+with no dependency and no second copy of the drawing. Shutters compose:
+`--every N` months, `--at 2003-06`, `--film N` frames `--fps` apart so the
+walkers move, and `--when REGEX`, which fires on a ticker line and **points
+the camera at the coordinates the line itself carries** (`FIRE at (12,30)`);
+`--after 0,2,4,6` then re-photographs that same spot months later, which is
+how a burnt lot is watched clearing itself. Every shot prints a caption with
+the month, the town and the watched tile in words (`RUBBLE 4mo left`),
+because a photograph cannot tell you how many months are left and squinting
+at a 12-px sprite to decide is how you see what you expected.
+
 ---
 
 ## 13. Rendering (`js/render.js`, the only canvas module)
 
-- Static layer: ground + chalk + roads + buildings + trees, drawn back to
-  front by (tx+ty) into an offscreen canvas the size of the viewport plus a
-  margin; redrawn when the world changes (dirty flag) or the camera moves
-  past the margin. Full redraw of 4,096 cells is a few ms.
-- Dynamic layer per frame: walkers, fire, campers, meeting glyphs, cursor,
-  ghost, zots — inserted into the same (tx+ty) order by their fractional
-  position: `key = (tx+ty)·1024 + zOrder`, ground 0, walker 512 +
-  floor(64·frac), building 768.
+- Static layer: ground + chalk + roads + **rubble** + water + kerbs, drawn
+  back to front by (tx+ty) into an offscreen canvas the size of the viewport
+  plus a margin; redrawn when the world changes (dirty flag) or the camera
+  moves past the margin. Full redraw of 4,096 cells is a few ms.
+  **Buildings and trees are NOT in it** — this line said they were until
+  session 8, and the difference is load-bearing: a caller that forgets
+  `invalidate()` sees a demolished building vanish on cue and its rubble
+  never appear, because the building is per-frame and the rubble is cached.
+  `main.js` invalidates on every tick and after every op; so must any other
+  driver (`tools/play.mjs`). Two checks pin the halves apart.
+- Dynamic layer per frame: **buildings, trees**, walkers, fire, campers,
+  meeting glyphs, cursor, ghost, zots — inserted into the same (tx+ty) order
+  by their fractional position: `key = (tx+ty)·1024 + zOrder`, ground 0,
+  walker 512 + floor(64·frac), building 768.
 - Water palette-cycles 4 frames per second on the static layer's water tiles
   only (separate small canvas per frame is fine).
 - Pick: flat inverse of the projection (the map is flat).

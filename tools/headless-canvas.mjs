@@ -25,12 +25,20 @@
 import { deflateSync } from 'node:zlib';
 
 const HEX = /^#([0-9a-f]{6})$/i;
+const RGBA = /^rgba?\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)\s*(?:,\s*([\d.]+)\s*)?\)$/i;
 
 function parseHex(s) {
-  const m = HEX.exec(String(s).trim());
-  if (!m) return [0, 0, 0, 255];
-  const n = parseInt(m[1], 16);
-  return [(n >> 16) & 255, (n >> 8) & 255, n & 255, 255];
+  const str = String(s).trim();
+  const m = HEX.exec(str);
+  if (m) {
+    const n = parseInt(m[1], 16);
+    return [(n >> 16) & 255, (n >> 8) & 255, n & 255, 255];
+  }
+  // js/render.js paints every overlay in rgba() and strokes the hover diamond
+  // in one, so the alpha here is the overlay's whole visual language.
+  const r = RGBA.exec(str);
+  if (r) return [Number(r[1]) & 255, Number(r[2]) & 255, Number(r[3]) & 255, Math.round((r[4] === undefined ? 1 : Number(r[4])) * 255)];
+  return [0, 0, 0, 255];
 }
 
 class ImageDataShim {
@@ -48,13 +56,25 @@ class Ctx2D {
     this.fillStyle = '#000000';
     this.globalAlpha = 1;
     this.globalCompositeOperation = 'source-over';
+    this.strokeStyle = '#000000';
+    this.lineWidth = 1;
     this._clip = null; // {x0,y0,x1,y1} or null for the whole canvas
     this._path = null;
+    this._poly = null; // moveTo/lineTo points, in DEVICE pixels
     this._stack = [];
+    // Only the uniform scale-and-translate js/render.js uses:
+    // setTransform(z, 0, 0, z, tx, ty). Skew and rotation are not iso.
+    this._t = { s: 1, x: 0, y: 0 };
+  }
+
+  setTransform(a, b, c, d, e, f) {
+    if (b || c) throw new Error('headless-canvas: only scale+translate, not skew/rotate');
+    if (a !== d) throw new Error('headless-canvas: only a UNIFORM scale');
+    this._t = { s: a, x: e, y: f };
   }
 
   save() {
-    this._stack.push({ clip: this._clip, fillStyle: this.fillStyle, globalAlpha: this.globalAlpha });
+    this._stack.push({ clip: this._clip, fillStyle: this.fillStyle, strokeStyle: this.strokeStyle, lineWidth: this.lineWidth, globalAlpha: this.globalAlpha, t: { ...this._t } });
   }
 
   restore() {
@@ -62,11 +82,98 @@ class Ctx2D {
     if (!s) return;
     this._clip = s.clip;
     this.fillStyle = s.fillStyle;
+    this.strokeStyle = s.strokeStyle;
+    this.lineWidth = s.lineWidth;
     this.globalAlpha = s.globalAlpha;
+    this._t = s.t;
   }
+
+  /** User space -> device pixels. */
+  _dx(x) { return x * this._t.s + this._t.x; }
+  _dy(y) { return y * this._t.s + this._t.y; }
 
   beginPath() {
     this._path = null;
+    this._poly = null;
+  }
+
+  moveTo(x, y) {
+    this._poly = [[this._dx(x), this._dy(y)]];
+  }
+
+  lineTo(x, y) {
+    if (!this._poly) this._poly = [];
+    this._poly.push([this._dx(x), this._dy(y)]);
+  }
+
+  closePath() {
+    if (this._poly && this._poly.length > 2) this._poly.push([...this._poly[0]]);
+  }
+
+  /** Even-odd scanline fill of the moveTo/lineTo polygon (the iso tile diamond). */
+  fill() {
+    const poly = this._poly;
+    if (!poly || poly.length < 3) return;
+    const [r, g, bl, pa] = parseHex(this.fillStyle);
+    const alpha = (pa / 255) * this.globalAlpha;
+    if (alpha <= 0) return;
+    const b = this._bounds();
+    let ymin = Infinity, ymax = -Infinity;
+    for (const [, y] of poly) { if (y < ymin) ymin = y; if (y > ymax) ymax = y; }
+    const y0 = Math.max(b.y0, Math.ceil(ymin));
+    const y1 = Math.min(b.y1, Math.ceil(ymax));
+    const xs = [];
+    for (let y = y0; y < y1; y++) {
+      xs.length = 0;
+      for (let k = 0; k < poly.length; k++) {
+        const [ax, ay] = poly[k];
+        const [bx, by] = poly[(k + 1) % poly.length];
+        if ((ay <= y && by > y) || (by <= y && ay > y)) xs.push(ax + ((y - ay) / (by - ay)) * (bx - ax));
+      }
+      xs.sort((m, n) => m - n);
+      for (let k = 0; k + 1 < xs.length; k += 2) {
+        const sx = Math.max(b.x0, Math.ceil(xs[k]));
+        const ex = Math.min(b.x1, Math.ceil(xs[k + 1]));
+        for (let x = sx; x < ex; x++) this._blend(x, y, r, g, bl, alpha);
+      }
+    }
+  }
+
+  /** The polygon's edges, lineWidth rounded to whole pixels. */
+  stroke() {
+    const poly = this._poly;
+    if (!poly || poly.length < 2) return;
+    const [r, g, bl, pa] = parseHex(this.strokeStyle);
+    const alpha = (pa / 255) * this.globalAlpha;
+    if (alpha <= 0) return;
+    const w = Math.max(1, Math.round(this.lineWidth * this._t.s));
+    for (let k = 0; k + 1 < poly.length; k++) this._line(poly[k], poly[k + 1], r, g, bl, alpha, w);
+  }
+
+  _line(a, b, r, g, bl, alpha, w) {
+    const steps = Math.max(1, Math.ceil(Math.max(Math.abs(b[0] - a[0]), Math.abs(b[1] - a[1]))));
+    const half = (w - 1) / 2;
+    for (let i = 0; i <= steps; i++) {
+      const x = Math.round(a[0] + ((b[0] - a[0]) * i) / steps);
+      const y = Math.round(a[1] + ((b[1] - a[1]) * i) / steps);
+      for (let oy = -Math.floor(half); oy <= Math.ceil(half); oy++) {
+        for (let ox = -Math.floor(half); ox <= Math.ceil(half); ox++) this._blend(x + ox, y + oy, r, g, bl, alpha);
+      }
+    }
+  }
+
+  _blend(x, y, r, g, bl, alpha) {
+    const c = this.canvas;
+    const k = this._clip;
+    if (x < 0 || y < 0 || x >= c.width || y >= c.height) return;
+    if (k && (x < k.x0 || y < k.y0 || x >= k.x1 || y >= k.y1)) return;
+    const d = c._data;
+    const t = (y * c.width + x) * 4;
+    const inv = 1 - alpha;
+    d[t] = r * alpha + d[t] * inv;
+    d[t + 1] = g * alpha + d[t + 1] * inv;
+    d[t + 2] = bl * alpha + d[t + 2] * inv;
+    d[t + 3] = Math.min(255, alpha * 255 + d[t + 3] * inv);
   }
 
   rect(x, y, w, h) {
@@ -156,12 +263,17 @@ class Ctx2D {
 
   fillRect(x, y, w, h) {
     const c = this.canvas;
-    const [r, g, bl] = parseHex(this.fillStyle);
+    const [r, g, bl, pa] = parseHex(this.fillStyle);
     const b = this._bounds();
-    const x0 = Math.max(b.x0, Math.round(x));
-    const y0 = Math.max(b.y0, Math.round(y));
-    const x1 = Math.min(b.x1, Math.round(x + w));
-    const y1 = Math.min(b.y1, Math.round(y + h));
+    const x0 = Math.max(b.x0, Math.round(this._dx(x)));
+    const y0 = Math.max(b.y0, Math.round(this._dy(y)));
+    const x1 = Math.min(b.x1, Math.round(this._dx(x + w)));
+    const y1 = Math.min(b.y1, Math.round(this._dy(y + h)));
+    const alpha = (pa / 255) * this.globalAlpha;
+    if (alpha < 1) {
+      for (let j = y0; j < y1; j++) for (let i = x0; i < x1; i++) this._blend(i, j, r, g, bl, alpha);
+      return;
+    }
     for (let j = y0; j < y1; j++) {
       for (let i = x0; i < x1; i++) {
         const t = (j * c.width + i) * 4;
@@ -173,24 +285,30 @@ class Ctx2D {
     }
   }
 
-  /** 3-argument drawImage, source-over, respecting the clip and globalAlpha. */
+  /**
+   * 3-argument drawImage, source-over, respecting the clip, globalAlpha and
+   * the current scale. The scale is NEAREST-NEIGHBOUR, which is not an
+   * approximation: js/render.js sets imageSmoothingEnabled = false because
+   * SPEC §3 wants whole pixels, so this is what the browser does too.
+   */
   drawImage(src, dx, dy) {
     const c = this.canvas;
     const d = c._data;
     const s = src._data;
     if (!s) return;
     const b = this._bounds();
-    const ox = Math.round(dx);
-    const oy = Math.round(dy);
+    const z = this._t.s;
+    const ox = Math.round(this._dx(dx));
+    const oy = Math.round(this._dy(dy));
     const ga = this.globalAlpha;
     const y0 = Math.max(b.y0, oy);
-    const y1 = Math.min(b.y1, oy + src.height);
+    const y1 = Math.min(b.y1, oy + Math.round(src.height * z));
     const x0 = Math.max(b.x0, ox);
-    const x1 = Math.min(b.x1, ox + src.width);
+    const x1 = Math.min(b.x1, ox + Math.round(src.width * z));
     for (let ty = y0; ty < y1; ty++) {
-      const sy = ty - oy;
+      const sy = z === 1 ? ty - oy : Math.min(src.height - 1, ((ty - oy) / z) | 0);
       for (let tx = x0; tx < x1; tx++) {
-        const sx = tx - ox;
+        const sx = z === 1 ? tx - ox : Math.min(src.width - 1, ((tx - ox) / z) | 0);
         const si = (sy * src.width + sx) * 4;
         let a = s[si + 3];
         if (!a) continue;
@@ -241,6 +359,18 @@ class CanvasShim {
     this._alloc();
   }
 
+  // js/render.js sizes itself from the CSS box and rebuilds when it disagrees
+  // with the backing store. Off-screen there is no CSS box, so the two are the
+  // same thing by definition and resize() is a no-op: the caller sets .width
+  // and .height and the renderer honours them.
+  get clientWidth() {
+    return this._w;
+  }
+
+  get clientHeight() {
+    return this._h;
+  }
+
   _alloc() {
     this._data = new Uint8ClampedArray(Math.max(0, this._w * this._h * 4));
     this._ctx = null;
@@ -269,6 +399,17 @@ export function installCanvas() {
     },
   };
   globalThis.document = doc;
+  // js/render.js constructs `new ImageData(data, w, h)` for every rasterised
+  // sprite. In a browser that is a platform global; here it is this shim, in
+  // the browser's argument order.
+  if (typeof globalThis.ImageData === 'undefined') {
+    globalThis.ImageData = class extends ImageDataShim {
+      constructor(a, b, c) {
+        if (typeof a === 'number') super(a, b);
+        else super(b, c ?? (a.length / 4 / b), a);
+      }
+    };
+  }
   return doc;
 }
 

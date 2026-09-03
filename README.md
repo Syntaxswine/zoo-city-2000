@@ -154,7 +154,7 @@ mill-town with a fox problem").
 
 - `tools/playtest.mjs --layout balanced|dormitory|millbelt --schedule 15:13,22:7`
   — a scripted mayor on the real map; the SPEC's acceptance targets.
-- `tools/check.mjs` — 159 checks: ledger conservation to the §, valves
+- `tools/check.mjs` — 167 checks: ledger conservation to the §, valves
   bounded, no NaN, the dangling-id law, rosters and capacities, commutes on
   roads, determinism, save → load → continue hash-equal, input-log replay,
   the crime-and-punishment invariants, the walls (the flood reproduces the
@@ -173,12 +173,28 @@ mill-town with a fox problem").
   engine saves most of them; the rubble clock counts itself down and the
   bulldozer is only impatience; a burglary needs no police station to happen
   and none at all means nothing is investigated; the file stains cap; every
-  line the events tick says goes on the record), the cheat op (booked under `cheat`,
+  line the events tick says goes on the record), the play camera (a town
+  renders to something that is not a blank rectangle; the cached GROUND layer
+  does not follow the world without an `invalidate()` and a per-frame BUILDING
+  does; a blit scales by the transform; `rgba()` fills blend instead of
+  painting black; both instruments import the one mayor), the cheat op (booked under `cheat`,
   logged, replayed, clamped, never undone, lifts a receivership at once),
   `budget.post` as the only cash mutator, relative imports, no
   `Math.random`, the sim blind to browser preferences, the title screen
   mounted over the owner's art, every sprite pixel a palette key, every
   anchor inside its sprite, 16/16 road masks, the painter key.
+- `tools/play.mjs --years 20 --every 24` — **watch the game play itself.** The
+  scripted mayor builds a town in the real sim and `js/render.js` — the file
+  the browser loads — photographs it through `tools/headless-canvas.mjs`. No
+  browser, no dependencies, no second copy of the drawing. The shutter can be
+  a clock (`--every`, `--at 2003-06`), a camera roll (`--film 24 --fps 12`, so
+  the walkers move), or **the news itself**: `--when "^FIRE" --after 0,2,4,6`
+  fires on a ticker line, points the camera at the coordinates that line
+  carries, and comes back months later to the same spot. Every shot is
+  captioned with the town and the watched tile in words.
+- `tools/mayor.mjs` — the scripted mayor, hers alone. `playtest.mjs` prints her
+  curves and `play.mjs` photographs her town; when the two disagree it is a
+  flag and never a second mayor.
 - `tools/serviceprobe.mjs --only fire --forced 6` / `--only police` — what a
   fire station and a police station actually BUY, over 40-year runs at 0 / 1 /
   2 / 4 / 12 of each. Fire asks its two questions with two instruments,

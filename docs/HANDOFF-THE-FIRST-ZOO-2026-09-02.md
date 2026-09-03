@@ -1047,13 +1047,82 @@ through: anchoring the origin weight out of the roster weight, and reverting
 
 **Not verified in the browser this session.** The preview pane was bound to
 another project's server on every port it would take, so the rubble clock and
-the hover card were checked headlessly and by source, not by looking. Someone
-should open it, burn a lot (`zoo.advance`), and watch the site clear itself.
+the hover card were checked headlessly and by source, not by looking. *That
+gap is what §15b is — the owner asked for a camera, and the rubble clock is
+now photographed month by month. The hover card is still unlooked-at: it is
+`js/ui.js`, which the play camera does not draw.*
+
+### 15b. The play camera — `tools/play.mjs` (the same night)
+
+The owner, after reading that §15 could not be verified by eye: *"do you think
+you could make a tool to do live play that takes screen shots?"*
+
+Yes, and it needed almost nothing new. `tools/headless-canvas.mjs` had existed
+since session 1 and its own header says it is "enough of Canvas2D to run
+js/render.js in Node" — but nothing had ever run `js/render.js` through it;
+only `shots.mjs`, which paints through `painter.js` directly. So the shim was
+missing `setTransform`, the whole path API, `rgba()` parsing, and a blit that
+honours a scale. Those went in, and **`docs/shots/*.png` came out byte-identical
+to what was committed**, which is how you know the additions are inert for the
+old caller.
+
+**What it is.** The scripted mayor builds a town in the real sim and
+`js/render.js` — the file the browser loads — photographs it. No browser, no
+dependency, no second copy of the drawing. Its shutter is a clock (`--every`,
+`--at 2003-06`), a camera roll (`--film 24 --fps 12`, so the walkers move), or
+the news itself:
+
+```
+node tools/play.mjs --seed 2 --years 18 --disasters --when "^FIRE" --after 0,2,4,6,8
+```
+
+`--when` fires on a ticker line and **points the camera at the coordinates the
+line already carries** (`FIRE at (22,21)`), then `--after` re-photographs that
+same spot months later. That run produced the sequence §15 could not:
+
+```
+2015-06  FIRE at (22,21)          [22,21 tier 2, BURNING 2mo]
+  +2                              [22,21 tier 0, RUBBLE 6mo left]
+  +4                              [22,21 tier 0, RUBBLE 4mo left]
+  +6                              [22,21 tier 0, RUBBLE 2mo left]
+  +8                              [22,21 tier 0]              ← chalk, eligible
+```
+
+Every caption carries the watched tile **in words**, because a photograph
+cannot tell you how many months are left and squinting at a 12-px sprite to
+decide is how you see what you expected.
+
+**One mayor.** `playtest.mjs`'s block planner moved out to `tools/mayor.mjs`
+whole, so the two instruments watch the same town. Proved by hash: seven flag
+combinations (`--years 30`, `--parks 2 --zoo 12`, `millbelt`, `dormitory`,
+`--markets 1 --pacify --stations`, `--disasters --stations --seed 5`,
+`--schedule 15:13,22:7 --recession 20`) print the same hash before the
+extraction and after it.
+
+**Two bugs in the tool, both of which it happily reported success on.**
+- Its first frames were an empty rectangle of background. `aim()` read
+  `left`/`w` off `mapBounds()`, which returns `minX`/`maxX`/`minY`/`maxY`; every
+  term was `undefined`, the camera went to `NaN`, and the tool wrote a full set
+  of PNGs, captioned them correctly and exited 0. **Only opening one caught it.**
+  A caption is not a photograph.
+- It never called `renderer.invalidate()`, so the cached ground layer was
+  frozen: burnt lots vanished on cue (buildings are per-frame) and their rubble
+  never appeared (the ground is cached). Half live, half a memory.
+
+**And a stale SPEC sentence found by the second one.** §13 said the static
+layer holds "ground + chalk + roads + buildings + trees". It does not — the
+buildings and trees are in the per-frame `paintScene`, as `render.js`'s own
+header line 15 says. That sentence is what made the missing `invalidate()`
+hard to see, and it is corrected, with two checks pinning the halves apart.
+
+**Suite 159 → 167.** All five new render checks mutation-tested, 5/5. The one
+that matters most is the blank-frame check, because it is the one the first
+draft failed while looking, by every other measure, like a working tool.
 
 ## 9. Verification recipe (what "done" looks like here)
 
 ```
-node tools/check.mjs                                   # 159 checks, 0 failures — the gate
+node tools/check.mjs                                   # 167 checks, 0 failures — the gate
 node tools/playtest.mjs --years 30 --quiet             # the §4 curves (disasters off)
 node tools/playtest.mjs --years 30 --parks 2 --zoo 12 --quiet
 node tools/playtest.mjs --disasters --stations --years 40 --seed 5
@@ -1061,6 +1130,8 @@ node tools/newsprobe.mjs                               # how much of what the ci
 node tools/serviceprobe.mjs --only fire --forced 6      # what a fire station buys (§15's table)
 node tools/serviceprobe.mjs --only police               # what a police station buys (§15's table)
 node tools/shots.mjs                                   # sheets + scene, then READ the PNGs
+node tools/play.mjs --years 20 --every 24              # WATCH IT PLAY, then READ the PNGs (§15b)
+node tools/play.mjs --seed 2 --years 18 --disasters --when "^FIRE" --after 0,2,4,6,8
 node tools/serve.mjs --port 8142                       # open it, N for a fresh city, zoo.advance(36), look, read the console (must be EMPTY)
 git push origin main                                   # Pages builds in ~1–2 min
 ```

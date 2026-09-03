@@ -1053,6 +1053,120 @@ if (existsSync(artIndex)) {
   console.log("art: js/art/index.js not present yet — Part C skipped");
 }
 
+// ---- Part C2: the play camera (tools/play.mjs photographs the REAL renderer) ----
+{
+  const HC = await import("./headless-canvas.mjs");
+  HC.installCanvas();
+  const { createRenderer } = await import("../js/render.js");
+  const { createWalkers } = await import("../js/walkers.js");
+  const { art } = await import("../js/art/index.js");
+  const { toScreen, HALF_H } = await import("../js/iso/iso.js");
+
+  const P = load(A.saved);
+  computeFields(P);
+  const canvas = HC.createCanvas(480, 320);
+  const renderer = createRenderer(canvas, P, art);
+  const walkers = createWalkers(P);
+  walkers.notify();
+  // Aim at the middle of what is BUILT, the way play.mjs does.
+  let n = 0, cx = 0, cy = 0;
+  for (let i = 0; i < P.w * P.h; i++) if (P.tier[i] > 0) { cx += i % P.w; cy += (i / P.w) | 0; n++; }
+  const [ax, ay] = toScreen(cx / n + 0.5, cy / n + 0.5);
+  const camera = { x: ax, y: ay + HALF_H, zoom: 2 };
+  const frame = () => { renderer.draw(camera, null, walkers, "off", 0); return Buffer.from(canvas._data).toString("base64"); };
+  const palette = () => {
+    const d = canvas._data;
+    const seen = new Set();
+    for (let i = 0; i < d.length; i += 4) seen.add((d[i] << 16) | (d[i + 1] << 8) | d[i + 2]);
+    return seen.size;
+  };
+
+  const shot = frame();
+  const colours = palette();
+  // THE check this section exists for. play.mjs's first draft read left/w off
+  // mapBounds (which returns minX/maxX/minY/maxY), sent the camera to NaN, and
+  // wrote a full set of PNGs that were one flat rectangle of background. The
+  // tool "worked": it ran, it captioned, it exited 0. Only looking caught it.
+  check("play: a town renders to something that is not a blank rectangle",
+    n > 10 && colours > 12, `${colours} distinct colours over ${n} built lots`);
+
+  // Two layers, two rules, and the difference is the whole reason play.mjs
+  // has to invalidate. A BUILDING is in the per-frame pass and appears the
+  // moment the world says so. The GROUND — terrain, roads, chalk and the
+  // RUBBLE tile — is a cached bitmap rebuilt only when the renderer is dirty
+  // or the camera has walked near its margin. play.mjs's first draft never
+  // invalidated, so a burnt lot vanished on cue and left no rubble behind it
+  // for six months: the picture was half live and half a memory.
+  //
+  // The nearest lot to the camera's aim; one merely inside the x range can be
+  // off the top of the frame, and a change nobody can see proves nothing.
+  const nearestAim = (fn) => {
+    let pick = -1, best = Infinity;
+    for (let i = 0; i < P.w * P.h; i++) {
+      if (!fn(i)) continue;
+      const d = Math.hypot((i % P.w) - cx / n, ((i / P.w) | 0) - cy / n);
+      if (d < best) { best = d; pick = i; }
+    }
+    return pick;
+  };
+  // GROUND: an EMPTY zoned lot, so nothing in the per-frame pass moves at all.
+  const bare = nearestAim((i) => P.tier[i] === 0 && P.zone[i] !== 0 && !P.rubble[i] && !P.burning[i]);
+  P.rubble[bare] = KNOBS.RUBBLE_MONTHS;
+  const stale = frame();
+  check("play: the GROUND does not follow the world without an invalidate — a camera that never calls it photographs a memory",
+    bare >= 0 && stale === shot, `lot ${bare % P.w},${(bare / P.w) | 0} changed with no invalidate`);
+  renderer.invalidate();
+  const fresh = frame();
+  check("play: and it does follow once invalidate() is called",
+    fresh !== stale, `lot ${bare % P.w},${(bare / P.w) | 0} still not drawn`);
+  // BUILDING: the per-frame pass, no invalidate needed.
+  const lot = nearestAim((i) => P.tier[i] > 0 && !P.rubble[i] && !P.burning[i]);
+  const withLot = frame();
+  P.tier[lot] = 0;
+  check("play: a BUILDING is in the per-frame pass and needs no invalidate at all",
+    lot >= 0 && frame() !== withLot, `lot ${lot % P.w},${(lot / P.w) | 0}`);
+
+  // The shim's scale is what makes the browser's zoom photographable.
+  const c1 = HC.createCanvas(40, 40);
+  const c2 = HC.createCanvas(40, 40);
+  const src = HC.createCanvas(4, 4);
+  const sctx = src.getContext("2d");
+  sctx.fillStyle = "#ff0000";
+  sctx.fillRect(0, 0, 4, 4);
+  const solid = (c) => { let k = 0; for (let i = 3; i < c._data.length; i += 4) if (c._data[i]) k++; return k; };
+  c1.getContext("2d").drawImage(src, 0, 0);
+  const g2 = c2.getContext("2d");
+  g2.setTransform(3, 0, 0, 3, 0, 0);
+  g2.drawImage(src, 0, 0);
+  check("play: the headless canvas scales a blit by the transform, nearest-neighbour",
+    solid(c1) === 16 && solid(c2) === 144, `${solid(c1)} px at 1x, ${solid(c2)} at 3x (want 16 and 144)`);
+
+  // Overlays are the one thing js/render.js draws as a PATH, and every overlay
+  // colour is an rgba() — the shim parsed only #rrggbb until the play camera
+  // needed them, and an unparsed colour is silently black.
+  const c3 = HC.createCanvas(8, 8);
+  const g3 = c3.getContext("2d");
+  g3.fillStyle = "#ffffff";
+  g3.fillRect(0, 0, 8, 8);
+  g3.fillStyle = "rgba(255,0,0,0.5)";
+  g3.beginPath();
+  g3.moveTo(0, 0); g3.lineTo(8, 0); g3.lineTo(8, 8); g3.lineTo(0, 8); g3.closePath();
+  g3.fill();
+  check("play: rgba() fills blend instead of painting black",
+    c3._data[0] === 255 && c3._data[1] > 100 && c3._data[1] < 160,
+    `[${c3._data[0]}, ${c3._data[1]}, ${c3._data[2]}] — half red over white`);
+
+  // One mayor. playtest.mjs prints her curves and play.mjs photographs her
+  // town; when they disagree it must be a flag and never a second mayor.
+  const playSrc = readFileSync(path.join(ROOT, "tools", "play.mjs"), "utf8");
+  const ptSrc = readFileSync(path.join(ROOT, "tools", "playtest.mjs"), "utf8");
+  check("play: both instruments import the ONE scripted mayor and neither plans blocks itself",
+    /createMayor/.test(playSrc) && /createMayor/.test(ptSrc)
+    && !/function nextBlock/.test(playSrc) && !/function nextBlock/.test(ptSrc));
+  check("play: the camera photographs js/render.js itself, not a second drawing",
+    /import\("\.\.\/js\/render\.js"\)/.test(playSrc) && !/paintScene/.test(playSrc));
+}
+
 // ---- Part D: the walker layer never writes the sim (SPEC §14) ---------------------
 const walkersPath = path.join(ROOT, "js", "walkers.js");
 if (existsSync(walkersPath)) {

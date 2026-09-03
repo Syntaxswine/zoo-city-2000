@@ -137,6 +137,20 @@ cold prints. **What is left:**
   makes a fire station worth more than the numbers in §15 say, and nobody has
   measured how much more.
 
+## The play camera — SHIPPED 2026-09-02 (`tools/play.mjs`, `tools/mayor.mjs`; handoff §15b; 7 checks)
+`js/render.js` photographs the scripted mayor's town in Node. **What is left:**
+- **It draws the map, not the UI.** `js/ui.js` (the panel, the hover card, the
+  news reader) is untouched by it, so the rubble hover line — the one the owner
+  will actually read — is still verified by source only.
+- **No contact sheet.** `--film` writes N PNGs and you flip through them by
+  hand; an animated GIF or a strip would be one file to look at.
+- **`--follow city` is a centroid,** so a town that grows two ways is framed
+  between them. A "follow the news" mode that tracks the last event would be
+  better for a long run.
+- **The shim has no rotate or skew** and throws if asked. `js/render.js` never
+  asks; a future overlay might.
+- **Nothing photographs the title screen** (`js/title.js` is DOM, not canvas).
+
 ## Polish the play-testers named (browser rounds 1–3), not yet done
 - (the Log tab's newest-first order and its double REPORT line: fixed by the
   news reader, SPEC §11b)
