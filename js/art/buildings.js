@@ -922,6 +922,18 @@ export function overlaySprite(kind, frame = 0) {
   return list[frame % list.length];
 }
 
+/**
+ * The authoring kit js/art/blocks.js builds the 2×2 and 3×3 families from —
+ * the same ramps, skins, grains and helpers, so a block reads as its zone
+ * (brick and slate for R, concrete and glass for C, rust for I, brown for M).
+ */
+export const KIT = Object.freeze({
+  walled, doorAt, flipPlan, extentBox,
+  BRICK, CONC, RUST, SLATE, EARTH, GRASS,
+  SLATE_SKIN, C_ROOF, TIMBER, PLINTH, CONC_WALL, END_GLASS, AWNING, AWNING_M, SAWDUST, BRACKET, HOOK, LAMP, BLUE_LAMP, STEP, POST,
+  brickGrain, ribGrain, ringGrain, TREE_REACH,
+});
+
 /** Every building sprite, named, for the audit. */
 export function allBuildings() {
   const out = [];

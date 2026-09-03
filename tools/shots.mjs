@@ -21,6 +21,7 @@ import { installCanvas, createCanvas, encodePNG, zoom as zoomCanvas } from "./he
 import { rasterize } from "../js/art/format.js";
 import { art } from "../js/art/index.js";
 import { BUILDINGS, PARK, ZOO, FIRE_STATION, POLICE_STATION, PACIFICATION_CENTRE, OVERLAYS } from "../js/art/buildings.js";
+import { BLOCKS } from "../js/art/blocks.js";
 import { ROADS, BRIDGES, N, E, S, W, DECK_TOP } from "../js/art/roads.js";
 import { WALLS, TUNNELS } from "../js/art/walls.js";
 import { RAILS, STATIONS } from "../js/art/rail.js";
@@ -106,6 +107,28 @@ function sheets(z) {
   const b = [];
   for (const zone of [1, 2, 3, 4]) for (const tier of [1, 2, 3]) for (const v of [0, 1]) b.push({ sprite: BUILDINGS[zone][tier][v], label: BUILDINGS[zone][tier][v].name, onTile: true });
   out.push(sheet("sheet-buildings.png", b, { cols: 6, cellW: 80, cellH: 100, groundY: 84, z }));
+
+  // The blocks: 4 zones × 2 sides × 2 variants, each on its own grass footprint (a row per zone).
+  {
+    const cols = 4, cellW = 280, cellH = 250, groundY = 205;
+    const cells = [];
+    for (const zone of [1, 2, 3, 4]) for (const side of [2, 3]) for (const v of [0, 1]) cells.push({ sprite: BLOCKS[zone][side][v], side });
+    const canvas = createCanvas(cols * cellW, Math.ceil(cells.length / cols) * cellH);
+    const ctx = background(canvas);
+    cells.forEach((cell, i) => {
+      const cx = (i % cols) * cellW + cellW / 2;
+      const cy = Math.floor(i / cols) * cellH + groundY;
+      // The footprint's ground: side × side grass diamonds round the footprint's centre, back to front.
+      const s = cell.side;
+      for (let ty = 0; ty < s; ty++) for (let tx = 0; tx < s; tx++) {
+        const [dx, dy] = toScreen(tx - (s - 1) / 2, ty - (s - 1) / 2);
+        blitAt(ctx, GRASS[(tx + ty) % 3], cx + dx, cy + dy);
+      }
+      blitAt(ctx, cell.sprite, cx, cy);
+      console.log(`  blocks [r${Math.floor(i / cols)} c${i % cols}] ${cell.sprite.name} (${cell.sprite.w}×${cell.sprite.h})`);
+    });
+    out.push(save("sheet-blocks.png", canvas, z));
+  }
 
   const c = [
     { sprite: PARK, label: "park", onTile: true },
