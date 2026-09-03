@@ -213,6 +213,36 @@ another's. Git merges those. `citizens.js`, `justice.js` and `events.js`
 are the risk: B adds one-liners at call sites; A adds one function; H
 edits two `post` sites; F edits one advisor function; D never opens them.
 
+## The freeze on a freshly zoned lot — FIXED 2026-09-03 (handoff §23; `tools/dom-shim.mjs`; 4 checks, both mutation-tested)
+The owner: *"the game hangs on placement of residential tiles."* It was not a
+hang: hovering a lot you had just zoned THREW. `TIER_NAME` has rows 1, 2, 3
+and the card built its name string EAGERLY beside the ternary that only uses
+it when the tier is non-zero, so `TIER_NAME[0][0]` was read on every empty
+lot. The line was safe until the blocks commit (`9c89f73`, session 11)
+hoisted it out of the ternary into a `const`; from that day the first thing a
+player does in a new city broke it. The throw landed inside `main.js`'s rAF
+frame one line above `requestAnimationFrame(frame)`, so the loop never
+rescheduled — no ticks, no drawing, no input, and nothing in the window to say
+why.
+
+Three parts to the fix: the name is lazy again; `frame()` guards its body and
+reschedules from the `catch`, so a panel bug is a glitch and never a freeze
+(the first faults go to the console with their stack and the player is told
+once); and `tools/dom-shim.mjs` + Part U' RUN the real `createUI` over every
+distinct tile state a thirty-year city holds, hovered and pinned. Reverting
+the one-line cure turns 2 checks red with 16 throws; removing the frame guard
+turns a third red.
+
+Left:
+- The shim covers what `ui.js` uses today. A part that reaches for a DOM API
+  it does not have will fail loudly in the suite, which is the right way
+  round — add the method, do not weaken the check.
+- The panel's OTHER surfaces (the tabs, the census, the news reader, the
+  saves menu) are now reachable by a check and still unswept. The card was
+  swept because that is where the freeze was.
+- Nothing yet asserts what the card SAYS beyond "zoned, empty" and "tier N" —
+  the text is the game's biggest untested prose surface.
+
 ## The level crossing — SHIPPED 2026-09-03 (plan §4-X; SPEC §7.9, §12.4c; handoff §22; 34 checks, all mutation-tested)
 The owner: *"railroads and roads should be able to cross over each other
 perpendicularly."* A road and a line share ONE tile when they cross

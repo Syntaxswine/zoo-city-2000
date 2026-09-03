@@ -1694,3 +1694,54 @@ what the suite spends walking them.
 - Superseded by this section: §4's *"v1 limits … no level crossings"* and
   §16's *"the art registry reserves … crossing with loud not-built errors"*.
   Handoff sections are appended, never edited; read them with this one.
+
+---
+
+## 23. Session 15 — the freeze on a freshly zoned lot (2026-09-03)
+
+The owner: *"the game hangs on placement of residential tiles."* It did not
+hang. It threw, once, and the throw took the game with it.
+
+| what | where |
+|---|---|
+| the bug | `js/ui.js` `cardForTile` — `TIER_NAME` has rows 1, 2, 3, and the card's name string was built EAGERLY beside the ternary that only uses it when the tier is non-zero. On a lot that is zoned and still empty `t` is 0, so `TIER_NAME[0][0]` was read and threw |
+| when it broke | `9c89f73` (session 11, the blocks). Before it the whole template sat INSIDE the ternary, on the truthy arm beside the literal "zoned, empty", so it was never evaluated for an empty lot. The blocks commit hoisted it to a `const` to share it with the block name. Mine |
+| why it looked like a hang | the throw landed in `main.js`'s rAF frame ONE LINE above `requestAnimationFrame(frame)`. The loop never rescheduled: no ticks, no drawing, no input, no message |
+| why no gate saw it | **nothing in the suite had ever run `js/ui.js`.** 373 checks, and the panel — the card, the tabs, the census, the rules, the reader — was read twice as TEXT by a grep and executed never |
+| how long it was live | five sessions. Every browser round since hovered roads, rail and built lots; none hovered the chalk you get in the first ten seconds of a new city |
+
+### The fix, in three parts
+
+1. **The name is lazy again** (`() => …`, called only when `t`). One line.
+2. **`frame()` guards its body and reschedules from the `catch`.** A panel bug
+   is now a glitch: the first five faults go to the console with their stack
+   and the player is told once that the panel stumbled. Not swallowed — the
+   suite is what keeps the card honest — but never fatal again.
+3. **`tools/dom-shim.mjs`** — enough DOM to run the real `createUI` in Node,
+   plus `stubApp(world)` and `textOf(el)`. It installs `headless-canvas` and
+   still hands back a real canvas for `createElement("canvas")`, so one
+   process can drive the renderer and the panel. **Part U'** then sweeps every
+   distinct tile state a thirty-year city holds — 32 of them, hovered and
+   pinned — and the zoned-empty case in all four zones at both densities.
+
+### What the instruments caught
+
+| what it looked like | what it was | the rule |
+|---|---|---|
+| "the game hangs" | it threw. The rAF loop's own last line is the reschedule, so ONE exception anywhere above it ends the game silently. A hang and a throw look identical to a player | when a loop reschedules itself, the reschedule belongs in a `finally`-shaped position, not after the work |
+| the sim was innocent | `node` ran the zone op and six ticks in 2 ms. The suite was green. The play camera was green. All three were looking somewhere else | reproduce in the layer the report names. "The game" is the browser, and the browser was the one thing no gate ran |
+| a sweep that found "5 distinct tile states" in a grown city | `updateHover` takes `{ tile: <index> }` and I passed `{ tile: {tx, ty} }`. It threw on garbage and reported garbage — a metric that agreed with everything | read the consumer's shape before trusting a sweep's count. 5 states in a 2,000-animal city was the tell, and I nearly walked past it |
+| the browser console said the bug was still there after the fix | the preview pane's console buffer is STICKY across reloads and navigations. The stale line even named `main.js:305`, which the fix had turned into `try {` | for absence, use page-local evidence: a fresh `window.onerror` trap and a frame counter. 702 frames and `errs: []` is proof; an empty console is not |
+| the pane fires no rAF while hidden | `document.hidden` is true, `requestAnimationFrame` never fires, and `world.tick` sits at 0 however long you wait | drive the loop by hand (`walkers.update` → `renderer.draw` → `ui.updateHover`) or force frames with a screenshot. This is the fifth time the hidden pane has cost an hour — it is in the traps memory for a reason |
+
+### Ammunition for the next arc
+
+- The shim makes the whole panel testable for the first time. The tabs, the
+  census, the news reader and the saves menu are now reachable by a check and
+  still unswept — the card was swept because that is where the fire was.
+- Nothing asserts what the card SAYS beyond "zoned, empty" and "tier N". The
+  panel is the game's largest prose surface and its text is untested.
+- `stubApp` returns stubs for every button's action. A check that wants to
+  know what a BUTTON does can override one and press it (`El.dispatch`).
+- The frame guard counts faults. If a future session wants a real telemetry
+  line — "the panel stumbled N times this session" — the counter is there.

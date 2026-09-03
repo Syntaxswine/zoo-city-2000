@@ -1194,6 +1194,18 @@ every other ground tile. The four square-on tiles the rule allows are on the
 rail sheet with two stubs beside them.
 
 ### 12.5 Instruments
+`tools/dom-shim.mjs` is enough DOM to RUN `js/ui.js` in Node — elements with
+`append` / `classList` / `textContent` / `style` / `dataset` / `value`, a
+`document` carrying the ids `createUI` looks up, a `stubApp(world)` with every
+field the panel reads, and `textOf(el)` for what a player would read off it.
+It cooperates with `headless-canvas.mjs` (it installs it, and still hands back
+a real canvas for `createElement("canvas")`), so a check may drive the
+renderer and the panel in the same process. It exists because the panel — the
+game's largest text surface — was never executed by the suite until session
+15, and a card that threw froze the game (§23 of the handoff). It is a shim,
+not a browser: no layout, no CSS, nothing about how the card LOOKS. That is
+still the browser round.
+
 `tools/shots.mjs --sheet` renders every family to a contact sheet PNG;
 `--scene` renders a 12×12 block with all 9 building families and 20 walkers
 at fractional positions **including one on a tile seam and one in front of
