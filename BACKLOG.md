@@ -33,8 +33,12 @@ plans per family, windows lit by fill, a species mark on the socket) ·
 names) · **G** integration. The plan's §5 is the file-ownership table; K7
 copies it here when the keel lands. Measured for it: mean friends per
 citizen 0.67 — the graph is thin; the plan makes that visible and does
-not touch the knob. §8 asks the owner four things: whose bodies the hall
-buys, livestock as product, `RECORD_HARD` 3 → 2, the save compaction.
+not touch the knob. Ruled on H: *"natural deaths is a good option. selling
+cubs sounds right, although i think the meat vendors would grow them to
+adulthood for best return on investment."* → the hall buys the dead, and
+buys livestock cubs into a PEN (`held`/`heldAt` + `c.pen`; slaughtered at
+16 for 2 units; the card lists the pen by name and date). §8 still asks:
+`RECORD_HARD` 3 → 2, the save compaction, a weaner age for the pen.
 
 ## Crime and punishment — SHIPPED 2026-09-02 (SPEC §9c; `js/sim/justice.js`); what is left
 - **Hunger visibility.** The scripted towns run at U 0–4, so the ×20 hunger

@@ -15,6 +15,11 @@ of meat in the whole history of the town and have 15 in cells."* → Part A
 is NEEDS shown through Inspect (not flavour, not a follow system); Part C
 shrinks to extending Inspect; a new Part H makes meat a STOCK with inflows.
 
+And on H's two questions: *"natural deaths is a good option. selling cubs
+sounds right, although i think the meat vendors would grow them to
+adulthood for best return on investment."* → the hall buys the dead, and
+the hall buys livestock cubs and PENS them until they are grown (§4-H).
+
 Plan only. Nothing here is built. Each part is sized for one agent-session,
 owns its own files, and codes against contracts written down in §3 so the
 parts can run at the same time. The keel (§3) lands first and is small.
@@ -623,21 +628,44 @@ dead — v2" since session 3).
      INTO the hall when one is in reach (the walker-layer item BACKLOG
      already lists — the killer's leg 1 goes to the hall's door, then
      home).
-  2. **The dead** → `buyTick`: a natural death whose home is within
-     `MEAT_BUY_R` 6 of a hall is BOUGHT with p `MEAT_BUY_P` 0.6 (any
-     species — the Beastars rule; the owner's §8 question 1 can narrow
-     it); the family's household gets nothing (there is no household cash)
-     but the mayor's cut gets `MEAT_PRICE` §50 as it does for a killing,
-     and the line says so (*"…and the hall at (30,12) paid the family"*).
-     ≈ 14 units/yr in the scripted town — the supply the owner is asking
-     for, without a single extra killing.
+  2. **The dead** (the owner: *"natural deaths is a good option"*) →
+     `buyTick`: a natural death whose home is within `MEAT_BUY_R` 6 of a
+     hall is BOUGHT with p `MEAT_BUY_P` 0.6, any species — the Beastars
+     rule; the family's household gets nothing (there is no household
+     cash) but the mayor's cut gets `MEAT_PRICE` §50 as it does for a
+     killing, and the line says so (*"…and the hall at (30,12) paid the
+     family"*). ≈ 14 units/yr in the scripted town — the supply the owner
+     is asking for, without a single extra killing.
   3. **The sentence** — SOLD as ruled, unchanged. The lever for volume, if
      the owner wants more sold and fewer in cells, is `RECORD_HARD` 3 → 2
      (a second trespass meets the table) — a knob, named, not moved.
-  4. **Livestock (owner's call, §8):** pigs and cows are livestock species;
-     a household of five with `litter` 5 could sell a cub to the hall at
-     16 instead of splitting it — the honest farm economy. NOT in the
-     plan's default; a question.
+  4. **Livestock, raised in the pen** (the owner: *"selling cubs sounds
+     right, although i think the meat vendors would grow them to adulthood
+     for best return on investment"*). Pigs and cows are the livestock
+     species. `penTick`: a hall with a free pen place buys a CUB (age <
+     `ADULT_AGE` 16) from a livestock household within `MEAT_BUY_R` whose
+     lot is FULL (the crowding push that already halves births — the
+     farm sells what it cannot house) with p `PEN_BUY_P` 0.25 per eligible
+     household-month; the mayor's cut gets `PEN_PRICE` §30. The cub moves
+     to the hall: `c.heldAt = hall`, `c.held = tick + monthsToAdult`,
+     `c.pen = true` — so every existing reader (`absent()`: no job, no
+     friendship sample, no mood, no investigation, no prey flight from it)
+     treats it as away, the way the centre's inmates are. It keeps its
+     name and its age. **On the month it turns 16 it is slaughtered**, not
+     released: `PEN_YIELD` 2 units (a grown animal against a bought
+     body's 1 — the vendor's return on investment, in the owner's words),
+     `removeCitizen(…, "slaughtered")`, the parents' household gets the
+     `LOST_CHILD` life event (B) and no grief (a farm sale, not a death —
+     the owner's farm economy), and the line prints *"THE PEN — Piglet
+     Buttercup, raised at the hall at (30,12) since 2007, went to market
+     this morning"*. The pen holds `PEN_CAP` 2 / 4 / 8 by hall tier. The
+     hall's card lists the pen by name and date: *in the pen: Piglet
+     Buttercup, 12 — for market 2011*. The walker layer stands the penned
+     animals beside the hall (a camper-like standing figure at the lot's
+     road edge, `w.kind = "penned"`, from the sim's `heldAt`; read-only).
+     Penned cubs do NOT split at 16, do not count in W, cannot be
+     befriended, cannot be killed by a predator (they are `absent()`), and
+     a bulldozed hall frees them home (like the centre) — a check for each.
 - **Outflow**: `eatTick` per hall per month: `demand = MEAT_EAT ×
   carnivores within reach(6)` (0.05 → a 40-carnivore neighbourhood eats 2
   units a month); `sold = min(stock, demand)`; the till `MEAT_SALE` §20 ×
@@ -676,9 +704,15 @@ in the ledger; B's `LOST_FRIEND` cause `"sold"` already exists).
 **Acceptance.**
 - The hash MOVES (a sim change); the commit records before/after on the
   standing gate (`--markets 1 --csv`) and the meatprobe table.
-- Conservation: `Σ bought + killed + convicted − eaten = Σ stock` over a
-  run, exact; stock ≤ `MEAT_CAP` 40 per hall; a hall with no road buys
-  nothing; a dry hall prints EMPTY HOOKS once, not monthly.
+- Conservation: `Σ bought + killed + convicted + 2·slaughtered − eaten =
+  Σ stock` over a run, exact; stock ≤ `MEAT_CAP` 40 per hall; a hall with
+  no road buys nothing; a dry hall prints EMPTY HOOKS once, not monthly.
+- The pen: a penned cub is `absent()` for its whole stay (never hired,
+  never sampled for a friendship, never a prey-flight source, never a
+  killing's victim — force each with the suite's fixtures); it is
+  slaughtered on the exact month it reaches 16 and yields 2; the pen never
+  exceeds its cap; a bulldozed hall sends its pen home alive; the parents'
+  household carries `LOST_CHILD` and no `grief`.
 - Monotone: buy radius 0/3/6/9 → units bought rises; `MEAT_EAT` 0/0.05/0.1
   → units sold rises and stock falls — the service-curve rule; all three
   columns printed.
@@ -699,8 +733,16 @@ never the sweep. The licence changes who gets the till — read
 `budget.js:40` before adding a second path. Dread scaling by stock moves
 every herbivore's mood in a hall's reach — expect the playtest's
 `herbivores within the smell` and the flight numbers to shift; say so.
+**The pen rides on `held`/`heldAt`, and `held`'s expiry today RELEASES
+the animal home** (the cells, the centre) — the release path must check
+`c.pen` and slaughter instead; a check forces a penned cub past 16 and
+asserts it is gone, not home. `absent()` also freezes investigations
+(BACKLOG) — a penned cub with an open file is a corner the suite should
+name. `ageYears` of a cub bought at 3 and slaughtered at 16 is 13 years
+in the pen — the card's date makes that visible; the owner may want
+`PEN_BUY_MIN_AGE` so the vendor buys weaners, not newborns.
 
-**Size.** ≈ 250 lines sim + 40 walkers + 40 ui + 150 probe; ~10 checks;
+**Size.** ≈ 320 lines sim + 60 walkers + 50 ui + 150 probe; ~14 checks;
 one session, the probe first.
 
 ### G. Integration — after the parts have merged
@@ -802,13 +844,14 @@ then F; K still first.
 
 ## 8. Questions for the owner (none block the keel)
 
-1. **Whose bodies does the hall buy?** H's default: any natural death
-   within reach, p 0.6 — the Beastars rule, and the only supply big
-   enough (24 a year). Narrow it to prey species only, or to herbivores,
-   and the supply is roughly halved; say which.
-2. **Livestock as product?** Pigs (litter 5) and cows are livestock
-   species. A farm household selling a cub to the hall at 16 instead of
-   splitting it is the honest farm economy and a dark line. In or out?
+1. ~~**Whose bodies does the hall buy?**~~ **Ruled:** *"natural deaths is
+   a good option."* Any natural death within reach, p 0.6.
+2. ~~**Livestock as product?**~~ **Ruled:** *"selling cubs sounds right,
+   although i think the meat vendors would grow them to adulthood for best
+   return on investment."* → the pen (§4-H inflow 4): bought as a cub,
+   raised at the hall, slaughtered at 16 for 2 units. Open detail: should
+   the vendor buy only weaners (`PEN_BUY_MIN_AGE`, say 4) so a cub is not
+   thirteen years in the pen?
 3. **The cells.** 15 in cells against 20 sold is the trespass minor at
    `RECORD_HARD` 3 (the third offence meets the table). Lower it to 2, or
    leave the ruling?
