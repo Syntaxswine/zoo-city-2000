@@ -40,6 +40,7 @@ import { lotScore, REASON } from "./sim/lots.js";
 import { tunnelAxis } from "./sim/reach.js";
 import { isWorker } from "./sim/census.js";
 import { BAG_FALL } from "./walkers.js";
+import { line as needLine } from "./sim/voice.js";
 
 const MARGIN = 256; // projection px around the viewport kept in the static layer
 const REACH_UP = 120; // tallest sprite above its tile's north vertex
@@ -70,6 +71,7 @@ export function createRenderer(canvas, initialWorld, art) {
   let clock = 0;
   let view = { left: 0, top: 0, w: 1, h: 1, zoom: 1 };
   const waterTints = [0, 1, 2, 3, 4, 5].map((f) => art.waterTint(f)); // reused objects: one cache entry each
+  const textWidths = new Map(); // need line → screen-pixel width; at most the voice table
 
   // ---- sprite cache -----------------------------------------------------------
   const cache = new Map(); // sprite → Map(tintKey → canvas)
@@ -320,6 +322,46 @@ export function createRenderer(canvas, initialWorld, art) {
     }
   }
 
+  /** Needs are screen-space labels: fixed 10px type at zoom 1 and zoom 2. */
+  function drawBubbles(list) {
+    const speaking = [];
+    for (const w of list || []) {
+      if (!w.need || w.citizen == null) continue;
+      const c = world.byId?.get(w.citizen);
+      if (!c) continue;
+      speaking.push({ w, text: needLine(world, c, { code: w.need }) });
+    }
+    speaking.sort((a, b) => (a.w.tx + a.w.ty) - (b.w.tx + b.w.ty) || a.w.id - b.w.id);
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.font = "10px ui-monospace, SFMono-Regular, Consolas, monospace";
+    ctx.textBaseline = "top";
+    ctx.textAlign = "left";
+    ctx.fillStyle = "#2A2620";
+    for (const { w, text } of speaking) {
+      let tw = textWidths.get(text);
+      if (tw == null) { tw = Math.ceil(ctx.measureText(text).width); textWidths.set(text, tw); }
+      const base = art.bubble(tw + 8, 15);
+      const [px, py] = toScreen(w.tx, w.ty);
+      const headX = (px - view.left) * view.zoom;
+      const headY = (py + HALF_H - view.top) * view.zoom - (w.age === "cub" ? 16 : 24);
+      // Normally the bubble is above the walker. Near the top edge its tail
+      // moves to the top and the body goes below. Horizontal clamping chooses
+      // a cached tail offset so an on-screen head remains the exact anchor;
+      // an off-screen pinned walker gets an edge-pointing callout.
+      const side = headY - base.anchor[1] < 0 ? "top" : "bottom";
+      const maxLeft = Math.max(0, canvas.width - base.w);
+      const maxTop = Math.max(0, canvas.height - base.h);
+      const left = Math.max(0, Math.min(maxLeft, Math.round(headX - base.anchor[0])));
+      const rawTop = side === "top" ? Math.round(headY) : Math.round(headY - base.anchor[1]);
+      const top = Math.max(0, Math.min(maxTop, rawTop));
+      const tailX = Math.max(0, Math.min(base.w - 1, Math.round(headX - left)));
+      const sprite = art.bubble(tw + 8, 15, tailX, side);
+      ctx.drawImage(raster(sprite), left, top);
+      ctx.fillText(text, left + 4, top + (side === "top" ? 6 : 3));
+    }
+    return speaking.length;
+  }
+
   // ---- the frame ---------------------------------------------------------------------------
   function draw(camera, hover, walkers, overlays, dt = 1 / 60) {
     clock += dt;
@@ -444,14 +486,19 @@ export function createRenderer(canvas, initialWorld, art) {
       if (item.alpha != null) ctx.globalAlpha = 1;
     });
     ctx.setTransform(1, 0, 0, 1, 0, 0);
+    drawBubbles(list);
   }
 
   // ---- picking ---------------------------------------------------------------------------------
-  function toProjection(sx, sy) {
+  function toProjection(sx, sy, camera = null) {
+    if (camera) {
+      const z = camera.zoom || 1;
+      return [sx / z + camera.x - canvas.width / (2 * z), sy / z + camera.y - canvas.height / (2 * z)];
+    }
     return [sx / view.zoom + view.left, sy / view.zoom + view.top];
   }
-  function pick(sx, sy) {
-    const [px, py] = toProjection(sx, sy);
+  function pick(sx, sy, camera = null) {
+    const [px, py] = toProjection(sx, sy, camera);
     return pickTile(px, py, world.w, world.h);
   }
   /** The walker under a screen point (its sprite's box), nearest feet first; null if none. */
@@ -482,5 +529,5 @@ export function createRenderer(canvas, initialWorld, art) {
   function setWorld(nw) { world = nw; dirty = true; G = null; }
 
   resize();
-  return { draw, invalidate, pick, pickWalker, resize, setWorld, viewportTiles, tileToScreen, get view() { return view; } };
+  return { draw, drawBubbles, invalidate, pick, pickWalker, resize, setWorld, viewportTiles, tileToScreen, get view() { return view; } };
 }

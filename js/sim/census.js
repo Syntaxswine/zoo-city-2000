@@ -6,6 +6,7 @@ import { SPECIES, SPECIES_BY_ID, isPredPrey, isPredatorOf, DIET_OF } from "./spe
 import { ZONE, CIVIC, ROAD, jobsOf, jobZone, absent, capacityOf, isPart } from "./world.js";
 import { hasAccess, edgeRoads , commuteTime, rides, fireExposure } from "./fields.js";
 import { landmarkOf } from "./landmarks.js";
+import { needOf, needsContext } from "./needs.js";
 
 export const ageMonths = (world, c) => world.tick - c.born;
 export const ageYears = (world, c) => Math.floor((world.tick - c.born) / 12);
@@ -46,6 +47,18 @@ export function isWorker(world, c) {
   if (c.onLeave) return false;
   if (absent(world, c)) return false; // the cells or the centre
   return true;
+}
+
+/** The same needOf histogram the bubbles and cards read, once per census. */
+export function needCensus(world) {
+  const counts = {};
+  const context = needsContext(world);
+  for (const c of world.citizens) {
+    if (c.dead) continue;
+    const code = needOf(world, c, context).code;
+    counts[code] = (counts[code] || 0) + 1;
+  }
+  return counts;
 }
 
 export function census(world) {

@@ -2,7 +2,7 @@
 
 import { KNOBS } from "./rules.js";
 import { computeFields, recountRosters } from "./fields.js";
-import { census } from "./census.js";
+import { census, needCensus } from "./census.js";
 import { updateDemand, peekDemand, neutralRate } from "./demand.js";
 import { yearlyFigures } from "./budget.js";
 import { lotsTick } from "./lots.js";
@@ -78,6 +78,7 @@ export function tick(world) {
   for (const line of notices) if (!evNotices.includes(line) && !jNotices.includes(line) && !lots.landmarks.includes(line)) world.events.log.push({ t: world.tick, id: "notice", line });
   if (world.events.log.length > 400) world.events.log.splice(0, world.events.log.length - 400);
   world.tick++;
+  world.last.needs = needCensus(world); // cards and walkers now read this same tick
   return { notices, events: evNotices };
 }
 
@@ -94,6 +95,7 @@ export function refreshLast(world) {
   const fig = yearlyFigures(world);
   const prev = world.last || {};
   world.last = { census: cen, demand: dem, budget: fig, grew: prev.grew || 0, decayed: prev.decayed || 0, arrived: prev.arrived || 0, left: prev.left || 0, births: prev.births || 0, deaths: prev.deaths || 0, funerals: prev.funerals || 0, littersLost: prev.littersLost || 0, rehomed: prev.rehomed || 0, zonedOut: prev.zonedOut || 0 };
+  world.last.needs = needCensus(world);
   return world.last;
 }
 

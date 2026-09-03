@@ -4,7 +4,19 @@ Open work, ranked. The design record is `SPEC.md`; the numbers are in
 `js/sim/rules.js` (KNOBS). Later layers were labelled at design time so v1
 could ship whole.
 
-## The People — IN PROGRESS 2026-09-03 (`docs/PLAN-THE-PEOPLE-2026-09-02.md`); Parts K and S shipped
+## The People — IN PROGRESS 2026-09-03 (`docs/PLAN-THE-PEOPLE-2026-09-02.md`); Parts K, A and S shipped
+
+**Part A SHIPPED 2026-09-03:** Inspect now makes the nearest eight walking
+citizens say one actionable need from the simulation's own mood, home, lot,
+demand and tax rules. The walker carries only a stable code; `voice.js`
+supplies the short line and remedy, `world.last.needs` supplies the exact
+town histogram for Part C's card/Census views, and the final render pass keeps
+bubbles at 10 screen pixels at either zoom. The focused truth table covers all
+24 codes; six declared, coherent 1,300-resident stress municipalities replace
+the final six monthly samples of one run so the 360-city-year stream covers
+all 24 too, while balanced (`NO_PARK`), dormitory (`NO_JOB`) and millbelt
+(`SMOKE`) towns keep distinct leaders. SPEC §14b; handoff §21.
+
 The owner: *"a master plan for how to really improve zoo city … one part i'd
 like is to be able to see the residents thoughts when they walk around. a
 larger goal of relating more strongly with the individual citizens. i think

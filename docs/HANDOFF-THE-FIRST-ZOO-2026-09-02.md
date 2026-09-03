@@ -1555,3 +1555,63 @@ unchanged and the other ten become what they were always going to be.
 - Part A's bubble text can name the shop ("off to the Slyfields' bookshop")
   from `shopOf`, and a customer walker could be drawn to a KIND (the
   bakery in the morning) with one weight in walkers.js.
+
+---
+
+## 21. Session 14 — The People, Part A: actionable thoughts (2026-09-03)
+
+Inspect is now the switch that lets the town speak. `needOf` selects one
+actionable pressure from the exact mood, home, lot, demand and tax rules; it
+returns a stable code, argument and remedy without consuming RNG. `voice.js`
+turns that code into one of two or three lines no longer than 30 characters,
+with species and diet overrides. The walker layer carries the code only, for
+the nearest eight citizens within six tiles and the pinned walker; the last
+renderer pass resolves and paints it in a fixed 10 px screen-space bubble.
+The cached tail slides along either edge and flips above the box at the top,
+so clamping keeps its tip on an on-screen head and points toward an off-screen
+pinned walker. Changing tool or leaving the map clears the layer. No cursor or thought enters
+the save or simulation hash.
+
+The Census contract is `world.last.needs`, rebuilt once per tick with the same
+`needOf` and a shared mood context. Part C owns presenting it and the matching
+citizen/card remedy; A deliberately did not enter `ui.js` or CSS. `homeTerms`
+is now the exact breakdown beneath the old `homeScore`, and all species at
+both strictness gates are checked against the sum so this refactor cannot
+quietly change settlement. Part E's building modules and existing shared-file
+hunks were not touched.
+
+The verification is deliberately split. `tools/need-fixtures.mjs` isolates
+all 24 return codes; the suite also mutation-checks SMOKE and SHOPS and proves
+that placing the promised park removes NO_PARK. `peopleprobe.mjs` keeps those
+truth fixtures separate from its population statistics, then watches the
+actual once-per-tick census for four seeds × three layouts × 30 years. The
+last six samples of the first balanced run are declared stress municipalities
+(`CONTENT`, `NO_ROAD`, `CAPPED`, `NO_DEMAND`, `TAX`, `VAN`). Each is a complete
+1,300-resident snapshot built from valid households, occupied homes, separate
+civics, capacity-bounded workplaces and real road commutes; a live recession
+balances the industrial raw demand, and `refreshLast` computes every field.
+The suite rebuilds those fields a second time and requires byte-identical
+results. This makes the city-month stream cover 24/24 codes without padding
+it with the separate focused fixtures. The
+millbelt fixture intersperses full-output works after year five so the field
+solver—not a synthetic mood value—creates its smoke. The final table has three
+different leaders: balanced `NO_PARK`, dormitory `NO_JOB`, millbelt `SMOKE`;
+the aggregate leader remains below the 40% noise ceiling. The palette-key
+bubble proof is `docs/shots/sheet-bubbles.png`.
+
+The renderer gate caught the session's real defect. `hash01` historically
+returns signed fractions despite its comment, so direct array indexing could
+select voice line -1 and crash for valid citizens. `voice.line` now folds its
+own hash into [0, 1) without changing that shared legacy function or any city
+hash. The suite tries every code across every species and 32 ids, then paints
+four real-citizen bubbles through the headless renderer. Landing verification:
+`npm run check` is **273 checks, 0 failures** on the integrated Part E tip;
+the final 30-year probe, hostile
+review verdict, commit and deployment are recorded in the delivery message.
+
+The requested interactive browser round was attempted on a clean local server
+at port 8147. The installed Browser plugin again rejected its own
+`browser-service.mjs` as outside the configured trusted path before opening
+localhost—the same infrastructure failure recorded in §17. No console/UI
+claim is inferred from that failure; the executable fallback is the real
+renderer check above plus the inspected four-line bubble sheet.

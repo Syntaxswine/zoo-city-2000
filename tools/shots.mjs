@@ -421,7 +421,26 @@ function sheets(z) {
     console.log("sheet-predation: row 0 wolf|fox carrying × se,ne,sw,nw × 3 frames; row 1 the fall at 22/12/4/0 px, tied, wriggle, elder tortoise + hat, bear ne, elder cow sw; row 2 at the door (0.32 tiles = 10 px, 5 down): wolf + tied sack, wolf walking home, fox + mouse under the falling sack");
     out.push(save("sheet-predation.png", canvas, Math.max(z, 4)));
   }
+  out.push(bubbleSheet(Math.max(2, z)));
   return out;
+}
+
+// Inspect thoughts: the stretched palette-key box and Canvas text, at the
+// exact 10px screen size render.js uses regardless of map zoom.
+function bubbleSheet(z) {
+  const phrases = ["the works gets in my fur", "no road to our door", "wish we had a park nearby", "nothing to want today"];
+  const canvas = createCanvas(210, 95);
+  const ctx = background(canvas, "#74863C");
+  ctx.font = "10px monospace";
+  ctx.textBaseline = "top";
+  ctx.fillStyle = "#2A2620";
+  phrases.forEach((text, i) => {
+    const sprite = art.bubble(Math.ceil(ctx.measureText(text).width) + 8, 15);
+    blit(ctx, sprite, 4, i * 23 + 2);
+    ctx.fillText(text, 8, i * 23 + 5);
+  });
+  console.log("sheet-bubbles: actionable, road, and content voices in the screen-space 10px box");
+  return save("sheet-bubbles.png", canvas, z);
 }
 
 function maskName(m) {
@@ -591,8 +610,9 @@ function scene(z) {
 // ---------------------------------------------------------------------- main
 
 const z = argNum("--zoom", 0);
-const both = !has("--sheet") && !has("--scene"); // `npm run shots` = everything
+const both = !has("--sheet") && !has("--scene") && !has("--bubbles"); // `npm run shots` = everything
 const did = [];
 if (both || has("--sheet")) did.push(...sheets(z || 3));
 if (both || has("--scene")) did.push(...scene(z || 2));
+if (has("--bubbles")) did.push(bubbleSheet(z || 2));
 console.log(`${did.length} PNG(s) — now LOOK at them.`);

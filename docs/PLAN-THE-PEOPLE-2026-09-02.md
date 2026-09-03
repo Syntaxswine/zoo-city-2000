@@ -251,6 +251,10 @@ play-camera proof in the commit message.
 
 ### A. Needs — *"the thought bubble text should be clues about needs … reuse the inspect button"*
 
+**SHIPPED 2026-09-03.** Core rule, voice table, Inspect walker selection,
+screen-space renderer, cached census, probe, checks and bubble sheet are in.
+Part C owns the already-specified card and Census presentation of A's data.
+
 **Goal.** With the Inspect tool active, the animals near the cursor say
 what they want — *"i wish there was more shopping nearby"* — and every
 line is a clue the player can act on with a tool they have. The card says

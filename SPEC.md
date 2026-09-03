@@ -1130,6 +1130,47 @@ scaled ×2 beside their twins.
   this tick. `check.mjs` hashes year-30 state with the walker layer on and
   off and requires equality.
 
+### 14b. Actionable needs and Inspect thoughts (`sim/needs.js`, `sim/voice.js`)
+
+- `needOf(world, citizen) -> { code, arg, act }` is pure and RNG-free. It
+  ranks only pressures already used by the simulation: actionable negative
+  `moodTerms`, unmet `homeTerms`, positive demand valves, the resident's
+  `lotScore` reason, and a tax rate above neutral. Personal mood points beat
+  the fixed valve (8) and lot/tax (6) weights; a result below 4 is `CONTENT`.
+  Stable `hash(citizen.id, code)` breaks ties. Grief, friends, held and fixed
+  status are biography, not buildable needs, so they are never bubbles.
+- The complete stable code set is `CONTENT`, `SHOPS`, `ROOMS`, `WORKS`,
+  `HOOKS`, `NO_JOB`, `SMOKE`, `NO_PARK`, `COMMUTE`, `FLIGHT`, `DREAD`,
+  `CRIME`, `VAN`, `WATER`, `TREES`, `HIGH`, `LOW`, `PASTURE`, `LV`,
+  `CLEAN`, `NO_ROAD`, `CAPPED`, `NO_DEMAND`, `TAX`. Every code has an
+  `ACT` remedy and at least two default lines no longer than 30 characters;
+  species/diet overrides change voice only. A citizen's line for one code is
+  chosen from its id without advancing any city or walker stream.
+- Inspect is the only switch. `walkers.setCursor([tx, ty], pinnedCitizen)`
+  attaches a code—not text—to the nearest real walkers within Chebyshev 6,
+  capped at 8; an active pinned walker's place in the eight is guaranteed.
+  Clearing the cursor or choosing another tool clears every code. The walker
+  module remains a read-only visual layer and its cursor is never saved or
+  hashed.
+- `drawBubbles` is the last render pass. It resets the canvas transform, uses
+  cached 10 px monospace measurements and palette-key `art.bubble` boxes,
+  and therefore stays the same screen size at zoom 1 and 2. The three-pixel
+  tail points to the walker's head and boxes clamp to the canvas. At the left
+  or right edge the cached tail moves along the box; at the top it flips above
+  the box. An off-screen pinned walker gets the corresponding edge-pointing
+  callout rather than a centred tail pointing at empty space.
+- `world.last.needs` is the once-per-tick living-citizen histogram from the
+  same `needOf` function. It is derived panel data, not saved state. Inspect
+  cards and the Census UI consume that contract when Part C owns those views.
+  `tools/peopleprobe.mjs` measures four seeds for 30 years across balanced,
+  dormitory and millbelt towns. Six declared stress municipalities replace
+  the final monthly samples of one balanced run to expose edge states a
+  competent mayor normally avoids. Each is a full 1,300-resident city with
+  valid households, occupied storeys, separate civic lots, capacity-bounded
+  homes/jobs and road-only commutes; `refreshLast` derives its fields and raw
+  demand. Thus the city-month samples themselves cover every code; focused
+  truth fixtures separately prove why each witness won.
+
 ## 15. Save (`js/sim/save.js`)
 
 - JSON: `{ version: 1, seed, tick, cash, rates, tiles (typed arrays as plain

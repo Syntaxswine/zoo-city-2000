@@ -297,6 +297,7 @@ function frame(now) {
   }
   app.input.update(dt);
   clampCamera();
+  app.input.syncCamera(); // a clamp/zoom can move the world tile under a still Inspect cursor
   if (!app.title.isOpen()) { // the painting covers the map; nothing to draw under it
     const wdt = app.paused ? 0 : dt * Math.min(app.speed, 3);
     app.walkers.update(wdt, app.renderer.viewportTiles());

@@ -57,6 +57,21 @@ export function createInput(canvas, app) {
   const world = () => app.world;
 
   const USE_LABEL = ["mixed — everyone", "predator-only — the hunters", "prey-only — everyone but a hunter"];
+  function syncThoughts(tile = state.hover) {
+    app.walkers.setCursor(state.tool === "inspect" && state.mouse.inside ? tile : null, state.pinnedWalker?.citizen ?? null);
+  }
+  function repickAfterCameraMove() {
+    const tile = state.mouse.inside ? app.renderer.pick(state.mouse.x, state.mouse.y, app.camera) : null;
+    const changed = !tile !== !state.hover || (tile && state.hover && (tile[0] !== state.hover[0] || tile[1] !== state.hover[1]));
+    state.hover = tile;
+    syncThoughts();
+    if (changed && state.tool !== "inspect") refreshCost();
+  }
+  function clearPins() {
+    state.pinned = null;
+    state.pinnedWalker = null;
+    syncThoughts();
+  }
   function setTool(id) {
     if (id === "use" && state.tool === "use") { state.use = (state.use + 1) % 3; app.ui.flash(`Use brush: ${USE_LABEL[state.use]}.`); }
     state.tool = id;
@@ -64,6 +79,7 @@ export function createInput(canvas, app) {
     state.cost = null;
     app.ui.setTool(id, state.density);
     app.ui.setCost("");
+    syncThoughts(id === "inspect" && state.mouse.inside ? state.hover : null);
   }
 
   function screenXY(e) {
@@ -136,7 +152,10 @@ export function createInput(canvas, app) {
   function onDown(e) {
     canvas.focus();
     const [sx, sy] = screenXY(e);
-    const tile = app.renderer.pick(sx, sy);
+    state.mouse = { x: sx, y: sy, inside: true };
+    const tile = app.renderer.pick(sx, sy, app.camera);
+    state.hover = tile;
+    syncThoughts(tile); // touch can begin here without a preceding pointermove
     const panButton = e.button === 1 || e.button === 2 || (e.button === 0 && state.tool === "inspect");
     if (panButton) {
       state.pan = { sx, sy, cx: app.camera.x, cy: app.camera.y, moved: false };
@@ -174,11 +193,13 @@ export function createInput(canvas, app) {
       app.camera.x = state.pan.cx - (sx - state.pan.sx) / z;
       app.camera.y = state.pan.cy - (sy - state.pan.sy) / z;
       if (Math.abs(sx - state.pan.sx) + Math.abs(sy - state.pan.sy) > 4) state.pan.moved = true;
+      repickAfterCameraMove();
       return;
     }
-    const tile = app.renderer.pick(sx, sy);
+    const tile = app.renderer.pick(sx, sy, app.camera);
     const changed = !tile !== !state.hover || (tile && state.hover && (tile[0] !== state.hover[0] || tile[1] !== state.hover[1]));
     state.hover = tile;
+    syncThoughts(tile);
     if (state.drag) {
       state.drag.shift = e.shiftKey;
       if (tile) { state.drag.bx = tile[0]; state.drag.by = tile[1]; }
@@ -204,6 +225,7 @@ export function createInput(canvas, app) {
           state.pinned = state.pinned === i ? null : i;
           state.pinnedWalker = null;
         }
+        syncThoughts();
       }
       return;
     }
@@ -224,6 +246,7 @@ export function createInput(canvas, app) {
 
   function onLeave() {
     state.mouse.inside = false;
+    app.walkers.setCursor(null);
     if (!state.drag) { state.hover = null; app.ui.setCost(""); state.cost = null; }
   }
 
@@ -231,6 +254,7 @@ export function createInput(canvas, app) {
     e.preventDefault();
     const [sx, sy] = screenXY(e);
     app.zoomAt(e.deltaY < 0 ? 1 : -1, sx, sy);
+    repickAfterCameraMove();
   }
 
   // ---- keyboard -------------------------------------------------------------------------------
@@ -261,12 +285,12 @@ export function createInput(canvas, app) {
       case "l": case "L": app.load(); break;
       case "o": case "O": app.cycleOverlay(); break;
       case "r": case "R": app.news.toggle(); break;
-      case "+": case "=": app.zoomAt(1); break;
-      case "-": case "_": app.zoomAt(-1); break;
+      case "+": case "=": app.zoomAt(1); repickAfterCameraMove(); break;
+      case "-": case "_": app.zoomAt(-1); repickAfterCameraMove(); break;
       case "n": case "N": app.ui.openNewCity(); break;
       case "Escape":
         // Two-step: a drag or a pinned card is cleared first; a clean map opens the title menu.
-        if (state.drag || state.pinned != null || state.pinnedWalker) { state.drag = null; state.pinned = null; state.pinnedWalker = null; state.cost = null; app.ui.setCost(""); }
+        if (state.drag || state.pinned != null || state.pinnedWalker) { state.drag = null; clearPins(); state.cost = null; app.ui.setCost(""); }
         else app.title.open();
         break;
       default:
@@ -336,6 +360,7 @@ export function createInput(canvas, app) {
       const s = (PAN_SPEED * dt) / app.camera.zoom;
       app.camera.x += dx * s;
       app.camera.y += dy * s;
+      repickAfterCameraMove();
     }
   }
 
@@ -361,7 +386,7 @@ export function createInput(canvas, app) {
     if (state.pinnedWalker) {
       const alive = app.walkers.list().includes(state.pinnedWalker);
       if (alive) return { walker: state.pinnedWalker, pinned: true };
-      state.pinnedWalker = null;
+      clearPins();
     }
     if (state.pinned != null) return { tile: state.pinned, pinned: true };
     if (!state.mouse.inside || state.drag) return state.hover ? { tile: idx(w, state.hover[0], state.hover[1]), pinned: false } : null;
@@ -386,12 +411,13 @@ export function createInput(canvas, app) {
     state,
     setTool,
     update,
+    syncCamera: repickAfterCameraMove,
     hover: hoverForRenderer,
     hoverInfo,
     refreshCost,
     get tool() { return state.tool; },
     get density() { return state.density; },
-    unpin() { state.pinned = null; state.pinnedWalker = null; },
+    unpin() { clearPins(); },
   };
 }
 

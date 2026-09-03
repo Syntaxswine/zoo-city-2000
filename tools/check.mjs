@@ -959,6 +959,214 @@ check("no Math.random under js/", mathRandom.length === 0, mathRandom.join(", ")
     stateHash(Y) === stateHash(load(save(Y))));
 }
 
+// ---- Part A': actionable needs and Inspect bubbles (SPEC §14b) ------------
+{
+  const { ACT, LINES, NEED_CODES, line } = await import("../js/sim/voice.js");
+  const { BUBBLES_MAX, needOf, needsContext } = await import("../js/sim/needs.js");
+  const { needCensus } = await import("../js/sim/census.js");
+  const { homeScore, homeTerms } = await import("../js/sim/citizens.js");
+  const { SPECIES } = await import("../js/sim/species.js");
+  const { refreshLast } = await import("../js/sim/tick.js");
+  const { createWalkers } = await import("../js/walkers.js");
+  const { art } = await import("../js/art/index.js");
+  const { needFixture, needTruthResults } = await import("./need-fixtures.mjs");
+  const { COHERENT_STRESS_CODES, coherentStressFacts, coherentStressFixture } = await import("./need-stress.mjs");
+
+  const lineCodes = Object.keys(LINES).sort();
+  check("needs: every return code has one action and a default voice table",
+    JSON.stringify(NEED_CODES.slice().sort()) === JSON.stringify(Object.keys(ACT).sort())
+      && JSON.stringify(lineCodes) === JSON.stringify(NEED_CODES.slice().sort())
+      && NEED_CODES.every((code) => ACT[code] && LINES[code].default?.length >= 2));
+  const knownVoices = new Set(["default", "herb", "omni", "carn", ...SPECIES.map((s) => s.id)]);
+  const badVoice = [];
+  for (const [code, groups] of Object.entries(LINES)) for (const [voice, lines] of Object.entries(groups)) {
+    if (!knownVoices.has(voice)) badVoice.push(`${code}:${voice}`);
+    for (const text of lines) if (!text || text.length > 30 || /\{(?!n\}|species\})/.test(text)) badVoice.push(`${code}:${voice}:${text}`);
+  }
+  check("needs: voice overrides are known and every authored line is 1–30 characters", badVoice.length === 0, badVoice.join(", "));
+  let unresolvedVoices = 0;
+  for (let id = 0; id < 32; id++) for (const species of SPECIES) for (const code of NEED_CODES) {
+    const text = line(null, { id, species: species.id }, { code });
+    if (typeof text !== "string" || !text.length || text.length > 30) unresolvedVoices++;
+  }
+  check("needs: signed visual hashes still resolve every species/code voice", unresolvedVoices === 0, `${unresolvedVoices}`);
+
+  const truthResults = needTruthResults();
+  const wrongCases = truthResults.filter((r) => r.expected !== r.actual);
+  check("needs: every need code wins a focused truth fixture", wrongCases.length === 0,
+    wrongCases.map((r) => `${r.expected}→${r.actual}`).join(", "));
+  const flightTruth = truthResults.find((r) => r.expected === "FLIGHT");
+  check("needs: FLIGHT identifies the threatening species, not the citizen's species",
+    flightTruth?.need?.arg?.species === "wolf", JSON.stringify(flightTruth?.need?.arg));
+
+  const stressResults = COHERENT_STRESS_CODES.map((code, i) => coherentStressFixture(code, 355 + i));
+  const wrongStress = stressResults.filter((r) => r.actual !== r.expected);
+  check("needs: rare probe codes occur in coherent full-town snapshots", wrongStress.length === 0,
+    wrongStress.map((r) => `${r.expected}→${r.actual}`).join(", "));
+  const badStressFacts = stressResults.map((r) => ({ code: r.expected, ...coherentStressFacts(r) })).filter((f) =>
+    f.population !== 1300 || f.civicZoneOverlap || f.occupiedTierZero || f.homeOverflow || f.jobOverflow || f.badHousehold || f.badPath);
+  check("needs: stress towns have valid households, storeys, civics, capacities, and road commutes", badStressFacts.length === 0,
+    JSON.stringify(badStressFacts));
+  const derivedDrift = [];
+  for (const result of stressResults) {
+    const before = Object.fromEntries(["roadDist", "pol", "lv", "traffic", "crime", "fireCov", "policeCov", "dread", "occupants", "staff"]
+      .map((field) => [field, Buffer.from(result.world[field]).toString("base64")]));
+    const demand = JSON.stringify(result.world.last.demand);
+    refreshLast(result.world);
+    const changed = Object.keys(before).filter((field) => before[field] !== Buffer.from(result.world[field]).toString("base64"));
+    if (changed.length || demand !== JSON.stringify(result.world.last.demand) || needOf(result.world, result.target).code !== result.expected) {
+      derivedDrift.push(`${result.expected}:${changed.join("+") || "demand/need"}`);
+    }
+  }
+  check("needs: every stress witness survives a complete derived-field rebuild", derivedDrift.length === 0, derivedDrift.join(", "));
+
+  const vf = needFixture("tortoise");
+  check("needs: before the first census the answer is CONTENT", needOf(createWorld({ seed: "need-zero" }), vf.citizen).code === "CONTENT");
+  const n = needOf(vf.world, vf.citizen);
+  check("needs: a citizen's line is stable and comes with the selected remedy",
+    line(vf.world, vf.citizen, n) === line(vf.world, vf.citizen, n) && n.act === ACT[n.code]);
+  const smokeTruth = needFixture("tortoise");
+  smokeTruth.world.pol[smokeTruth.home] = 100;
+  const smokeOn = needOf(smokeTruth.world, smokeTruth.citizen).code;
+  smokeTruth.world.pol[smokeTruth.home] = 0;
+  const smokeOff = needOf(smokeTruth.world, smokeTruth.citizen).code;
+  check("needs: removing the mood's SMOKE deficit removes the SMOKE need",
+    smokeOn === "SMOKE" && smokeOff !== "SMOKE", `${smokeOn} → ${smokeOff}`);
+  const shopsTruth = needFixture("tortoise");
+  shopsTruth.world.last.demand.r.C = 1;
+  const shopsOn = needOf(shopsTruth.world, shopsTruth.citizen).code;
+  shopsTruth.world.last.demand.r.C = 0;
+  const shopsOff = needOf(shopsTruth.world, shopsTruth.citizen).code;
+  check("needs: closing the C valve removes the SHOPS need",
+    shopsOn === "SHOPS" && shopsOff !== "SHOPS", `${shopsOn} → ${shopsOff}`);
+  const parkTruth = needFixture("tortoise");
+  parkTruth.world.civic[parkTruth.park] = CIVIC.NONE;
+  const parkBefore = needOf(parkTruth.world, parkTruth.citizen).code;
+  parkTruth.world.civic[parkTruth.park] = CIVIC.PARK;
+  const parkAfter = needOf(parkTruth.world, parkTruth.citizen).code;
+  check("needs: the stated NO_PARK remedy makes that need fall at once",
+    parkBefore === "NO_PARK" && parkAfter !== "NO_PARK", `${parkBefore} → ${parkAfter}`);
+  let scoreDrift = 0;
+  for (const species of SPECIES.map((s) => s.id)) for (const strict of [false, true]) {
+    const f = needFixture(species);
+    const sum = homeTerms(f.world, species, f.home, strict).reduce((s, term) => s + term.value, 0);
+    if (homeScore(f.world, species, f.home, strict) !== sum) scoreDrift++;
+  }
+  check("needs: homeScore is exactly the sum of homeTerms for every species and gate", scoreDrift === 0, `${scoreDrift}`);
+  // Earlier field-law checks deliberately recompute A.world's derived fields
+  // without refreshing its panel cache. Exercise the cache contract on one
+  // coherent snapshot, exactly as load/new-game and the paused UI do.
+  const censusWorld = load(save(A.world));
+  refreshLast(censusWorld);
+  const liveNeeds = needCensus(censusWorld);
+  const cachedNeedTotal = Object.values(censusWorld.last.needs).reduce((s, x) => s + x, 0);
+  const livingCitizens = censusWorld.citizens.filter((c) => !c.dead).length;
+  check("needs: the cached census is the same histogram and counts every living citizen",
+    JSON.stringify(censusWorld.last.needs) === JSON.stringify(liveNeeds) && cachedNeedTotal === livingCitizens,
+    `cached ${JSON.stringify(censusWorld.last.needs)} · live ${JSON.stringify(liveNeeds)} · ${cachedNeedTotal}/${livingCitizens}`);
+
+  const W = createWalkers(A.world);
+  const hashBefore = stateHash(A.world);
+  W.notify();
+  for (let k = 0; k < 80; k++) W.update(0.1, { x0: 0, y0: 0, x1: A.world.w, y1: A.world.h });
+  const first = W.list().find((x) => x.citizen != null);
+  W.setCursor(first ? [Math.floor(first.tx), Math.floor(first.ty)] : null);
+  const voiced = W.list().filter((x) => x.need);
+  check("needs: Inspect attaches only stable need codes to the nearest eight walkers",
+    !!first && voiced.length > 0 && voiced.length <= BUBBLES_MAX && voiced.every((x) => NEED_CODES.includes(x.need)));
+  if (first) W.setCursor([0, 0], first.citizen);
+  const pinned = W.list().filter((x) => x.need);
+  check("needs: a pinned citizen's walker stays in the eight even beyond the cursor reach",
+    !!first && pinned.length <= BUBBLES_MAX && pinned.some((x) => x.citizen === first.citizen));
+  W.setCursor(null);
+  check("needs: leaving Inspect clears every bubble and the walker layer never writes the sim",
+    W.list().every((x) => x.need == null) && stateHash(A.world) === hashBefore);
+
+  // The input regression is event-driven: pan under a stationary pointer,
+  // change tools, and clear a pinned walker through both exits that used to
+  // leave walkers.pinnedNeed behind.
+  const oldWindow = globalThis.window;
+  const windowEvents = {};
+  globalThis.window = { addEventListener: (type, fn) => { windowEvents[type] = fn; } };
+  const canvasEvents = {};
+  const inputCanvas = {
+    focus() {}, setPointerCapture() {},
+    getBoundingClientRect: () => ({ left: 0, top: 0, width: 320, height: 200 }),
+    addEventListener: (type, fn) => { canvasEvents[type] = fn; },
+  };
+  const cursorCalls = [];
+  let costRefreshes = 0;
+  const pinnedWalker = { citizen: A.world.citizens[0].id };
+  let walkerAlive = true;
+  const inputApp = {
+    world: A.world, camera: { x: 20, y: 20, zoom: 1 },
+    renderer: {
+      pick: (_sx, _sy, camera) => [Math.floor((camera || inputApp.camera).x), Math.floor((camera || inputApp.camera).y)],
+      pickWalker: () => walkerAlive ? pinnedWalker : null,
+    },
+    walkers: {
+      list: () => walkerAlive ? [pinnedWalker] : [],
+      setCursor: (tile, pin) => cursorCalls.push({ tile: tile ? [...tile] : null, pin }),
+    },
+    ui: { setTool() {}, setCost() { costRefreshes++; }, flash() {}, modalOpen: () => false, closeModals() {}, openNewCity() {} },
+    title: { isOpen: () => false, open() {}, back() {} },
+    news: { isOpen: () => false, toggle() {}, key: () => false },
+    art: { civic: () => null, station: () => null },
+    doOp() {}, undo() {}, save() {}, load() {}, cycleOverlay() {},
+    zoomAt(dir) { inputApp.camera.zoom = dir > 0 ? 2 : 1; inputApp.camera.x += dir > 0 ? 7 : -7; },
+    togglePause() {}, setSpeed() {},
+  };
+  const { createInput } = await import("../js/input.js");
+  const input = createInput(inputCanvas, inputApp);
+  const pe = (x, y, button = 0) => ({ clientX: x, clientY: y, button, pointerId: 1, shiftKey: false, preventDefault() {} });
+  input.setTool("inspect");
+  // A touch/pointer press can be the first canvas event: it must establish
+  // the hover and thought cursor without relying on an earlier mouse move.
+  canvasEvents.pointerdown(pe(10, 10));
+  canvasEvents.pointerup(pe(10, 10));
+  const pinAttached = cursorCalls.at(-1)?.pin === pinnedWalker.citizen && cursorCalls.at(-1)?.tile != null;
+  windowEvents.keydown({ key: "Escape", code: "Escape", preventDefault() {} });
+  const escapeCleared = cursorCalls.at(-1)?.pin == null;
+  canvasEvents.pointerdown(pe(10, 10));
+  canvasEvents.pointermove(pe(30, 10));
+  const dragRepicked = cursorCalls.at(-1)?.tile?.[0] === Math.floor(inputApp.camera.x);
+  canvasEvents.pointerup(pe(30, 10));
+  windowEvents.keydown({ key: "ArrowRight", code: "ArrowRight", repeat: false, preventDefault() {} });
+  input.update(0.1);
+  const keyRepicked = cursorCalls.at(-1)?.tile?.[0] === Math.floor(inputApp.camera.x);
+  windowEvents.keyup({ key: "ArrowRight", code: "ArrowRight" });
+  windowEvents.keydown({ key: "+", code: "Equal", repeat: false, preventDefault() {} });
+  const zoomRepicked = cursorCalls.at(-1)?.tile?.[0] === Math.floor(inputApp.camera.x);
+  inputApp.camera.x = -99;
+  input.syncCamera(); // main calls this after clamping the real camera
+  const clampRepicked = cursorCalls.at(-1)?.tile?.[0] === -99;
+  input.setTool("park");
+  const costBeforePan = costRefreshes;
+  canvasEvents.pointerdown(pe(10, 10, 1));
+  canvasEvents.pointermove(pe(30, 10, 1));
+  canvasEvents.pointerup(pe(30, 10, 1));
+  const costRepicked = costRefreshes > costBeforePan;
+  input.setTool("road");
+  const roadCleared = cursorCalls.at(-1)?.tile == null;
+  input.setTool("inspect");
+  canvasEvents.pointerdown(pe(10, 10));
+  canvasEvents.pointerup(pe(10, 10));
+  walkerAlive = false;
+  input.hoverInfo();
+  const staleCleared = cursorCalls.at(-1)?.pin == null;
+  globalThis.window = oldWindow;
+  check("needs: camera pans repick Inspect; road and every unpin path synchronize the bubble layer",
+    pinAttached && escapeCleared && dragRepicked && keyRepicked && zoomRepicked && clampRepicked && costRepicked && roadCleared && staleCleared,
+    JSON.stringify({ pinAttached, escapeCleared, dragRepicked, keyRepicked, zoomRepicked, clampRepicked, costRepicked, roadCleared, staleCleared }));
+
+  const b1 = art.bubble(90, 15), b2 = art.bubble(90, 15);
+  check("needs: bubble art is cached, palette-keyed, and includes its three-pixel tail",
+    b1 === b2 && b1.w === 90 && b1.h === 18 && b1.anchor[1] === 17
+      && art.bubble(90, 15, 0, "top").anchor[0] === 0 && art.bubble(90, 15, 89, "top").anchor[0] === 89);
+  const simNeedLeak = files.filter((f) => /[\\/]sim[\\/]/.test(f) && /\.need\b|setCursor\(|needCursor/.test(readFileSync(f, "utf8"))).map((f) => path.relative(ROOT, f));
+  check("needs: no simulation module reads walker need or the Inspect cursor", simNeedLeak.length === 0, simNeedLeak.join(", "));
+}
+
 // ---- Part J': named save slots (SPEC §15) -----------------------------------
 {
   const memoryStore = () => {
@@ -1424,6 +1632,69 @@ if (existsSync(artIndex)) {
   check("play: a town renders to something that is not a blank rectangle",
     n > 10 && colours > 12, `${colours} distinct colours over ${n} built lots`);
 
+  // Four real citizens, carrying only need codes as the walker contract says,
+  // exercise Canvas text and the screen-space bubble pass through render.js.
+  const bubbleCodes = ["SMOKE", "NO_PARK", "NO_JOB", "WATER"];
+  const speakers = P.citizens.slice(0, 4).map((c, i) => ({
+    id: c.id, citizen: c.id, species: c.species, age: "adult", need: bubbleCodes[i],
+    tx: cx / n + (i - 1.5) * 0.8, ty: cy / n + (i & 1 ? 0.7 : -0.7),
+  }));
+  renderer.draw(camera, null, { list: () => speakers }, "off", 0);
+  const withThoughts = Buffer.from(canvas._data).toString("base64");
+  check("needs: the real renderer paints four legible screen-space thought bubbles",
+    renderer.drawBubbles(speakers) === 4 && withThoughts !== shot, `${speakers.length} speakers`);
+  const bubbleBounds = (zoom) => {
+    const c = HC.createCanvas(320, 200);
+    const r = createRenderer(c, P, art);
+    const speaker = speakers[0];
+    const [px, py] = toScreen(speaker.tx, speaker.ty);
+    r.draw({ x: px, y: py + HALF_H, zoom }, null, null, "off", 0);
+    const before = Uint8ClampedArray.from(c._data);
+    r.drawBubbles([speaker]);
+    let x0 = c.width, y0 = c.height, x1 = -1, y1 = -1;
+    for (let y = 0; y < c.height; y++) for (let x = 0; x < c.width; x++) {
+      const i = (y * c.width + x) * 4;
+      if (before[i] === c._data[i] && before[i + 1] === c._data[i + 1] && before[i + 2] === c._data[i + 2]) continue;
+      x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x); y1 = Math.max(y1, y);
+    }
+    return [x1 - x0 + 1, y1 - y0 + 1];
+  };
+  const bubbleAt1 = bubbleBounds(1), bubbleAt2 = bubbleBounds(2);
+  check("needs: thought bubbles have the same device-pixel box at zoom 1 and zoom 2",
+    bubbleAt1[0] > 20 && bubbleAt1[1] > 8 && bubbleAt1[0] === bubbleAt2[0] && bubbleAt1[1] === bubbleAt2[1],
+    `zoom 1 ${bubbleAt1.join("×")} · zoom 2 ${bubbleAt2.join("×")}`);
+  const edgeTail = (headX, headY) => {
+    const c = HC.createCanvas(320, 200);
+    const r = createRenderer(c, P, art);
+    const speaker = speakers[0];
+    const [px, py] = toScreen(speaker.tx, speaker.ty);
+    const edgeCamera = {
+      x: px + c.width / 2 - headX,
+      y: py + HALF_H + c.height / 2 - 24 - headY,
+      zoom: 1,
+    };
+    r.draw(edgeCamera, null, null, "off", 0);
+    r.drawBubbles([speaker]);
+    const x = Math.max(0, Math.min(c.width - 1, headX));
+    const y = Math.max(0, Math.min(c.height - 1, headY));
+    const i = (y * c.width + x) * 4;
+    return c._data[i] === 0x2a && c._data[i + 1] === 0x26 && c._data[i + 2] === 0x20;
+  };
+  check("needs: a clamped bubble keeps its tail on each edge and points toward off-screen pins",
+    edgeTail(0, 100) && edgeTail(319, 100) && edgeTail(160, 0) && edgeTail(160, 199)
+      && edgeTail(-40, 100) && edgeTail(360, 100) && edgeTail(160, -30) && edgeTail(160, 230));
+  const eightSpeakers = P.citizens.slice(0, 8).map((c, i) => ({
+    id: c.id, citizen: c.id, species: c.species, age: "adult", need: bubbleCodes[i % bubbleCodes.length],
+    tx: cx / n + (i % 4 - 1.5), ty: cy / n + ((i / 4) | 0) - 0.5,
+  }));
+  for (let i = 0; i < 10; i++) renderer.drawBubbles(eightSpeakers);
+  const thoughtT0 = performance.now();
+  for (let i = 0; i < 100; i++) renderer.drawBubbles(eightSpeakers);
+  const thoughtMs = (performance.now() - thoughtT0) / 100;
+  check("needs: the cached eight-bubble pass adds under 1 ms per frame",
+    thoughtMs < 1, `${thoughtMs.toFixed(3)} ms`);
+  console.log(`needs: 8-bubble pass ${thoughtMs.toFixed(3)} ms · zoom boxes ${bubbleAt1.join("×")} / ${bubbleAt2.join("×")}`);
+
   // Two layers, two rules, and the difference is the whole reason play.mjs
   // has to invalidate. A BUILDING is in the per-frame pass and appears the
   // moment the world says so. The GROUND — terrain, roads, chalk and the
@@ -1869,13 +2140,24 @@ if (existsSync(walkersPath)) {
       } else if (pred) gone = true;
     }
   }
+  const list60 = walkers.list();
+  check("walkers carry real citizen ids", list60.every((x) => x.citizen == null || w2.byId.has(x.citizen) || x.kind !== "commuter"), `${list60.length} walkers`);
+  // Continue to year 30 with the visual side actively selecting and resolving
+  // Inspect needs every month. The twin never constructs a walker layer.
+  for (let t = 60; t < 30 * 12; t++) {
+    tick(w1);
+    tick(w2);
+    walkers.notify();
+    walkers.setCursor([sx + (t % 3) - 1, sy + ((t / 3) % 3 | 0) - 1]);
+    walkers.update(0.05, viewport);
+    walkers.list();
+  }
   KNOBS.KILL_P = savePD;
   check("a forced killing publishes a record and the walker layer takes it: the killer's own walker, the neighbour named in the sack", !!rec && !!pred && pred.citizen === rec.killer && pred.preyName === rec.victim.name, rec ? (pred ? `${pred.citizen} vs ${rec.killer}` : "no predation walker") : "no killing landed in 30 forced months");
   check("the sack falls, is tied at the door, goes home over the shoulder, and the walker finishes", sawFall && sawTied && stoodAtDoor && sawCarry && gone, `fall ${sawFall} tied ${sawTied} door ${stoodAtDoor} carry ${sawCarry} gone ${gone}`);
-  check("walkers never write the sim: hash equal with the walker layer on and off", stateHash(w1) === stateHash(w2), `${stateHash(w1)} vs ${stateHash(w2)}`);
+  check("walkers never write the sim: 30 years with Inspect needs on and off hash-equal", stateHash(w1) === stateHash(w2), `${stateHash(w1)} vs ${stateHash(w2)}`);
   const list = walkers.list();
-  check("walkers carry real citizen ids", list.every((x) => x.citizen == null || w2.byId.has(x.citizen) || x.kind !== "commuter"), `${list.length} walkers`);
-  console.log(`walkers: ${list.length} active after 60 ticks`);
+  console.log(`walkers: ${list.length} active after 360 ticks`);
 } else {
   console.log("walkers: js/walkers.js not present yet — Part D skipped");
 }

@@ -18,14 +18,34 @@
 // SCOPE. Exactly the Canvas2D surface js/render.js uses and not one method
 // more: createImageData / putImageData / getImageData, 3-argument drawImage,
 // clearRect, fillRect + fillStyle, save / restore / beginPath / rect / clip,
-// globalAlpha. Everything the renderer draws is per-pixel ImageData or a blit
-// of another canvas, because SPEC §3 forbids path drawing for sprite edges —
-// which is exactly why this shim can be this small.
+// globalAlpha, and the tiny monospace fillText/measureText surface used only
+// by Inspect bubbles. Everything else is per-pixel ImageData or a blit.
 
 import { deflateSync } from 'node:zlib';
 
 const HEX = /^#([0-9a-f]{6})$/i;
 const RGBA = /^rgba?\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)\s*(?:,\s*([\d.]+)\s*)?\)$/i;
+
+// Five-by-seven CI font. Browser play uses its real monospace; this keeps the
+// headless camera's bubble proof readable without introducing a dependency.
+const FONT5 = {
+  a:["01110","10001","10001","11111","10001","10001","10001"], b:["11110","10001","10001","11110","10001","10001","11110"],
+  c:["01111","10000","10000","10000","10000","10000","01111"], d:["11110","10001","10001","10001","10001","10001","11110"],
+  e:["11111","10000","10000","11110","10000","10000","11111"], f:["11111","10000","10000","11110","10000","10000","10000"],
+  g:["01111","10000","10000","10111","10001","10001","01111"], h:["10001","10001","10001","11111","10001","10001","10001"],
+  i:["11111","00100","00100","00100","00100","00100","11111"], j:["00111","00010","00010","00010","10010","10010","01100"],
+  k:["10001","10010","10100","11000","10100","10010","10001"], l:["10000","10000","10000","10000","10000","10000","11111"],
+  m:["10001","11011","10101","10101","10001","10001","10001"], n:["10001","11001","10101","10011","10001","10001","10001"],
+  o:["01110","10001","10001","10001","10001","10001","01110"], p:["11110","10001","10001","11110","10000","10000","10000"],
+  q:["01110","10001","10001","10001","10101","10010","01101"], r:["11110","10001","10001","11110","10100","10010","10001"],
+  s:["01111","10000","10000","01110","00001","00001","11110"], t:["11111","00100","00100","00100","00100","00100","00100"],
+  u:["10001","10001","10001","10001","10001","10001","01110"], v:["10001","10001","10001","10001","10001","01010","00100"],
+  w:["10001","10001","10001","10101","10101","10101","01010"], x:["10001","10001","01010","00100","01010","10001","10001"],
+  y:["10001","10001","01010","00100","00100","00100","00100"], z:["11111","00001","00010","00100","01000","10000","11111"],
+  "?":["01110","10001","00001","00010","00100","00000","00100"], ".":["00000","00000","00000","00000","00000","00110","00110"],
+  ",":["00000","00000","00000","00000","00110","00110","00100"], "'":["00100","00100","00000","00000","00000","00000","00000"],
+  "-":["00000","00000","00000","11111","00000","00000","00000"], " ":["00000","00000","00000","00000","00000","00000","00000"],
+};
 
 function parseHex(s) {
   const str = String(s).trim();
@@ -58,6 +78,9 @@ class Ctx2D {
     this.globalCompositeOperation = 'source-over';
     this.strokeStyle = '#000000';
     this.lineWidth = 1;
+    this.font = '10px monospace';
+    this.textBaseline = 'top';
+    this.textAlign = 'left';
     this._clip = null; // {x0,y0,x1,y1} or null for the whole canvas
     this._path = null;
     this._poly = null; // moveTo/lineTo points, in DEVICE pixels
@@ -74,7 +97,7 @@ class Ctx2D {
   }
 
   save() {
-    this._stack.push({ clip: this._clip, fillStyle: this.fillStyle, strokeStyle: this.strokeStyle, lineWidth: this.lineWidth, globalAlpha: this.globalAlpha, t: { ...this._t } });
+    this._stack.push({ clip: this._clip, fillStyle: this.fillStyle, strokeStyle: this.strokeStyle, lineWidth: this.lineWidth, globalAlpha: this.globalAlpha, font: this.font, textBaseline: this.textBaseline, textAlign: this.textAlign, t: { ...this._t } });
   }
 
   restore() {
@@ -85,6 +108,9 @@ class Ctx2D {
     this.strokeStyle = s.strokeStyle;
     this.lineWidth = s.lineWidth;
     this.globalAlpha = s.globalAlpha;
+    this.font = s.font;
+    this.textBaseline = s.textBaseline;
+    this.textAlign = s.textAlign;
     this._t = s.t;
   }
 
@@ -282,6 +308,23 @@ class Ctx2D {
         c._data[t + 2] = bl;
         c._data[t + 3] = 255;
       }
+    }
+  }
+
+  measureText(text) {
+    return { width: String(text).length * 6 };
+  }
+
+  fillText(text, x, y) {
+    const [r, g, bl, pa] = parseHex(this.fillStyle);
+    const alpha = (pa / 255) * this.globalAlpha;
+    const str = String(text).toLowerCase().replaceAll('’', "'");
+    let ox = Math.round(this._dx(x));
+    const oy = Math.round(this._dy(y));
+    for (const ch of str) {
+      const rows = FONT5[ch] || FONT5["?"];
+      for (let yy = 0; yy < 7; yy++) for (let xx = 0; xx < 5; xx++) if (rows[yy][xx] === "1") this._blend(ox + xx, oy + yy, r, g, bl, alpha);
+      ox += 6;
     }
   }
 

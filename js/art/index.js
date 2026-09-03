@@ -42,6 +42,7 @@ import { wallSprite, tunnelSprite, allWalls } from "./walls.js";
 import { railSprite, stationSprite, allRail } from "./rail.js";
 import { GRASS, CHALK, RUBBLE, WATER_TILE, KERB, TREES, TREE_LIST, ZOTS, PLAZA, CURSOR, GHOST, waterTint, WATER_FRAMES, allTerrain } from "./terrain.js";
 import { citizenSprite, TENT, HAT, MEETING, SACKS, allCitizens } from "./citizens.js";
+import { bubbleSprite, BUBBLE_SAMPLES } from "./bubbles.js";
 
 const EXTRA = { tent: TENT, hat: HAT, meeting: MEETING, plaza: PLAZA, cursor: CURSOR, ghost: GHOST };
 
@@ -94,7 +95,7 @@ function notBuilt(name) {
   throw new Error(`art.${name}: not built`);
 }
 
-export function bubble(_w, _h) { return notBuilt("bubble"); }
+export const bubble = bubbleSprite;
 export function portrait(_species, _opts = {}) { return notBuilt("portrait"); }
 export function mark(_species) { return notBuilt("mark"); }
 export function look(_id) { return { shade: 0, mark: 0 }; }
@@ -127,7 +128,7 @@ export const art = Object.freeze({
 
 /** Every sprite the registry can hand out, named — the check.mjs audit walks this. */
 export function allSprites() {
-  const out = [...allBuildings(), ...allBlocks(), ...allLandmarks(), ...allShops(), ...allRoads(), ...allWalls(), ...allRail(), ...allTerrain(), ...allCitizens()];
+  const out = [...allBuildings(), ...allBlocks(), ...allLandmarks(), ...allShops(), ...allRoads(), ...allWalls(), ...allRail(), ...allTerrain(), ...allCitizens(), ...BUBBLE_SAMPLES.map((sprite) => ({ name: sprite.name, sprite }))];
   const seen = new Set();
   return out.filter(({ name }) => (seen.has(name) ? false : (seen.add(name), true)));
 }

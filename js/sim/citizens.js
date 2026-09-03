@@ -243,28 +243,56 @@ function treeWithin(world, i, r) {
   return false;
 }
 
-/** How much a species likes a vacant R lot. `strict` honours the soft gates. */
-function homeScore(world, species, i, strict) {
+/**
+ * The exact terms in a species' home score. `potential` marks the preference
+ * bonus a lot could supply; Needs reads the missing part instead of copying
+ * the preference rule. `strict` preserves the fox/bear soft arrival gates.
+ */
+export function homeTerms(world, species, i, strict = false) {
   const sp = SPECIES_BY_ID[species];
   const lv = world.lv[i];
   const pol = world.pol[i];
-  let s = lv - pol * (1 - sp.polTol / 100);
+  const terms = [
+    { code: "LV_BASE", value: lv },
+    { code: "POLLUTION", value: -pol * (1 - sp.polTol / 100) },
+  ];
   // The meat hall's dread: herbivores steer away from it; carnivores do not mind (the LV term already took 0.8·dread off).
   const diet = DIET_OF[species];
-  if (diet === "herb") s -= KNOBS.DREAD_HOME_HERB * world.dread[i];
-  else if (diet === "carn") s += KNOBS.DREAD_HOME_CARN * world.dread[i];
+  if (diet === "herb") terms.push({ code: "DREAD_HOME", value: -KNOBS.DREAD_HOME_HERB * world.dread[i] });
+  else if (diet === "carn") terms.push({ code: "DREAD_HOME", value: KNOBS.DREAD_HOME_CARN * world.dread[i] });
   switch (sp.homePref) {
-    case "high": if (world.maxTier[i] === 3 && world.tier[i] >= 2) s += 15; break;
-    case "low": if (world.maxTier[i] === 1 || world.tier[i] === 1) s += 15; else if (strict) return -Infinity; break;
-    case "lv50": if (lv >= 50) s += 20; else if (strict) return -Infinity; break;
-    case "water": if (waterWithin(world, i, 6)) s += 15; break;
-    case "trees": if (treeWithin(world, i, 3)) s += 15; break;
-    case "pasture": if (world.maxTier[i] === 1 || world.tier[i] === 1) s += 10; if (parkWithin(world, i, 4)) s += 10; break;
-    case "flats": if (world.tier[i] >= 2) s += 15; break;
-    case "dirt": if (pol >= 15) s += 12; break;   // raccoons like it messy — they settle beside the pigs
+    case "high": {
+      const met = world.maxTier[i] === 3 && world.tier[i] >= 2;
+      terms.push({ code: "HIGH", value: met ? 15 : 0, potential: 15 });
+      break;
+    }
+    case "low": {
+      const met = world.maxTier[i] === 1 || world.tier[i] === 1;
+      terms.push({ code: "LOW", value: met ? 15 : strict ? -Infinity : 0, potential: 15 });
+      break;
+    }
+    case "lv50": {
+      const met = lv >= 50;
+      terms.push({ code: "LV", value: met ? 20 : strict ? -Infinity : 0, potential: 20 });
+      break;
+    }
+    case "water": terms.push({ code: "WATER", value: waterWithin(world, i, 6) ? 15 : 0, potential: 15 }); break;
+    case "trees": terms.push({ code: "TREES", value: treeWithin(world, i, 3) ? 15 : 0, potential: 15 }); break;
+    case "pasture": {
+      terms.push({ code: "PASTURE", value: world.maxTier[i] === 1 || world.tier[i] === 1 ? 10 : 0, potential: 10 });
+      terms.push({ code: "PASTURE", value: parkWithin(world, i, 4) ? 10 : 0, potential: 10 });
+      break;
+    }
+    case "flats": terms.push({ code: "HIGH", value: world.tier[i] >= 2 ? 15 : 0, potential: 15 }); break;
+    case "dirt": terms.push({ code: "CLEAN", value: pol >= 15 ? 12 : 0, potential: 12 }); break; // raccoons like it messy
     default: break;
   }
-  return s;
+  return terms;
+}
+
+/** How much a species likes a vacant R lot. `strict` honours the soft gates. */
+export function homeScore(world, species, i, strict = false) {
+  return homeTerms(world, species, i, strict).reduce((sum, term) => sum + term.value, 0);
 }
 
 /** Vacant R lots with room for `size` that ADMIT the species (use-zoning, SPEC §7.8), optionally limited to a set of lots. */
@@ -848,6 +876,8 @@ export function moodTerms(world, c, context = moodContext(world)) {
   // PREY FLIGHT: a predator of my kind next door (Chebyshev 1) costs mood,
   // unless I have a friend of that species — the bridge. Weights, never gates.
   let flight = 0;
+  let flightSpecies = null;
+  let flightSpeciesPts = -1;
   const preds = PREY_OF[c.species];
   if (preds && c.home >= 0) {
     const tx = c.home % w;
@@ -872,9 +902,16 @@ export function moodTerms(world, c, context = moodContext(world)) {
       if (!s[1]) continue;
       let bridged = false;
       for (const f of c.friends) { const o = world.byId.get(f); if (o && o.species === p) { bridged = true; break; } }
-      if (!bridged) flight += KNOBS.PREY_FLIGHT * (s[1] / s[0]);
+      if (!bridged) {
+        const points = KNOBS.PREY_FLIGHT * (s[1] / s[0]);
+        flight += points;
+        if (points > flightSpeciesPts) { flightSpeciesPts = points; flightSpecies = p; }
+      }
     }
-    if (wolfMoon && preds.includes("wolf")) flight += KNOBS.PREY_FLIGHT;
+    if (wolfMoon && preds.includes("wolf")) {
+      flight += KNOBS.PREY_FLIGHT;
+      if (KNOBS.PREY_FLIGHT > flightSpeciesPts) { flightSpeciesPts = KNOBS.PREY_FLIGHT; flightSpecies = "wolf"; }
+    }
   }
 
   if (c.home >= 0) {
@@ -905,7 +942,7 @@ export function moodTerms(world, c, context = moodContext(world)) {
     if (van && diet === "carn") terms.push({ code: "VAN", value: -KNOBS.VAN_MOOD });
   }
   terms.push({ code: "FRIENDS", value: 5 * c.friends.length });
-  terms.push({ code: "FLIGHT", value: -Math.min(20, flight) });
+  terms.push({ code: "FLIGHT", arg: flightSpecies, value: -Math.min(20, flight) });
   if (c.home >= 0) terms.push({ code: "CRIME", value: -KNOBS.CRIME_MOOD * Math.max(0, world.crime[c.home] - KNOBS.CRIME_MOOD_FROM) });
   for (const e of world.events.active) {
     const value = e.moodBySpecies && e.moodBySpecies[c.species];

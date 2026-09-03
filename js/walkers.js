@@ -31,6 +31,7 @@ import { hash01 } from "./sim/rng.js";
 import { edgeRoads } from "./sim/fields.js";
 import { KNOBS } from "./sim/rules.js";
 import { art } from "./art/index.js";
+import { BUBBLES_MAX, NEED_REACH, needOf, needsContext } from "./sim/needs.js";
 
 export const MAX_WALKERS = 150;
 const SPAWN_PER_UPDATE = 3;
@@ -54,6 +55,9 @@ export function createWalkers(initialWorld) {
   let lastTick = -1;
   let nextFake = -1; // ids for departure walkers (negative: never a citizen)
   let pending = []; // predations not yet on the map (the killer's other walker is released first); each carries `until`, a tick
+  let needCursor = null; // [tx, ty] only while Inspect is active
+  let pinnedNeed = null; // a pinned citizen's walker is kept in the eight
+  let needSig = "";
 
   // ---- BFS scratch, local to this module -----------------------------------
   let n = world.w * world.h;
@@ -603,7 +607,48 @@ export function createWalkers(initialWorld) {
   }
 
   function list() {
+    refreshNeeds();
     return active;
+  }
+
+  /**
+   * Attach need CODES to the nearest eight real citizens under Inspect. Text
+   * remains outside the walker state; render/card resolve the same code.
+   */
+  function refreshNeeds() {
+    const positions = active.map((w) => `${w.id}:${Math.floor(w.tx)},${Math.floor(w.ty)}`).join(";");
+    const sig = `${world.tick}|${needCursor ? needCursor.join(",") : "-"}|${pinnedNeed ?? "-"}|${positions}`;
+    if (sig === needSig) return;
+    needSig = sig;
+    for (const w of active) w.need = null;
+    if (!needCursor) return;
+    const [cx, cy] = needCursor;
+    const eligible = [];
+    for (const w of active) {
+      if (w.citizen == null || !world.byId?.has(w.citizen)) continue;
+      const dx = w.tx - (cx + 0.5);
+      const dy = w.ty - (cy + 0.5);
+      const d = Math.max(Math.abs(dx), Math.abs(dy));
+      if (d <= NEED_REACH || w.citizen === pinnedNeed) eligible.push({ w, d, d2: dx * dx + dy * dy });
+    }
+    eligible.sort((a, b) => a.d2 - b.d2 || a.w.id - b.w.id);
+    let chosen = eligible.slice(0, BUBBLES_MAX);
+    const pin = eligible.find((e) => e.w.citizen === pinnedNeed);
+    if (pin && !chosen.includes(pin)) { chosen = chosen.slice(0, BUBBLES_MAX - 1); chosen.push(pin); }
+    const context = needsContext(world);
+    for (const { w } of chosen) {
+      const c = world.byId.get(w.citizen);
+      w.need = needOf(world, c, context).code;
+    }
+  }
+
+  function setCursor(tile, pinnedCitizen = null) {
+    const next = Array.isArray(tile) ? [tile[0], tile[1]] : null;
+    const pin = Number.isInteger(pinnedCitizen) ? pinnedCitizen : null;
+    if ((!next && !needCursor || next && needCursor && next[0] === needCursor[0] && next[1] === needCursor[1]) && pin === pinnedNeed) return;
+    needCursor = next;
+    pinnedNeed = pin;
+    needSig = "";
   }
 
   function setWorld(nw) {
@@ -613,8 +658,11 @@ export function createWalkers(initialWorld) {
     pending = [];
     cursor = 0;
     lastTick = -1;
+    needCursor = null;
+    pinnedNeed = null;
+    needSig = "";
     resize();
   }
 
-  return { update, list, notify, setWorld, get count() { return active.length; } };
+  return { update, list, notify, setCursor, setWorld, get count() { return active.length; } };
 }
