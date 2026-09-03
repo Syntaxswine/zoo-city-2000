@@ -11,6 +11,7 @@ import { budgetTick } from "./budget.js";
 import { eventsTick } from "./events.js";
 import { justiceTick } from "./justice.js";
 import { storyTick } from "./story.js";
+import { beginMeatMonth, penMaturityTick, meatTick, meatCensus, resetMeatRoutes } from "./meat.js";
 import { SPECIES } from "./species.js";
 import { ZONE } from "./world.js";
 
@@ -26,12 +27,21 @@ export function tick(world) {
   world.departures = [];
   world.arrivals = [];
   world.predations = []; // this month's killings, for the walker layer (justice.kill)
+  world.naturalDeaths = []; // this month's bodies, captured before removeCitizen scrubs their homes
+  world.meatTrips = []; // this month's exact logistics routes, read-only to the walker layer
   world.lifeEvents = []; // this month's biographies; storyTick is their only path to news
   if (!world.byId) {
     // First tick of a fresh world.
     world.byId = new Map();
     world.hhById = new Map();
   }
+  const meatNotices = [];
+  const market = beginMeatMonth(world);
+  if (market) meatNotices.push(market);
+  // Pens mature before the birthday/split pass: on the exact sixteenth
+  // birthday the animal goes to market instead of becoming a new household.
+  meatNotices.push(...penMaturityTick(world));
+  notices.push(...meatNotices);
   // 1. fields
   computeFields(world);
   recountRosters(world);
@@ -52,8 +62,14 @@ export function tick(world) {
   const evNotices = eventsTick(world, cen, dem);
   notices.push(...evNotices);
   // 7b. crime and punishment: releases, the killing, burglary, the files.
+  // Lots and events can change a hall or a road in this same month.
+  resetMeatRoutes(world);
   const jNotices = justiceTick(world, cen);
   notices.push(...jNotices);
+  const monthMeat = meatTick(world);
+  meatNotices.push(...monthMeat);
+  notices.push(...monthMeat);
+  Object.assign(cen, meatCensus(world));
   storyTick(world);
   // Events can remove households (revolt, rubble, a killing, a sale); compact
   // before anything counts or saves — a dead citizen must never survive a tick boundary.
@@ -75,7 +91,7 @@ export function tick(world) {
   if (ms) notices.push(ms);
   // Every line the ticker shows goes into the log too, so a loaded city can
   // show its own history (rolled events already logged themselves).
-  for (const line of notices) if (!evNotices.includes(line) && !jNotices.includes(line) && !lots.landmarks.includes(line)) world.events.log.push({ t: world.tick, id: "notice", line });
+  for (const line of notices) if (!evNotices.includes(line) && !jNotices.includes(line) && !meatNotices.includes(line) && !lots.landmarks.includes(line)) world.events.log.push({ t: world.tick, id: "notice", line });
   if (world.events.log.length > 400) world.events.log.splice(0, world.events.log.length - 400);
   world.tick++;
   world.last.needs = needCensus(world); // cards and walkers now read this same tick
@@ -91,6 +107,7 @@ export function refreshLast(world) {
   computeFields(world);
   recountRosters(world);
   const cen = census(world);
+  Object.assign(cen, meatCensus(world));
   const dem = peekDemand(world, cen);
   const fig = yearlyFigures(world);
   const prev = world.last || {};

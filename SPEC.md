@@ -632,7 +632,7 @@ weighted by unemployment, no jobs means hungry wolves. 2. no, random based
 on proximity. i think it should be possible for prey to murder too, but just
 much less likely. 3. yes."* Designed by two panels
 (`docs/PROPOSAL-CRIME-AND-PUNISHMENT.md`), built as stated there with the
-rulings applied. Every constant is in KNOBS; the rules tab has M1–M3, K1,
+rulings applied. Every constant is in KNOBS; the rules tab has M1–M6, K1,
 P1–P3.
 
 ```
@@ -641,9 +641,11 @@ DIET     herb = rabbit, mouse, beaver, tortoise, pig, cow · omni = bear, raccoo
 
 ZONE M   key M, "Meat", §12 a tile, drag-zoned; tiers stall / meat hall / cold store, M_JOBS [0, 3, 8, 16];
          its own valve rM = clamp((0.06·carnivores + 10 − Jm)/max(Jm, 20), −1, 1), T_M = T_C — a 1,600 town wants ~72 hall jobs;
-         Jm ∈ J and Lab, ∉ Jc (no crowd-out of shops); local_M = 0.6·clamp(carnivores within 5 / 40 − 0.5, ±0.3) + 0.4·(50 − LV)/200;
+         Jm ∈ J and Lab, ∉ Jc (no crowd-out of shops); local_M = 0.6·clamp(carnivores within 5 / 40 − 0.5, ±0.3) + 0.4·(50 − LV)/200
+         + 0.20·min(1, stock/8);
          maxTier 3 like I; staffed by diet JOB_M {carn 0.9, omni 0.5, herb 0.1} (a weight — pigs and beavers, jobC 0.2, will walk to one)
-DREAD    world.dread (derived): a hall spreads [0, 40, 70, 105] over radius [0, 2, 3, 4] (the pollution shape); LV −= 0.8·dread
+DREAD    world.dread (derived): a hall spreads [0, 40, 70, 105] × (0.5 + 0.5·min(1, stock/8)) over radius [0, 2, 3, 4]
+         (the pollution shape); LV −= 0.8·dread
          → a tier-3 hall −84/−67/−50/−34/−17 LV at d 0..4, exactly twice a works (−42/−34/−25/−17/−8)
          herbivores: mood −min(25, 0.25·dread) (halved with a carnivore friend); home score −dread; arrivals ×(1 − 0.3·min(1, halls/3));
                      REHOME: a herbivore household at dread ≥ 40 moves along the road (≤ 12 tiles) at 3%/month, to a lot with less dread
@@ -651,7 +653,8 @@ DREAD    world.dread (derived): a hall spreads [0, 40, 70, 105] over radius [0, 
          omnivores: nothing. NOT pollution (pollution pulls raccoons and pigs and refuses R growth — the rule is herbivore-specific)
 CRIME    crime += a hall's [0, 10, 18, 25] over [0, 1, 2, 3] (×0.5 licensed) + 15 within 2 of every open FILE
          + 3 per unemployed adult in the 3×3 (a carnivore ×2)   ← "no jobs means hungry wolves", counted from live state
-MONEY    unlicensed: the CUT, §25 per filled M job per year, ledger "cut", untaxed; a killing near a hall +§50; a convict sold +§100
+MONEY    unlicensed: the CUT, §25 per filled M job per year, ledger "cut", untaxed; a killing bought by a hall +§50; a convict sold +§100;
+         meals are §20/unit to "cut" unlicensed, or the C-rate share to "tax" licensed — every cash change uses budget.post
          LICENCE (offered deterministically the month the first hall reaches tier 2; §2,000 + §400/yr per hall): M jobs taxed at the C rate,
                  the crime hill ×0.5, the buyer's pull ×0.5 (3 → 1.5); the smell is unchanged
          RAID (a BOON kind so the No-disasters toggle never masks it; w3; cooldown 24): an unlicensed hall with police cover, crime > 50
@@ -659,7 +662,7 @@ MONEY    unlicensed: the CUT, §25 per filled M job per year, ledger "cut", unta
          THE GREENS' LEAGUE (w2, 6 months): herbivores ≥ 40% and a killing's file standing → V_C −0.3, herbivore mood +5
 
 THE KILLING (justice.js killingTick, every month, before the files):
-         Σ = Σ over adults of KILL_DIET {carn 1, omni 0.1, herb 0.03} × 20 if unemployed × 3 within a hall's smell (1.5 licensed)
+         Σ = Σ over adults of KILL_DIET {carn 1, omni 0.1, herb 0.03} × 20 if unemployed × 3 with a non-full hall in H service reach (1.5 licensed)
              × 2 if on a hall's staff × (0.5 + crime at home/100); fixed, held and cubs 0
          killings this month k = floor(0.00005·Σ + rng) — drawn once wherever an adult lives (the baseline hash moves; see §4)
          killer = weighted pick; victim = weighted pick of adults within Chebyshev 3 of the killer's home (not the household):
@@ -681,11 +684,11 @@ THE WRONG ANIMAL 5% of arrests: any adult within 4 of the file, weighted 1/(1 + 
          the innocent is sentenced like the guilty; the culprit stays; c.wrongful / c.wrongedBy saved; when the real one is later taken:
          EXONERATED, −§500 compensation, the town −5 mood for 6 months, "there is no way to unfix / unsell"
 THE SENTENCE (the owner's table): a predator's (carn or omni) first conviction → the PACIFICATION CENTRE if one has road access and a bed;
-         a prey animal, or anyone already fixed → the MEAT HALL if one has road access (removed, cause "sold", +§100 to the cut);
+         a prey animal, or anyone already fixed → a non-full MEAT HALL in H service reach (removed, cause "sold", +1 stock, +§100 to the cut);
          otherwise the CELLS, 3 months, home with a record. Every conviction is record++.
-CUSTODY  c.held = untilTick (saved), c.heldAt = the centre or −1; the job is released (releaseJob — ONE function for retirement,
-         decay, bulldoze, custody); home kept; absent(world, c) = held > tick is ONE predicate read by isWorker, computeCrime's inline
-         copy, prey flight, births, the walkers, every pool; mood −15 while held
+CUSTODY  c.held = untilTick (saved), c.heldAt = the centre or −1; `c.pen` is the separate market-pen state; the job is released (releaseJob — ONE function for retirement,
+         decay, bulldoze, custody); home kept; `absent(world, c) = pen || held > tick` is ONE predicate read by isWorker, computeCrime's inline
+         copy, prey flight, births, friendship sampling, the walkers and every pool; mood −15 while held, while a pen freezes the last street mood
 FIXED    permanent, saved; no litter (a pair needs two unfixed fertile adults — skipped households count in last.littersLost);
          never a killer; PREY FLIGHT is proportional — flight = 10 × (unfixed adults of that species in the 3×3 / all of them);
          a fixed predator's friendship with its prey rolls at 0.7 (not 0.4) and counts ONCE in H (census.hKnife is the share
@@ -694,6 +697,65 @@ THE CENTRE CIVIC.CENTRE, 1×1, key V, §1,500, §900/yr, 4 C-type jobs (isCivicE
          6 beds counted from heldAt; LV −6 within 2; carnivores −5 mood within 4 (the van); bulldozing it releases the inmates
          unfixed and is not undoable
 ```
+
+### Meat on hand (Part H, `js/sim/meat.js`)
+
+One unit is one body. A standing M anchor holds at most `MEAT_CAP` 40;
+parts of a 2×2/3×3 aggregate into that anchor. The saved identity is:
+
+```
+stock = opening + bought + killed + convicted + PEN_YIELD·slaughtered − eaten − spoiled
+```
+
+`spoiled` is explicit: stock on a hall that burns, decays or is bulldozed,
+block overflow imported from a hand-edited/old state, and the unavoidable
+excess when a grown pen animal reaches a full hall. A full hall refuses a
+dead body, killing or convict before it becomes supply; no counter or cash
+moves. Bulldozing a stocked hall is non-undoable. `meatBalance()` audits the
+identity, and stock is consolidated in Number space before entering the
+`Uint16Array`, so a block merge cannot wrap.
+
+Pens have an independent custody identity:
+
+```
+live penned = opening penned + penBought − slaughtered − penReleased
+```
+
+`penReleased` names an animal freed alive by a removed/invalid or down-tiered
+hall. A household move, zoning departure or revolt acts only on members
+physically at home: an absent pen member is not counted, moved, remembered or
+removed, and retains its household and return address until slaughter/release.
+
+`hallReach(world, lot, max)` uses `fields.dial`'s real two-layer physical
+path and returns `{hall, door, from, walkSteps, physicalSteps, path}`.
+Walking road/platform edges cost one. For this H logistics policy only,
+boarding, alighting and every rail edge cost **zero**: an arbitrarily long
+ride adds physical path tiles and `RIDE` tags but no measured reach. The
+nearest hall is by walked steps, then anchor tile id. A missing station, cut
+track, disconnected door, or more than 60 walked steps gives no hall.
+Ordinary citizen `commutePath` still uses `RAIL_COST` 3/10. Land value,
+parks, the Zoo, centre/plaque halos and dread never read `hallReach` or Dial:
+their distance is geographic/wall-aware and rail gives no distance discount
+(rail smoke and a physical rail tunnel retain their separately stated
+effects).
+
+Inflows are a reachable killing (+1), a convicted sale (+1), each reachable
+natural death bought with `MEAT_BUY_P` (+1), and livestock from the pen.
+A full pig/cow household may sell its oldest cub into a reachable pen with
+capacity 2/4/8 by hall tier. The named animal remains in its household but is
+absent from work, friendship, mood, births, investigation and predation. On
+the exact sixteenth birthday it is removed as `slaughtered`, yields two
+units, and every remaining household member records `LOST_CHILD` without
+grief. Losing the hall frees it alive. Carnivores are assigned to their
+nearest reachable hall; saved fractional demand accumulates and integer
+`min(stock,demand)` is sold each month. `world.meatTrips` and predation
+records transiently carry the exact sim-selected RIDE path to the read-only
+cart/sack walkers; they are neither saved nor hashed.
+
+The hall card names on-hand stock, yearly sales, source breakdown and every
+pen animal/market date. Census keeps meat units sold separate from
+`events.justice.sold` convicts. `EMPTY HOOKS` flashes once per dry spell and
+resets on any restock; `THE MARKET` reports once each January.
 
 Measured (`tools/playtest.mjs`, 30 years, rates 8, seeds 7/3/5, disasters off): killings 3–7 per 30 years in a fed town
 with no hall; 5–16 with two hall blocks (11–19 halls, ~70 jobs, the cut ≈ §1.4k/yr); arrests 4–9 per 30 years with a station

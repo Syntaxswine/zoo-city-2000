@@ -492,6 +492,10 @@ export function createRenderer(canvas, initialWorld, art) {
       // shots.mjs lifted its walkers, the renderer did not — they stood in the river.
       const onBridge = world.road[Math.floor(w.ty) * world.w + Math.floor(w.tx)] === ROAD.BRIDGE;
       items.push({ sprite: art.citizen(w.species, w.facing, w.frame, w.age, { look: w.look, hat: w.hat, carry: w.carry }), tx: w.tx, ty: w.ty, kind: "walker", walker: w, dy: onBridge ? -DECK_TOP : w.riding ? -3 : 0 }); // a rider sits up on the train
+      if (w.kind === "cart" && w.leg >= 1 && w.companion) {
+        const p = w.companion;
+        items.push({ sprite: art.citizen(p.species, w.facing, w.frame, p.age, { look: p.look }), tx: w.tx + 0.24, ty: w.ty + 0.12, kind: "walker", dy: onBridge ? -DECK_TOP : w.riding ? -3 : 0 });
+      }
       if (w.glyph === "meeting" && w.standUntil > 0) items.push({ sprite: meet, tx: w.tx, ty: w.ty, kind: "walker", z: 1000, dy: -24 });
       if (w.kind === "predation" && w.bag != null && w.prey) {
         // The neighbour at the door. First the open sack falls over it (a

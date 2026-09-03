@@ -26,14 +26,15 @@
 // Every line names the animals and uses no pronoun — the sim has no sex.
 
 import { KNOBS } from "./rules.js";
-import { ZONE, CIVIC, inBounds, absent, USE_NAME, isPart } from "./world.js";
+import { ZONE, CIVIC, inBounds, absent, USE_NAME } from "./world.js";
 import { DIET_OF, isPredatorOf } from "./species.js";
 import { post } from "./budget.js";
 import { removeCitizen, holdFuneral, releaseJob } from "./citizens.js";
 import { ageYears, isWorker } from "./census.js";
 import { hasAccess, exposure } from "./fields.js";
-import { reachFrom, forEachWithin } from "./reach.js";
+import { reachFrom } from "./reach.js";
 import { KIND, remember } from "./life.js";
+import { hallReach, routeToHall, receiveMeat } from "./meat.js";
 
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 const monthName = (tick) => MONTHS[((tick % 12) + 12) % 12];
@@ -97,25 +98,17 @@ export function thiefPool(world, lot) {
 // The killing
 // ---------------------------------------------------------------------------
 
-function killWeight(world, c) {
+export function killWeight(world, c) {
   if (c.dead || c.home < 0 || c.fixed || absent(world, c) || ageYears(world, c) < KNOBS.ADULT_AGE) return 0;
   let w = KNOBS.KILL_DIET[DIET_OF[c.species]] || 0;
   if (c.job < 0 && isWorker(world, c)) w *= KNOBS.KILL_HUNGRY;
-  if (world.dread[c.home] > 0) w *= world.events.licence ? KNOBS.KILL_MARKET_LICENSED : KNOBS.KILL_MARKET;
+  // The market influence is a service route, not the four-tile smell. Rail
+  // on this H route is free; a cut line or a hall beyond 60 walked steps is
+  // no market at all. Full hooks cannot buy another body.
+  if (hallReach(world, c.home, KNOBS.MEAT_ROAD, { space: true })) w *= world.events.licence ? KNOBS.KILL_MARKET_LICENSED : KNOBS.KILL_MARKET;
   if (c.job >= 0 && world.zone[c.job] === ZONE.M) w *= KNOBS.KILL_STAFF;
   w *= 0.5 + world.crime[c.home] / 100;
   return w;
-}
-
-/** The nearest built meat hall within `r` of `tile`, or −1. */
-function hallNear(world, tile, r) {
-  let best = -1;
-  let bestD = r + 1;
-  forEachWithin(world, tile, r, (j, d) => {
-    if (world.zone[j] !== ZONE.M || world.tier[j] === 0 || isPart(world, j)) return; // a block's hall is its anchor
-    if (d < bestD || (d === bestD && j < best)) { bestD = d; best = j; }
-  });
-  return best;
 }
 
 function kill(world, killer, victim, notices) {
@@ -125,17 +118,30 @@ function kill(world, killer, victim, notices) {
   const mourners = victim.friends.slice();
   const hh = world.hhById.get(victim.household);
   const family = hh ? hh.members.filter((id) => id !== victim.id) : [];
-  // The walker layer's cue (SPEC §14): this month's killings, published BEFORE
-  // the victim is scrubbed — the sack has to know who is in it. Per-tick like
-  // world.meetings; never saved, never hashed, read-only to the reader.
-  (world.predations || (world.predations = [])).push({ killer: killer.id, killerHome: killer.home, victimHome, victim: { id: victim.id, species: victim.species, age: ageYears(world, victim), name: nameOf(victim) } });
+  const market = hallReach(world, killer.home, KNOBS.MEAT_ROAD, { space: true });
+  const selectedHall = market?.hall ?? -1;
+  // The sim publishes the exact selected two-layer path before deleting the
+  // victim. The walker consumes it verbatim, including RIDE tags; it never
+  // recomputes a road-only fiction for a free-rail route.
+  const sackRoute = selectedHall >= 0 ? routeToHall(world, victimHome, selectedHall, KNOBS.MEAT_ROAD) : null;
+  // A hall cannot buy a body its promised sack walker cannot physically
+  // reach. KILL_MARKET still describes the killer's market influence, but
+  // stock, cash and the transient trip all use the same victim-to-hall route.
+  const hall = sackRoute ? selectedHall : -1;
+  const homeRoute = hall >= 0 ? market : null;
+  (world.predations || (world.predations = [])).push({
+    killer: killer.id, killerHome: killer.home, victimHome, hall,
+    marketPath: market ? Array.from(market.path) : null,
+    sackPath: sackRoute ? Array.from(sackRoute.path) : null,
+    homePath: homeRoute ? Array.from(homeRoute.path) : null,
+    victim: { id: victim.id, species: victim.species, age: ageYears(world, victim), name: nameOf(victim) },
+  });
   remember(world, killer, KIND.KILLED, victim.id);
   removeCitizen(world, victim, "killed");
   holdFuneral(world, mourners, null);
   for (const id of family) { const o = world.byId.get(id); if (o) o.grief = tick + 12; }
   ev.active.push({ id: "fear", until: tick + KNOBS.FEAR_MONTHS, moodBySpecies: { [victim.species]: -KNOBS.FEAR_MOOD } });
-  const hall = world.dread[killer.home] > 0 ? hallNear(world, killer.home, 6) : -1;
-  if (hall >= 0) post(world, "cut", KNOBS.MEAT_PRICE);
+  if (hall >= 0 && receiveMeat(world, hall, "killed", 1)) post(world, "cut", KNOBS.MEAT_PRICE);
   post(world, "inquest", -Math.min(KNOBS.INQUEST, Math.max(0, world.cash)));
   ev.killings++;
   const jobless = killer.job < 0 && isWorker(world, killer);
@@ -233,19 +239,6 @@ function pickWrongful(world, f, culprit) {
   return weightedPick(world, cands, weights);
 }
 
-/** The nearest built meat hall with road access, or −1. */
-function hallWithAccess(world, from) {
-  const n = world.w * world.h;
-  let best = -1;
-  let bestD = Infinity;
-  for (let i = 0; i < n; i++) {
-    if (world.zone[i] !== ZONE.M || world.tier[i] === 0 || world.rubble[i] || world.burning[i] || !hasAccess(world, i) || isPart(world, i)) continue; // a block's hall is its anchor
-    const d = from >= 0 ? cheb(world, from, i) : 0;
-    if (d < bestD) { bestD = d; best = i; }
-  }
-  return best;
-}
-
 /** Beds taken at a centre — counted, never stored. */
 export function bedsAt(world, i) {
   let n = 0;
@@ -308,7 +301,8 @@ export function arrest(world, f, c, wrongful, notices, opts = {}) {
   const tail = wrongful ? ` ${c.name} was at home on Tuesday; it was the wrong animal.${still}` : "";
   const home = c.home;
   const diet = DIET_OF[c.species];
-  const hall = minor ? -1 : c.fixed || diet === "herb" ? hallWithAccess(world, home) : -1;
+  const market = minor || !(c.fixed || diet === "herb") ? null : hallReach(world, home, KNOBS.MEAT_ROAD, { space: true });
+  const hall = market?.hall ?? -1;
   let line;
   if (minor) {
     releaseJob(world, c);
@@ -326,6 +320,7 @@ export function arrest(world, f, c, wrongful, notices, opts = {}) {
     removeCitizen(world, c, "sold");
     for (const id of family) { const o = world.byId.get(id); if (o) o.grief = tick + 12; }
     post(world, "cut", KNOBS.SOLD_PRICE);
+    receiveMeat(world, hall, "convicted", 1);
     ev.justice.sold++;
     line = `SOLD — ${nameOf(c)} was convicted ${why} and sold at the meat hall at ${at(world, hall)}.${wasFixed ? " Pacification is once." : ""}${tail}`;
   } else {
@@ -402,7 +397,10 @@ export function custodyTick(world, notices) {
   const ev = world.events;
   const tick = world.tick;
   for (const c of world.citizens) {
-    if (c.dead || !c.held || c.held > tick) continue;
+    // Pens mature in meat.penMaturityTick before justice. Keep this guard so
+    // a direct custody tick can never turn a penned cub into an ordinary
+    // released inmate at the exact expiry month.
+    if (c.dead || c.pen || !c.held || c.held > tick) continue;
     const fromCentre = c.heldAt >= 0;
     c.held = 0;
     c.heldAt = -1;

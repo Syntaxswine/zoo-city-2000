@@ -19,7 +19,7 @@
 //   createUI(app) → { refresh, onTick, setTool, setCost, flash, updateHover,
 //                     showChoice, hideChoice, openNewCity, closeModals, modalOpen, setWorld }
 
-import { ZONE, CIVIC, TERRAIN, ROAD, ZONE_NAME, USE_NAME } from "./sim/world.js";
+import { ZONE, CIVIC, TERRAIN, ROAD, ZONE_NAME, USE_NAME, anchorOf } from "./sim/world.js";
 import { dateOf, characterLine } from "./sim/tick.js";
 import { eventTitle, TICKER_FLASH } from "./sim/events.js";
 import { lotReport, REASON } from "./sim/lots.js";
@@ -31,6 +31,7 @@ import { pluralSpecies } from "./sim/landmarks.js";
 import { ageYears, isWorker } from "./sim/census.js";
 import { TOOLS } from "./input.js";
 import { newsRows } from "./news.js";
+import { hallStock, hallYear } from "./sim/meat.js";
 
 const $ = (sel, root = document) => root.querySelector(sel);
 const el = (tag, cls, text) => {
@@ -352,6 +353,14 @@ export function createUI(app) {
       for (const c of held) lines.push(el("div", "", `held: ${c.name} ${c.surname} (${c.species}), home in ${c.held - w.tick} month${c.held - w.tick === 1 ? "" : "s"}${c.wrongful ? " — the wrong animal" : ""}`));
       lines.push(el("div", "dim", "Six beds, six months. They come home calm and childless; one arrest in twenty was the wrong animal."));
     }
+    if (rep.zone === ZONE.M && rep.tier > 0) {
+      const hall = anchorOf(w, i);
+      const flow = hallYear(w, hall);
+      lines.push(el("div", "", `meat on hand ${hallStock(w, hall)}/${KNOBS.MEAT_CAP} · sold this year ${flow.eaten || 0}`));
+      lines.push(el("div", "dim", `bought this year: ${flow.bought || 0} dead · ${flow.killed || 0} killings · ${flow.convicted || 0} convicted · ${flow.slaughtered || 0} from the pen`));
+      const pen = w.citizens.filter((c) => !c.dead && c.pen && anchorOf(w, c.heldAt) === hall).sort((a, b) => a.id - b.id);
+      for (const c of pen) lines.push(el("div", "", `in the pen: ${c.name} ${c.surname}, ${ageYears(w, c)} — bought ${dateOf(w, c.penSince).label}; for market ${dateOf(w, c.held).label}`));
+    }
     if (pinned) head.append(el("span", "pin", " pinned (Esc)"));
     lines.push(head);
 
@@ -378,8 +387,8 @@ export function createUI(app) {
     if (w.rail[i] === 2) {
       let door = -1;
       for (const [dx, dy] of [[0, -1], [1, 0], [0, 1], [-1, 0]]) { const xx = tx + dx, yy = ty + dy; if (xx >= 0 && yy >= 0 && xx < w.w && yy < w.h && w.road[yy * w.w + xx] !== ROAD.NONE) { door = yy * w.w + xx; break; } }
-      lines.push(el("div", door >= 0 ? "dim" : "warn", door >= 0 ? `a station: riders board from the road at (${door % w.w},${(door / w.w) | 0}); a ride costs 0.3 of a walk and makes no traffic — neutral travel until they step off` : "a station with no road beside it: nobody can reach the platform"));
-    } else if (w.rail[i]) lines.push(el("div", "dim", "rail: trains ride it between stations at 0.3 of a walk; no road traffic, a little smoke"));
+      lines.push(el("div", door >= 0 ? "dim" : "warn", door >= 0 ? `a station: riders board from the road at (${door % w.w},${(door / w.w) | 0}); a citizen's ride costs 0.3 of a walk, while a hall cart's ride is free distance; neither changes property-value distance` : "a station with no road beside it: nobody can reach the platform"));
+    } else if (w.rail[i]) lines.push(el("div", "dim", "rail: citizen commutes price it at 0.3 of a walk; hall logistics count it as free travel; it never shortens property-value distance"));
     if (w.wall[i]) lines.push(el("div", "dim", w.road[i] !== ROAD.NONE ? "a tunnel: the road runs through the wall; smells, dread and cover pass along it and nowhere else" : "a wall: smells, dread, cover and land-value halos go round it, and a killer's reach stops at it; a road through it is a tunnel"));
     if (rep.dread) lines.push(el("div", "dim", `dread ${rep.dread}: herbivores −${Math.min(KNOBS.DREAD_MOOD_CAP, Math.round(KNOBS.DREAD_MOOD_HERB * rep.dread))} mood and −${Math.round(KNOBS.DREAD_HOME_HERB * rep.dread)} on the home score; LV −${Math.round(KNOBS.LV_DREAD * rep.dread)}; carnivores do not mind`));
     for (const f of w.events.files) {
@@ -451,7 +460,8 @@ export function createUI(app) {
       const jobS = c.job >= 0 ? `(${c.job % w.w},${(c.job / w.w) | 0})` : isWorker(w, c) ? `none${c.jobless ? ` — ${c.jobless} months looking` : ""}` : "—";
       lines.push(el("div", "", `home ${homeS} · job ${jobS} · mood ${Math.round(c.mood)}`));
       const status = [];
-      if ((c.held || 0) > w.tick) status.push(c.heldAt >= 0 ? `at the Pacification Centre until ${dateOf(w, c.held).label}` : `in the cells until ${dateOf(w, c.held).label}`);
+      if (c.pen) status.push(`in the market pen until ${dateOf(w, c.held).label}`);
+      else if ((c.held || 0) > w.tick) status.push(c.heldAt >= 0 ? `at the Pacification Centre until ${dateOf(w, c.held).label}` : `in the cells until ${dateOf(w, c.held).label}`);
       if (c.fixed) status.push(`fixed${c.wrongful ? " — the wrong animal" : ""}${c.exonerated ? ", exonerated" : ""}`);
       if (c.record) status.push(`record ${c.record}`);
       if (status.length) lines.push(el("div", "warn", status.join(" · ")));
@@ -460,8 +470,8 @@ export function createUI(app) {
       const friends = c.friends.map((f) => w.byId.get(f)).filter(Boolean);
       lines.push(el("div", "dim", friends.length ? `friends: ${friends.map((f) => `${f.name} ${f.surname} (${f.species})`).join(", ")}` : "no friends yet"));
       const doing = wk.riding ? "on the train"
-        : wk.kind === "predation" ? (wk.carry ? `walking home with a heavy sack — ${wk.preyName} did not come home` : `calling on ${wk.preyName}`)
-        : { commuter: "commuting", stroller: "out for a stroll", cub: "off to the park", arrival: "just arrived — walking home", meeting: "meeting a new friend" }[wk.kind] || wk.kind;
+        : wk.kind === "predation" ? (wk.carry ? `${wk.leg < wk.legs.length - 1 ? "taking" : "walking home from the hall with"} a heavy sack — ${wk.preyName} did not come home` : `calling on ${wk.preyName}`)
+        : { commuter: "commuting", stroller: "out for a stroll", cub: "off to the park", arrival: "just arrived — walking home", meeting: "meeting a new friend", cart: wk.leg ? "bringing the hall cart home" : "taking the hall cart to a door", penned: "standing in the market pen" }[wk.kind] || wk.kind;
       lines.push(el("div", "dim", doing + (c.centenary ? " · wears the centenary hat" : "")));
     } else {
       head.append(el("b", "", wk.name || cap(wk.species)), el("span", "dim", `  ${wk.species}`));
@@ -592,7 +602,12 @@ export function createUI(app) {
     if (c.walls) tr("walls · tunnels", `${c.walls} · ${c.tunnels}`);
     if (c.railTiles || c.stations) tr("rail · stations · riders", `${c.railTiles} · ${c.stations} · ${c.riders}`);
     if (c.commuteN) tr("mean commute (walk-steps; a ride is 0.3)", c.meanCommute.toFixed(1));
-    if (c.markets) tr("meat halls", `${c.markets} (${c.Jm} jobs) · ${c.herbNear} herbivores within the smell`);
+    if (c.markets) {
+      tr("meat halls", `${c.markets} (${c.Jm} jobs) · ${c.herbNear} herbivores within the smell`);
+      tr("meat on hand · sold this year", `${c.meatOnHand || 0} · ${c.meatSold || 0}`);
+      tr("sources this year", `${c.meatBought || 0} dead · ${c.meatKilled || 0} killings · ${c.meatConvicted || 0} convicted · ${c.meatSlaughtered || 0} pen`);
+      if (c.penned) tr("in market pens", `${c.penned}`);
+    }
     { const j = w.events.justice || {}; const open = (w.events.files || []).filter((f) => !f.closed).length;
       if (c.usePred || c.usePrey) tr("use-zoned tiles (predator · prey)", `${c.usePred} · ${c.usePrey}`);
       if (fig.zonedOut) tr("zoned out last month", `${fig.zonedOut}`);

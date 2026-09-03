@@ -139,6 +139,17 @@ export const KNOBS = {
   M_JOBS: [0, 3, 8, 16],
   MEAT_PER_CARN: 0.06,      // rM = (0.06·carnivores + 10 − Jm)/max(Jm, 20): a 1,600 town wants two halls
   MEAT_SEED: 10,
+  MEAT_CAP: 40,             // integer bodies/units held by one hall
+  MEAT_ROAD: 60,            // paid WALK steps; Part H freight rides rail for zero distance
+  MEAT_RAIL_COST: 0,        // H logistics only — citizen commutes retain RAIL_COST below
+  MEAT_BUY_P: 0.6,          // a reachable natural death is bought at the door
+  MEAT_EAT: 0.05,           // units wanted by each assigned carnivore per month
+  MEAT_SALE: 20,            // till per unit eaten; licensed halls pay the C-rate share
+  MEAT_LOCAL: 0.2,          // stocked hooks add up to this much local M score
+  PEN_BUY_P: 0.25,          // eligible full livestock household per month
+  PEN_PRICE: 30,            // the mayor's cut when a cub enters a hall pen
+  PEN_YIELD: 2,             // units when that animal reaches adulthood
+  PEN_CAP: [0, 2, 4, 8],    // penned animals by hall tier
   M_CUSTOMERS_DIV: 40,      // local_M reads carnivores housed within 5 (shops use residents/80)
   JOB_M: { carn: 0.9, omni: 0.5, herb: 0.1 },   // job preference by diet (jobC/jobI are per species)
   // Dread — what a hall does to the street: exactly twice a works' LV shadow at every ring.
@@ -420,7 +431,7 @@ export const RULES = Object.freeze([
   },
   {
     id: "M2", title: "Dread — herbivores smell it four tiles off",
-    formula: "a hall spreads 40/70/105 over 2/3/4 tiles ; LV −0.8·dread (twice a works) ; herbivores −0.25·dread mood (halved with a carnivore friend), −dread on the home score, and a household at dread ≥ 40 moves along the road at 3%/month ; carnivores +5 inside the smell and do not mind",
+    formula: "a hall spreads 40/70/105 over 2/3/4 tiles × (0.5 + 0.5·min(stock/8,1)) ; LV −0.8·dread (twice a works) ; herbivores −0.25·dread mood (halved with a carnivore friend), −dread on the home score, and a household at dread ≥ 40 moves along the road at 3%/month ; carnivores +5 inside the smell and do not mind",
     live: (w) => `max dread ${w.last.census.maxDread} · ${w.last.census.herbNear} herbivores within the smell`,
   },
   {
@@ -429,8 +440,23 @@ export const RULES = Object.freeze([
     live: (w) => (w.events.licence ? "licensed" : "unlicensed"),
   },
   {
+    id: "M4", title: "Meat on hand is conserved",
+    formula: "stock ≤ 40 per hall ; stock = opening + bought dead + killings + convicted + 2·pen animals − meals sold − named spoilage ; a stocked hall gains up to +0.20 local M score",
+    live: (w) => `${w.last.census.meatOnHand || 0} on hand · ${w.last.census.meatSold || 0} meals sold this year`,
+  },
+  {
+    id: "M5", title: "The hall buys by a real service route",
+    formula: "nearest hall within 60 WALKED road steps; board, alight and every rail edge cost ZERO for meat carts and sacks, and their visible path carries those rail tiles. Citizen commutes still price rail at 0.3. Property value, parks, Zoo, plaques and smell use geographic distance — rail never shortens them",
+    live: (w) => `${w.last.census.railTiles || 0} rail tiles · freight rail distance 0 · property distance unchanged`,
+  },
+  {
+    id: "M6", title: "Livestock grows in the pen",
+    formula: "a full pig or cow household may sell a cub to a reachable free pen (2/4/8 places by tier); it is absent until the exact sixteenth birthday, then yields 2 units; razing or losing the hall frees it alive",
+    live: (w) => `${w.last.census.penned || 0} in pens · ${w.last.census.meatSlaughtered || 0} units from pens this year`,
+  },
+  {
     id: "K1", title: "The killing — no jobs means hungry wolves",
-    formula: "killings/month = 0.00005 × Σ over adults of: carnivore 1, omnivore 0.1, herbivore 0.03 ; ×20 unemployed ; ×3 within a hall's smell (×1.5 licensed) ; ×2 hall staff ; ×(0.5 + crime at home/100) ; fixed 0 ; victims live within 3: prey ×1, anyone else ×0.1, a friendship ×0.1 ; adults only ; the wake befriends the mourners",
+    formula: "killings/month = 0.00005 × Σ over adults of: carnivore 1, omnivore 0.1, herbivore 0.03 ; ×20 unemployed ; ×3 with a non-full hall in the 60-step service network (×1.5 licensed) ; ×2 hall staff ; ×(0.5 + crime at home/100) ; fixed 0 ; victims live within 3: prey ×1, anyone else ×0.1, a friendship ×0.1 ; adults only ; the wake befriends the mourners",
     live: (w) => `${w.events.killings} killings since founding · ${w.last.census.U} unemployed · ${w.events.files.filter((f) => !f.closed).length} open files`,
   },
   {

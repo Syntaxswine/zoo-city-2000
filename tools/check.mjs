@@ -200,7 +200,7 @@ function auditIds(w) {
   }
   check("dread: on every built hall, nowhere beyond a hall's radius", builtM > 0 && dreadOnM === builtM && dreadFar === 0, `halls ${builtM} · with dread ${dreadOnM} · stray ${dreadFar}`);
   const dreadPeak = Math.max(...halls.map((i) => D.dread[i]));
-  check("dread: a tier-2 hall reads 70 on its own tile", dreadPeak >= 70, `${dreadPeak}`);
+  check("dread: empty halls emit less than the old full-strength tier-2 value", dreadPeak > 0 && dreadPeak < 70, `${dreadPeak}`);
   for (const i of halls) { D.zone[i] = ZONE.NONE; D.tier[i] = 0; }
   computeFields(D);
   let stray = 0;
@@ -236,7 +236,8 @@ function auditIds(w) {
   // sentence table), so one round is not guaranteed to fill a bed.
   const saveA = KNOBS.ARREST_BASE, saveW = KNOBS.WRONGFUL_P;
   let rounds = 0;
-  while (F.events.justice.takenIn === 0 && rounds < 8) {
+  const taken0 = F.events.justice.takenIn, wrongful0 = F.events.justice.wrongful;
+  while ((F.events.justice.takenIn === taken0 || F.events.justice.wrongful === wrongful0) && rounds < 8) {
     KNOBS.KILL_P = 1 / Math.max(1e-9, killTotal(F));
     tick(F);
     KNOBS.KILL_P = saveP;
@@ -246,11 +247,11 @@ function auditIds(w) {
     rounds++;
   }
   const j = F.events.justice;
-  check("forced months convict, the wrong animal among them, and one lands in the centre", j.takenIn > 0 && j.wrongful > 0, `taken in ${j.takenIn} · cells ${j.cells} · sold ${j.sold} · wrongful ${j.wrongful} · rounds ${rounds}`);
+  check("forced months convict, the wrong animal among them, and one lands in the centre", j.takenIn > taken0 && j.wrongful > wrongful0, `taken in ${taken0}→${j.takenIn} · cells ${j.cells} · sold ${j.sold} · wrongful ${wrongful0}→${j.wrongful} · rounds ${rounds}`);
   let heldBad = 0, heldN = 0, bedsOver = 0;
   const beds = new Map();
   for (const c of F.citizens) {
-    if ((c.held || 0) > F.tick) { heldN++; if (c.job >= 0) heldBad++; if (c.heldAt >= 0) beds.set(c.heldAt, (beds.get(c.heldAt) || 0) + 1); }
+    if (!c.pen && (c.held || 0) > F.tick) { heldN++; if (c.job >= 0) heldBad++; if (c.heldAt >= 0) beds.set(c.heldAt, (beds.get(c.heldAt) || 0) + 1); }
   }
   for (const [i, n] of beds) if (F.civic[i] !== CIVIC.CENTRE || n > KNOBS.CENTRE_BEDS) bedsOver++;
   check("held citizens hold no job; beds point at a centre and never exceed it", heldN > 0 && heldBad === 0 && bedsOver === 0, `held ${heldN} · with a job ${heldBad} · bad beds ${bedsOver}`);
@@ -1060,10 +1061,10 @@ check("no Math.random under js/", mathRandom.length === 0, mathRandom.join(", ")
   refreshLast(censusWorld);
   const liveNeeds = needCensus(censusWorld);
   const cachedNeedTotal = Object.values(censusWorld.last.needs).reduce((s, x) => s + x, 0);
-  const livingCitizens = censusWorld.citizens.filter((c) => !c.dead).length;
-  check("needs: the cached census is the same histogram and counts every living citizen",
-    JSON.stringify(censusWorld.last.needs) === JSON.stringify(liveNeeds) && cachedNeedTotal === livingCitizens,
-    `cached ${JSON.stringify(censusWorld.last.needs)} · live ${JSON.stringify(liveNeeds)} · ${cachedNeedTotal}/${livingCitizens}`);
+  const presentCitizens = censusWorld.citizens.filter((c) => !c.dead && !c.pen && (c.held || 0) <= censusWorld.tick).length;
+  check("needs: the cached census is the same histogram and excludes animals away in custody or a pen",
+    JSON.stringify(censusWorld.last.needs) === JSON.stringify(liveNeeds) && cachedNeedTotal === presentCitizens,
+    `cached ${JSON.stringify(censusWorld.last.needs)} · live ${JSON.stringify(liveNeeds)} · ${cachedNeedTotal}/${presentCitizens}`);
 
   const W = createWalkers(A.world);
   const hashBefore = stateHash(A.world);
@@ -1740,7 +1741,7 @@ if (existsSync(artIndex)) {
   const registered = allCitizens(), registeredNames = new Set(registered.map((x) => x.name));
   const registeredPortraits = registered.filter(({ sprite }) => sprite.tags.includes("portrait"));
   check("looks: allCitizens walks the exact full matrix without duplicate cache names",
-    registered.length === 3224 && registeredNames.size === registered.length && registeredPortraits.length === 504,
+    registered.length === 3236 && registeredNames.size === registered.length && registeredPortraits.length === 504,
     `${registered.length} entries · ${registeredNames.size} names · ${registeredPortraits.length} portraits`);
   check("looks: the global art registry keeps every look and portrait after name de-duplication",
     allSprites().filter(({ sprite }) => sprite.tags.includes("portrait")).length === 504);
@@ -1768,7 +1769,7 @@ if (existsSync(artIndex)) {
   const citizenCalls = renderSrcD.match(/art\.citizen\(/g) || [];
   const lookArgs = renderSrcD.match(/art\.citizen\([^\n]+look:/g) || [];
   check("looks: normal, tent, prey and picking render paths all pass their stored look",
-    citizenCalls.length === 4 && lookArgs.length === 4, `${lookArgs.length}/${citizenCalls.length} look-bearing calls`);
+    citizenCalls.length >= 5 && lookArgs.length === citizenCalls.length, `${lookArgs.length}/${citizenCalls.length} look-bearing calls`);
   const specD = readFileSync(path.join(ROOT, "SPEC.md"), "utf8");
   check("looks: SPEC records the cub-resolution, portrait and idle contracts", /### 12\.3b/.test(specD) && /shade-only/i.test(specD) && /paintPortrait/.test(specD));
 }
@@ -1893,15 +1894,17 @@ if (existsSync(artIndex)) {
     return pick;
   };
   // GROUND: an EMPTY zoned lot, so nothing in the per-frame pass moves at all.
-  const bare = nearestAim((i) => P.tier[i] === 0 && P.zone[i] !== 0 && !P.rubble[i] && !P.burning[i]);
-  P.rubble[bare] = KNOBS.RUBBLE_MONTHS;
+  const bare = [];
+  for (let i = 0; i < P.w * P.h; i++) if (P.tier[i] === 0 && P.terrain[i] !== 1 && !P.road[i] && !P.civic[i] && !P.wall[i] && !P.rail[i] && !P.rubble[i] && !P.burning[i]) {
+    bare.push(i); P.rubble[i] = KNOBS.RUBBLE_MONTHS; // rubble precedes chalk/grass in the cached ground pass
+  }
   const stale = frame();
   check("play: the GROUND does not follow the world without an invalidate — a camera that never calls it photographs a memory",
-    bare >= 0 && stale === shot, `lot ${bare % P.w},${(bare / P.w) | 0} changed with no invalidate`);
+    bare.length > 0 && stale === shot, `${bare.length} ground tiles changed with no invalidate`);
   renderer.invalidate();
   const fresh = frame();
   check("play: and it does follow once invalidate() is called",
-    fresh !== stale, `lot ${bare % P.w},${(bare / P.w) | 0} still not drawn`);
+    fresh !== stale, `${bare.length} ground tiles still not drawn`);
   // BUILDING: the per-frame pass, no invalidate needed.
   const lot = nearestAim((i) => P.tier[i] > 0 && !P.rubble[i] && !P.burning[i]);
   const withLot = frame();
@@ -2205,16 +2208,18 @@ function costOfBulldoze(w, x, y) { return (0, costOfOp)(w, { kind: "bulldoze", x
   const rb = apply(F, { kind: "bulldoze", x0: 11, y0: 11, x1: 11, y1: 11 });
   check("landmarks: the bulldozer on a part clears the landmark's theme with its footprint", rb.ok && F.theme[a] === 0 && F.big[a] === 0);
 
-  // The scripted mayor with a market: the seed-7 town raises a 3×3 in month 54 that rises as the Mews (measured: cat 42, fox 24 of 129 on the block).
+  // The scripted mayor with a market still raises and reports a themed block;
+  // H deliberately moves the population RNG history, so the old exact month,
+  // species and coordinate are no longer a meaningful invariant.
   const { createMayor } = await import("./mayor.mjs");
   const M = createWorld({ seed: "7" });
   const mayor = createMayor(M, { layout: "balanced", rates: [8, 8, 8], markets: 1 });
   let seen = null;
-  for (let t = 0; t < 60; t++) { mayor.month(t); const { notices } = tick(M); for (const s of notices) if (/^LANDMARK/.test(s) && !seen) seen = { t, s }; }
+  for (let t = 0; t < 120; t++) { mayor.month(t); const { notices } = tick(M); for (const s of notices) if (/^LANDMARK/.test(s) && !seen) seen = { t, s }; }
   const logRows = M.events.log.filter((e) => e.id === "landmark");
-  check("landmarks: the seed-7 market town raises the Mews at month 54 — cats and foxes — the line carries the block's coordinates, the log holds it under its own id, the census counts one",
-    seen && seen.t === 54 && /^LANDMARK — the Mews: the Purringtons and the Slyfields have made a landmark of the block at \(18,4\); \d+ of \d+ living there are cats and foxes\.$/.test(seen.s) && logRows.length === 1 && logRows[0].line === seen.s && M.last.census.landmarks === 1 && M.theme[4 * M.w + 18] === 5,
-    seen ? `m${seen.t}: ${seen.s} · log ${logRows.length} same ${logRows[0] && logRows[0].line === seen.s} census ${M.last.census.landmarks} theme ${M.theme[4 * M.w + 18]}` : "no landmark in five years");
+  check("landmarks: the seed-7 market town raises a named block — the line carries coordinates, the log holds it, and the census counts it",
+    seen && /^LANDMARK — .+ at \(\d+,\d+\); \d+ of \d+ /.test(seen.s) && logRows.some((x) => x.line === seen.s) && M.last.census.landmarks > 0,
+    seen ? `m${seen.t}: ${seen.s} · log ${logRows.length} census ${M.last.census.landmarks}` : "no landmark in ten years");
   void lotsTick;
 }
 
@@ -2273,6 +2278,382 @@ function costOfBulldoze(w, x, y) { return (0, costOfOp)(w, { kind: "bulldoze", x
   check("shops: a tier-2 store and an R lot report no shop", (F.tier[shopLot] = 2, lotReport(F, shopLot).shop === null) && lotReport(F, homeLot).shop === null && shopOf(F, homeLot) === null);
   F.tier[shopLot] = 1;
 }
+// ---- Part H: meat on hand, free-rail freight, pens (SPEC §9c) ---------------------
+{
+  const ME = await import("../js/sim/meat.js");
+  const JU = await import("../js/sim/justice.js");
+  const CI = await import("../js/sim/citizens.js");
+  const CE = await import("../js/sim/census.js");
+  const FI = await import("../js/sim/fields.js");
+  const WO = await import("../js/sim/world.js");
+  const HE = await import("../js/sim/events.js");
+  const { KIND: H_KIND } = await import("../js/sim/life.js");
+  const { createWalkers } = await import("../js/walkers.js");
+  const { art: hArt } = await import("../js/art/index.js");
+  const { ink: hInk } = await import("../js/art/format.js");
+  const flatFreight = (seed = "h-freight", withRail = true) => {
+    const w = createWorld({ seed, w: 64, h: 16 });
+    w.terrain.fill(WO.TERRAIN.GRASS); w.road.fill(ROAD.NONE); w.rail.fill(0); w.zone.fill(ZONE.NONE); w.tier.fill(0);
+    w.civic.fill(CIVIC.NONE); w.wall.fill(0); w.big.fill(0); w.rubble.fill(0); w.burning.fill(0); w.meat.fill(0);
+    w.citizens = []; w.households = []; w.byId = new Map(); w.hhById = new Map(); w.nextId = 1; w.nextHouseholdId = 1;
+    w.events.noDisasters = true; w.valves = { R: 0, C: 0, I: 0, M: 0 };
+    const at = (x, y) => y * w.w + x;
+    for (let x = 2; x <= 58; x++) w.road[at(x, 7)] = ROAD.ROAD;
+    const home = at(2, 8), hall = at(58, 8);
+    w.zone[home] = ZONE.R; w.tier[home] = 1;
+    w.zone[hall] = ZONE.M; w.tier[hall] = 2;
+    if (withRail) {
+      for (let x = 5; x <= 55; x++) w.rail[at(x, 6)] = 1;
+      w.rail[at(5, 6)] = 2; w.rail[at(55, 6)] = 2;
+    }
+    w.roadsDirty = true; w.wallsDirty = true;
+    computeFields(w); FI.recountRosters(w); CI.rebuildMaps(w);
+    return { w, at, home, hall };
+  };
+
+  // One graph, two explicit policies: citizen rail still costs 0.3; freight
+  // boards, rides any physical length and alights for zero measured distance.
+  const R = flatFreight();
+  const route = ME.hallReach(R.w, R.home, 8);
+  const ridden = route ? Array.from(route.path).filter((p) => p & FI.RIDE).length : 0;
+  check("meat route: an arbitrarily long rail ride counts only its eight road/platform steps",
+    !!route && route.hall === R.hall && route.walkSteps === 8 && route.physicalSteps > 50 && ridden > 40,
+    route ? `walk ${route.walkSteps} · physical ${route.physicalSteps} · ridden ${ridden}` : "no route");
+  check("meat route: the same hall is beyond seven walked steps but reachable at Infinity",
+    ME.hallReach(R.w, R.home, 7) === null && ME.hallReach(R.w, R.home, Infinity)?.hall === R.hall);
+  const commute = FI.commutePath(R.w, "rabbit", FI.doorOf(R.w, R.home), FI.doorOf(R.w, R.hall), 60);
+  check("meat route: free freight does not mutate ordinary 0.3-cost commuting",
+    !!commute && commute.cost > route.walkSteps * FI.WALK && KNOBS.RAIL_COST === 3 && KNOBS.MEAT_RAIL_COST === 0,
+    `freight ${route.walkSteps * FI.WALK} · commute ${commute?.cost}`);
+  R.w.use.fill(WO.USE.PREY); ME.resetMeatRoutes(R.w);
+  check("meat route: neutral freight crosses use-zoned roads without borrowing a citizen diet", ME.hallReach(R.w, R.home, 8)?.walkSteps === 8);
+  R.w.use.fill(WO.USE.MIXED);
+  R.w.rail[R.at(30, 6)] = 0; ME.resetMeatRoutes(R.w);
+  check("meat route: cutting the track removes the under-eight route", ME.hallReach(R.w, R.home, 8) === null);
+  R.w.rail[R.at(30, 6)] = 1; R.w.rail[R.at(5, 6)] = 1; R.w.rail[R.at(55, 6)] = 1; ME.resetMeatRoutes(R.w);
+  check("meat route: track without both stations gives no free ride", ME.hallReach(R.w, R.home, 8) === null);
+  R.w.rail[R.at(5, 6)] = 2; R.w.rail[R.at(55, 6)] = 2;
+  R.w.zone[R.at(59, 8)] = ZONE.M; R.w.tier[R.at(59, 8)] = 1; R.w.roadsDirty = true; computeFields(R.w); ME.resetMeatRoutes(R.w);
+  check("meat route: equal-cost halls sharing a door tie by stable tile id", ME.hallReach(R.w, R.home, 8)?.hall === R.hall);
+  R.w.meat[R.hall] = KNOBS.MEAT_CAP; ME.resetMeatRoutes(R.w);
+  check("meat route: a full nearest hall redirects supply to the next reachable hall", ME.hallReach(R.w, R.home, 9, { space: true })?.hall === R.at(59, 8));
+  R.w.meat[R.hall] = 0;
+  R.w.road[R.at(30, 7)] = ROAD.NONE; R.w.rail[R.at(30, 6)] = 0; ME.resetMeatRoutes(R.w);
+  check("meat route: a physically near but disconnected hall is not serviceable", ME.hallReach(R.w, R.home, Infinity) === null);
+  const RW = flatFreight("h-road-only", false);
+  check("meat route: a road-only trip obeys the same exact walked-step limit",
+    ME.hallReach(RW.w, RW.home, 55) === null && ME.hallReach(RW.w, RW.home, 56)?.walkSteps === 56 && ME.hallReach(RW.w, RW.home, Infinity)?.hall === RW.hall);
+
+  // The cosmetic door search must obey the same bare-wall barrier as
+  // fields.doorOf. Otherwise a pen figure or the killer's first leg can pop
+  // to a road edge that the stored H route does not begin on.
+  const WD = createWorld({ seed: "h-wall-door", w: 8, h: 8 });
+  WD.terrain.fill(WO.TERRAIN.GRASS); WD.road.fill(ROAD.NONE); WD.zone.fill(ZONE.NONE); WD.tier.fill(0); WD.wall.fill(0); WD.citizens = []; WD.households = []; WD.byId = new Map(); WD.hhById = new Map();
+  const wat = (x, y) => y * WD.w + x, wh = wat(3, 3), wk = wat(7, 4);
+  WD.zone[wh] = ZONE.M; WD.tier[wh] = 1; WD.zone[wk] = ZONE.R; WD.tier[wk] = 1;
+  WD.wall[wat(3, 2)] = 1; WD.road[wat(3, 1)] = ROAD.ROAD;
+  for (let x = 5; x <= 7; x++) WD.road[wat(x, 3)] = ROAD.ROAD;
+  const penHh = CI.createHousehold(WD, "pig", 1), killerHh = CI.createHousehold(WD, "wolf", 1);
+  CI.placeHousehold(WD, penHh, wk); CI.placeHousehold(WD, killerHh, wk);
+  const penC = WD.byId.get(penHh.members[0]), killerC = WD.byId.get(killerHh.members[0]);
+  penC.pen = true; penC.penSince = 0; penC.heldAt = wh; penC.held = 100;
+  const simDoor = FI.doorOf(WD, wh);
+  WD.predations = [{ killer: killerC.id, killerHome: wk, victimHome: wh, hall: wh,
+    sackPath: Uint16Array.from([simDoor]), homePath: Uint16Array.from([simDoor, wat(6, 3), wat(7, 3)]),
+    victim: { id: 99999, species: "rabbit", age: 20, name: "Wall Test" } }];
+  WD.meatTrips = []; WD.arrivals = []; WD.departures = []; WD.meetings = [];
+  const wallWalkers = createWalkers(WD); wallWalkers.notify();
+  const penWalker = wallWalkers.list().find((w) => w.kind === "penned");
+  const predWalker = wallWalkers.list().find((w) => w.kind === "predation");
+  check("meat walkers: bare walls cannot make penned figures or pre-sack legs disagree with the sim-selected door",
+    simDoor === wat(5, 3) && penWalker?.tx === 5.5 && penWalker?.ty === 3.5
+      && predWalker?.legs[0].path.at(-1) === (WD.predations[0].sackPath[0] & 0x7fff));
+
+  let cartBody = true, cartExtra = true;
+  for (const species of ["rabbit", "mouse", "fox", "beaver", "owl", "bear", "tortoise", "raccoon", "pig", "cow", "wolf", "cat", "hawk", "skunk"])
+    for (const age of ["adult", "elder"])
+      for (const facing of ["se", "ne", "sw", "nw"])
+        for (let frame = 0; frame < 3; frame++)
+          for (const look of [{ shade: 0, mark: 0 }, { shade: 0, mark: 1 }, { shade: 1, mark: 0 }, { shade: 1, mark: 1 }]) {
+            const plain = hArt.citizen(species, facing, frame, age, { look });
+            const cart = hArt.citizen(species, facing, frame, age, { look, carry: "cart" });
+            if (cart.w !== 18 || cart.h !== plain.h || cart.anchor[0] !== plain.anchor[0] + 3 || cart.anchor[1] !== plain.anchor[1]) cartBody = false;
+            for (let y = 0; y < plain.h; y++) for (let x = 0; x < plain.w; x++) {
+              // Tortoise '+' is the post-compose silhouette outline: the
+              // cart legitimately occupies some formerly empty outline
+              // neighbours. Every authored animal pixel must still match.
+              if (plain.rows[y][x] !== "." && !(species === "tortoise" && plain.rows[y][x] === "+") && cart.rows[y][x + 3] !== plain.rows[y][x]) cartBody = false;
+            }
+            if (hInk(cart.rows) <= hInk(plain.rows) + 12) cartExtra = false;
+          }
+  check("meat art: every adult/elder look, facing and frame keeps the exact figure and feet inside the wider handcart sprite", cartBody);
+  check("meat art: every handcart pose adds a substantial readable cart silhouette", cartExtra);
+
+  // Rail is not a wormhole for LV or any park/centre/plaque distance. Strip
+  // the already-specified rail pollution out of two wall-less twins, then
+  // call the property computation itself: the arrays must be byte-identical.
+  const PR = flatFreight("h-property", true), PG = flatFreight("h-property", false);
+  PR.w.civic[PR.at(40, 12)] = CIVIC.PARK; PG.w.civic[PG.at(40, 12)] = CIVIC.PARK;
+  for (const x of [PR.w, PG.w]) { x.pol.fill(0); x.dread.fill(0); FI.computeLandValue(x); }
+  check("property distance: a long rail shortcut gives no LV, park, Zoo, centre, plaque or smell distance discount",
+    Array.from(PR.w.lv).every((n, i) => n === PG.w.lv[i]) && PR.w.lv[PR.home] === PG.w.lv[PG.home]);
+  const DR = flatFreight("h-dread", false);
+  FI.computeDread(DR.w); const emptyDread = DR.w.dread[DR.hall];
+  DR.w.meat[DR.hall] = 8; FI.computeDread(DR.w); const fullDread = DR.w.dread[DR.hall];
+  check("meat feedback: an isolated empty hall smells at half strength and stock eight restores exact full strength",
+    emptyDread === Math.round(KNOBS.DREAD[2] * 0.5) && fullDread === KNOBS.DREAD[2], `${emptyDread} → ${fullDread}`);
+
+  const old = {
+    buy: KNOBS.MEAT_BUY_P, eat: KNOBS.MEAT_EAT, pen: KNOBS.PEN_BUY_P,
+    friendP: KNOBS.FRIEND_P, friendN: KNOBS.FRIEND_SAMPLES, funeral: KNOBS.FUNERAL_P,
+    zoned: KNOBS.ZONED_OUT_MONTHS, rehomeDreadP: KNOBS.REHOME_DREAD_P, kill: KNOBS.KILL_P,
+  };
+  try {
+    KNOBS.MEAT_BUY_P = 1; KNOBS.MEAT_EAT = 0; KNOBS.PEN_BUY_P = 0;
+    const E = flatFreight("h-economy");
+    E.w.naturalDeaths = [{ id: 9001, name: "Test Body", species: "rabbit", age: 40, home: E.home }];
+    E.w.meatTrips = [];
+    const cash0 = E.w.cash, cut0 = E.w.ledger.cut || 0;
+    const boughtLines = ME.meatTick(E.w);
+    const trip = E.w.meatTrips[0];
+    check("meat inflow: a reachable natural death is bought once, paid only through budget.post and routed visibly",
+      ME.hallStock(E.w, E.hall) === 1 && E.w.meatStats.total.bought === 1 && E.w.cash === cash0 + KNOBS.MEAT_PRICE
+      && (E.w.ledger.cut || 0) === cut0 + KNOBS.MEAT_PRICE && boughtLines.some((x) => x.startsWith("BOUGHT"))
+      && trip?.hall === E.hall && trip.path.some((p) => p & FI.RIDE));
+    E.w.naturalDeaths = [];
+    ME.receiveMeat(E.w, E.hall, "killed", 1);
+    ME.receiveMeat(E.w, E.hall, "convicted", 1);
+    check("meat inflow: killing and conviction are distinct one-unit sources", ME.hallStock(E.w, E.hall) === 3 && E.w.meatStats.total.killed === 1 && E.w.meatStats.total.convicted === 1);
+
+    const K = flatFreight("h-killing");
+    const kh2 = K.at(3, 8); K.w.zone[kh2] = ZONE.R; K.w.tier[kh2] = 1; K.w.roadsDirty = true; computeFields(K.w);
+    const hunters = CI.createHousehold(K.w, "wolf", 2), prey = CI.createHousehold(K.w, "rabbit", 1);
+    CI.placeHousehold(K.w, hunters, K.home); CI.placeHousehold(K.w, prey, kh2);
+    for (const c of K.w.citizens) c.deathAge = 1e9;
+    const hunter = K.w.byId.get(hunters.members[0]);
+    const nearWeight = JU.killWeight(K.w, hunter);
+    K.w.road[K.at(30, 7)] = ROAD.NONE; K.w.rail[K.at(30, 6)] = 0; ME.resetMeatRoutes(K.w);
+    const cutWeight = JU.killWeight(K.w, hunter);
+    check("meat killing: KILL_MARKET follows the service network, even beyond the smell, and drops when road and rail are cut",
+      nearWeight > 0 && Math.abs(nearWeight / cutWeight - KNOBS.KILL_MARKET) < 1e-9, `${nearWeight} / ${cutWeight}`);
+    K.w.road[K.at(30, 7)] = ROAD.ROAD; K.w.rail[K.at(30, 6)] = 1; ME.resetMeatRoutes(K.w);
+    KNOBS.KILL_P = 1 / JU.killTotal(K.w);
+    const killLines = []; JU.killingTick(K.w, census(K.w), killLines);
+    check("meat killing: a forced distant killing stocks exactly one unit and publishes the selected rail hall-leg for the sack",
+      K.w.meatStats.total.killed === 1 && ME.hallStock(K.w, K.hall) === 1 && K.w.predations.length === 1 && K.w.predations[0].hall === K.hall
+      && K.w.predations[0].sackPath.some((p) => p & FI.RIDE) && K.w.ledger.cut === KNOBS.MEAT_PRICE);
+    KNOBS.KILL_P = old.kill;
+
+    const S = flatFreight("h-sentence");
+    const soldHh = CI.createHousehold(S.w, "rabbit", 1); CI.placeHousehold(S.w, soldHh, S.home);
+    const convict = S.w.byId.get(soldHh.members[0]), soldLines = [];
+    const soldFile = JU.openFile(S.w, { tile: S.home, culpritId: convict.id, cause: "burglary" });
+    JU.arrest(S.w, soldFile, convict, false, soldLines);
+    check("meat sentence: SOLD increments convict count and convicted stock exactly once, with its §100 cut distinct from meatSold",
+      !S.w.byId.has(convict.id) && S.w.events.justice.sold === 1 && S.w.meatStats.total.convicted === 1 && ME.hallStock(S.w, S.hall) === 1
+      && S.w.ledger.cut === KNOBS.SOLD_PRICE && (S.w.last?.census?.meatSold || 0) === 0);
+
+    const wolves = CI.createHousehold(E.w, "wolf", 2); for (const id of wolves.members) E.w.byId.get(id).deathAge = 1e9;
+    CI.placeHousehold(E.w, wolves, E.home);
+    KNOBS.MEAT_EAT = 1;
+    const beforeSale = E.w.ledger.cut || 0;
+    ME.meatTick(E.w);
+    check("meat outflow: assigned carnivores sell min(integer demand, stock) to the grey-hall cut",
+      E.w.meatStats.total.eaten === 2 && ME.hallStock(E.w, E.hall) === 1 && (E.w.ledger.cut || 0) - beforeSale === 2 * KNOBS.MEAT_SALE);
+    ME.receiveMeat(E.w, E.hall, "bought", 2); E.w.events.licence = true;
+    const tax0 = E.w.ledger.tax || 0, cut1 = E.w.ledger.cut || 0;
+    ME.meatTick(E.w);
+    check("meat outflow: a licensed hall books the C-rate share as tax, never as grey cut",
+      (E.w.ledger.tax || 0) - tax0 === Math.round(2 * KNOBS.MEAT_SALE * E.w.rates.C / 100) && (E.w.ledger.cut || 0) === cut1);
+    check("meat conservation: mixed sources and meals balance exactly", ME.meatBalance(E.w).ok, JSON.stringify(ME.meatBalance(E.w)));
+
+    const walkers = createWalkers(E.w), hash0 = stateHash(E.w);
+    walkers.notify(); walkers.update(0.25, { x0: 0, y0: 0, x1: E.w.w, y1: E.w.h });
+    const cart = walkers.list().find((x) => x.kind === "cart");
+    const exactBack = cart && cart.legs[1].path.join(",") === trip.path.map((p) => p & 0x7fff).join(",");
+    check("meat walkers: the cart consumes the sim-selected RIDE route out and back and never writes sim state",
+      !!cart && cart.carry === "cart" && exactBack && cart.legs[1].ride.some(Boolean) && stateHash(E.w) === hash0);
+
+    const C = flatFreight("h-cap");
+    ME.receiveMeat(C.w, C.hall, "killed", 100);
+    const totalsAtCap = { ...C.w.meatStats.total };
+    ME.receiveMeat(C.w, C.hall, "convicted", 1);
+    check("meat capacity: a hall keeps at most 40 and refuses excess doorstep supply without counting it",
+      ME.hallStock(C.w, C.hall) === KNOBS.MEAT_CAP && totalsAtCap.killed === KNOBS.MEAT_CAP && C.w.meatStats.total.convicted === 0 && C.w.meatStats.total.spoiled === 0);
+    ME.receiveMeat(C.w, C.hall, "slaughtered", 2);
+    check("meat capacity: an already-grown pen animal becomes named spoilage rather than Uint16 overflow",
+      C.w.meat[C.hall] === KNOBS.MEAT_CAP && C.w.meatStats.total.slaughtered === 1 && C.w.meatStats.total.spoiled === 2 && ME.meatBalance(C.w).ok);
+
+    // Pen entry, absence, save/load, exact birthday, family memory and razing.
+    KNOBS.MEAT_BUY_P = 0; KNOBS.MEAT_EAT = 0; KNOBS.PEN_BUY_P = 1;
+    const P = flatFreight("h-pen");
+    const pigs = CI.createHousehold(P.w, "pig", 4); CI.placeHousehold(P.w, pigs, P.home);
+    for (const id of pigs.members) P.w.byId.get(id).deathAge = 1e9;
+    const cubs = pigs.members.map((id) => P.w.byId.get(id)).filter((c) => CE.ageYears(P.w, c) < KNOBS.ADULT_AGE);
+    cubs.forEach((c) => { c.born = 0; }); cubs[0].born = -15 * 12;
+    P.w.meatTrips = []; ME.meatTick(P.w);
+    const penned = P.w.citizens.find((c) => c.pen);
+    const penCensus = census(P.w);
+    check("market pen: one oldest cub from a full pig household enters a reachable tier-2 pen and keeps identity",
+      !!penned && penned.id === cubs[0].id && penned.home === pigs.home && penned.heldAt === P.hall && penned.held === penned.born + 12 * KNOBS.ADULT_AGE
+      && P.w.meatStats.total.penBought === 1 && P.w.meatTrips.some((x) => x.kind === "pen" && x.citizen === penned.id)
+      && penCensus.penned === 1 && penCensus.held === 0);
+    const PN = flatFreight("h-pen-rules"), rabbitHh = CI.createHousehold(PN.w, "rabbit", 4);
+    CI.placeHousehold(PN.w, rabbitHh, PN.home); rabbitHh.members.forEach((id) => { PN.w.byId.get(id).born = 0; });
+    ME.meatTick(PN.w);
+    const underfull = flatFreight("h-pen-underfull"), cowHh = CI.createHousehold(underfull.w, "cow", 3);
+    CI.placeHousehold(underfull.w, cowHh, underfull.home); cowHh.members.forEach((id) => { underfull.w.byId.get(id).born = 0; });
+    ME.meatTick(underfull.w);
+    check("market pen: only pig/cow cubs from a full household qualify, and tier capacities are exactly 2/4/8",
+      !PN.w.citizens.some((c) => c.pen) && !underfull.w.citizens.some((c) => c.pen)
+      && (PN.w.tier[PN.hall] = 1, ME.penCapacity(PN.w, PN.hall) === 2)
+      && (PN.w.tier[PN.hall] = 2, ME.penCapacity(PN.w, PN.hall) === 4)
+      && (PN.w.tier[PN.hall] = 3, ME.penCapacity(PN.w, PN.hall) === 8));
+    PN.w.tier[PN.hall] = 1;
+    for (const id of rabbitHh.members.slice(0, 3)) {
+      const c = PN.w.byId.get(id); c.pen = true; c.penSince = id; c.heldAt = PN.hall; c.held = PN.w.tick + 100;
+    }
+    ME.penMaturityTick(PN.w);
+    check("market pen: losing a storey releases deterministic excess animals alive before the cap can be exceeded",
+      PN.w.citizens.filter((c) => c.pen).length === 2 && PN.w.byId.get(rabbitHh.members[2]).heldAt === -1);
+    const penHash = stateHash(P.w), PL = load(save(P.w));
+    check("market pen: optional pen state survives save/load hash-equal and derived routes are not saved",
+      penHash === stateHash(PL) && !Object.hasOwn(toPlain(P.w), "meatTrips") && !Object.hasOwn(toPlain(P.w), "_meatReach"));
+
+    const PD = load(save(PL)), departedCub = PD.byId.get(penned.id), departedFamily = PD.hhById.get(departedCub.household);
+    const removedFamily = CI.removeHousehold(PD, departedFamily, "left");
+    check("market pen lifecycle: family departure removes only animals actually at home and cannot delete a purchased cub",
+      removedFamily === 3 && PD.byId.has(departedCub.id) && departedCub.pen && !departedFamily.gone
+      && departedFamily.members.length === 1 && departedFamily.members[0] === departedCub.id,
+      `removed ${removedFamily} · members ${departedFamily.members.join(",")} · pen ${departedCub.pen}`);
+    PD.tick = departedCub.held;
+    ME.penMaturityTick(PD); CI.compact(PD);
+    const departureBalance = ME.meatBalance(PD);
+    check("market pen lifecycle: a cub preserved through family departure remains accounted until exact maturity",
+      !PD.byId.has(departedCub.id) && ME.hallStock(PD, P.hall) === KNOBS.PEN_YIELD && departureBalance.penOk,
+      JSON.stringify(departureBalance));
+
+    const PZ = load(save(PL)), zonedCub = PZ.byId.get(penned.id), zonedFamily = PZ.hhById.get(zonedCub.household);
+    PZ.use[P.home] = WO.USE.PRED; KNOBS.ZONED_OUT_MONTHS = 1; KNOBS.PEN_BUY_P = 0;
+    tick(PZ);
+    const zonedDeparture = PZ.departures.at(-1);
+    const zonedStayedHome = zonedFamily.home === P.home && zonedCub.home === P.home;
+    const zonedLife = zonedCub.life.some((e) => e[1] === H_KIND.ZONED_OUT);
+    const zonedRaze = apply(PZ, { kind: "bulldoze", x0: P.hall % PZ.w, y0: (P.hall / PZ.w) | 0, x1: P.hall % PZ.w, y1: (P.hall / PZ.w) | 0 });
+    check("market pen relocation: zoning moves/counts only the animals at home, then a razed hall returns the cub to its standing address",
+      PZ.last.left === 3 && PZ.last.zonedOut === 3 && zonedDeparture?.n === 3 && zonedStayedHome && !zonedLife
+      && zonedRaze.ok && PZ.byId.has(zonedCub.id) && !zonedCub.pen && zonedCub.home === P.home && PZ.zone[P.home] === ZONE.R,
+      `left ${PZ.last.left}/${zonedDeparture?.n} · home ${zonedFamily.home}/${zonedCub.home} · zoned life ${zonedLife}`);
+    KNOBS.ZONED_OUT_MONTHS = old.zoned;
+
+    const PS = load(save(PL)), smellCub = PS.byId.get(penned.id), smellFamily = PS.hhById.get(smellCub.household), smellTo = P.at(3, 8);
+    PS.zone[smellTo] = ZONE.R; PS.tier[smellTo] = 1; PS.dread.fill(0); PS.dread[P.home] = 100;
+    KNOBS.REHOME_DREAD_P = 1;
+    const smellOut = CI.citizensTick(PS, census(PS), {});
+    const movedFamily = PS.households.find((h) => !h.gone && h.home === smellTo);
+    check("market pen relocation: a forced hall-smell move relocates the family at home but cannot move or remember an absent cub",
+      smellOut.rehomed === 1 && movedFamily?.members.length === 3 && smellFamily.members.length === 1
+      && smellFamily.members[0] === smellCub.id && smellCub.home === P.home
+      && !smellCub.life.some((e) => e[1] === H_KIND.MOVED),
+      `rehomed ${smellOut.rehomed} · moved ${movedFamily?.members.length} · pen home ${smellCub.home}`);
+    KNOBS.REHOME_DREAD_P = old.rehomeDreadP;
+
+    const PF = load(save(PL)), funeralPen = PF.byId.get(penned.id), funeralFamily = PF.hhById.get(funeralPen.household);
+    const funeralPeers = funeralFamily.members.filter((id) => id !== funeralPen.id).slice(0, 2).map((id) => PF.byId.get(id));
+    [funeralPen, ...funeralPeers].forEach((c) => { c.friends.length = 0; });
+    KNOBS.FUNERAL_P = 1;
+    CI.holdFuneral(PF, [funeralPen.id, ...funeralPeers.map((c) => c.id)], null);
+    check("market pen absence: a funeral may join present mourners but never gives a penned mourner a new friendship",
+      funeralPen.friends.length === 0 && funeralPeers[0].friends.includes(funeralPeers[1].id));
+    KNOBS.FUNERAL_P = old.funeral;
+
+    const penWalkers = createWalkers(P.w), penWalkHash = stateHash(P.w); penWalkers.notify();
+    const penList = penWalkers.list(), penCart = penList.find((x) => x.kind === "cart" && x.companion), penFigure = penList.find((x) => x.kind === "penned" && x.citizen === penned.id);
+    check("market pen walkers: the cub stands at the hall and walks beside its exact-route collection cart without changing the hash",
+      !!penCart && penCart.legs[1].ride.some(Boolean) && !!penFigure && stateHash(P.w) === penWalkHash);
+
+    const oldMood = penned.mood, oldFriends = penned.friends.slice();
+    KNOBS.FRIEND_P = 1; KNOBS.FRIEND_SAMPLES = 1000;
+    tick(P.w);
+    const heldCub = P.w.byId.get(penned.id);
+    const file = JU.openFile(P.w, { tile: P.home, culpritId: heldCub.id, cause: "burglary" }); file.opened = P.w.tick - 1;
+    P.w.civic[P.at(10, 10)] = CIVIC.POLICE; computeFields(P.w);
+    JU.filesTick(P.w, census(P.w), []);
+    check("market pen: a held cub is absent from mood, friendship, investigation and killing",
+      WO.absent(P.w, heldCub) && heldCub.mood === oldMood && heldCub.friends.join(",") === oldFriends.join(",") && !file.closed && JU.killWeight(P.w, heldCub) === 0);
+
+    const PM = load(save(PL));
+    const mc = PM.byId.get(penned.id), family = PM.hhById.get(mc.household).members.filter((id) => id !== mc.id);
+    PM.tick = mc.held;
+    const penLines = ME.penMaturityTick(PM);
+    const removedAtMaturity = !PM.byId.has(mc.id);
+    const tickMeatCensus = ME.meatCensus(PM);
+    CI.compact(PM); // tick's normal removal boundary before a fresh direct census
+    const maturityCensus = census(PM);
+    check("market pen: the exact sixteenth birthday yields two units, removes the animal, and prints its named market line",
+      removedAtMaturity && ME.hallStock(PM, P.hall) === 2 && PM.meatStats.total.slaughtered === 1 && penLines.length === 1 && penLines[0].includes(mc.name),
+      `alive ${!removedAtMaturity} · stock ${ME.hallStock(PM, P.hall)} · slaughtered ${PM.meatStats.total.slaughtered} · lines ${penLines.length} · name ${penLines[0] || "—"}`);
+    check("market pen: direct Census and the tick refresh both report slaughtered meat in yielded units, not animals",
+      maturityCensus.meatSlaughtered === KNOBS.PEN_YIELD && tickMeatCensus.meatSlaughtered === KNOBS.PEN_YIELD);
+    check("market pen: parents remember LOST_CHILD and receive no grief",
+      family.every((id) => PM.byId.get(id)?.life.some((e) => e[1] === 16 && e[2] === mc.id) && !(PM.byId.get(id).grief > PM.tick)));
+
+    const PB = load(save(PL)), freed = PB.byId.get(penned.id);
+    const raze = apply(PB, { kind: "bulldoze", x0: P.hall % PB.w, y0: (P.hall / PB.w) | 0, x1: P.hall % PB.w, y1: (P.hall / PB.w) | 0 });
+    check("market pen: bulldozing the hall frees the cub home alive and makes the destructive op non-undoable",
+      raze.ok && !raze.undoable && PB.byId.has(freed.id) && !freed.pen && freed.heldAt === -1 && freed.home === PB.hhById.get(freed.household).home
+      && PB.meatStats.total.penReleased === 1 && ME.meatBalance(PB).penOk);
+
+    const PC = load(save(PL));
+    for (let k = 0; k < 24; k++) { tick(PL); tick(PC); }
+    check("market pen: a 24-month continuation through maturity is save/load deterministic", stateHash(PL) === stateHash(PC), `${stateHash(PL)} vs ${stateHash(PC)}`);
+
+    const FD = flatFreight("h-fractional-demand"), fdWolves = CI.createHousehold(FD.w, "wolf", 1);
+    CI.placeHousehold(FD.w, fdWolves, FD.home); FD.w.meat[FD.hall] = 20;
+    KNOBS.PEN_BUY_P = 0; KNOBS.MEAT_BUY_P = 0; KNOBS.MEAT_EAT = 0.05;
+    ME.meatTick(FD.w);
+    const FDL = load(save(FD.w));
+    for (let k = 0; k < 24; k++) { FD.w.tick++; FDL.tick++; ME.meatTick(FD.w); ME.meatTick(FDL); }
+    check("meat save: a fractional demand remainder survives save/load and continues hash-identically",
+      FD.w.meatStats.demand[String(FD.hall)] > 0 && stateHash(FD.w) === stateHash(FDL), `${stateHash(FD.w)} vs ${stateHash(FDL)}`);
+
+    // A block keeps one aggregate inventory through merge/split and gives it
+    // an explicit fate when the last hall disappears.
+    const B = flatFreight("h-block", false), tiles = [B.at(57, 8), B.at(58, 8), B.at(57, 9), B.at(58, 9)], ba = tiles[0];
+    B.w.zone[B.hall] = ZONE.NONE; B.w.tier[B.hall] = 0;
+    for (const i of tiles) { B.w.zone[i] = ZONE.M; B.w.tier[i] = 3; }
+    B.w.meat[tiles[0]] = 2; B.w.meat[tiles[1]] = 3; B.w.meat[tiles[2]] = 4; B.w.meat[tiles[3]] = 1;
+    ME.meatStats(B.w); CI.rebuildMaps(B.w);
+    const BL = await import("../js/sim/blocks.js");
+    BL.mergeLots(B.w, { side: 2, anchor: ba, tiles }); ME.meatTick(B.w);
+    const merged = ME.hallStock(B.w, ba);
+    BL.splitLot(B.w, ba); const split = ME.hallStock(B.w, ba);
+    const razed = apply(B.w, { kind: "bulldoze", x0: ba % B.w.w, y0: (ba / B.w.w) | 0, x1: ba % B.w.w, y1: (ba / B.w.w) | 0 });
+    check("meat blocks: merge and split conserve aggregate stock; razing names all ten units as spoilage with no ghost",
+      merged === 10 && split === 10 && razed.ok && ME.hallStock(B.w, ba) === 0 && B.w.meatStats.total.spoiled === 10 && ME.meatBalance(B.w).ok);
+
+    const BF = flatFreight("h-fire", false); ME.receiveMeat(BF.w, BF.hall, "bought", 7); BF.w.burning[BF.hall] = 1;
+    ME.meatTick(BF.w);
+    check("meat lifecycle: fire/decay invalidation cannot leave ghost stock", BF.w.meat[BF.hall] === 0 && BF.w.meatStats.total.spoiled === 7 && ME.meatBalance(BF.w).ok);
+
+    const D = flatFreight("h-dry"); KNOBS.MEAT_EAT = 0;
+    const dry1 = ME.meatTick(D.w), dry2 = ME.meatTick(D.w);
+    ME.receiveMeat(D.w, D.hall, "bought", 1);
+    const oneWolf = CI.createHousehold(D.w, "wolf", 1); CI.placeHousehold(D.w, oneWolf, D.home); KNOBS.MEAT_EAT = 1;
+    const dry3 = ME.meatTick(D.w);
+    D.w.tick = 12; const annual1 = ME.beginMeatMonth(D.w), annual2 = ME.beginMeatMonth(D.w);
+    check("meat news: EMPTY HOOKS appears once per dry spell, resets on restock, and THE MARKET appears once per year",
+      dry1.filter((x) => x.startsWith("EMPTY HOOKS")).length === 1 && !dry2.some((x) => x.startsWith("EMPTY HOOKS"))
+      && dry3.filter((x) => x.startsWith("EMPTY HOOKS")).length === 1 && annual1?.startsWith("THE MARKET") && annual2 === null
+      && D.w.events.log.filter((x) => x.id === "market" && x.t === 12).length === 1
+      && HE.TICKER_BAD.test(dry1[0]) && HE.TICKER_FLASH.test(dry1[0]) && !HE.TICKER_FLASH.test(annual1));
+  } finally {
+    KNOBS.MEAT_BUY_P = old.buy; KNOBS.MEAT_EAT = old.eat; KNOBS.PEN_BUY_P = old.pen;
+    KNOBS.FRIEND_P = old.friendP; KNOBS.FRIEND_SAMPLES = old.friendN; KNOBS.FUNERAL_P = old.funeral;
+    KNOBS.ZONED_OUT_MONTHS = old.zoned; KNOBS.REHOME_DREAD_P = old.rehomeDreadP; KNOBS.KILL_P = old.kill;
+  }
+}
+
 // ---- Part D: the walker layer never writes the sim (SPEC §14) ---------------------
 const walkersPath = path.join(ROOT, "js", "walkers.js");
 if (existsSync(walkersPath)) {

@@ -5,7 +5,7 @@ import { homeTerms, moodContext, moodTerms } from "./citizens.js";
 import { lotScore, REASON } from "./lots.js";
 import { neutralRate } from "./demand.js";
 import { DIET_OF } from "./species.js";
-import { ZONE } from "./world.js";
+import { ZONE, anchorOf, footprintOf, absent } from "./world.js";
 import { hash01, seedFromString } from "./rng.js";
 import { ACT } from "./voice.js";
 
@@ -30,7 +30,7 @@ const zoneCode = (zone) => zone === ZONE.R ? "R" : zone === ZONE.C ? "C" : zone 
  * shared moodContext for callers walking the whole town; it changes no rule.
  */
 export function needOf(world, c, context = null) {
-  if (!world?.last || !c || c.dead) return { code: "CONTENT", arg: null, act: ACT.CONTENT };
+  if (!world?.last || !c || c.dead || absent(world, c)) return { code: "CONTENT", arg: null, act: ACT.CONTENT };
   const choices = [];
   const add = (code, points, arg = null) => {
     if (!(points > 0) || !ACT[code]) return;
@@ -68,7 +68,9 @@ export function needOf(world, c, context = null) {
     if (demand.r.C > 0.05) add("SHOPS", NEED_VALVE_PTS, { value: demand.r.C });
     if (demand.r.R > 0.05) add("ROOMS", NEED_VALVE_PTS, { value: demand.r.R });
     if (demand.r.I > 0.05) add("WORKS", NEED_VALVE_PTS, { value: demand.r.I });
-    const emptyHall = DIET_OF[c.species] === "carn" && c.job >= 0 && world.zone[c.job] === ZONE.M && (world.meat?.[c.job] || 0) === 0;
+    let jobStock = 0;
+    if (c.job >= 0 && world.zone[c.job] === ZONE.M) for (const j of footprintOf(world, anchorOf(world, c.job))) jobStock += world.meat?.[j] || 0;
+    const emptyHall = DIET_OF[c.species] === "carn" && c.job >= 0 && world.zone[c.job] === ZONE.M && jobStock === 0;
     if (DIET_OF[c.species] === "carn" && (demand.r.M > 0.05 || emptyHall)) add("HOOKS", NEED_VALVE_PTS, { value: demand.r.M, lot: emptyHall ? c.job : -1 });
   }
 

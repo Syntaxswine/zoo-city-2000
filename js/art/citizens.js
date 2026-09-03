@@ -943,6 +943,22 @@ const SACK_SHOULDER = part([
   "...qq....",
   "....y....",
 ]);
+// A small two-wheel handcart for Part H's hall collections. It uses the
+// earth ramp (wood and canvas) and the outline key for the wheels. Like the
+// sack it is composed with the carrier, so the animal's exact coat rows and
+// feet anchor remain the same figure translated three pixels into the wider
+// grid. SE pulls it screen-left; NE screen-right; west facings mirror both.
+const HANDCART = part([
+  ".......q.",
+  "......qq.",
+  ".....qq..",
+  ".ttttttt.",
+  "uuttttssr",
+  "utttttssr",
+  "qqqqqqqqq",
+  ".++...++.",
+  "++++.++++",
+]);
 const CARRY_OX = 3; // the carrying grid is 18 wide; the figure sits 3 px in — SYMMETRIC, so the mirrored facings land the figure on itself — the sack over its screen-left shoulder
 const CARRY_LIFT = 3; // the sack's top rides 3 px above the frame's top row — its bulk BESIDE the head, not over it; the cord and the hand end on row 7, the row above the shoulder (body row 8)
 
@@ -1226,7 +1242,7 @@ function normLook(opts = {}) {
 }
 
 function composeAdult(species, facing, frame, elder, hat, carry = false) {
-  const lift = (hat ? 4 : 0) + (carry ? CARRY_LIFT : 0);
+  const lift = (hat ? 4 : 0) + (carry === "sack" ? CARRY_LIFT : 0);
   const ox = carry ? CARRY_OX : 0;
   const H = 20 + lift;
   const g = blank(12 + 2 * ox, H);
@@ -1239,7 +1255,8 @@ function composeAdult(species, facing, frame, elder, hat, carry = false) {
   // fixed row (the body starts at row 8) — never from the head's top, so the
   // body rows of a carrying sprite are the plain sprite's, 3 px in (check.mjs).
   const sackAt = () => stamp(g, SACK_SHOULDER, 0, lift - CARRY_LIFT);
-  if (carry && facing === "se") sackAt();
+  if (carry === "sack" && facing === "se") sackAt();
+  if (carry === "cart") stamp(g, HANDCART, facing === "se" ? 0 : 9, lift + 11);
   if (tail && tail[3]) put(tail[0], tail[1], tail[2]);
   const shellBehind = species === "tortoise" && facing === "se";
   if (shellBehind) put(SHELL.se[0], SHELL.se[1], SHELL.se[2]);
@@ -1264,7 +1281,7 @@ function composeAdult(species, facing, frame, elder, hat, carry = false) {
     while (top < 9 && head[top].split("").every((c) => c === ".")) top++;
     stamp(g, HAT_ROWS, 3 + ox, top + lift - 4);
   }
-  if (carry && facing === "ne") sackAt();
+  if (carry === "sack" && facing === "ne") sackAt();
   return toRows(g); // AUTHORED keys — mirrored and remapped by citizenSprite
 }
 
@@ -1318,8 +1335,9 @@ const PORTRAIT_CACHE = new Map();
  * The composed, cached citizen sprite. `facing` 'se'|'ne'|'sw'|'nw' (or an
  * index into FACINGS), `frame` 0..2 (or 'stand'|'stepA'|'stepB'), `age`
  * 'adult'|'elder'|'cub' (or years). `opts.hat` adds the centenary hat;
- * `opts.carry === "sack"` puts a sack over the shoulder (adults and elders
- * only — the killing is an adult's; the grid widens to 16 and the anchor
+ * `opts.carry` may be `sack` or `cart` (adults and elders only); the sack
+ * goes over the shoulder and the cart stays on the ground. The grid widens
+ * to 18 and the anchor
  * follows the feet, so the figure stays on its tile).
  */
 export function citizenSprite(species, facing = "se", frame = 0, age = "adult", opts = {}) {
@@ -1329,12 +1347,12 @@ export function citizenSprite(species, facing = "se", frame = 0, age = "adult", 
   const ag = normAge(species, age);
   const look = normLook(opts);
   const hat = !!opts.hat && ag !== "cub";
-  const carry = opts.carry === "sack" && ag !== "cub";
+  const carry = (opts.carry === "sack" || opts.carry === "cart") && ag !== "cub" ? opts.carry : false;
   // Shade is itself a stable hash bit, so tying glasses to it gives exactly
   // half of elder looks glasses without making a mark toggle change pixels
   // outside that species' declared mark box.
   const glasses = ag === "elder" && look.shade === 1;
-  const key = `${species}|${f}|${fr}|${ag}|s${look.shade}m${look.mark}g${glasses ? 1 : 0}|${hat ? "h" : ""}${carry ? "c" : ""}`;
+  const key = `${species}|${f}|${fr}|${ag}|s${look.shade}m${look.mark}g${glasses ? 1 : 0}|${hat ? "h" : ""}${carry === "sack" ? "s" : carry === "cart" ? "r" : ""}`;
   let s = CACHE.get(key);
   if (s) return s;
   const authored = f === "sw" ? "se" : f === "nw" ? "ne" : f;
@@ -1344,13 +1362,13 @@ export function citizenSprite(species, facing = "se", frame = 0, age = "adult", 
   if (ag === "cub" && look.mark) rows = cubCoatTreatment(rows, f === "sw" || f === "nw");
   if (ag !== "cub" && look.mark) {
     const g = rows.map((r) => r.split(""));
-    const lift = (hat ? 4 : 0) + (carry ? CARRY_LIFT : 0);
+    const lift = (hat ? 4 : 0) + (carry === "sack" ? CARRY_LIFT : 0);
     stampLookMark(g, species, authored, lift, carry ? CARRY_OX : 0, f === "sw" || f === "nw");
     rows = toRows(g);
   }
   if (glasses) {
     const g = rows.map((r) => r.split(""));
-    const lift = (hat ? 4 : 0) + (carry ? CARRY_LIFT : 0);
+    const lift = (hat ? 4 : 0) + (carry === "sack" ? CARRY_LIFT : 0);
     stampGlasses(g, species, authored, lift, carry ? CARRY_OX : 0, f === "sw" || f === "nw");
     rows = toRows(g);
   }
@@ -1501,6 +1519,11 @@ export function allCitizens() {
         const c = citizenSprite(species, facing, frame, "adult", { carry: "sack" });
         out.push({ name: c.name, sprite: c });
       }
+  for (const facing of FACINGS)
+    for (let frame = 0; frame < 3; frame++) {
+      const c = citizenSprite("fox", facing, frame, "adult", { carry: "cart" });
+      out.push({ name: c.name, sprite: c });
+    }
   const hc = citizenSprite("tortoise", "se", 0, "elder", { hat: true, carry: "sack" });
   out.push({ name: hc.name, sprite: hc });
   out.push({ name: TENT.name, sprite: TENT }, { name: HAT.name, sprite: HAT }, { name: MEETING.name, sprite: MEETING });

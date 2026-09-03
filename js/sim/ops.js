@@ -13,6 +13,7 @@ import { clearLot, invalidatePaths, releaseJob } from "./citizens.js";
 import { resolveChoice } from "./events.js";
 import { refreshLast } from "./tick.js";
 import { computeOcclusion } from "./reach.js";
+import { closeHall, hallStock, resetMeatRoutes } from "./meat.js";
 
 const C = KNOBS.COST;
 
@@ -77,10 +78,14 @@ export function costOf(world, op) {
           // A block goes as one building: every tile of its footprint, §2 each; its people are on the anchor.
           const a = anchorOf(world, i);
           for (const j of footprintOf(world, a)) { taken.add(j); add(j, C.bulldoze, "building"); }
-          if (world.occupants[a] || world.staff[a]) evicts++;
+          if (world.occupants[a] || world.staff[a] || (world.zone[a] === ZONE.M && (hallStock(world, a) || world.citizens.some((c) => !c.dead && c.pen && anchorOf(world, c.heldAt) === a)))) evicts++;
           continue;
         }
-        if (isBuilt(world, i)) { add(i, C.bulldoze, "building"); if (world.occupants[i] || world.staff[i]) evicts++; continue; }
+        if (isBuilt(world, i)) {
+          add(i, C.bulldoze, "building");
+          if (world.occupants[i] || world.staff[i] || (world.zone[i] === ZONE.M && (hallStock(world, i) || world.citizens.some((c) => !c.dead && c.pen && anchorOf(world, c.heldAt) === i)))) evicts++;
+          continue;
+        }
         if (world.zone[i]) { add(i, 0, "unzone"); continue; }
         if (world.terrain[i] === TERRAIN.TREE) { add(i, C.bulldozeTree, "tree"); continue; }
       }
@@ -252,6 +257,7 @@ export function apply(world, op, { log = true } = {}) {
           // footprint and its anchor's people; the rest are plain ground by then.
           const a = anchorOf(world, i);
           const tiles = world.big[i] ? footprintOf(world, a) : [i];
+          if (world.zone[a] === ZONE.M) closeHall(world, a); // stock spoils explicitly; penned cubs go home alive
           for (const j of tiles) { world.tier[j] = 0; world.zone[j] = ZONE.NONE; world.rubble[j] = 0; world.burning[j] = 0; world.maxTier[j] = 3; world.big[j] = 0; world.theme[j] = 0; }
           clearLot(world, a);
         }
@@ -306,6 +312,7 @@ export function apply(world, op, { log = true } = {}) {
   // A wall changes what a road can reach (doors, road distance) as much as a road does; a road across a wall makes a tunnel.
   if (roads || walls || rails) { world.roadsDirty = true; invalidatePaths(world); computeOcclusion(world); } // occlusion now, so wallCount reads live; roadDist at the tick
   else if (lines) invalidatePaths(world); // the stale pass re-searches under the line and releases the workers it forbids
+  resetMeatRoutes(world); // a hall, its door, capacity or the freight graph may have changed inside this tick
   post(world, "build", -plan.cost);
   world.undoStack = plan.evicts ? [] : [{ op, snap, cost: plan.cost, roads: roads || walls || rails, t: world.tick }];
   if (log) world.log.push({ t: world.tick, op: stripOp(op) });
@@ -360,6 +367,7 @@ export function undo(world) {
   }
   if (u.roads) { world.roadsDirty = true; invalidatePaths(world); computeOcclusion(world); }
   else if (u.op.kind === "use") invalidatePaths(world);
+  resetMeatRoutes(world);
   post(world, "build", u.cost);
   world.log.push({ t: world.tick, op: { kind: "undo" } });
   return { ok: true };

@@ -20,6 +20,13 @@ sounds right, although i think the meat vendors would grow them to
 adulthood for best return on investment."* → the hall buys the dead, and
 the hall buys livestock cubs and PENS them until they are grown (§4-H).
 
+And on the H route (2026-09-03): *"railroad should be counted as free travel
+when measuring distance for pathing, but not distance for property values."*
+→ H freight uses the real road/station/rail path with every rail and transfer
+edge at zero measured distance. This is H-specific: citizen commute rail
+remains 0.3 of a walk. LV and every park/Zoo/centre/plaque/dread radius remain
+geographic and never read the freight route.
+
 And (2026-09-03): *"adding the control city is a good idea, i will build one
 for you soon, please add on that the save button only lets you save the
 game once, a load save menu would be better. i think we also need a GUI for
@@ -43,7 +50,8 @@ zoos."* and *"the other way to think about it is that all sides have
 access points"* → R4 is ONE predicate, `served`, doors on every side, and
 a table of every rule that asks for a road (§4-R).
 
-Plan only. Nothing here is built. Each part is sized for one agent-session,
+This began as a plan; sections marked SHIPPED are now built and verified.
+Each remaining part is sized for one agent-session,
 owns its own files, and codes against contracts written down in §3 so the
 parts can run at the same time. The keel (§3) lands first and is small.
 
@@ -122,13 +130,15 @@ someone. The rules as they stand tonight, read at the owner's distance:
 | SOLD (`hallWithAccess`) | town-wide, nearest by Chebyshev | works — which is why the owner's 20 exist at all |
 | H's first draft: buy the dead / buy a cub "within 6" | 6 tiles | would have been the same mistake a fourth time |
 
-**The law this plan adopts for H: meat travels by ROAD, town-wide.** A hall
+**The law this plan adopts for H: meat travels by ROAD AND RAIL, town-wide.** A hall
 has a reach that is the commute graph's, not a radius: `lotsWithinRoad`
 already walks the road network to `maxRoad` 40 for job search, and
 `fields.dial` already prices every step (and the rail). A hall's "buyers'
-round" is the set of lots within `MEAT_ROAD` 60 walk-steps (a ride counts
-0.3, like the commute), nearest hall wins a body, and the visible form is a
-**cart walker** from the hall to the door and back — the sack already
+round" is the set of lots within `MEAT_ROAD` 60 walk-steps (rail and its
+transfers cost zero for H, while citizen commuting still counts a ride at
+0.3), nearest hall wins a body, and the visible form is a **cart walker**
+from the hall to the door and back — every road step costs one;
+the sack already
 proves the shape. The dread field stays a SMELL (4 tiles; that is what a
 smell is); the mood and LV effects of a hall on its own block are right as
 they are. `KILL_MARKET` and the hall's cut from a killing move onto the
@@ -710,7 +720,7 @@ keep `keyOf`), the hidden pane's timers. An obituary for every death is
 **Size.** ≈ 150 story + 80 news + 40 events + 40 probe; ~6 checks; half a
 session.
 
-### H. Meat on hand — *"the meat market should have more meat on hand"*
+### H. Meat on hand — SHIPPED 2026-09-03 — *"the meat market should have more meat on hand"*
 
 **Goal.** Meat is a QUANTITY the hall holds, with inflows the town
 produces and an outflow the carnivores eat, and the card, the census and
@@ -730,20 +740,23 @@ dead — v2" since session 3).
 
 **Design.**
 - `world.meat[i]` (K6b): units on hand per M lot. One unit = one body.
-- **Reach is by road (§1b), never a radius.** `hallReach(world, lot) →
-  { hall, steps }`: the nearest built hall with road access within
-  `MEAT_ROAD` 60 walk-steps of the lot's door on the commute graph (a
-  ride 0.3 of a walk, like `commuteTime`), or none. Computed once a tick
+- **Reach is by a physical transport path (§1b), never a radius.** `hallReach(world, lot) →
+  { hall, walkSteps, physicalSteps, path }`: the nearest built hall with road
+  access within `MEAT_ROAD` 60 walked steps of the lot's door on the commute
+  graph. Under H's explicit policy, board/alight and every rail edge cost
+  **zero**, while the returned path still contains those physical RIDE tiles.
+  Citizen commuting keeps its existing 0.3 rail cost. Property-value and
+  amenity/smell distance never read this route. Computed once a tick
   for the lots that need it (a death, a killing, a full livestock lot —
   dozens, not thousands); `lotsWithinRoad` is the precedent. The dread
   field keeps its 4-tile smell; `KILL_MARKET` and the hall's cut from a
   killing move from `dread[home] > 0` to `hallReach(home).hall >= 0`.
 - **Inflows**, each ONE unit to the hall `hallReach` names:
-  1. **The killing** → the killer's hall by road (today only a hall inside
+  1. **The killing** → the killer's reachable hall (today only a hall inside
      the 4-tile smell earns the mayor §50 and a line — at the owner's
      scale, never); the sack walks INTO the hall when one is in reach (the
-     walker-layer item BACKLOG already lists — the killer's leg 1 goes to
-     the hall's door by `roadPath`, however far, then home).
+     walker consumes the sim-selected H route verbatim, including its visible
+     zero-cost RIDE tiles, then follows the stored route home).
   2. **The dead** (the owner: *"natural deaths is a good option"*) →
      `buyTick`: a natural death whose home has a hall in road reach is
      BOUGHT with p `MEAT_BUY_P` 0.6, any species — the Beastars rule; the
@@ -751,9 +764,9 @@ dead — v2" since session 3).
      mayor's cut gets `MEAT_PRICE` §50 as it does for a killing, and the
      line says so (*"…and the cart from the hall at (30,12) called at the
      house"*). The visible form: a **cart walker** (`w.kind = "cart"`, a
-     hall staffer with a handcart sprite — D authors the cart as a carry
-     variant like the sack) from the hall to the door and back, on the
-     roads; in a town like the owner's that is a 30-tile round trip the
+     hall staffer with a handcart sprite — a carry variant like the sack)
+     from the hall to the door and back on the exact road/rail H route; in
+     a town like the owner's that is a 30-tile physical round trip the
      player will see. ≈ 24 deaths/yr in the rig, and in the owner's town
      of 2,854 more — with p 0.6 and every house on a road to a hall, the
      hall buys most of them. **The knob to set on the owner's layout is
@@ -813,7 +826,8 @@ dead — v2" since session 3).
   `--save <file>` takes an exported real city) print, per seed × layout,
   inflow by source, the stock curve, units sold per hall-year, cart trips
   and their mean length, and the cut — BEFORE the knobs are chosen, then
-  after. The target, on `estate`: a two-hall town holds 5–20 units and
+  after. The measured/calibrated envelope on `estate`: a two-hall town holds
+  4–20 units and
   sells most of what it buys; a hall with no road to any house runs dry
   and prints. The balanced rig is the curve's shape only.
 
@@ -836,7 +850,7 @@ in the ledger; B's `LOST_FRIEND` cause `"sold"` already exists).
 **Acceptance.**
 - The hash MOVES (a sim change); the commit records before/after on the
   standing gate (`--markets 1 --csv`) and the meatprobe table.
-- Conservation: `Σ bought + killed + convicted + 2·slaughtered − eaten =
+- Conservation: `opening + Σ bought + killed + convicted + 2·slaughtered − eaten − named spoilage =
   Σ stock` over a run, exact; stock ≤ `MEAT_CAP` 40 per hall; a hall with
   no road buys nothing; a dry hall prints EMPTY HOOKS once, not monthly.
 - The pen: a penned cub is `absent()` for its whole stay (never hired,
@@ -846,8 +860,9 @@ in the ledger; B's `LOST_FRIEND` cause `"sold"` already exists).
   exceeds its cap; a bulldozed hall sends its pen home alive; the parents'
   household carries `LOST_CHILD` and no `grief`.
 - Monotone: `MEAT_ROAD` 0/20/40/60/∞ → units bought rises on `estate`
-  and is FLAT on `balanced` past 20 (the rig cannot test reach — "the
-  easy case cannot test"); `MEAT_BUY_P` 0/0.3/0.6/1 → bought rises;
+  and eventually flattens on `balanced`; the original "flat past 20" guess
+  was rejected by the fixed-city curve (seed 7 reaches 2/162/254/254/254 R
+  lots, flat past 40). `MEAT_BUY_P` 0/0.3/0.6/1 → bought rises;
   `MEAT_EAT` 0/0.05/0.1 → sold rises and stock falls — the service-curve
   rule; every column printed.
 - The killing reaches the hall on `estate`: force one (the suite's recipe)
@@ -882,6 +897,29 @@ in the pen — the card's date makes that visible; the owner may want
 
 **Size.** ≈ 320 lines sim + 60 walkers + 50 ui + 150 probe; ~14 checks;
 one session, the probe first.
+
+**Shipped evidence (2026-09-03).** The canonical suite carries H-specific
+checks across route selection, zero-cost physical rail paths, isolated LV
+distance, source hooks, till split, conservation/cap/blocks/fire, exact pen
+maturity and release, save/load and read-only walkers. On `estate`, four
+15-year seeds end with exactly two halls and 4/14/14/18 units, sell
+3.8–4.7 units per hall-year, and conserve both stock and pen custody 4/4
+exactly; their carts average
+54–68 physical path steps but only 15–29 charged road steps because rail is
+free for H. A 200-seed estate reservation/rail geometry fuzz has zero failures
+and a minimum 37-tile physical R→M separation (some seeds build the second
+reserved hall in year 5 rather than year 4). The fixed-city `--curves` gate is monotone:
+estate reach 0/26/60/60/60 at road limits 0/20/40/60/∞, buying
+0/18/35/60 at p 0/.3/.6/1, and eating 0/16/32 units at 0/.05/.1 while
+ending stock falls 80/64/48. The same settled reach sweep on `balanced` is
+3/161/228/228/228, so its measured topology flattens after 40 rather than the
+design note's guessed 20.
+
+The pen ledger separately proves `opening penned + bought = slaughtered +
+released + still penned`. Household departures, revolts, eviction and zoning
+partition animals physically at home from absent pen members: they neither
+delete nor count/move/name a cub in those events, and the retained household
+keeps its return address until maturity or an explicit hall release.
 
 ### P. The palette — *"a remote control on the left side of the screen"*
 

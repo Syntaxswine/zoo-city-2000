@@ -23,7 +23,7 @@ export function recountMajority(world) {
   counts.fill(0);
   world.majority.fill(0);
   for (const c of world.citizens) {
-    if (c.dead) continue;
+    if (c.dead || absent(world, c)) continue;
     const slot = SPECIES_SLOT[c.species];
     if (slot == null) continue;
     if (c.home >= 0 && world.zone[c.home] === ZONE.R) counts[c.home * speciesN + slot]++;
@@ -54,7 +54,7 @@ export function needCensus(world) {
   const counts = {};
   const context = needsContext(world);
   for (const c of world.citizens) {
-    if (c.dead) continue;
+    if (c.dead || absent(world, c)) continue;
     const code = needOf(world, c, context).code;
     counts[code] = (counts[code] || 0) + 1;
   }
@@ -67,6 +67,7 @@ export function census(world) {
   const n = w * h;
   const P = citizens.length;
   let W = 0;
+  let U = 0;
   let F = 0;
   let moodSum = 0;
   let native = 0;
@@ -81,6 +82,7 @@ export function census(world) {
   let wrongful = 0;
   let exonerated = 0;
   let held = 0;
+  let penned = 0;
   let herbNear = 0;
   let riders = 0;
   let commuteN = 0;
@@ -90,7 +92,7 @@ export function census(world) {
   for (const c of citizens) byId.set(c.id, c);
   world.byId = byId;
   for (const c of citizens) {
-    if (isWorker(world, c)) W++;
+    if (isWorker(world, c)) { W++; if (c.job < 0) U++; }
     if (c.job >= 0) F++;
     moodSum += c.mood;
     if (c.native) native++;
@@ -99,7 +101,8 @@ export function census(world) {
     if (c.fixed) fixed++;
     if (c.wrongful) wrongful++;
     if (c.exonerated) exonerated++;
-    if (absent(world, c)) held++;
+    if (!c.pen && (c.held || 0) > world.tick) held++;
+    if (c.pen) penned++;
     if (c.home >= 0 && world.dread[c.home] > 0 && DIET_OF[c.species] === "herb") herbNear++;
     if (c.path) { commuteN++; commuteSum += commuteTime(c.path); if (rides(c.path)) riders++; }
     for (const f of c.friends) {
@@ -150,7 +153,9 @@ export function census(world) {
   let crimeSum = 0;
   let crimeN = 0;
   let maxCrime = 0;
+  let meatOnHand = 0;
   for (let i = 0; i < n; i++) {
+    meatOnHand += world.meat?.[i] || 0;
     const jobs = jobsOf(world, i);
     if (jobs) {
       J += jobs;
@@ -185,7 +190,6 @@ export function census(world) {
     if (world.pol[i] > maxPol) maxPol = world.pol[i];
     if (world.traffic[i] > maxTraffic) maxTraffic = world.traffic[i];
   }
-  const U = Math.max(0, W - F);
   const Lab = J ? Math.max(0, Math.min(1.3, W / J)) : 1.3;
   const shares = {};
   for (const s of SPECIES) shares[s.id] = P ? counts[s.id] / P : 0;
@@ -202,7 +206,13 @@ export function census(world) {
     P, W, J, Jc, Ji, Jm, F, U, Lab,
     counts, shares, speciesPresent, diet, carnivores: diet.carn,
     friendships, cross, predPrey, predPreyFixed, H, hKnife,
-    fixed, wrongful, exonerated, held, herbNear, maxDread, markets, centres,
+    fixed, wrongful, exonerated, held, penned, herbNear, maxDread, markets, centres,
+    meatOnHand,
+    meatSold: world.meatStats?.yearly?.eaten || 0,
+    meatBought: world.meatStats?.yearly?.bought || 0,
+    meatKilled: world.meatStats?.yearly?.killed || 0,
+    meatConvicted: world.meatStats?.yearly?.convicted || 0,
+    meatSlaughtered: (world.meatStats?.yearly?.slaughtered || 0) * KNOBS.PEN_YIELD,
     approval: P ? moodSum / P : 50,
     native: P ? native / P : 0,
     parks, zoos, lots, roads, walls, tunnels, usePred, usePrey, railTiles, stations, riders, commuteN, meanCommute: commuteN ? commuteSum / commuteN : 0, lotsNoRoad,

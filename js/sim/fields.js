@@ -5,7 +5,7 @@
 // radius²)); 4,096 tiles is microseconds.
 
 import { KNOBS } from "./rules.js";
-import { TERRAIN, ROAD, ZONE, CIVIC, idx, inBounds, N4, isStation, absent, occAt } from "./world.js";
+import { TERRAIN, ROAD, ZONE, CIVIC, idx, inBounds, N4, isStation, absent, occAt, anchorOf, footprintOf } from "./world.js";
 import { SPECIES_BY_ID, DIET_OF, admits } from "./species.js";
 import { forEachWithin, computeOcclusion, isBarrier } from "./reach.js";
 
@@ -119,7 +119,13 @@ export function computeDread(world) {
   e.fill(0);
   for (let i = 0; i < n; i++) {
     const t = world.tier[i];
-    if (world.zone[i] === ZONE.M && t > 0) spread(world, e, i, KNOBS.DREAD[t], KNOBS.DREAD_RADIUS[t]);
+    if (world.zone[i] === ZONE.M && t > 0) {
+      const hall = anchorOf(world, i);
+      let stock = 0;
+      for (const j of footprintOf(world, hall)) stock += world.meat[j] || 0;
+      const scale = 0.5 + 0.5 * Math.min(1, stock / 8);
+      spread(world, e, i, KNOBS.DREAD[t] * scale, KNOBS.DREAD_RADIUS[t]);
+    }
   }
   for (let i = 0; i < n; i++) world.dread[i] = Math.max(0, Math.min(100, Math.round(e[i])));
 }
@@ -451,9 +457,12 @@ export function stepCost(world, species, j) {
  * track) the settle order, the prev tree and the paths are the BFS's
  * exactly; the suite checks every commuter's path against roadPath.
  * `settle(tile, cost)` is called once per WALK node; return true to stop.
+ * `policy` may set `{ railCost, neutral }`: the default is the citizen
+ * commute law, while Part H passes railCost 0 and neutral true for freight.
+ * Land value never calls Dial; its geographic distances remain separate.
  * Returns the { dist, prev } scratch (valid until the next call; −1 = unreached).
  */
-export function dial(world, species, from, maxCost, settle) {
+export function dial(world, species, from, maxCost, settle, policy = {}) {
   const { w, h, road, rail } = world;
   const n = w * h;
   const dist = world._ddist && world._ddist.length === 2 * n ? world._ddist : (world._ddist = new Int32Array(2 * n));
@@ -471,7 +480,8 @@ export function dial(world, species, from, maxCost, settle) {
   dist[from] = 0;
   prev[from] = -1;
   buckets[0].push(from);
-  const ride = KNOBS.RAIL_COST;
+  const ride = policy.railCost == null ? KNOBS.RAIL_COST : Math.max(0, policy.railCost);
+  const neutral = !!policy.neutral;
   for (let c = 0; c <= maxCost; c++) {
     const b = buckets[c];
     for (let q = 0; q < b.length; q++) {
@@ -490,7 +500,10 @@ export function dial(world, species, from, maxCost, settle) {
           if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
           const j = ny * w + nx;
           if (road[j] === ROAD.NONE && rail[j] !== 2) continue; // a road, or a platform
-          relax(j, c + stepCost(world, species, j), i);
+          // Logistics (Part H) is neutral freight: use-zoning is a rule for
+          // animals living, working and walking, not for a hall's cart. It
+          // still uses this one two-layer graph, with an explicit cost policy.
+          relax(j, c + (neutral ? WALK : stepCost(world, species, j)), i);
         }
       } else {
         if (rail[tile] === 2) relax(tile, c, i); // alight

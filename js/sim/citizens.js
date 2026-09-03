@@ -66,6 +66,8 @@ export function citizenDefaults() {
     centenary: false,
     held: 0,
     heldAt: -1,
+    pen: false,
+    penSince: 0,
     fixed: false,
     record: 0,
     wrongful: false,
@@ -178,10 +180,19 @@ export function removeCitizen(world, c, cause) {
 }
 
 export function removeHousehold(world, hh, cause) {
+  let removed = 0;
   for (const id of hh.members.slice()) {
     const c = world.byId.get(id);
-    if (c) removeCitizen(world, c, cause);
+    // A pen purchase removes the cub from ordinary town life, not from its
+    // identity or family.  Household departures, revolts and evictions may
+    // remove everybody else, but the hall keeps the animal until release or
+    // its exact sixteenth birthday.
+    if (c && !c.pen) {
+      removeCitizen(world, c, cause);
+      removed++;
+    }
   }
+  return removed;
 }
 
 /** Compact the arrays after a tick's removals. */
@@ -193,7 +204,7 @@ export function compact(world) {
   }
   const referenced = new Set();
   for (const c of world.citizens) for (const [, kind, arg] of c.life || []) {
-    if (kind === KIND.FRIEND || kind === KIND.KILLED) referenced.add(String(arg));
+    if (kind === KIND.FRIEND || kind === KIND.KILLED || kind === KIND.LOST_CHILD) referenced.add(String(arg));
     else if (kind === KIND.LOST_FRIEND && Array.isArray(arg)) referenced.add(String(arg[0]));
   }
   const cutoff = world.tick - NAMES_YEARS * 12;
@@ -318,6 +329,32 @@ function bestHome(world, species, size, strict, allowed = null) {
   return best;
 }
 
+/**
+ * A penned cub retains its original household and return address while the
+ * animals physically at home may move or leave.  Split those present members
+ * into a temporary household before relocation so no pen receives a move,
+ * zoning notice or departure by proxy.
+ */
+function detachPresent(world, hh) {
+  const present = hh.members.filter((id) => {
+    const c = world.byId.get(id);
+    return c && !c.dead && !c.pen;
+  });
+  if (!present.length) return null;
+  const penned = hh.members.filter((id) => {
+    const c = world.byId.get(id);
+    return c && !c.dead && c.pen;
+  });
+  if (!penned.length) return hh;
+  const moving = { ...hh, id: world.nextHouseholdId++, members: present.slice() };
+  hh.members = penned;
+  hh.notice = 0;
+  for (const id of present) world.byId.get(id).household = moving.id;
+  world.households.push(moving);
+  world.hhById.set(moving.id, moving);
+  return moving;
+}
+
 /** Lots whose door is within `maxRoad` road tiles of `fromLot`'s door. */
 function lotsWithinRoad(world, fromLot, maxRoad) {
   const door = doorOf(world, fromLot);
@@ -364,17 +401,19 @@ export function evictFromLot(world, i, newCap) {
   let allowed = null;
   for (const h of hhs) {
     if (world.occupants[i] <= newCap) break;
+    const moving = detachPresent(world, h);
+    if (!moving) continue;
     // Vacate.
-    for (const id of h.members) {
+    for (const id of moving.members) {
       const c = world.byId.get(id);
       c.home = -1;
       world.occupants[i]--;
     }
-    h.home = -1;
+    moving.home = -1;
     if (!allowed) allowed = lotsWithinRoad(world, i, KNOBS.REHOME_RADIUS);
-    const to = bestHome(world, h.species, h.members.length, false, allowed);
-    if (to >= 0) { placeHousehold(world, h, to); if (to !== i) for (const id of h.members) remember(world, world.byId.get(id), KIND.MOVED, to); }
-    else removeHousehold(world, h, "evicted");
+    const to = bestHome(world, moving.species, moving.members.length, false, allowed);
+    if (to >= 0) { placeHousehold(world, moving, to); if (to !== i) for (const id of moving.members) remember(world, world.byId.get(id), KIND.MOVED, to); }
+    else removeHousehold(world, moving, "evicted");
   }
 }
 
@@ -394,15 +433,17 @@ export function fireFromLot(world, i, newCap) {
 export function clearLot(world, i) {
   const hhs = world.households.filter((h) => h.home === i && !h.gone);
   for (const h of hhs) {
-    for (const id of h.members) {
+    const moving = detachPresent(world, h);
+    if (!moving) continue;
+    for (const id of moving.members) {
       const c = world.byId.get(id);
       c.home = -1;
       world.occupants[i]--;
     }
-    h.home = -1;
-    const to = bestHome(world, h.species, h.members.length, false);
-    if (to >= 0) { placeHousehold(world, h, to); for (const id of h.members) remember(world, world.byId.get(id), KIND.MOVED, to); }
-    else removeHousehold(world, h, "bulldozed");
+    moving.home = -1;
+    const to = bestHome(world, moving.species, moving.members.length, false);
+    if (to >= 0) { placeHousehold(world, moving, to); for (const id of moving.members) remember(world, world.byId.get(id), KIND.MOVED, to); }
+    else removeHousehold(world, moving, "bulldozed");
   }
   for (const c of world.citizens) if (c.job === i && !c.dead) releaseJob(world, c);
 }
@@ -504,11 +545,13 @@ export function citizensTick(world, cen, dem) {
     if (hh.gone || hh.home < 0) continue;
     const i = hh.home;
     if (world.zone[i] === ZONE.R && world.tier[i] > 0 && !world.rubble[i]) continue;
-    for (const id of hh.members) { const c = world.byId.get(id); c.home = -1; world.occupants[i]--; }
-    hh.home = -1;
-    const to = bestHome(world, hh.species, hh.members.length, false);
-    if (to >= 0) { placeHousehold(world, hh, to); for (const id of hh.members) remember(world, world.byId.get(id), KIND.MOVED, to); }
-    else removeHousehold(world, hh, "homeless");
+    const moving = detachPresent(world, hh);
+    if (!moving) continue;
+    for (const id of moving.members) { const c = world.byId.get(id); c.home = -1; world.occupants[i]--; }
+    moving.home = -1;
+    const to = bestHome(world, moving.species, moving.members.length, false);
+    if (to >= 0) { placeHousehold(world, moving, to); for (const id of moving.members) remember(world, world.byId.get(id), KIND.MOVED, to); }
+    else removeHousehold(world, moving, "homeless");
   }
 
   // 0b. The player's line (use-zoning, SPEC §7.8): a household whose lot no
@@ -518,29 +561,33 @@ export function citizensTick(world, cen, dem) {
   for (const hh of world.households) {
     if (hh.gone || hh.home < 0) continue;
     if (admits(world.use[hh.home], hh.species)) { hh.notice = 0; continue; }
+    if (!hh.members.some((id) => { const c = world.byId.get(id); return c && !c.dead && !c.pen; })) { hh.notice = 0; continue; }
     hh.notice = (hh.notice || 0) + 1;
     if (hh.notice < KNOBS.ZONED_OUT_MONTHS) continue;
     const from = hh.home;
-    for (const id of hh.members) remember(world, world.byId.get(id), KIND.ZONED_OUT, from);
+    const moving = detachPresent(world, hh);
+    if (!moving) continue;
+    for (const id of moving.members) remember(world, world.byId.get(id), KIND.ZONED_OUT, from);
     const allowed = lotsWithinRoad(world, from, KNOBS.REHOME_RADIUS);
     allowed.delete(from);
-    for (const id of hh.members) { const c = world.byId.get(id); c.home = -1; world.occupants[from]--; }
-    hh.home = -1;
-    const to = bestHome(world, hh.species, hh.members.length, false, allowed);
-    if (to >= 0) { placeHousehold(world, hh, to); for (const id of hh.members) remember(world, world.byId.get(id), KIND.MOVED, to); out.rehomed++; hh.notice = 0; }
+    for (const id of moving.members) { const c = world.byId.get(id); c.home = -1; world.occupants[from]--; }
+    moving.home = -1;
+    const to = bestHome(world, moving.species, moving.members.length, false, allowed);
+    if (to >= 0) { placeHousehold(world, moving, to); for (const id of moving.members) remember(world, world.byId.get(id), KIND.MOVED, to); out.rehomed++; moving.notice = 0; }
     else {
-      const n = hh.members.length;
+      const n = moving.members.length;
       out.left += n;
       out.zonedOut += n;
-      world.departures.push({ species: hh.species, surname: hh.surname, n, from });
-      out.zonedOutLines.push(`ZONED OUT — the ${hh.surname}s (${n === 1 ? hh.species : `${n} ${hh.species}s`}) left (${from % world.w},${(from / world.w) | 0}): the lot is ${USE_NAME[world.use[from]]}-only land now, and nothing within twelve road tiles would have them.`);
-      removeHousehold(world, hh, "zonedOut");
+      world.departures.push({ species: moving.species, surname: moving.surname, n, from });
+      out.zonedOutLines.push(`ZONED OUT — the ${moving.surname}s (${n === 1 ? moving.species : `${n} ${moving.species}s`}) left (${from % world.w},${(from / world.w) | 0}): the lot is ${USE_NAME[world.use[from]]}-only land now, and nothing within twelve road tiles would have them.`);
+      removeHousehold(world, moving, "zonedOut");
     }
   }
 
   // 1. Birthdays: adulthood (move out), retirement (release the job).
   for (const c of world.citizens) {
     if (c.dead) continue;
+    if (c.pen) continue; // Part H matures the pen before birthdays; never split a held cub into a new household.
     const m = ageMonths(world, c);
     if (m % 12 !== 0 || m === 0) continue;
     const y = m / 12;
@@ -573,6 +620,13 @@ export function citizensTick(world, cen, dem) {
     if (c.dead) continue;
     if (ageMonths(world, c) < c.deathAge) continue;
     const mourners = c.friends.slice();
+    (world.naturalDeaths || (world.naturalDeaths = [])).push({
+      id: c.id,
+      name: `${c.name} ${c.surname}`,
+      species: c.species,
+      age: ageYears(world, c),
+      home: c.home,
+    });
     removeCitizen(world, c, "died");
     out.deaths++;
     holdFuneral(world, mourners, out);
@@ -626,13 +680,15 @@ export function citizensTick(world, cen, dem) {
     if (world.dread[hh.home] < KNOBS.REHOME_DREAD) continue;
     if (!rng.chance(KNOBS.REHOME_DREAD_P)) continue;
     const from = hh.home;
+    const moving = detachPresent(world, hh);
+    if (!moving) continue;
     const allowed = lotsWithinRoad(world, from, KNOBS.REHOME_RADIUS);
     allowed.delete(from);
-    for (const id of hh.members) { const c = world.byId.get(id); c.home = -1; world.occupants[from]--; }
-    hh.home = -1;
-    const to = bestHome(world, hh.species, hh.members.length, false, allowed);
-    if (to >= 0 && world.dread[to] < world.dread[from]) { placeHousehold(world, hh, to); for (const id of hh.members) remember(world, world.byId.get(id), KIND.MOVED, to); out.rehomed++; }
-    else placeHousehold(world, hh, from);
+    for (const id of moving.members) { const c = world.byId.get(id); c.home = -1; world.occupants[from]--; }
+    moving.home = -1;
+    const to = bestHome(world, moving.species, moving.members.length, false, allowed);
+    if (to >= 0 && world.dread[to] < world.dread[from]) { placeHousehold(world, moving, to); for (const id of moving.members) remember(world, world.byId.get(id), KIND.MOVED, to); out.rehomed++; }
+    else placeHousehold(world, moving, from);
   }
 
   // 4. Job search (≤ 64 per tick, id order, rotating start). Stale paths first.
@@ -679,13 +735,16 @@ export function citizensTick(world, cen, dem) {
   const VR = world.valves.R;
   for (const hh of world.households) {
     if (hh.gone || hh.home < 0 || hh.members.length === 0) continue;
+    const present = hh.members.map((id) => world.byId.get(id)).filter((c) => c && !c.dead && !absent(world, c));
+    // A family whose only remaining member is in a hall pen has nobody at
+    // home who can decide to leave, and must retain the household record.
+    if (present.length === 0) continue;
     let unemployed = false;
     let friends = 0;
     let mood = 0;
     let friendless = 0;
     let adults = 0;
-    for (const id of hh.members) {
-      const c = world.byId.get(id);
+    for (const c of present) {
       const worker = isWorker(world, c);
       if (worker && c.job < 0) unemployed = true;
       friends += c.friends.length;
@@ -695,7 +754,7 @@ export function citizensTick(world, cen, dem) {
         if (c.friends.length === 0) friendless++;
       }
     }
-    const nM = hh.members.length;
+    const nM = present.length;
     const meanFriends = friends / nM;
     const meanMood = mood / nM;
     let p = 0;
@@ -737,7 +796,7 @@ export function holdFuneral(world, mourners, out) {
       for (let b = a + 1; b < mourners.length; b++) {
         const x = world.byId.get(mourners[a]);
         const y = world.byId.get(mourners[b]);
-        if (!x || !y || x.friends.includes(y.id)) continue;
+        if (!x || !y || absent(world, x) || absent(world, y) || x.friends.includes(y.id)) continue;
         if (rng.chance(KNOBS.FUNERAL_P)) befriend(world, x, y, out);
       }
     }
@@ -781,7 +840,7 @@ function friendships(world, out) {
   const byJob = new Map();
   const byHome = new Map();
   for (const c of cs) {
-    if (c.dead) continue;
+    if (c.dead || absent(world, c)) continue;
     if (c.job >= 0) { let l = byJob.get(c.job); if (!l) byJob.set(c.job, (l = [])); l.push(c); }
     if (c.home >= 0) { let l = byHome.get(c.home); if (!l) byHome.set(c.home, (l = [])); l.push(c); }
   }
@@ -791,7 +850,7 @@ function friendships(world, out) {
   const rng = world.rng;
   for (let k = 0; k < samples; k++) {
     const c = cs[(start + k) % N];
-    if (c.dead || c.friends.length >= KNOBS.FRIEND_MAX) continue;
+    if (c.dead || absent(world, c) || c.friends.length >= KNOBS.FRIEND_MAX) continue;
     let cand = null;
     const mode = rng.int(3);
     let parkBonus = 1;
@@ -829,7 +888,7 @@ function friendships(world, out) {
         }
       }
     }
-    if (!cand || cand === c || cand.dead || cand.friends.length >= KNOBS.FRIEND_MAX || c.friends.includes(cand.id)) continue;
+    if (!cand || cand === c || cand.dead || absent(world, cand) || cand.friends.length >= KNOBS.FRIEND_MAX || c.friends.includes(cand.id)) continue;
     const boost = world.events.active.reduce((m, e) => m * (e.friendMult || 1), 1);
     if (rng.chance(KNOBS.FRIEND_P * pairAffinity(c, cand) * parkBonus * boost)) befriend(world, c, cand, out);
   }
@@ -960,7 +1019,7 @@ export function moodTerms(world, c, context = moodContext(world)) {
 function moods(world) {
   const context = moodContext(world);
   for (const c of world.citizens) {
-    if (c.dead) continue;
+    if (c.dead || c.pen) continue; // a penned animal is away; its last street mood is frozen.
     const adult = ageYears(world, c) >= KNOBS.ADULT_AGE;
     const m = moodTerms(world, c, context).reduce((sum, term) => sum + term.value, 0);
     c.mood = Math.max(0, Math.min(100, Math.round(m)));

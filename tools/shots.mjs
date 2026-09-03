@@ -460,6 +460,35 @@ function sheets(z) {
     console.log("sheet-predation: row 0 wolf|fox carrying × se,ne,sw,nw × 3 frames; row 1 the fall at 22/12/4/0 px, tied, wriggle, elder tortoise + hat, bear ne, elder cow sw; row 2 at the door (0.32 tiles = 10 px, 5 down): wolf + tied sack, wolf walking home, fox + mouse under the falling sack");
     out.push(save("sheet-predation.png", canvas, Math.max(z, 4)));
   }
+  // Part H: the real carry sprite in every pose, the two livestock cubs
+  // that can stand in a pen, and the cart-with-cub return composition used
+  // by render.js. This makes the smallest new moving silhouette reviewable
+  // at authored pixel scale instead of hiding it in a full-city scene.
+  {
+    const cols = 12, cellW = 24, cellH = 42;
+    const canvas = createCanvas(cols * cellW + 8, 3 * cellH + 8);
+    const ctx = background(canvas, "#74863c");
+    let col = 0;
+    for (const facing of FACINGS) for (let frame = 0; frame < 3; frame++) {
+      const x = 8 + col * cellW + cellW / 2;
+      blitAt(ctx, ROADS[0][E | W], x, 38);
+      blitAt(ctx, citizenSprite("fox", facing, frame, "adult", { carry: "cart", look: { shade: col & 1, mark: (col >> 1) & 1 } }), x, 38);
+      col++;
+    }
+    for (let i = 0; i < 8; i++) {
+      const species = i < 4 ? "pig" : "cow";
+      const look = { shade: i & 1, mark: (i >> 1) & 1 };
+      blitAt(ctx, citizenSprite(species, i & 1 ? "sw" : "se", 0, "cub", { look }), 8 + i * 36 + 14, 78);
+    }
+    for (let i = 0; i < FACINGS.length; i++) {
+      const facing = FACINGS[i], x = 34 + i * 70;
+      blitAt(ctx, ROADS[0][N | S], x, 120);
+      blitAt(ctx, citizenSprite("fox", facing, i % 3, "adult", { carry: "cart", look: { shade: 1, mark: 1 } }), x, 120);
+      blitAt(ctx, citizenSprite(i & 1 ? "cow" : "pig", facing, i % 3, "cub", { look: { shade: i & 1, mark: 1 } }), x + 8, 124);
+    }
+    console.log("sheet-meat: row 0 handcart × four facings × three frames; row 1 pig/cow pen looks; row 2 the cart-with-cub return composition");
+    out.push(save("sheet-meat.png", canvas, Math.max(z, 6)));
+  }
   out.push(bubbleSheet(Math.max(2, z)));
   return out;
 }

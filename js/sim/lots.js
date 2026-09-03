@@ -5,7 +5,7 @@
 // ever say what the rule did (SPEC §0.6).
 
 import { KNOBS } from "./rules.js";
-import { ZONE, CIVIC, idx, inBounds, capacityOf, jobsOf, isPart, anchorOf, sideOf, occAt, carnAtOf } from "./world.js";
+import { ZONE, CIVIC, idx, inBounds, capacityOf, jobsOf, isPart, anchorOf, footprintOf, sideOf, occAt, carnAtOf } from "./world.js";
 import { hasAccess } from "./fields.js";
 import { evictFromLot, fireFromLot } from "./citizens.js";
 import { mergeWindow, windowFill, mergeLots, splitLot } from "./blocks.js";
@@ -68,6 +68,12 @@ function carnivoresNear(world, i, r = 5) {
   return sum;
 }
 
+function stockAtHall(world, i) {
+  let n = 0;
+  for (const j of footprintOf(world, anchorOf(world, i))) n += world.meat[j] || 0;
+  return n;
+}
+
 export function maxTierByLV(world, i) {
   const z = world.zone[i];
   if (z === ZONE.I || z === ZONE.M) return 3; // a hall floors its own LV; an LV ladder would cap it at a stall
@@ -105,7 +111,8 @@ export function lotScore(world, i) {
     if (world.crime[i] > KNOBS.CRIME_HIGH) local -= KNOBS.CRIME_C_PENALTY; // shops need safe streets
   } else if (z === ZONE.M) {
     // A hall wants carnivores near and cheap ground; a grey market minds no crime.
-    local = 0.6 * clamp(carnivoresNear(world, i) / KNOBS.M_CUSTOMERS_DIV - 0.5, -KNOBS.LOCAL_CLAMP, KNOBS.LOCAL_CLAMP) + 0.4 * ((50 - lv) / KNOBS.LOCAL_SCALE);
+    local = 0.6 * clamp(carnivoresNear(world, i) / KNOBS.M_CUSTOMERS_DIV - 0.5, -KNOBS.LOCAL_CLAMP, KNOBS.LOCAL_CLAMP) + 0.4 * ((50 - lv) / KNOBS.LOCAL_SCALE)
+      + KNOBS.MEAT_LOCAL * Math.min(1, stockAtHall(world, i) / 8);
   } else {
     local = 0.4 * ((50 - lv) / KNOBS.LOCAL_SCALE);
   }

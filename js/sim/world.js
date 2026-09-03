@@ -17,8 +17,8 @@ export const ZONE_NAME = ["none", "R", "C", "I", "M"];
 /** Use-zoning: who a lot or a road admits. Mixed is the default; the other two are the player's line, not the species' (species.js admits). */
 export const USE = Object.freeze({ MIXED: 0, PRED: 1, PREY: 2 });
 export const USE_NAME = ["mixed", "predator", "prey"];
-/** In custody (the cells or the centre): not a worker, not at home for the flight rule, not on the street. */
-export const absent = (world, c) => (c.held || 0) > world.tick;
+/** In custody or a market pen: not working, socialising, breeding, hunting or on the street. */
+export const absent = (world, c) => !!c.pen || (c.held || 0) > world.tick;
 
 export const idx = (w, tx, ty) => ty * w.w + tx;
 export const inBounds = (w, tx, ty) => tx >= 0 && ty >= 0 && tx < w.w && ty < w.h;

@@ -4,7 +4,20 @@ Open work, ranked. The design record is `SPEC.md`; the numbers are in
 `js/sim/rules.js` (KNOBS). Later layers were labelled at design time so v1
 could ship whole.
 
-## The People — IN PROGRESS 2026-09-03 (`docs/PLAN-THE-PEOPLE-2026-09-02.md`); Parts K, A, D and S shipped
+## The People — IN PROGRESS 2026-09-03 (`docs/PLAN-THE-PEOPLE-2026-09-02.md`); Parts K, A, D, H and S shipped
+
+**Part H SHIPPED 2026-09-03:** halls now hold conserved stock from dead
+bought at the door, killings, convicted sales and livestock raised to
+sixteen, with carnivore meals out, explicit spoilage and a hard 40-unit cap.
+H carts and sacks traverse a real road/station/rail path, but all rail and
+transfer edges count as zero reach; citizen commutes stay at 0.3 and
+property/amenity/smell distance stays geographic. The card, Census, Rules
+M4–M6 and news expose it. Exact stored RIDE paths drive the visible handcart,
+cub companion, pen and sack-to-hall walkers. `--layout estate` reserves exactly
+two hall lots, 6×6 interiors and ≥37 physical tiles R→M; four 15-year seeds build
+  both halls and conserve stock plus pen custody exactly,
+  end at 4–18 units and sell 3.8–4.7 units/hall-year. SPEC §9c;
+  `tools/meatprobe.mjs`; 339 canonical checks and `sheet-meat.png` pass.
 
 **Part D SHIPPED 2026-09-03:** every citizen id now hashes to one of four
 stable appearances, with a darker coat bit and one ≤6×6 species motif; cubs
@@ -12,7 +25,8 @@ keep motifs off their bodies and use a four-way coat-only treatment. The same
 look follows walkers, tents, picking, carried sacks and predation victims.
 Every species also has a cached 16×16 bust in three readable expressions,
 half of elders wear glasses, and a fourth anchored frame animates after a
-walker stands for a second. The 3,224-entry art audit includes 504 portraits;
+walker stands for a second. The 3,236-entry art audit includes 504 portraits
+and H's twelve handcart poses;
 293 checks and both independent PNG critics pass. SPEC §12.3b.
 
 **Part A SHIPPED 2026-09-03:** Inspect now makes the nearest eight walking
@@ -64,8 +78,9 @@ and meat; the scripted mayor's BLOCK 7 puts the hall next door — so the
 dread smell (4 tiles), KILL_MARKET (`dread[home] > 0`) and the hall's §50
 from a killing (`hallNear(…, 6)`) NEVER fire in the owner's town, and my
 first draft of H ("within 6") repeated the mistake. H's law: meat travels
-by ROAD, town-wide (`hallReach` on the commute graph, MEAT_ROAD 60
-walk-steps; a cart walker fetches the dead and the cubs); the rig gains
+by ROAD and RAIL, town-wide (`hallReach` on the commute graph, MEAT_ROAD 60
+walk-steps; rail and transfers cost zero for H only; a cart walker fetches
+the dead and the cubs); the rig gains
 `--layout estate` and `meatprobe --save` takes a real exported city. §8
 still asks: `RECORD_HARD` 3 → 2, the save compaction, a weaner age.
 **2026-09-03, two more parts and a fixture coming:** *"adding the control
@@ -260,16 +275,17 @@ size-aware pull-back. What is left:
   run). `WRONGFUL_P` is the owner's number; the lever for visibility is the
   arrest volume (police cover, `ARREST_COVER`).
 - **Customer walkers** to the hall (walkers.js `isShop` could include M);
-  the meat hall's staff skinned by species; a "sold" departure walker.
+  a "sold" departure walker. Part H shipped named staff handcarts for supply,
+  not individual meal customers.
 - **The predation animation SHIPPED 2026-09-02** (SPEC §14: the sack falls,
   is tied, goes home over the shoulder). Left: the victim's OWN walker, if
   it had one, is released at its next tile centre while the figure at the
   door already stands — two of the same animal for under a second; the
-  sack could be carried INTO the meat hall when the killer works there
-  (today it goes home); no sound, no ticker flash at the moment of the
+  sack now follows the exact H road/rail route INTO the selected meat hall
+  and then home; no sound, no ticker flash at the moment of the
   drop (the KILLING line is the month's, not the second's).
-- **Supply from funerals** as the hall's local term (Beastars: the market
-  buys the dead) — the honest grey economy, v2.
+- ~~**Supply from funerals**~~ SHIPPED in Part H as the natural-death body
+  bus plus the hall's probabilistic doorstep purchase.
 - **The abattoir** — a 3×3 M landmark on the landmarks proposal's merge rule.
 - **Per-species fixed counts** on the census histogram (`wolf 129 · 11 fixed`).
 - **The scripted suite city loses its M row to a year-7 fire** (seed 7,

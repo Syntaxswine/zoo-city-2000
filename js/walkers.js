@@ -24,11 +24,12 @@
 // cued by `world.predations`, which justice.kill publishes before the victim
 // is scrubbed; the figure in the sack is a record, not a citizen).
 
-import { ROAD, CIVIC, ZONE, TERRAIN, inBounds } from "./sim/world.js";
+import { ROAD, CIVIC, ZONE, TERRAIN, inBounds, anchorOf, absent } from "./sim/world.js";
 import { ageYears } from "./sim/census.js";
 import { SPECIES_BY_ID } from "./sim/species.js";
 import { hash01 } from "./sim/rng.js";
 import { edgeRoads } from "./sim/fields.js";
+import { isBarrier } from "./sim/reach.js";
 import { KNOBS } from "./sim/rules.js";
 import { art } from "./art/index.js";
 import { BUBBLES_MAX, NEED_REACH, needOf, needsContext } from "./sim/needs.js";
@@ -132,7 +133,7 @@ export function createWalkers(initialWorld) {
           const ny = ty + dy;
           if (!inBounds(world, nx, ny)) continue;
           const j = ny * w + nx;
-          if (seen[j]) continue;
+          if (seen[j] || isBarrier(world, j)) continue;
           seen[j] = 1;
           if (world.road[j] !== ROAD.NONE) return j;
           next.push(j);
@@ -202,7 +203,7 @@ export function createWalkers(initialWorld) {
       kind,
       species,
       age,
-      look: art.look(id),
+      look: opts.look || art.look(id),
       need: null,
       name: c ? `${c.name} ${c.surname}` : opts.name || "",
       hat: !!(c && c.centenary),
@@ -231,6 +232,8 @@ export function createWalkers(initialWorld) {
       home0: c ? c.home : -1,
       job0: c ? c.job : -1,
       done: false,
+      heldAt0: c ? c.heldAt : -1,
+      companion: opts.companion || null,
     };
     const first = legs.length ? legs[0].path[0] : opts.tile;
     if (first != null && first >= 0) [w.tx, w.ty] = centre(first);
@@ -306,6 +309,57 @@ export function createWalkers(initialWorld) {
     add(make("meeting", b, [{ path: pb, stand: MEET_STAND }], { glyph: null }));
   }
 
+  /** Unpack the sim's immutable RIDE-tagged route without changing it. */
+  function transportLeg(raw, stand = 0) {
+    const tagged = Array.from(raw || []);
+    return {
+      path: tagged.map((p) => p & 0x7fff),
+      ride: tagged.map((p) => (p & 0x8000) !== 0),
+      stand,
+    };
+  }
+
+  function reverseLeg(leg, stand = leg.stand) {
+    return { path: leg.path.slice().reverse(), ride: leg.ride.slice().reverse(), stand };
+  }
+
+  /** A hall worker pulls the exact route selected by meat.js, out and back. */
+  function spawnCart(trip) {
+    const homeToHall = transportLeg(trip.path, 0.8);
+    if (!homeToHall.path.length) return null;
+    const out = reverseLeg(homeToHall, 1.2); // hall → door
+    const back = { ...homeToHall, stand: HOME_STAND }; // door → hall
+    const staff = world.citizens
+      .filter((c) => !c.dead && !c.pen && c.job >= 0 && anchorOf(world, c.job) === anchorOf(world, trip.hall))
+      .sort((a, b) => a.id - b.id)[0] || null;
+    // A busy real staffer keeps the existing walker; its cart duplicate is a
+    // cosmetic proxy with the same species, name and stable coat.
+    const real = staff && !activeIds.has(staff.id) ? staff : null;
+    const subject = trip.subject || {};
+    const opts = real ? {} : {
+      id: nextFake--,
+      species: staff?.species || subject.species || "fox",
+      age: staff ? ageOf(staff) : "adult",
+      name: staff ? `${staff.name} ${staff.surname}` : "the hall cart",
+      look: staff ? art.look(staff.id) : undefined,
+    };
+    const w = make("cart", real, [out, back], opts);
+    w.carry = "cart";
+    w.speed *= CARRY_SPEED;
+    w.trip = trip.id;
+    if (trip.kind === "pen" && subject.id != null) {
+      w.companion = { id: subject.id, species: subject.species, name: subject.name, age: "cub", look: art.look(subject.id) };
+    }
+    return add(w);
+  }
+
+  /** A penned cub is a standing, clickable mirror of sim state. */
+  function spawnPenned(c) {
+    const tile = door(c.heldAt);
+    if (tile < 0) return null;
+    return add(make("penned", c, [], { tile, facing: (c.id & 1) ? "sw" : "se" }));
+  }
+
   /**
    * The killing, as the street sees it: the killer walks from its own door
    * to the neighbour's, stands there BAG_STAND seconds while the sack falls
@@ -329,7 +383,14 @@ export function createWalkers(initialWorld) {
     }
     const there = roadPath(dk, dv);
     if (!there || there.length < 2) return "drop";
-    const w = make("predation", c, [{ path: there, stand: BAG_STAND }, { path: there.slice().reverse(), stand: HOME_STAND }]);
+    const legs = [{ path: there, stand: BAG_STAND }];
+    if (rec.hall >= 0 && rec.sackPath?.length) {
+      legs.push(transportLeg(rec.sackPath, 0.8));
+      if (rec.homePath?.length) legs.push(reverseLeg(transportLeg(rec.homePath), HOME_STAND));
+    } else {
+      legs.push({ path: there.slice().reverse(), stand: HOME_STAND });
+    }
+    const w = make("predation", c, legs);
     const [ax, ay] = centre(there[there.length - 2]);
     const [bx, by] = centre(there[there.length - 1]);
     const dx = Math.sign(bx - ax);
@@ -442,7 +503,8 @@ export function createWalkers(initialWorld) {
       }
       if (w.citizen == null) continue;
       const c = byId.get(w.citizen);
-      const changed = !c || c.home !== w.home0 || (w.kind === "commuter" && c.job !== w.job0) || (w.kind === "commuter" && !c.path);
+      if (c?.pen && w.kind !== "penned") { remove(k); continue; }
+      const changed = !c || c.home !== w.home0 || (w.kind === "penned" && (!c.pen || c.heldAt !== w.heldAt0)) || (w.kind === "commuter" && c.job !== w.job0) || (w.kind === "commuter" && !c.path);
       if (changed) {
         w.release = true;
         if (w.standUntil > 0 || !w.legs.length) remove(k);
@@ -452,6 +514,16 @@ export function createWalkers(initialWorld) {
     // Once per tick: arrivals, departures, meetings, campers.
     if (world.tick !== lastTick) {
       lastTick = world.tick;
+      // Pens and collections are state readers. Failure to draw because the
+      // cosmetic cap is full never changes stock, cash, custody or hashes.
+      for (const c of world.citizens) {
+        if (active.length >= MAX_WALKERS) break;
+        if (c.pen && !activeIds.has(c.id)) spawnPenned(c);
+      }
+      for (const trip of world.meatTrips || []) {
+        if (active.length >= MAX_WALKERS) break;
+        spawnCart(trip);
+      }
       // Arrivals: a walk in from the edge for each new animal, but never let
       // a burst (or a tab that got no frames) fill the roster with them.
       let budget = Math.min(24, Math.max(0, 100 - active.length));
@@ -514,7 +586,7 @@ export function createWalkers(initialWorld) {
       cursor = (cursor + 1) % cs.length;
       const c = cs[cursor];
       if (c.dead || c.home < 0 || activeIds.has(c.id)) continue;
-      if ((c.held || 0) > world.tick) continue; // in the cells or the centre
+      if (absent(world, c)) continue; // in the cells, centre, or a hall pen
       if (winter && c.species === "bear") continue;
       if (!inView(c.home, vp)) continue;
       const r = hash01(world.tick, c.id, 0x77);
@@ -605,7 +677,7 @@ export function createWalkers(initialWorld) {
     if (!(dt > 0)) dt = 0;
     const vp = viewport || { x0: 0, y0: 0, x1: world.w, y1: world.h };
     for (const w of active) {
-      if (w.kind === "camper") { w.idle += dt; w.frame = w.idle > 1 ? 3 : 0; continue; }
+      if (w.kind === "camper" || w.kind === "penned") { w.idle += dt; w.frame = w.idle > 1 ? 3 : 0; continue; }
       step(w, dt);
     }
     for (let k = active.length - 1; k >= 0; k--) if (active[k].done) remove(k);

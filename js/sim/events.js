@@ -194,16 +194,21 @@ export const ROSTER = [
     id: "taxRevolt", kind: DISASTER, weight: () => 4,
     gate: (w) => w.events.revoltArmed >= 12,
     fire: (w) => {
-      const hhs = w.households.filter((h) => !h.gone && h.home >= 0);
+      const hhs = w.households.filter((h) => !h.gone && h.home >= 0
+        && h.members.some((id) => { const c = w.byId.get(id); return c && !c.dead && !c.pen; }));
       const n = Math.max(1, Math.floor(hhs.length * 0.08));
       w.rng.shuffle(hhs);
       let left = 0;
       let ringleader = null;
       for (let k = 0; k < n && k < hhs.length; k++) {
         if (!ringleader) ringleader = hhs[k].surname;
-        left += hhs[k].members.length;
+        const leaving = hhs[k].members.reduce((sum, id) => {
+          const c = w.byId.get(id);
+          return sum + (c && !c.dead && !c.pen ? 1 : 0);
+        }, 0);
+        left += leaving;
         w.departures = w.departures || [];
-        w.departures.push({ species: hhs[k].species, surname: hhs[k].surname, n: hhs[k].members.length, from: hhs[k].home });
+        w.departures.push({ species: hhs[k].species, surname: hhs[k].surname, n: leaving, from: hhs[k].home });
         removeHousehold(w, hhs[k], "revolt");
       }
       post(w, "revolt", -Math.round(Math.max(0, w.cash) * 0.02));
@@ -383,9 +388,9 @@ export const eventTitle = (id) => EVENT_TITLES[id] || id;
  * logged and never shown or counted (found by the predation research,
  * 2026-09-02). A new event line adds its prefix here and nowhere else.
  */
-export const TICKER_BAD = /^(FIRE|FLOOD|TORNADO|TAX REVOLT|RECESSION|RECEIVERSHIP|A SMOG|HEIST|KILLING|BURGLARY|SOLD|CELLS|TAKEN IN|RAID)/;
+export const TICKER_BAD = /^(FIRE|FLOOD|TORNADO|TAX REVOLT|RECESSION|RECEIVERSHIP|A SMOG|HEIST|KILLING|BURGLARY|SOLD|CELLS|TAKEN IN|RAID|EMPTY HOOKS)/;
 export const TICKER_GOOD = /^(MILESTONE|BOOM|FOUNDERS|COUNTY|FOX|RABBIT|MOUSE|TRUFFLE|DAIRY|HOME|EXONERATED|SAVED|LANDMARK)/;
-export const TICKER_FLASH = /^(MILESTONE|FIRE|FLOOD|TORNADO|TAX REVOLT|RECESSION|BOOM|FOUNDERS|COUNTY|BEAR|RECEIVERSHIP|The Gnawleys|A SMOG|MOUSE|RABBIT|FOX|The Scrubbers|HEIST|SKUNK INCIDENT|WOLF MOON|TRUFFLE|DAIRY|KILLING|BURGLARY|SOLD|CELLS|TAKEN IN|HOME|RELEASED|EXONERATED|COLD|RAID|THE GREENS|The Butchers|SAVED|LANDMARK)|ONE HUNDRED/;
+export const TICKER_FLASH = /^(MILESTONE|FIRE|FLOOD|TORNADO|TAX REVOLT|RECESSION|BOOM|FOUNDERS|COUNTY|BEAR|RECEIVERSHIP|The Gnawleys|A SMOG|MOUSE|RABBIT|FOX|The Scrubbers|HEIST|SKUNK INCIDENT|WOLF MOON|TRUFFLE|DAIRY|KILLING|BURGLARY|SOLD|CELLS|TAKEN IN|HOME|RELEASED|EXONERATED|COLD|RAID|THE GREENS|The Butchers|SAVED|LANDMARK|EMPTY HOOKS)|ONE HUNDRED/;
 
 /** Resolve the choice card. */
 export function resolveChoice(world, accept) {

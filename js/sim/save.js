@@ -17,7 +17,7 @@ const TILE_ARRAYS = ["terrain", "road", "zone", "maxTier", "tier", "civic", "bur
 // This expanded shape is the pre-Part-B save shape. stateHash deliberately
 // keeps using it: storage compaction must not redefine simulation identity.
 function canonicalCitizen(c) {
-  return {
+  const out = {
     id: c.id, name: c.name, surname: c.surname, species: c.species, born: c.born, deathAge: c.deathAge,
     home: c.home, job: c.job, household: c.household, friends: c.friends.slice(), life: (c.life || []).map((e) => e.slice()), mood: c.mood,
     jobless: c.jobless, native: c.native, onLeave: c.onLeave, hired: c.hired,
@@ -26,6 +26,10 @@ function canonicalCitizen(c) {
     held: c.held || 0, heldAt: c.heldAt ?? -1, fixed: !!c.fixed, record: c.record || 0, wrongful: !!c.wrongful, wrongedBy: c.wrongedBy || 0, exonerated: !!c.exonerated,
     moodPenalty: c.moodPenalty || 0, moodPenaltyUntil: c.moodPenaltyUntil || 0,
   };
+  // Optional in old saves/hashes: a penned animal carries the market state;
+  // ordinary citizens retain the exact pre-H canonical shape.
+  if (c.pen) { out.pen = true; out.penSince = c.penSince || 0; }
+  return out;
 }
 
 function plainCitizen(c) {
@@ -67,6 +71,7 @@ export function toPlain(world) {
     friendCursor: world._friendCursor || 0,
     jobCursor: world._jobCursor || 0,
   };
+  if (world.meatStats) o.meatStats = JSON.parse(JSON.stringify(world.meatStats));
   for (const k of TILE_ARRAYS) o[k] = Array.from(world[k]);
   return o;
 }
@@ -105,6 +110,7 @@ export function fromPlain(o) {
   world.rngNames = makeRng(o.rng.names);
   world._friendCursor = o.friendCursor || 0;
   world._jobCursor = o.jobCursor || 0;
+  world.meatStats = o.meatStats ? JSON.parse(JSON.stringify(o.meatStats)) : null;
   rebuildDerived(world);
   return world;
 }
@@ -144,6 +150,12 @@ export function stateHash(world) {
   if (!Object.keys(o.names).length) delete o.names;
   if (!o.deaths.length) delete o.deaths;
   if (o.meat.every((n) => n === 0)) delete o.meat;
+  if (o.meatStats) {
+    const m = o.meatStats;
+    const flows = [...Object.values(m.total || {}), ...Object.values(m.yearly || {}), ...Object.values(m.halls || {}).flatMap((x) => Object.values(x || {}))];
+    const live = flows.some((n) => n !== 0) || Object.values(m.demand || {}).some((n) => n !== 0) || Object.values(m.dry || {}).some(Boolean) || (m.opening || 0) !== 0;
+    if (!live) delete o.meatStats; // lazy all-zero H scaffolding does not redefine a pre-H city's identity
+  }
   if (o.big.every((n) => n === 0)) delete o.big; // a town with no block yet hashes as it did before the blocks
   if (o.theme.every((n) => n === 0)) delete o.theme; // and one with no landmark as it did before the landmarks (SPEC §3c)
 
