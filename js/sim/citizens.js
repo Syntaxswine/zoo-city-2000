@@ -11,6 +11,7 @@ import { SPECIES, SPECIES_BY_ID, NAME_PARTS, affinity, ARRIVING, PREY_OF, DIET_O
 import { ZONE, CIVIC, TERRAIN, ROAD, idx, inBounds, capacityOf, jobsOf, jobZone, absent, USE_NAME } from "./world.js";
 import { doorOf, edgeRoads, hasAccess, commutePath, dial, WALK, nodePath, commuteTime } from "./fields.js";
 import { ageYears, ageMonths, isWorker } from "./census.js";
+import { DEATHS_MAX, KIND, NAMES_YEARS, remember } from "./life.js";
 
 const SURNAMES = {
   rabbit: ["Burrowes", "Bramblefoot", "Clovermere", "Thistlewood"],
@@ -126,10 +127,12 @@ export function placeHousehold(world, hh, lot) {
 /** Release a citizen's job in ONE place — retirement, a lot's decay, a bulldoze, custody. */
 export function releaseJob(world, c) {
   if (c.job < 0) return;
+  const lot = c.job;
   world.staff[c.job]--;
   c.job = -1;
   c.path = null;
   c.hired = -1;
+  remember(world, c, KIND.LOST_JOB, lot);
 }
 
 // ---------------------------------------------------------------------------
@@ -143,9 +146,17 @@ export function removeCitizen(world, c, cause) {
   for (const f of c.friends) {
     const o = world.byId.get(f);
     if (o && !o.dead) {
+      remember(world, o, KIND.LOST_FRIEND, [c.id, cause]);
       const k = o.friends.indexOf(c.id);
       if (k >= 0) o.friends.splice(k, 1);
     }
+  }
+  if (!world.names) world.names = {};
+  if (!world.deaths) world.deaths = [];
+  world.names[c.id] = { n: `${c.name} ${c.surname}`, s: c.species, a: ageYears(world, c), c: cause, t: world.tick };
+  if (cause === "died" || cause === "killed" || cause === "sold") {
+    world.deaths.push([world.tick, c.id]);
+    if (world.deaths.length > DEATHS_MAX) world.deaths.splice(0, world.deaths.length - DEATHS_MAX);
   }
   c.friends.length = 0;
   if (c.home >= 0) world.occupants[c.home]--;
@@ -175,10 +186,23 @@ export function removeHousehold(world, hh, cause) {
 
 /** Compact the arrays after a tick's removals. */
 export function compact(world) {
-  if (!world._removed) return;
-  world.citizens = world.citizens.filter((c) => !c.dead);
-  world.households = world.households.filter((h) => !h.gone);
-  world._removed = 0;
+  if (world._removed) {
+    world.citizens = world.citizens.filter((c) => !c.dead);
+    world.households = world.households.filter((h) => !h.gone);
+    world._removed = 0;
+  }
+  const referenced = new Set();
+  for (const c of world.citizens) for (const [, kind, arg] of c.life || []) {
+    if (kind === KIND.FRIEND || kind === KIND.KILLED) referenced.add(String(arg));
+    else if (kind === KIND.LOST_FRIEND && Array.isArray(arg)) referenced.add(String(arg[0]));
+  }
+  const cutoff = world.tick - NAMES_YEARS * 12;
+  for (const [id, kept] of Object.entries(world.names || {})) {
+    // A still-displayed life must never acquire a dangling name merely because
+    // its subject died twenty years ago; all other old names expire here.
+    if ((kept.t ?? kept.tick ?? world.tick) < cutoff && !referenced.has(id)) delete world.names[id];
+  }
+  world.deaths = (world.deaths || []).filter((entry) => (Array.isArray(entry) ? entry[0] : entry.tick) >= world.tick - 12);
 }
 
 // ---------------------------------------------------------------------------
@@ -321,7 +345,7 @@ export function evictFromLot(world, i, newCap) {
     h.home = -1;
     if (!allowed) allowed = lotsWithinRoad(world, i, KNOBS.REHOME_RADIUS);
     const to = bestHome(world, h.species, h.members.length, false, allowed);
-    if (to >= 0) placeHousehold(world, h, to);
+    if (to >= 0) { placeHousehold(world, h, to); if (to !== i) for (const id of h.members) remember(world, world.byId.get(id), KIND.MOVED, to); }
     else removeHousehold(world, h, "evicted");
   }
 }
@@ -349,7 +373,7 @@ export function clearLot(world, i) {
     }
     h.home = -1;
     const to = bestHome(world, h.species, h.members.length, false);
-    if (to >= 0) placeHousehold(world, h, to);
+    if (to >= 0) { placeHousehold(world, h, to); for (const id of h.members) remember(world, world.byId.get(id), KIND.MOVED, to); }
     else removeHousehold(world, h, "bulldozed");
   }
   for (const c of world.citizens) if (c.job === i && !c.dead) releaseJob(world, c);
@@ -455,7 +479,7 @@ export function citizensTick(world, cen, dem) {
     for (const id of hh.members) { const c = world.byId.get(id); c.home = -1; world.occupants[i]--; }
     hh.home = -1;
     const to = bestHome(world, hh.species, hh.members.length, false);
-    if (to >= 0) placeHousehold(world, hh, to);
+    if (to >= 0) { placeHousehold(world, hh, to); for (const id of hh.members) remember(world, world.byId.get(id), KIND.MOVED, to); }
     else removeHousehold(world, hh, "homeless");
   }
 
@@ -469,12 +493,13 @@ export function citizensTick(world, cen, dem) {
     hh.notice = (hh.notice || 0) + 1;
     if (hh.notice < KNOBS.ZONED_OUT_MONTHS) continue;
     const from = hh.home;
+    for (const id of hh.members) remember(world, world.byId.get(id), KIND.ZONED_OUT, from);
     const allowed = lotsWithinRoad(world, from, KNOBS.REHOME_RADIUS);
     allowed.delete(from);
     for (const id of hh.members) { const c = world.byId.get(id); c.home = -1; world.occupants[from]--; }
     hh.home = -1;
     const to = bestHome(world, hh.species, hh.members.length, false, allowed);
-    if (to >= 0) { placeHousehold(world, hh, to); out.rehomed++; hh.notice = 0; }
+    if (to >= 0) { placeHousehold(world, hh, to); for (const id of hh.members) remember(world, world.byId.get(id), KIND.MOVED, to); out.rehomed++; hh.notice = 0; }
     else {
       const n = hh.members.length;
       out.left += n;
@@ -508,10 +533,11 @@ export function citizensTick(world, cen, dem) {
           world.hhById.set(nh.id, nh);
           c.household = nh.id;
           placeHousehold(world, nh, to);
+          remember(world, c, KIND.LEFT_HOME, to);
         }
       }
     }
-    if (y === sp.retire) releaseJob(world, c);
+    if (y === sp.retire) { releaseJob(world, c); remember(world, c, KIND.RETIRED); }
   }
 
   // 2. Deaths, with the funeral rule.
@@ -534,6 +560,7 @@ export function citizensTick(world, cen, dem) {
     let litter = 0;
     let parentSpecies = null;
     let fertileAge = 0;
+    const parents = [];
     for (const id of hh.members) {
       const c = world.byId.get(id);
       const sp = SPECIES_BY_ID[c.species];
@@ -542,6 +569,7 @@ export function citizensTick(world, cen, dem) {
         fertileAge++;
         if (c.fixed || absent(world, c)) continue; // fixed animals cannot have offspring (the owner); the held are away
         fertile++;
+        parents.push(c);
         litter += sp.litter;
         if (!parentSpecies || rng.chance(0.5)) parentSpecies = c.species;
       }
@@ -555,6 +583,8 @@ export function citizensTick(world, cen, dem) {
       hh.members.push(cub.id);
       world.citizens.push(cub);
       world.byId.set(cub.id, cub);
+      remember(world, cub, KIND.BORN, hh.home);
+      for (const parent of parents.slice(0, 2)) remember(world, parent, KIND.LITTER, 1);
       out.births++;
     }
   }
@@ -573,7 +603,7 @@ export function citizensTick(world, cen, dem) {
     for (const id of hh.members) { const c = world.byId.get(id); c.home = -1; world.occupants[from]--; }
     hh.home = -1;
     const to = bestHome(world, hh.species, hh.members.length, false, allowed);
-    if (to >= 0 && world.dread[to] < world.dread[from]) { placeHousehold(world, hh, to); out.rehomed++; }
+    if (to >= 0 && world.dread[to] < world.dread[from]) { placeHousehold(world, hh, to); for (const id of hh.members) remember(world, world.byId.get(id), KIND.MOVED, to); out.rehomed++; }
     else placeHousehold(world, hh, from);
   }
 
@@ -600,6 +630,7 @@ export function citizensTick(world, cen, dem) {
       if (lot < 0) break;
       const hh = createHousehold(world, species, size);
       placeHousehold(world, hh, lot);
+      for (const id of hh.members) remember(world, world.byId.get(id), KIND.ARRIVED, lot);
       out.arrived += size;
       // For the walker layer: these animals walk in from the edge road.
       world.arrivals.push(...hh.members);
@@ -699,6 +730,8 @@ function befriend(world, a, b, out) {
   if (a.friends.includes(b.id)) return;
   a.friends.push(b.id);
   b.friends.push(a.id);
+  remember(world, a, KIND.FRIEND, b.id);
+  remember(world, b, KIND.FRIEND, a.id);
   if (a.friends.length > KNOBS.FRIEND_MAX) {
     const dropped = a.friends.shift();
     const o = world.byId.get(dropped);
@@ -934,12 +967,7 @@ function jobSearch(world, out) {
     const r = a != null && b != null ? commutePath(world, c.species, a, b) : null;
     const path = r ? r.path : null;
     if (path) c.path = path;
-    else {
-      world.staff[c.job]--;
-      c.job = -1;
-      c.hired = -1;
-      c.path = null;
-    }
+    else releaseJob(world, c);
   }
   for (let k = 0; k < N && searches < KNOBS.JOB_SEARCHES; k++) {
     const c = cs[(start + k) % N];
@@ -957,6 +985,7 @@ function jobSearch(world, out) {
       c.path = best.path;
       c.jobless = 0;
       world.staff[best.lot]++;
+      remember(world, c, KIND.HIRED, best.lot);
       if (world.staff[best.lot] >= jobsOf(world, best.lot)) {
         const l = openByDoor.get(best.door);
         if (l) { const k2 = l.indexOf(best.lot); if (k2 >= 0) l.splice(k2, 1); if (!l.length) openByDoor.delete(best.door); }

@@ -454,6 +454,27 @@ rail tile emits `EMIT_RAIL` 1 flat with no traffic term; *neutral travel* —
 `exposure` counts walking entries only. Walkers ride at `RIDE_SPEED` ×3
 and sit 3 px up on the train (no train sprite in v1 — BACKLOG).
 
+### 7.10 Lives and remembrance
+
+Every citizen carries `life`, at most twelve compact triples
+`[tick, kindId, arg]`. The first two chapters are pinned; the remaining ten
+are the newest chapters. Creation, homes, work, friends, family, retirement,
+justice, centenaries, and zoning all write through `life.remember`, which also
+publishes the current month's `world.lifeEvents`. `lifeLines` is the sole
+sentence writer: years begin at 2000, lots are coordinates with the family
+living there now, and citizen ids resolve through the living roster before
+the graveyard.
+
+`world.names` receives a compact name/species/age/cause record whenever a
+citizen leaves the roster. `compact()` alone expires unreferenced records
+after twenty years; records named by a living biography remain until that
+reference rolls off, preserving the dangling-id law. `world.deaths` is a
+bounded `[tick,id]` ring for the trailing year, and `memorial(world)` joins it
+to the graveyard. Saves omit default-valued citizen fields and restore them
+from the same defaults used at creation; the canonical state hash retains the
+expanded citizen shape so storage compaction does not redefine simulation
+identity.
+
 ## 8. Budget (`js/sim/budget.js`), integer §, monthly slice of yearly figures
 
 ```

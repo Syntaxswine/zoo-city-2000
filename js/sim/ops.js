@@ -333,7 +333,7 @@ function removeCivic(world, i) {
     if (!inBounds(world, ax, ay) || world.civic[idx(world, ax, ay)] !== CIVIC.ZOO) continue;
     const a = idx(world, ax, ay);
     // Fire the zoo's workers.
-    for (const cz of world.citizens) if (cz.job === a) { cz.job = -1; cz.path = null; cz.hired = -1; world.staff[a]--; }
+    for (const cz of world.citizens) if (cz.job === a) releaseJob(world, cz);
     for (let yy = 0; yy < 2; yy++) for (let xx = 0; xx < 2; xx++) {
       if (inBounds(world, ax + xx, ay + yy)) world.civic[idx(world, ax + xx, ay + yy)] = CIVIC.NONE;
     }

@@ -33,6 +33,7 @@ import { removeCitizen, holdFuneral, releaseJob } from "./citizens.js";
 import { ageYears, isWorker } from "./census.js";
 import { hasAccess, exposure } from "./fields.js";
 import { reachFrom, forEachWithin } from "./reach.js";
+import { KIND, remember } from "./life.js";
 
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 const monthName = (tick) => MONTHS[((tick % 12) + 12) % 12];
@@ -128,6 +129,7 @@ function kill(world, killer, victim, notices) {
   // the victim is scrubbed — the sack has to know who is in it. Per-tick like
   // world.meetings; never saved, never hashed, read-only to the reader.
   (world.predations || (world.predations = [])).push({ killer: killer.id, killerHome: killer.home, victimHome, victim: { id: victim.id, species: victim.species, age: ageYears(world, victim), name: nameOf(victim) } });
+  remember(world, killer, KIND.KILLED, victim.id);
   removeCitizen(world, victim, "killed");
   holdFuneral(world, mourners, null);
   for (const id of family) { const o = world.byId.get(id); if (o) o.grief = tick + 12; }
@@ -274,7 +276,7 @@ function exonerate(world, culprit, notices) {
     post(world, "compensation", -Math.min(KNOBS.COMPENSATION, Math.max(0, world.cash)));
     ev.active.push({ id: "namedMood", until: world.tick + KNOBS.NAMED_MONTHS, moodBoost: -KNOBS.NAMED_MOOD });
     const wronged = world.byId.get(a.citizenId);
-    if (wronged) wronged.exonerated = true;
+    if (wronged) { wronged.exonerated = true; remember(world, wronged, KIND.EXONERATED, a.cause); }
     const first = a.name.split(" ")[0];
     const tail = wronged ? `There is no way to unfix ${first}.` : `${first} was sold; there is no way to unsell anyone.`;
     const line = `EXONERATED — ${a.name} was the wrong animal; ${nameOf(culprit)} was taken in today for the same ${a.cause}. The city pays §${KNOBS.COMPENSATION}. ${tail}`;
@@ -294,6 +296,7 @@ export function arrest(world, f, c, wrongful, notices, opts = {}) {
   f.closed = true;
   const culprit = world.byId.get(f.culpritId);
   c.record = (c.record || 0) + 1;
+  remember(world, c, KIND.ARRESTED, f.cause);
   // A minor (trespass, SPEC §9c): the cells for a month and the record — until the record reaches RECORD_HARD, when the table applies.
   const minor = !!opts.minor && c.record < KNOBS.RECORD_HARD;
   if (wrongful) { c.wrongful = true; c.wrongedBy = f.culpritId; ev.justice.wrongful++; }
@@ -406,6 +409,7 @@ export function custodyTick(world, notices) {
     let line;
     if (fromCentre) {
       c.fixed = true;
+      remember(world, c, KIND.FIXED);
       ev.justice.pacified++;
       const hh = world.hhById.get(c.household);
       if (hh) for (const id of hh.members) { const o = world.byId.get(id); if (o && o !== c) { o.moodPenalty = -KNOBS.RETURN_MOOD; o.moodPenaltyUntil = tick + KNOBS.RETURN_MONTHS; } }

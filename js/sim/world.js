@@ -75,6 +75,7 @@ export function createWorld({ seed = "zoo", w = 64, h = 64 } = {}) {
     households: [],
     campers: [],
     names: {}, // removed citizens by stable id; Part B fills the graveyard
+    deaths: [], // compact [tick, id] ring; details live in names
     lifeEvents: [], // this tick only; storyTick is the sole bridge to news
     nextId: 1,
     nextHouseholdId: 1,

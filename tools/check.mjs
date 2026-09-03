@@ -845,6 +845,120 @@ check("no Math.random under js/", mathRandom.length === 0, mathRandom.join(", ")
     stateHash(migrated) === "688bc6ed", stateHash(migrated));
 }
 
+// ---- Part B'': lives, graveyard, memorial, and the call-site mutation run ---
+{
+  const { KIND, LIFE_MAX, NAMES_YEARS, lifeLines, memorial, remember } = await import("../js/sim/life.js");
+  const { compact, createHousehold, placeHousehold, removeCitizen } = await import("../js/sim/citizens.js");
+  const { DIET_OF } = await import("../js/sim/species.js");
+
+  const Z = createWorld({ seed: "life-zoo-job", w: 8, h: 8 });
+  for (const i of [9, 10, 17, 18]) {
+    Z.terrain[i] = 0; Z.road[i] = 0; Z.zone[i] = 0; Z.civic[i] = 0; Z.wall[i] = 0; Z.rail[i] = 0;
+  }
+  const builtZoo = apply(Z, { kind: "zoo", tx: 1, ty: 1 });
+  const zh = createHousehold(Z, "owl", 2);
+  const zooWorker = Z.byId.get(zh.members[0]);
+  zooWorker.job = 9; zooWorker.hired = 0; Z.staff[9] = 1;
+  const razedZoo = apply(Z, { kind: "bulldoze", x0: 1, y0: 1, x1: 1, y1: 1 });
+  const zooJobLost = zooWorker.life.find((e) => e[1] === KIND.LOST_JOB);
+  check("lives: demolishing a zoo releases its worker through LOST_JOB",
+    builtZoo.ok && razedZoo.ok && zooWorker.job === -1 && Z.staff[9] === 0 && zooJobLost?.[2] === 9);
+
+  const R = createWorld({ seed: "life-ring", w: 8, h: 8 });
+  const rh = createHousehold(R, "rabbit", 2);
+  const rc = R.byId.get(rh.members[0]);
+  remember(R, rc, KIND.BORN, 9);
+  remember(R, rc, KIND.MOVED, 10);
+  for (let n = 0; n < 20; n++) { R.tick++; remember(R, rc, KIND.MOVED, n); }
+  check("lives: the ring is twelve and preserves its pinned first two entries",
+    rc.life.length === LIFE_MAX && rc.life[0][1] === KIND.BORN && rc.life[1][2] === 10
+      && rc.life.slice(2).map((e) => e[2]).join(",") === "10,11,12,13,14,15,16,17,18,19");
+
+  const L = createWorld({ seed: "life-lines", w: 8, h: 8 });
+  const lot = 9;
+  L.zone[lot] = ZONE.R; L.tier[lot] = 1;
+  const lh = createHousehold(L, "rabbit", 2);
+  placeHousehold(L, lh, lot);
+  const [gone, witness] = lh.members.map((id) => L.byId.get(id));
+  remember(L, witness, KIND.BORN, lot);
+  gone.friends = [witness.id]; witness.friends = [gone.id];
+  L.tick = 50;
+  const goneName = `${gone.name} ${gone.surname}`;
+  removeCitizen(L, gone, "killed");
+  const lost = witness.life.find((e) => e[1] === KIND.LOST_FRIEND);
+  const prose = lifeLines(L, witness).join(" ");
+  check("lives: removal records LOST_FRIEND before the splice and graves the stable id",
+    !!lost && lost[2][0] === gone.id && lost[2][1] === "killed"
+      && !witness.friends.includes(gone.id) && L.names[gone.id]?.n === goneName);
+  check("lives: prose resolves graveyard names and describes a lot's current family",
+    prose.includes(goneName) && prose.includes("(1,1)") && prose.includes(`now home to the ${lh.surname} family`), prose);
+  const recent = memorial(L);
+  check("lives: the memorial returns the trailing removal with its public fields",
+    recent.length === 1 && recent[0].name === goneName && recent[0].species === gone.species
+      && recent[0].age === L.names[gone.id].a && recent[0].cause === "killed" && recent[0].tick === 50,
+    JSON.stringify(recent));
+  const leavers = createHousehold(L, "owl", 2);
+  const leaverId = leavers.members[0];
+  removeCitizen(L, L.byId.get(leaverId), "left");
+  check("lives: emigrants enter the name index but not the memorial's death ring",
+    !!L.names[leaverId] && memorial(L).length === 1);
+  const recentLoaded = load(save(L));
+  check("lives: lives, names, and the death ring survive save/load hash-equal",
+    stateHash(L) === stateHash(recentLoaded) && memorial(recentLoaded)[0]?.name === goneName);
+  L.names[99999] = { name: "Old Unreferenced", species: "owl", age: 80, cause: "died", tick: 0 };
+  L.tick = 50 + NAMES_YEARS * 12 + 1;
+  check("lives: an expired graveyard name exists until compact runs", !!L.names[99999]);
+  compact(L);
+  check("lives: compact prunes expired names but retains any name a live biography references",
+    !L.names[99999] && !!L.names[gone.id]);
+  check("lives: retained graveyard references survive save/load hash-equal",
+    stateHash(L) === stateHash(load(save(L))));
+
+  // The real mayor runs thirty years. The last missing deterministic branches
+  // are forced in-world: a use line matures for three months, then a wrongful
+  // arrest is followed by the actual culprit's arrest and exoneration.
+  const { createMayor } = await import("./mayor.mjs");
+  const { arrest } = await import("../js/sim/justice.js");
+  const Y = createWorld({ seed: "7" });
+  const mayor = createMayor(Y, { layout: "balanced", rates: [8, 8, 8], schedule: [], parks: 2, markets: 1, pacify: true, stations: true, disasters: false, recessionYear: null, zooYear: 12 });
+  const seen = new Set();
+  for (let t = 0; t < 30 * 12; t++) {
+    mayor.month(t);
+    if (t === 356) {
+      const target = Y.households.find((h) => !h.gone && h.home >= 0 && h.members.length);
+      const resident = target && Y.byId.get(target.members[0]);
+      if (resident) { Y.rates.R = 0; Y.valves.R = 1; Y.use[target.home] = DIET_OF[resident.species] === "carn" ? 2 : 1; }
+    }
+    tick(Y);
+    for (const event of Y.lifeEvents) seen.add(event.kind);
+  }
+  const pair = Y.citizens.filter((c) => !c.dead && !c.fixed && (!c.held || c.held <= Y.tick) && DIET_OF[c.species] === "carn").slice(0, 2);
+  if (pair.length === 2) {
+    const [culprit, wronged] = pair;
+    arrest(Y, { closed: false, tile: wronged.home, culpritId: culprit.id, cause: "burglary" }, wronged, true, []);
+    arrest(Y, { closed: false, tile: culprit.home, culpritId: culprit.id, cause: "burglary" }, culprit, false, []);
+    for (const event of Y.lifeEvents) seen.add(event.kind);
+  }
+  const missingKinds = Object.entries(KIND).filter(([, id]) => !seen.has(id)).map(([name]) => name);
+  check("lives: the thirty-year forced run observes every KIND call site", missingKinds.length === 0, missingKinds.join(", "));
+
+  const dangling = [];
+  for (const c of Y.citizens) for (const [, kind, arg] of c.life || []) {
+    const id = kind === KIND.LOST_FRIEND && Array.isArray(arg) ? arg[0]
+      : kind === KIND.FRIEND || kind === KIND.KILLED ? arg : null;
+    if (id != null && !Y.byId.has(id) && !Y.names[id]) dangling.push(`${c.id}:${kind}:${id}`);
+  }
+  check("lives: every stored friend, lost-friend, and killed id still resolves", dangling.length === 0, dangling.slice(0, 8).join(", "));
+  const S = createWorld({ seed: "7" });
+  const sizeMayor = createMayor(S, { layout: "balanced", rates: [8, 8, 8], schedule: [], parks: 0, markets: 0, pacify: false, stations: false, disasters: false, recessionYear: null, zooYear: null });
+  for (let t = 0; t < 30 * 12; t++) { sizeMayor.month(t); tick(S); }
+  const citizenBytes = Buffer.byteLength(JSON.stringify(toPlain(S).citizens));
+  check("lives: year-30 citizens use no more than 60% of the 732 KB baseline",
+    citizenBytes <= 732_000 * 0.60, `${citizenBytes} bytes`);
+  check("lives: year-30 save/load with biographies continues hash-equal",
+    stateHash(Y) === stateHash(load(save(Y))));
+}
+
 // ---- Part J': named save slots (SPEC §15) -----------------------------------
 {
   const memoryStore = () => {

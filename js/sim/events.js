@@ -17,6 +17,7 @@ import { SPECIES_BY_ID, SPECIES } from "./species.js";
 import { thiefPool, openFile } from "./justice.js";
 import { hasAccess, builtLots, fireExposure } from "./fields.js";
 import { dissolve, ignite as igniteTile } from "./blocks.js"; // `ignite` is eventsTick's list of tiles the fire spreads to
+import { KIND, remember } from "./life.js";
 
 const DISASTER = "disaster";
 const BOON = "boon";
@@ -484,6 +485,7 @@ export function eventsTick(world, cen, dem) {
     if (ageYears(world, c) >= 100) {
       c.centenary = true;
       ev.centenaries.push({ tile: c.home, radius: 3, bonus: 8, name: `${c.name} ${c.surname}` });
+      remember(world, c, KIND.CENTENARY);
       say("centenary", `${c.name} ${c.surname} is ONE HUNDRED. A plaque goes up; the street is worth more for it.`);
     }
   }

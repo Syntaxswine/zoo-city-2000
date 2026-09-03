@@ -54,6 +54,7 @@ export function toPlain(world) {
     valves: { ...world.valves }, festivalBonus: world.festivalBonus,
     citizens: world.citizens.filter((c) => !c.dead).map(plainCitizen),
     names: { ...(world.names || {}) },
+    deaths: (world.deaths || []).map((entry) => Array.isArray(entry) ? entry.slice() : { ...entry }),
     households: world.households.filter((h) => !h.gone).map((h) => ({ id: h.id, members: h.members.slice(), home: h.home, species: h.species, surname: h.surname, arrived: h.arrived, notice: h.notice || 0 })),
     campers: world.campers.map((c) => ({ ...c })),
     nextId: world.nextId, nextHouseholdId: world.nextHouseholdId,
@@ -89,6 +90,7 @@ export function fromPlain(o) {
   }));
   world.households = o.households.map((h) => ({ ...h, members: h.members.slice() }));
   world.names = { ...(o.names || {}) };
+  world.deaths = (o.deaths || []).map((entry) => Array.isArray(entry) ? entry.slice() : { ...entry });
   world.campers = o.campers.map((c) => ({ ...c }));
   world.nextId = o.nextId;
   world.nextHouseholdId = o.nextHouseholdId;
@@ -140,6 +142,7 @@ export function stateHash(world) {
   // Part K adds empty, backward-compatible save fields without changing the
   // standing simulation hash. Once Parts B/H put state in them, it is hashed.
   if (!Object.keys(o.names).length) delete o.names;
+  if (!o.deaths.length) delete o.deaths;
   if (o.meat.every((n) => n === 0)) delete o.meat;
   if (o.big.every((n) => n === 0)) delete o.big; // a town with no block yet hashes as it did before the blocks
   for (const c of o.citizens) if (!c.life?.length) delete c.life;
