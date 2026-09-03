@@ -71,7 +71,9 @@ so tuning changes one file.
   `terrain` (0 grass, 1 water, 2 tree), `road` (0 none, 1 road, 2 bridge),
   `zone` (0 none, 1 R, 2 C, 3 I), `maxTier` (1 or 3; default 3), `tier`
   (0..3), `civic` (0 none, 1 park, 2 zoo anchor, 3 zoo part), `burning`
-  (ticks left), `rubble` (0/1), `variant` (art seed byte), `wall` (0/1 —
+  (ticks left), `rubble` (MONTHS LEFT, counting down — every `if (world.rubble[i])` still
+  reads "there is rubble here", and no new tile array joins the save),
+  `variant` (art seed byte), `wall` (0/1 —
   with a road or rail on the tile, a tunnel; §6b), `use` (0 mixed, 1
   predator-only, 2 prey-only — the player's line on lots and roads; §7.8),
   `rail` (0 none, 1 rail, 2 station; §7.9).
@@ -444,9 +446,9 @@ kinds. Timed effects are `{id, until, params}` structs saved with the city.
 
 | # | event | kind | gate / weight | effect | dig-out |
 |---|---|---|---|---|---|
-| 1 | Fire | disaster | w3; ×2 Jun–Aug | starts on a built lot (covered lots at 1/6 weight); burns 2 ticks (1 if covered); each tick spreads to 4-neighbour built lots p 0.3 (0.1 if covered; never across road, water, park); burnt → rubble, zoning kept; households displaced | bulldoze rubble §2; a fire station |
+| 1 | Fire | disaster | w3 × season × **exposure** (§9b) — ×1 uncovered, ×1/6 covered end to end; ×2 Jun–Aug | starts on a built lot (covered lots at 1/6 weight); burns 2 ticks (1 if covered); each tick spreads to 4-neighbour built lots p 0.3 (0.1 if covered; never across road, water, park); on burnout a covered lot is SAVED at p 0.7 (−1 storey), else → rubble for RUBBLE_MONTHS, zoning kept; households displaced | wait — rubble clears itself in 6 months and the plot rebuilds; bulldoze §2 to be impatient; a fire station |
 | 2 | Flood | disaster | w2, needs water | tiles within Manhattan 3 of water flood 4 ticks; lots there −1 tier; parks immune | the floodplain has the best LV: that is the tension |
-| 3 | Tornado | disaster | w1 | 12-tile straight path; lots → rubble, trees felled, roads survive | rebuild |
+| 3 | Tornado | disaster | w1 | 12-tile straight path; lots → rubble (which clears itself in RUBBLE_MONTHS), trees felled, roads survive | wait, or bulldoze §2 each |
 | 4 | Beaver dam | mixed | beavers ≥ 12% and water; w2 | a 2×2 pond appears beside the river; adjacent lots −1 tier once; permanent nature (+LV) | rezone around it or bulldoze §40 (beavers' mood −20 for a year) |
 | 5 | Smog bank | disaster | mean Pol > 35; w2 | Pol +25 for 6 ticks; raccoon arrivals ×2 | trees, parks, thin the I belt |
 | 6 | Mouse boom | boon/bust | mice ≥ 35%; w2 | births ×3 for 12 ticks | zone R ahead |
@@ -479,10 +481,20 @@ each, §400/yr each, four C-type jobs each, effective only with road access.
 
 ```
 fireCov(i)   = 1 within Chebyshev 6 of a fire station
-               a covered lot is picked as a fire's ORIGIN at 1/6 the weight (unlikely, never impossible),
-               a fire on a covered lot burns ONE month (else two) and spreads at 0.1 (else 0.3)
+exposure     = mean over BUILT lots of (fireCov ? 1/6 : 1)      — fields.fireExposure()
+               THE FIRE CARD'S ROSTER WEIGHT IS w3 × season × exposure, so covering the town makes
+               a fire RARER and not merely differently placed: ×1 uncovered, ×1/6 covered end to end.
+               The same number picks the lot it starts on. One implementation, two questions.
+               A fire on a covered lot burns ONE month (else two) and spreads at 0.1 (else 0.3),
+               and when it burns out the ENGINE IS THERE: p FIRE_SAVED 0.7 the building is saved and
+               loses ONE STOREY instead of the lot (a tier-1 shed comes out gutted at tier 0 — clear
+               ground, not rubble). Off a beat, or on the unlucky 0.3, the lot goes to rubble.
+               The month's outcome is published on world.fires {saved, razed}: per-tick, never saved,
+               never hashed (a fire that is put out leaves no mark to count).
 policeCov(i) = 60 within 3 of a police station, 30 within 6 (max over stations)
-crime(i)     = clamp(40 − 0.5·LV + 0.4·animals in the 3×3 + 40·(U/W) − policeCov, 0, 100)
+crime(i)     = clamp(40 − 0.5·LV + 0.4·animals in the 3×3 + 40·(U/W) + file stains (capped at
+               FILE_CRIME_MAX 25 — a street where three things happened is a bad street, not three
+               bad streets) − policeCov, 0, 100)
                (Micropolis: 128 − LV + density − police; 0 on empty unzoned tiles)
 crime > 60   → LV −10 on that tile; a C lot's local score −0.2 ("shops need safe streets")
 mood         −= 0.3 · max(0, crime_home − 40)
@@ -545,9 +557,15 @@ THE KILLING (justice.js killingTick, every month, before the files):
            the victim's species −15 mood city-wide for 6 months; −§200 inquest; a FILE at the victim's home; the line names both
 THE FILE events.files [{tile, radius 2, crime 15, opened, until +24, culpritId, victimId, cause, line, closed}] — saved under events;
          opened by a killing, a heist (the thief is now any adult within 4, weighted: unemployed ×3, hot home ×2, fox/raccoon/cat ×2,
-         a record ×2), a BURGLARY (with a police station: once a month over built lots with crime > 60, p = min(0.3, 0.006·hot),
-         −§20·tier), a raid. INVESTIGATION for 6 months: each month p = 0.02 + 0.18·policeCov/60 + 0.05·record
-         → 11% / 50% / 74% over the file at cover 0 / 30 / 60; a killing's file that lapses prints COLD and names the culprit
+         a record ×2), a BURGLARY (once a month over built lots with crime > 60, p = min(0.3, 0.006·hot), −§20·tier —
+         a burglary needs NO police station to happen, and the file opens either way because the file is the STREET's
+         memory of it; a station buys somebody looking), a raid. INVESTIGATION for 6 months, five rolls:
+         p = 0.02 + 0.10·min(1, stations/4) + 0.18·policeCov/60 + 0.05·record, and with NO station in town no roll is
+         made at all — nothing is investigated and every file goes cold. The FORCE term is there because the cover term
+         is read AT THE SCENE, and a scene is by construction the darkest tile in town: a burglary picks a lot with crime
+         above 60, and crime is high exactly where the police are not (measured: 97.4% of scenes at zero cover with one
+         station, 44.8% with four). A killing's file that lapses prints COLD and names the culprit; a burglary's prints a
+         quieter line that is deliberately not in TICKER_FLASH — the record, not the news
 THE WRONG ANIMAL 5% of arrests: any adult within 4 of the file, weighted 1/(1 + d) — no species weight ("random based on proximity")
          the innocent is sentenced like the guilty; the culprit stays; c.wrongful / c.wrongedBy saved; when the real one is later taken:
          EXONERATED, −§500 compensation, the town −5 mood for 6 months, "there is no way to unfix / unsell"

@@ -15,16 +15,10 @@ import { neutralRate } from "./demand.js";
 import { ageYears } from "./census.js";
 import { SPECIES_BY_ID, SPECIES } from "./species.js";
 import { thiefPool, openFile } from "./justice.js";
-import { hasAccess } from "./fields.js";
+import { hasAccess, builtLots, fireExposure } from "./fields.js";
 
 const DISASTER = "disaster";
 const BOON = "boon";
-
-function builtLots(world) {
-  const out = [];
-  for (let i = 0; i < world.w * world.h; i++) if (world.tier[i] > 0 && !world.rubble[i] && !world.burning[i]) out.push(i);
-  return out;
-}
 
 function anyWater(world) {
   for (let i = 0; i < world.terrain.length; i++) if (world.terrain[i] === TERRAIN.WATER) return true;
@@ -39,23 +33,45 @@ function lowerTier(world, i) {
   else fireFromLot(world, i, cap);
 }
 
+/**
+ * Rubble. `world.rubble[i]` is the number of months it has left to lie there,
+ * so every `if (world.rubble[i])` in the codebase still reads "there is rubble
+ * here" and no new tile array joins the save. It counts down in eventsTick and
+ * the plot is eligible again on its own (the owner, session 8); the bulldozer
+ * (§2) is now impatience, not a toll.
+ */
 function toRubble(world, i) {
   if (world.zone[i] === ZONE.NONE || world.tier[i] === 0) return;
   while (world.tier[i] > 0) lowerTier(world, i);
-  world.rubble[i] = 1;
+  world.rubble[i] = KNOBS.RUBBLE_MONTHS;
+}
+
+/**
+ * What a fire station is FOR: the engine gets there, and the building loses a
+ * storey instead of the lot. A tier-1 shed has no storey to lose and comes out
+ * gutted — tier 0, but clear ground, not rubble, so it rebuilds next month.
+ */
+function saveFromFire(world, i) {
+  if (world.tier[i] > 0) lowerTier(world, i);
 }
 
 /** The roster. `gate(world, cen)` arms; `weight`; `fire(world, cen)` applies and returns the ticker line. */
 export const ROSTER = [
   {
-    id: "fire", kind: DISASTER, weight: (w, c) => 3 * (((w.tick % 12) >= 5 && (w.tick % 12) <= 7) ? 2 : 1),
+    id: "fire", kind: DISASTER,
+    // The roster weight is the town's own exposure, so covering the town makes
+    // a fire LESS LIKELY and not merely differently placed. Until session 8 the
+    // weight was a flat 3: the origin weighting moved the fire onto whatever
+    // was still uncovered and the number of fires a town suffered did not
+    // change at all — measured 30.5 fires in forty years at no cover against
+    // 31.7 at 31% (the owner: "even if you have a ton of them the fires ...
+    // are not prevented"). Same quantity, two questions: one implementation.
+    weight: (w, c) => 3 * (((w.tick % 12) >= 5 && (w.tick % 12) <= 7) ? 2 : 1) * fireExposure(w).share,
     gate: (w) => builtLots(w).length > 0,
     fire: (w) => {
       // Where it starts: every built lot, weighted 1 uncovered / FIRE_START_COVERED
       // covered — a fire station makes a fire nearby unlikely, not impossible.
-      const lots = builtLots(w);
-      let total = 0;
-      for (const l of lots) total += w.fireCov[l] ? KNOBS.FIRE_START_COVERED : 1;
+      const { lots, total } = fireExposure(w);
       let r = w.rng.next() * total;
       let i = lots[lots.length - 1];
       for (const l of lots) { r -= w.fireCov[l] ? KNOBS.FIRE_START_COVERED : 1; if (r <= 0) { i = l; break; } }
@@ -361,8 +377,8 @@ export const eventTitle = (id) => EVENT_TITLES[id] || id;
  * 2026-09-02). A new event line adds its prefix here and nowhere else.
  */
 export const TICKER_BAD = /^(FIRE|FLOOD|TORNADO|TAX REVOLT|RECESSION|RECEIVERSHIP|A SMOG|HEIST|KILLING|BURGLARY|SOLD|CELLS|TAKEN IN|RAID)/;
-export const TICKER_GOOD = /^(MILESTONE|BOOM|FOUNDERS|COUNTY|FOX|RABBIT|MOUSE|TRUFFLE|DAIRY|HOME|EXONERATED)/;
-export const TICKER_FLASH = /^(MILESTONE|FIRE|FLOOD|TORNADO|TAX REVOLT|RECESSION|BOOM|FOUNDERS|COUNTY|BEAR|RECEIVERSHIP|The Gnawleys|A SMOG|MOUSE|RABBIT|FOX|The Scrubbers|HEIST|SKUNK INCIDENT|WOLF MOON|TRUFFLE|DAIRY|KILLING|BURGLARY|SOLD|CELLS|TAKEN IN|HOME|RELEASED|EXONERATED|COLD|RAID|THE GREENS|The Butchers)|ONE HUNDRED/;
+export const TICKER_GOOD = /^(MILESTONE|BOOM|FOUNDERS|COUNTY|FOX|RABBIT|MOUSE|TRUFFLE|DAIRY|HOME|EXONERATED|SAVED)/;
+export const TICKER_FLASH = /^(MILESTONE|FIRE|FLOOD|TORNADO|TAX REVOLT|RECESSION|BOOM|FOUNDERS|COUNTY|BEAR|RECEIVERSHIP|The Gnawleys|A SMOG|MOUSE|RABBIT|FOX|The Scrubbers|HEIST|SKUNK INCIDENT|WOLF MOON|TRUFFLE|DAIRY|KILLING|BURGLARY|SOLD|CELLS|TAKEN IN|HOME|RELEASED|EXONERATED|COLD|RAID|THE GREENS|The Butchers|SAVED)|ONE HUNDRED/;
 
 /** Resolve the choice card. */
 export function resolveChoice(world, accept) {
@@ -388,9 +404,23 @@ export function eventsTick(world, cen, dem) {
   const ev = world.events;
   const { w, h } = world;
   const n = w * h;
+  // Everything this function says goes on the record with it. tick.js logs the
+  // month's other notices but SKIPS the ones eventsTick returns, on the ground
+  // that "rolled events already logged themselves" — true of the roster and of
+  // nothing else, so bear winter, the tortoise centenary and the licence card
+  // flashed over the map and were never in the log at all. The news reader
+  // (SPEC §11b) reads the log, so those three could not be read back.
+  const say = (id, line) => { notices.push(line); ev.log.push({ t: world.tick, id, line }); };
+
+  // Rubble ages out FIRST, so a lot that burns down further down this same
+  // function gets the whole of its RUBBLE_MONTHS and not one month less.
+  for (let i = 0; i < n; i++) if (world.rubble[i]) world.rubble[i]--;
 
   // Fire spreads and burns out.
   const ignite = [];
+  let saved = 0;
+  let razed = 0;
+  let savedAt = -1;
   for (let i = 0; i < n; i++) {
     if (!world.burning[i]) continue;
     world.burning[i]--;
@@ -405,8 +435,21 @@ export function eventsTick(world, cen, dem) {
         if (world.rng.chance(world.fireCov[j] ? KNOBS.FIRE_SPREAD_COVERED : KNOBS.FIRE_SPREAD)) ignite.push(j);
       }
     }
-    if (world.burning[i] === 0) toRubble(world, i);
+    // Burnt out. On a covered lot the engine is there: FIRE_SAVED of the time
+    // the walls stand and the building loses a storey. Off a beat, or on the
+    // unlucky rest, the lot goes to rubble as it always did.
+    if (world.burning[i] === 0) {
+      if (world.tier[i] > 0 && world.fireCov[i] && world.rng.chance(KNOBS.FIRE_SAVED)) { saveFromFire(world, i); saved++; if (savedAt < 0) savedAt = i; }
+      else { if (world.tier[i] > 0) razed++; toRubble(world, i); }
+    }
   }
+  // This month's fire outcome, published for instruments the way world.predations
+  // is (SPEC §14): per-tick, never saved, never hashed. A fire that is put out
+  // leaves no trace on the map at all, so without this the only way to count a
+  // save is to infer it from what did NOT become rubble — and a flood taking a
+  // burning tier-1 lot to tier 0 looks exactly the same.
+  world.fires = { saved, razed };
+  if (saved) say("saved", `SAVED — the engine reached ${saved === 1 ? `the fire at (${savedAt % w},${(savedAt / w) | 0})` : `${saved} of this month's fires`}; the walls stand and a storey is gone.${razed ? ` ${razed} beyond the beat went to rubble.` : ""}`);
   for (const j of ignite) if (!world.burning[j] && world.tier[j] > 0) world.burning[j] = world.fireCov[j] ? 1 : 2;
   // Flood recedes.
   for (let i = 0; i < n; i++) if (world.flooded[i]) world.flooded[i]--;
@@ -423,7 +466,7 @@ export function eventsTick(world, cen, dem) {
   if (month === 11 && cen.shares.bear >= 0.10 && !ev.active.some((e) => e.id === "bearWinter")) {
     ev.active.push({ id: "bearWinter", until: world.tick + 3 });
     for (const c of world.citizens) if (c.species === "bear") c.onLeave = true;
-    notices.push("BEAR WINTER — the Ursins have gone to sleep until March. Their jobs stand empty; upkeep falls a fifth.");
+    say("bearWinter", "BEAR WINTER — the Ursins have gone to sleep until March. Their jobs stand empty; upkeep falls a fifth.");
   }
   if (!ev.active.some((e) => e.id === "bearWinter")) {
     for (const c of world.citizens) if (c.onLeave) c.onLeave = false;
@@ -435,7 +478,7 @@ export function eventsTick(world, cen, dem) {
     if (ageYears(world, c) >= 100) {
       c.centenary = true;
       ev.centenaries.push({ tile: c.home, radius: 3, bonus: 8, name: `${c.name} ${c.surname}` });
-      notices.push(`${c.name} ${c.surname} is ONE HUNDRED. A plaque goes up; the street is worth more for it.`);
+      say("centenary", `${c.name} ${c.surname} is ONE HUNDRED. A plaque goes up; the street is worth more for it.`);
     }
   }
 
@@ -447,7 +490,7 @@ export function eventsTick(world, cen, dem) {
     if (hall2) {
       ev.lastLicenceOffer = world.tick;
       ev.choice = { id: "licence", title: "The Butchers' Licence", text: `The Butchers' Guild has a licence on your desk: an inspector in every meat hall, §${KNOBS.LICENCE_COST} and §${KNOBS.UPKEEP_LICENCE} a year each. The till pays tax at the C rate; crime around the halls halves; the halls buy half as eagerly.`, cost: KNOBS.LICENCE_COST, accept: `Pay §${KNOBS.LICENCE_COST}`, decline: "Decline" };
-      notices.push("The Butchers' Licence is on your desk.");
+      say("licence", "The Butchers' Licence is on your desk.");
     }
   }
 
@@ -476,8 +519,7 @@ export function eventsTick(world, cen, dem) {
           ev.active.push(eff);
         }
         if (pick.kind === DISASTER) ev.cooldown = KNOBS.DISASTER_COOLDOWN;
-        ev.log.push({ t: world.tick, id: pick.id, line });
-        notices.push(line);
+        say(pick.id, line);
       }
     }
   }

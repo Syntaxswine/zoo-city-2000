@@ -139,8 +139,12 @@ function advisor(world, cen, dem, fig) {
   const maxRate = Math.max(world.rates.R, world.rates.C, world.rates.I);
   if (maxRate > dem.n + 3) out.push(`ADVISOR: taxes are well above the neutral ${dem.n.toFixed(1)}%. The animals are talking about leaving.`);
   if (cen.P >= 800 && cen.zoos === 0) out.push("ADVISOR: the citizens want a Zoo.");
-  if (cen.P >= 300 && cen.fireStations === 0) out.push("ADVISOR: no fire station — a fire will burn two months and spread. One covers six tiles (§500).");
-  if (cen.meanCrime > 50 && cen.policeStations === 0) out.push(`ADVISOR: crime on the built lots averages ${Math.round(cen.meanCrime)}. A police station covers six tiles (§500).`);
+  if (cen.P >= 300 && cen.fireStations === 0) out.push(`ADVISOR: no fire station — a fire burns two months, spreads at ${KNOBS.FIRE_SPREAD}, and always takes the building. A station covers six tiles (§500) and its engine saves ${Math.round(KNOBS.FIRE_SAVED * 10)} fires in ten on its own beat.`);
+  // No station at all is not "less policing", it is NO investigation: filesTick
+  // does not roll where there is no force, so every file goes cold. The old
+  // line was gated on meanCrime > 50 and a police-less town measured 39.9.
+  if (cen.policeStations === 0 && world.events.files.some((f) => !f.closed)) out.push("ADVISOR: there is no police station, so nothing is investigated — every file goes cold. One covers six tiles (§500); the town's detectives work every case wherever it happened.");
+  else if (cen.meanCrime > 50 && cen.policeStations === 0) out.push(`ADVISOR: crime on the built lots averages ${Math.round(cen.meanCrime)}. A police station covers six tiles (§500).`);
   else if (cen.meanCrime > 50) out.push(`ADVISOR: crime averages ${Math.round(cen.meanCrime)} — the stations do not reach everywhere.`);
   if (cen.meanPol > 40) out.push("ADVISOR: the air is thick. Trees and parks clear it; industry makes it.");
   if (world.cash < 0) out.push("ADVISOR: the treasury is in the red.");

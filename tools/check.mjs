@@ -577,6 +577,225 @@ check("determinism: same seed + same inputs ⇒ same hash", stateHash(A.world) =
   check("rail: save → load → 12 ticks with rail and riders hash-equals", stateHash(G) === stateHash(H), `${stateHash(G)} vs ${stateHash(H)}`);
 }
 
+// ---- what a station BUYS: fire, police, and the rubble clock (session 8; tools/serviceprobe.mjs) ----
+{
+  const EV = await import("../js/sim/events.js");
+  const JU = await import("../js/sim/justice.js");
+  const { lotScore, REASON } = await import("../js/sim/lots.js");
+  const FIRE = EV.ROSTER.find((e) => e.id === "fire");
+  const N = A.world.w * A.world.h;
+  const anyBurning = (w) => { for (let i = 0; i < N; i++) if (w.burning[i]) return true; return false; };
+  const firstBuilt = (w) => { for (let i = 0; i < N; i++) if (w.tier[i] > 0 && !w.burning[i] && !w.rubble[i]) return i; return -1; };
+
+  // --- HOW OFTEN. The roster weight is exact arithmetic, so this needs no run:
+  // a town covered end to end must roll fires at FIRE_START_COVERED of the rate
+  // of the same town covered nowhere. Before session 8 the weight was flat and
+  // coverage only moved a fire onto whatever was still uncovered.
+  const Wt = load(A.saved);
+  computeFields(Wt);
+  const cenWt = census(Wt);
+  Wt.fireCov.fill(0);
+  const wBare = FIRE.weight(Wt, cenWt);
+  Wt.fireCov.fill(1);
+  const wCovered = FIRE.weight(Wt, cenWt);
+  check("fire: covering the town makes a fire RARER, not differently placed",
+    wBare > 0 && Math.abs(wCovered / wBare - KNOBS.FIRE_START_COVERED) < 1e-9,
+    `weight ${wBare.toFixed(3)} bare vs ${wCovered.toFixed(3)} covered — ratio ${(wCovered / wBare).toFixed(4)}, wanted ${KNOBS.FIRE_START_COVERED.toFixed(4)}`);
+  check("fire: the roster weight and the origin picker read the SAME exposure",
+    /fireExposure\(w\)\.share/.test(readFileSync(path.join(ROOT, "js/sim/events.js"), "utf8"))
+    && /const \{ lots, total \} = fireExposure\(w\)/.test(readFileSync(path.join(ROOT, "js/sim/events.js"), "utf8")));
+
+  // --- HOW BAD. A fire that is put out leaves no mark on the map, so the count
+  // comes from world.fires, which eventsTick publishes per tick. eventsTick is
+  // driven directly: tick() would recompute coverage and undo the forced cover.
+  function burnTrials(cov, trials) {
+    const T = load(A.saved);
+    T.events.noDisasters = true;
+    computeFields(T);
+    const cen = census(T);
+    const dem = T.last ? T.last.demand : { n: 8 };
+    let lit = 0, saved = 0, razed = 0;
+    for (let k = 0; k < trials; k++) {
+      const i = firstBuilt(T);
+      if (i < 0) break;
+      T.fireCov.fill(cov);
+      T.burning[i] = cov ? 1 : 2;
+      lit++;
+      for (let guard = 0; guard < 80 && anyBurning(T); guard++) {
+        T.fireCov.fill(cov); // eventsTick never touches coverage; computeFields would
+        EV.eventsTick(T, cen, dem);
+        saved += T.fires.saved;
+        razed += T.fires.razed;
+      }
+    }
+    return { lit, saved, razed };
+  }
+  // Off a beat a fire is supercritical (two months × four neighbours × FIRE_SPREAD),
+  // so it eats its whole block and the town runs out of unburnt lots long before
+  // 30 trials — the count of trials is a ceiling, not a promise.
+  const dark = burnTrials(0, 30);
+  const beat = burnTrials(1, 30);
+  check("fire: off a beat the building ALWAYS goes — that was true on a beat too until session 8",
+    dark.lit >= 5 && dark.saved === 0 && dark.razed >= dark.lit,
+    `${dark.lit} lit · ${dark.saved} saved · ${dark.razed} razed`);
+  check("fire: on a beat the engine saves most of them",
+    beat.saved > 0 && beat.saved > beat.razed,
+    `${beat.lit} lit · ${beat.saved} saved · ${beat.razed} razed (FIRE_SAVED ${KNOBS.FIRE_SAVED})`);
+  const savedLine = "SAVED — the engine reached the fire at (1,2); the walls stand and a storey is gone.";
+  check("fire: the SAVED line is registered as a good headline (the HEIST trap, 944e507)",
+    EV.TICKER_FLASH.test(savedLine) && EV.TICKER_GOOD.test(savedLine) && !EV.TICKER_BAD.test(savedLine));
+
+  // --- The rubble clock: it counts down in the tile array itself, so every
+  // `if (world.rubble[i])` in the codebase still reads "there is rubble here"
+  // and the save carries the clock without a new field.
+  const R = load(A.saved);
+  R.events.noDisasters = true;
+  computeFields(R);
+  let lot = -1;
+  for (let i = 0; i < N; i++) if (R.tier[i] > 0 && !R.rubble[i] && !R.burning[i] && !R.fireCov[i]) { lot = i; break; }
+  R.burning[lot] = 1;
+  tick(R);
+  check("rubble: a lot that burns down starts a RUBBLE_MONTHS clock, not a permanent flag",
+    lot >= 0 && R.rubble[lot] === KNOBS.RUBBLE_MONTHS && R.tier[lot] === 0,
+    `rubble ${R.rubble[lot]} of ${KNOBS.RUBBLE_MONTHS} · tier ${R.tier[lot]}`);
+  check("rubble: the lot is not eligible while the clock runs", lotScore(R, lot).reason === REASON.RUBBLE);
+  const clock = load(save(R));
+  check("rubble: the clock survives a save (it rides in the rubble array, no new tile field)",
+    clock.rubble[lot] === R.rubble[lot] && R.rubble[lot] > 1, `${clock.rubble[lot]} vs ${R.rubble[lot]}`);
+  const ticks = [];
+  for (let k = 0; k < KNOBS.RUBBLE_MONTHS; k++) { tick(R); ticks.push(R.rubble[lot]); }
+  check("rubble: it clears ITSELF, one month at a time, and the plot is eligible with no bulldozer",
+    R.rubble[lot] === 0 && ticks.every((v, k) => v === KNOBS.RUBBLE_MONTHS - 1 - k) && lotScore(R, lot).reason !== REASON.RUBBLE,
+    `countdown ${ticks.join(",")}`);
+  const B2 = load(A.saved);
+  B2.events.noDisasters = true;
+  computeFields(B2);
+  let lot2 = -1;
+  for (let i = 0; i < N; i++) if (B2.tier[i] > 0 && !B2.rubble[i] && !B2.burning[i] && !B2.fireCov[i]) { lot2 = i; break; }
+  B2.burning[lot2] = 1;
+  tick(B2);
+  B2.cash = 9999;
+  apply(B2, { kind: "bulldoze", x0: lot2 % B2.w, y0: (lot2 / B2.w) | 0, x1: lot2 % B2.w, y1: (lot2 / B2.w) | 0 });
+  check("rubble: the bulldozer is still impatience — it clears the clock at once",
+    B2.rubble[lot2] === 0, `${B2.rubble[lot2]}`);
+
+  // --- The three lines that flashed and were never written down. tick.js skips
+  // logging anything eventsTick returns, on the ground that "rolled events
+  // already logged themselves" — which was true of the roster and of nothing
+  // else, so the news reader (SPEC §11b) could not show them.
+  const C = load(A.saved);
+  C.events.noDisasters = true;
+  computeFields(C);
+  const cenC = census(C);
+  const old = C.citizens.find((c) => !c.dead && c.home >= 0);
+  old.species = "tortoise";
+  old.born = C.tick - 100 * 12;
+  old.centenary = false;
+  // eventsTick directly, not tick(): a full month would run citizensTick first,
+  // and a hundred-year-old rolls against its species' lifespan before it can
+  // have its birthday.
+  const cRes = EV.eventsTick(C, cenC, C.last ? C.last.demand : { n: 8 });
+  const hundred = cRes.find((l) => /ONE HUNDRED/.test(l));
+  check("events: the centenary reaches the LOG and not only the map — the reader reads the log",
+    !!hundred && C.events.log.some((e) => e.t === C.tick && e.line === hundred),
+    hundred ? "said but never written down" : "no centenary line at all");
+  let orphan = 0, said = 0;
+  const L = load(A.saved);
+  for (let t = 0; t < 120; t++) {
+    const r = tick(L);
+    for (const line of r.events) { said++; if (!L.events.log.some((e) => e.t === L.tick - 1 && e.line === line)) orphan++; }
+  }
+  check("events: EVERY line the events tick says goes on the record", orphan === 0 && said > 0, `${orphan} orphaned of ${said}`);
+
+  // --- Crime is not caused by having police.
+  const P0 = load(A.saved);
+  for (let i = 0; i < N; i++) if (P0.civic[i] === CIVIC.POLICE) P0.civic[i] = 0;
+  P0.events.files = []; // the scripted city arrives with its own open files
+  computeFields(P0);
+  const cen0 = census(P0);
+  for (let i = 0; i < N; i++) if (P0.tier[i] > 0) P0.crime[i] = 100; // a town gone bad, with nobody to call
+  let burgled = 0;
+  for (let k = 0; k < 400; k++) { const nn = []; JU.burglaryTick(P0, cen0, nn); burgled += nn.length; }
+  check("crime: a burglary needs no police station to HAPPEN — a station buys the investigation, not the crime",
+    cen0.policeStations === 0 && burgled > 0 && P0.events.files.filter((f) => f.cause === "burglary").length === burgled,
+    `${burgled} burglaries, ${P0.events.files.filter((f) => f.cause === "burglary").length} files, ${cen0.policeStations} stations`);
+  const arrests0 = P0.events.arrests.length;
+  const cold0 = P0.events.justice.cold;
+  const coldLines = [];
+  for (let k = 0; k <= KNOBS.CASE_MONTHS + 1; k++) { P0.tick++; JU.filesTick(P0, cen0, coldLines); }
+  check("crime: with no station in town nothing is investigated — every file goes cold",
+    P0.events.arrests.length === arrests0 && P0.events.justice.cold - cold0 === burgled,
+    `${P0.events.arrests.length - arrests0} arrests · ${P0.events.justice.cold - cold0} cold of ${burgled}`);
+  check("crime: a burglary going cold is written down, and does NOT flash over the map",
+    coldLines.length > 0 && coldLines.every((l) => /never charged/.test(l) && !EV.TICKER_FLASH.test(l))
+    && P0.events.log.some((e) => e.id === "cold" && /never charged/.test(e.line)),
+    `${coldLines.length} lines`);
+
+  // --- The force works the case; the beat works the street. Same world, same
+  // scenes, only the number of stations the census reports changes.
+  function solveRate(stations) {
+    const S = load(A.saved);
+    computeFields(S);
+    const cen = { ...census(S), policeStations: stations };
+    for (let i = 0; i < N; i++) if (S.tier[i] > 0) S.crime[i] = 100;
+    let opened = 0;
+    for (let k = 0; k < 120; k++) { const nn = []; JU.burglaryTick(S, cen, nn); opened += nn.length; }
+    const a0 = S.events.arrests.length;
+    for (let k = 0; k <= KNOBS.CASE_MONTHS + 1; k++) { S.tick++; JU.filesTick(S, cen, []); }
+    return { opened, arrests: S.events.arrests.length - a0 };
+  }
+  const one = solveRate(1);
+  const many = solveRate(KNOBS.ARREST_FORCE_N);
+  check("crime: a bigger force clears more files, wherever the crime happened",
+    one.opened > 10 && many.opened > 10 && many.arrests / many.opened > one.arrests / one.opened,
+    `1 station ${one.arrests}/${one.opened} · ${KNOBS.ARREST_FORCE_N} stations ${many.arrests}/${many.opened}`);
+
+  // --- The stain of open files is capped, so crime cannot manufacture itself.
+  function crimeWith(files) {
+    const S = load(A.saved);
+    S.events.files = [];
+    computeFields(S);
+    const t0 = firstBuilt(S);
+    for (let k = 0; k < files; k++) JU.openFile(S, { tile: t0, culpritId: -1, cause: "burglary" });
+    computeFields(S);
+    return { t0, crime: S.crime[t0] };
+  }
+  const c0 = crimeWith(0).crime, c1 = crimeWith(1).crime, c2 = crimeWith(2).crime, c6 = crimeWith(6).crime;
+  check("crime: the stains of overlapping files CAP — a street where three things happened is a bad street, not three bad streets",
+    c1 > c0 && c2 > c1 && c6 === c2 && c2 - c0 === KNOBS.FILE_CRIME_MAX,
+    `0 files ${c0} · 1 ${c1} · 2 ${c2} · 6 ${c6} (cap ${KNOBS.FILE_CRIME_MAX})`);
+
+  // The hover card has to tell the player the clock is running, or a
+  // self-clearing site is indistinguishable from a stuck one. Source-level:
+  // the card reads the countdown out of the tile, it does not say a fixed
+  // number that RUBBLE_MONTHS could drift away from.
+  const uiRubble = (readFileSync(path.join(ROOT, "js", "ui.js"), "utf8").split("\n").find((l) => /w\.rubble\[i\]\)\s*lines\.push/.test(l)) || "");
+  // The Rules tab's live lines run against the world every refresh and nothing
+  // ever ran them here, so a `live` reading a census field that does not exist
+  // would break the tab in the browser with the suite green. S2 and S3 gained
+  // such reads this session.
+  const { RULES } = await import("../js/sim/rules.js");
+  const broke = [];
+  for (const r of RULES) {
+    try { const s = r.live(A.world); if (typeof s !== "string") broke.push(`${r.id}: ${typeof s}`); }
+    catch (e) { broke.push(`${r.id}: ${e.message}`); }
+  }
+  // A rule may have no figure to show (G4 returns "" on purpose); what it may
+  // never do is throw, or hand the panel something that is not a string.
+  const spoken = RULES.filter((r) => r.live(A.world).length > 0).length;
+  check("the recipe: every rule renders its live line against a real city",
+    RULES.length > 0 && broke.length === 0 && spoken >= RULES.length - 1,
+    broke.join(" · ") || `${spoken} of ${RULES.length} rules have a figure`);
+  check("the recipe: the fire and police rules quote what a station now buys",
+    /engine SAVES|saves the building/i.test(RULES.find((r) => r.id === "S3").formula)
+    && /rolled at the town/i.test(RULES.find((r) => r.id === "S3").formula)
+    && /FORCE/.test(RULES.find((r) => r.id === "S2").formula));
+
+  check("rubble: the hover card counts the months down from the tile itself",
+    /\$\{w\.rubble\[i\]\}/.test(uiRubble) && /clears itself/.test(uiRubble) && !/\b6 months\b/.test(uiRubble),
+    uiRubble.trim().slice(0, 90));
+}
+
 // ---- Part B: the code ----------------------------------------------------------
 function walk(dir, out = []) {
   for (const f of readdirSync(dir)) {

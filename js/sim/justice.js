@@ -11,9 +11,12 @@
 //
 // In tick order: RELEASES (the cells → home with a record; the centre → home
 // FIXED), the KILLING (any adult may kill a neighbour, weighted), BURGLARY
-// (where crime is high and a station exists to file it), the INVESTIGATION
-// (every open file rolls once a month; police cover is the probability;
-// 5% wrongful, random by proximity), the SENTENCE (a predator's first
+// (where crime is high — no station needed; a burglary is not caused by
+// having police, and the file opens either way because the file is the
+// STREET's memory of it), the INVESTIGATION (every open file rolls once a
+// month; the town's FORCE and the cover at the scene are the probability, and
+// with no station in town no roll is made at all; 5% wrongful, random by
+// proximity), the SENTENCE (a predator's first
 // conviction: the centre; prey, or anyone already fixed: the meat hall —
 // sold; else the cells), EXONERATION when the real one is taken.
 //
@@ -188,7 +191,12 @@ export function killingTick(world, cen, notices) {
 // ---------------------------------------------------------------------------
 
 export function burglaryTick(world, cen, notices) {
-  if (!cen.policeStations) return; // nobody to file it
+  // A burglary is not caused by having police. Until session 8 this returned
+  // early when the town had no station ("nobody to file it"), so the FIRST
+  // station a mayor built did not reduce crime, it invented it: serviceprobe
+  // measured 6 files in forty years at zero stations against 116 at one, and
+  // 8.3% of lots hot against 18.6%. The crime happens either way now; what a
+  // station buys is somebody looking for who did it.
   const n = world.w * world.h;
   const hot = [];
   for (let i = 0; i < n; i++) if (world.tier[i] > 0 && !world.rubble[i] && !world.burning[i] && world.crime[i] > KNOBS.CRIME_HIGH) hot.push(i);
@@ -203,7 +211,10 @@ export function burglaryTick(world, cen, notices) {
   post(world, "theft", -Math.min(loss, Math.max(0, world.cash)));
   const z = world.zone[lot];
   const where = z === ZONE.R ? `broke into the house at ${at(world, lot)}` : z === ZONE.C ? `walked out of the shop at ${at(world, lot)} with §${loss} of stock` : z === ZONE.M ? `left the meat hall at ${at(world, lot)} with §${loss} of stock` : `took §${loss} of copper off the works at ${at(world, lot)}`;
-  const line = `BURGLARY — ${nameOf(thief)} ${where}. A file is open for six months.`;
+  // The file opens either way: it is the STREET's memory of the burglary, not
+  // the paperwork's, and a street does not forget faster for want of a desk
+  // sergeant. Whether anyone WORKS it is filesTick's question.
+  const line = `BURGLARY — ${nameOf(thief)} ${where}. ${cen.policeStations ? "A file is open for six months." : "There is no station in town; the street remembers it and nobody comes looking."}`;
   openFile(world, { tile: lot, culpritId: thief.id, cause: "burglary", line });
   world.events.log.push({ t: world.tick, id: "burglary", line });
   notices.push(line);
@@ -344,16 +355,29 @@ export function filesTick(world, cen, notices) {
     if (tick >= f.opened + KNOBS.CASE_MONTHS) {
       f.closed = true;
       ev.justice.cold++;
-      // Only a killing's file going cold is worth a line; a burglary's closes quietly (it was six a year of COLD in a small hot town).
-      if (f.cause === "killing") {
-        const line = `COLD — the file on the ${f.cause} at ${at(world, f.tile)} closed without an arrest. ${nameOf(culprit)} is still at ${at(world, culprit.home)}.`;
-        ev.log.push({ t: tick, id: "cold", line });
-        notices.push(line);
-      }
+      // A killing going cold is a headline (COLD is in TICKER_FLASH). A
+      // burglary going cold is the record, not the news: it printed nothing at
+      // all until session 8, so a mayor watched 101 of 116 files die in silence
+      // and concluded, correctly, that nothing was being done. The line does
+      // not start with a flashing prefix, so it lands in the reader and not
+      // over the map.
+      const line = f.cause === "killing"
+        ? `COLD — the file on the ${f.cause} at ${at(world, f.tile)} closed without an arrest. ${nameOf(culprit)} is still at ${at(world, culprit.home)}.`
+        : `The file on the ${f.cause} at ${at(world, f.tile)} closed after ${KNOBS.CASE_MONTHS} months. ${nameOf(culprit)} was never charged.`;
+      ev.log.push({ t: tick, id: "cold", line });
+      notices.push(line);
       continue;
     }
     if (tick <= f.opened || absent(world, culprit)) continue;
-    const p = KNOBS.ARREST_BASE + KNOBS.ARREST_COVER * world.policeCov[f.tile] / KNOBS.POLICE_EFFECT + KNOBS.ARREST_PRIOR * (culprit.record || 0);
+    // No station in town, nobody works it: the file lies open, stains the
+    // street for FILE_MONTHS and goes cold. Every other town has a FORCE, and
+    // the force works the case wherever it happened — reading only the scene's
+    // cover made the cover term almost always zero, because a burglary picks a
+    // lot with crime above CRIME_HIGH and crime is high exactly where the
+    // police are not (97.4% of scenes dark at one station, 44.8% at four).
+    const force = Math.min(1, cen.policeStations / KNOBS.ARREST_FORCE_N);
+    if (force <= 0) continue;
+    const p = KNOBS.ARREST_BASE + KNOBS.ARREST_FORCE * force + KNOBS.ARREST_COVER * world.policeCov[f.tile] / KNOBS.POLICE_EFFECT + KNOBS.ARREST_PRIOR * (culprit.record || 0);
     if (!world.rng.chance(Math.min(0.95, p))) continue;
     let wrongful = world.rng.chance(KNOBS.WRONGFUL_P);
     let target = culprit;

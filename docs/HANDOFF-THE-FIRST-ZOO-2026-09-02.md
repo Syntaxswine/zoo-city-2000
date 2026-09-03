@@ -243,13 +243,15 @@ you would SEE.
 
 ## 4. The numbers (measured on the committed code, seed 7, rates 8, disasters OFF unless said)
 
-- **Balanced, no civics:** 1,126 by y6, 1,508 by y10, 1,599 at y20 under a
-  cap of 1,939, 1,742 by y30 under a cap of 2,215. Cash §86.0k by y30
-  (+4.3k/yr at the end). *Re-measured in session 6 (`playtest.mjs --years 30
-  --quiet`, seed 7, rates 8): session 3's crime arc moved every figure in
-  this row, which had read 1,161 / 1,500 / 1,499 / 1,643 under a cap of
-  1,657 since session 2. **§4 is only ever true of the commit that measured
-  it** — re-run before you quote it.*
+- **Balanced, no civics:** 1,267 by y6, 1,481 by y10, 1,489 at y20 under a
+  cap of 1,964, **1,638 by y30 under a cap of 1,938, cash §70.9k**. *Re-measured
+  in session 8 (`playtest.mjs --years 30 --quiet`, seed 7, rates 8). It read
+  1,161 / 1,500 / 1,499 / 1,643 and §~from session 2, then 1,126 / 1,508 /
+  1,599 / 1,742 and §86.0k from session 6, and session 8's crime rebalance
+  moved it again: an unpoliced town is now BURGLED (−§2,440 over the run,
+  in the ledger) where it used to be immune, which is the intended cost of
+  building no police. **§4 is only ever true of the commit that measured
+  it** — re-run before you quote it. Three sessions running, it was stale.*
 - **Balanced, `--parks 2 --zoo 12`:** 1,852 by y20, 1,948 by y30 under a cap
   of 2,783 → 3,058 (1200 + 300 + 500, × (1 + 0.5·0.78)). Net ≈ +0.3k/yr at
   y20, +2.6k/yr at y30 — with civics the treasury is thin, as intended.
@@ -266,12 +268,20 @@ you would SEE.
   `--stations` (fire + police at t=24): mean 25 the year they land, 33–37
   within three years as the town outgrows their six tiles; a hover-card
   reading beside the station is ~17.
+- **What a station buys** (session 8, `serviceprobe.mjs`, a nine-block town
+  over 40 years): police 0 / 1 / 2 / 4 / 12 → mean crime 43.7 / 34.5 / 28.7 /
+  15.8 / 3.7, lots hot 20.8% / 15.5% / 13.1% / 1.9% / 0.4%, files solved 0% /
+  22% / 30% / 53% / 56%. Fire, per 80 forced fires: buildings lost 535 / 520 /
+  423 / 195 / **7.5**, saved by the engine 0 / 4.8 / 15.1 / 34.6 / **73**.
+  Monotone in every column, which is the point — before session 8 the first
+  police station DOUBLED the hot lots and the clear-up rate was flat at 9%.
+  §15 has the before/after and the rig.
 - **Fires:** `--disasters --stations --years 40`, seeds 5, 7, 3, 1: 17 fires,
   0 on covered lots (every line said "bulldoze a firebreak").
-- **Tick cost:** ~4.7 ms at the scripted **210** citizens (check.mjs), ~7 ms
-  (max ~10) at 1,650–1,950 (playtest). The ms is this machine's; the citizen
-  count is deterministic, so if `check.mjs` no longer prints 210 the fixture
-  changed and this row is stale again (it read 226 until session 6).
+- **Tick cost:** ~4.3 ms at the scripted **242** citizens (check.mjs), ~7.5 ms
+  (max ~9) at 1,650 (playtest). The ms is this machine's; the citizen
+  count is deterministic, so if `check.mjs` no longer prints 242 the fixture
+  changed and this row is stale again (226 until session 6, 210 until 8).
 - **Species (balanced):** y1 leaders cat 15% / tortoise 13% / beaver 11%;
   thereafter pig 14–19%, beaver 11–15%, wolf 10–13%, no species above 20%.
   Dormitory: bears 30–39% from y4 (cottages). Millbelt y1: bears 36%.
@@ -901,14 +911,155 @@ its next centre while the figure at the door already stands — two of the
 same animal for under a second. The sack goes HOME; a hall's staff could
 carry it to the hall. No sound, no flash at the second of the drop.
 
+## 15. Session 8 — what a station BUYS, and the rubble clock (2026-09-02, night; SPEC §9b, §9c)
+
+The owner, in one message: *"there's still a balance issue with police and
+fire, even if you have a ton of them the fires and crime are not prevented
+and most go unsolved"* and *"i'd like a quality of life update for fire. i'd
+like the building plot to stay as rubble for a period of time and then
+automatically becomes eligible for the game to build on. it just takes a few
+months before its eligible again. it can still be deleted and rebuilt, but
+you dont have to, it will be rebuilt automatically."*
+
+Both halves are the same complaint. A fire took a building and left a scar
+you had to go and click, and the station you paid §500 and §400/yr for did
+not stop any of it.
+
+**The census came first** (`tools/serviceprobe.mjs`, an instrument: exit 0
+always). The same town nine blocks wide, warmed eight years with disasters
+off, then 0 / 1 / 2 / 4 / 12 stations, then forty years. Every number below
+is from it. Do not quote them without re-running it.
+
+### What was actually wrong (three defects, all measured before anything changed)
+
+**1. A fire station never saved a building.** Buildings lost per fire was
+exactly **1.00** at 0%, 28%, 71% *and* 100% coverage. Coverage changed where
+a fire started, how long it burned and how far it spread — never whether the
+lot survived. A covered lot burned for one month instead of two and then
+became rubble just the same.
+
+**2. Coverage moved fires; it did not reduce them.** The roster weight was a
+flat `w3 × season`. The origin picker weighted covered lots at 1/6, so a
+station pushed the fire onto whatever was still uncovered and the number of
+fires a town suffered did not change: **30.5 fires in forty years at no
+cover against 31.7 at 31%.** That is the owner's sentence, exactly.
+
+**3. The FIRST police station made crime worse, and then crime fed itself.**
+`burglaryTick` returned early when the town had no station ("nobody to file
+it"), so crime was *created by having police*. And every open file stained
++15 crime over radius 2 for 24 months, uncapped and stacking, while the
+burglary rate reads the COUNT of hot lots — so a burst of burglaries painted
+more lots hot, which raised the rate, which opened more files.
+
+| police | lots hot BEFORE | AFTER | files opened BEFORE | AFTER | solved BEFORE | AFTER |
+|---|---|---|---|---|---|---|
+| 0 | 7.6% | 20.8% | 7.4 | 130.7 | 9.5% | 0% |
+| 1 | **17.5%** | 15.5% | **109.2** | 99.4 | 9.2% | 21.9% |
+| 2 | 12.9% | 13.1% | 81.9 | 84.4 | 12.7% | 30.1% |
+| 4 | 1.4% | 1.9% | 12.4 | 19.5 | 41.9% | 52.8% |
+| 12 | 0.4% | 0.4% | 6.5 | 9.8 | 43.1% | 56.1% |
+
+*(10 seeds × 40 years, `--only police`, matched before/after on one rig.)*
+Read the BEFORE column down: buying your first police station **more than
+doubled** the hot lots and bought a clear-up rate of 9.2% against the 9.5%
+you already had. It was worse than nothing.
+
+**3b. And the arrest roll is made at the crime scene, which is by
+construction the darkest tile in town.** A burglary picks a lot with crime
+above `CRIME_HIGH`, and crime is high exactly where police cover is not:
+**97.4% of scenes at zero cover with one station, 44.8% with four.** So
+`ARREST_COVER · policeCov/60` was almost always multiplied by nothing and
+`ARREST_BASE` alone decided every case.
+
+### What shipped
+
+- **The roster weight is the town's own exposure.** `fields.fireExposure()`
+  sums every built lot's origin weight and the fire card multiplies by its
+  mean. The SAME number that picks the lot a fire starts on now decides how
+  often one is rolled: ×1 uncovered, ×0.32 at 81%, ×1/6 covered end to end.
+  One implementation, two questions, so no station can move a fire without
+  also making it rarer.
+- **The engine saves the building.** On burnout, a covered lot is saved at
+  `FIRE_SAVED` 0.7 and loses one storey instead of the lot. A tier-1 shed
+  comes out gutted at tier 0 — clear ground, not rubble.
+- **The rubble clock.** `world.rubble[i]` is now the months it has left,
+  counting down in `eventsTick`. Every `if (world.rubble[i])` in the codebase
+  still reads "there is rubble here", so nothing else changed and no new tile
+  array joined the save. The bulldozer is impatience now, not a toll.
+- **A burglary needs no police station to happen,** and the file opens
+  either way, because the file is the STREET's memory of the crime and a
+  street does not forget faster for want of a desk sergeant.
+- **The file stains cap** at `FILE_CRIME_MAX` 25 — a street where three
+  things happened is a bad street, not three bad streets.
+- **The force works the case.** `p = 0.02 + 0.10·min(1, stations/4) +
+  0.18·cover/60 + 0.05·record`, and with no station in town **no roll is made
+  at all**: nothing is investigated, every file goes cold, and the advisor
+  says so.
+- **A burglary going cold prints.** 101 of 116 files used to die in silence
+  (`justice.js` wrote COLD only for a killing), so a mayor watched crimes
+  reported and never heard another word and concluded, correctly, that
+  nothing was being done. The line is deliberately NOT in `TICKER_FLASH`:
+  the record, not the news.
+
+Fire, after (`--only fire --forced 6`, 8 seeds, 80 forced fires each):
+
+| fire stations | covered | roll weight | lit per fire | buildings lost | saved by the engine |
+|---|---|---|---|---|---|
+| 0 | 0% | ×1 | 6.7 | 535.4 | 0 |
+| 1 | 35% | ×0.70 | 6.6 | 520.1 | 4.8 |
+| 2 | 52% | ×0.56 | 5.4 | 422.9 | 15.1 |
+| 4 | 81% | ×0.32 | 2.6 | 194.5 | 34.6 |
+| 12 | 100% | ×0.17 | 0.3 | **7.5** | **73** |
+
+### Two defects found in passing, both older than this session
+
+- **Three lines flashed over the map and were never written down.**
+  `tick.js` skips logging anything `eventsTick` returns, on the ground that
+  "rolled events already logged themselves" — true of the roster and of
+  nothing else. So BEAR WINTER, the tortoise centenary and the Butchers'
+  Licence card were never in `world.events.log`, and the news reader shipped
+  last session reads the log. `eventsTick` now has one `say(id, line)` that
+  speaks and records in one move, and a check demands that EVERY line it
+  returns is on the record.
+- **Nothing ever ran the Rules tab's `live` lines.** A `live` reading a
+  census field that does not exist would break the tab in the browser with
+  the suite green. It cannot now.
+
+### The rig, and why fire needed two instruments
+
+A fire spreads to four neighbours at 0.3 for two months off a beat: **~2.4
+offspring per burning lot, a supercritical branching process**, stopped only
+by the road ring round the block. So a town loses a whole block or none of
+one, and a forty-year run rolls about three fires. Twelve seeds of that is
+noise shaped like an answer — I read a "one station triples fires" result off
+it and had to go back, and the same spike was there at HEAD. The fire
+questions are therefore asked separately: **how often** is exact arithmetic
+off `fireExposure()` with no simulation at all, and **how bad** is measured
+with fires forced through the real roster card, 80 per seed.
+
+### Verification
+
+159 checks, 0 failures. **Every one of the 11 new mechanism checks was
+mutation-tested** — the code broken on purpose, one edit at a time, and each
+mutation killed its check (11/11). The two the suite would otherwise have let
+through: anchoring the origin weight out of the roster weight, and reverting
+`say()` to `notices.push` for the centenary.
+
+**Not verified in the browser this session.** The preview pane was bound to
+another project's server on every port it would take, so the rubble clock and
+the hover card were checked headlessly and by source, not by looking. Someone
+should open it, burn a lot (`zoo.advance`), and watch the site clear itself.
+
 ## 9. Verification recipe (what "done" looks like here)
 
 ```
-node tools/check.mjs                                   # 139 checks, 0 failures — the gate
+node tools/check.mjs                                   # 159 checks, 0 failures — the gate
 node tools/playtest.mjs --years 30 --quiet             # the §4 curves (disasters off)
 node tools/playtest.mjs --years 30 --parks 2 --zoo 12 --quiet
 node tools/playtest.mjs --disasters --stations --years 40 --seed 5
 node tools/newsprobe.mjs                               # how much of what the city says ever reaches the player (§13's table)
+node tools/serviceprobe.mjs --only fire --forced 6      # what a fire station buys (§15's table)
+node tools/serviceprobe.mjs --only police               # what a police station buys (§15's table)
 node tools/shots.mjs                                   # sheets + scene, then READ the PNGs
 node tools/serve.mjs --port 8142                       # open it, N for a fresh city, zoo.advance(36), look, read the console (must be EMPTY)
 git push origin main                                   # Pages builds in ~1–2 min

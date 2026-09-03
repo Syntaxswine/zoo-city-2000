@@ -4,7 +4,7 @@
 import { KNOBS } from "./rules.js";
 import { SPECIES, SPECIES_BY_ID, isPredPrey, isPredatorOf, DIET_OF } from "./species.js";
 import { ZONE, CIVIC, ROAD, jobsOf, jobZone, absent } from "./world.js";
-import { hasAccess, edgeRoads , commuteTime, rides } from "./fields.js";
+import { hasAccess, edgeRoads , commuteTime, rides, fireExposure } from "./fields.js";
 
 export const ageMonths = (world, c) => world.tick - c.born;
 export const ageYears = (world, c) => Math.floor((world.tick - c.born) / 12);
@@ -157,6 +157,10 @@ export function census(world) {
     native: P ? native / P : 0,
     parks, zoos, lots, roads, walls, tunnels, usePred, usePrey, railTiles, stations, riders, commuteN, meanCommute: commuteN ? commuteSum / commuteN : 0, lotsNoRoad,
     fireStations, policeStations, burning,
+    // What covering the town is WORTH: the multiplier on how often a fire is
+    // rolled at all, 1 in a town with no cover. The rules tab shows it, and it
+    // is the same function the roster weight uses (fields.fireExposure).
+    fireExposure: fireExposure(world).share,
     meanCrime: crimeN ? crimeSum / crimeN : 0, maxCrime,
     edgeRoads: Math.min(KNOBS.EDGE_ROAD_MAX, edgeRoads(world).length),
     meanLV: lvSum / n,

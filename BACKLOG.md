@@ -103,6 +103,40 @@ could ship whole.
   whatever tab is open, taking an FNV of each row's text, and the tab rebuilds
   the feed too. Only the reader memoises. Far under the tick, but unprofiled.
 
+## What a station buys, and the rubble clock — SHIPPED 2026-09-02 (SPEC §9b, §9c; handoff §15; `tools/serviceprobe.mjs`; 13 checks, all mutation-tested)
+The owner: *"even if you have a ton of them the fires and crime are not
+prevented and most go unsolved"* and *"the building plot [should] stay as
+rubble for a period of time and then automatically become eligible"*. The fire
+card now rolls at the town's own exposure (×1 uncovered, ×1/6 covered end to
+end) instead of a flat weight; a covered lot that burns out is saved at 0.7 and
+loses a storey; rubble counts itself down in the tile array; a burglary needs
+no police station to happen; the file stains cap; the arrest roll carries a
+FORCE term and is not made at all with no station in town; a burglary going
+cold prints. **What is left:**
+- **The quiet third door.** A file whose culprit dies or leaves town closes
+  with no line and no counter (`justice.js`: `if (!culprit || culprit.dead)
+  { f.closed = true; continue; }`). It is 24% of files at twelve stations —
+  the real ceiling on the clear-up rate, and the player is never told.
+- **`absent()` freezes an investigation.** A culprit in the cells, at the
+  centre, or a bear asleep for the winter cannot be investigated for anything
+  else. Deliberate, undocumented, and it costs three months a year in a
+  bear town.
+- **ARREST_FORCE caps at 4 stations.** Past that more stations buy cover, not
+  detectives, so the clear-up rate flattens at ~56%. If "a ton of them" should
+  reach 80%, the cap is the knob — but the ceiling above is the real limit.
+- **A saved lot is not drawn differently.** SAVED prints a line; the tile
+  shows a building one storey shorter and nothing else. A scorch overlay
+  would make the fire station's work visible on the map, not just in the news.
+- **Rubble is one clock for every cause.** A tornado's rubble and a fire's
+  clear at the same rate. If a tornado's should linger, `toRubble` takes the
+  argument.
+- **RUBBLE_MONTHS 6 is not play-tested by a human.** It was chosen to be "a
+  few months" and never felt.
+- **Self-clearing rubble is fuel again.** A burnt block used to be a
+  permanent firebreak; it now rebuilds. That is the intended trade, but it
+  makes a fire station worth more than the numbers in §15 say, and nobody has
+  measured how much more.
+
 ## Polish the play-testers named (browser rounds 1–3), not yet done
 - (the Log tab's newest-first order and its double REPORT line: fixed by the
   news reader, SPEC §11b)
@@ -141,11 +175,14 @@ could ship whole.
 - **Minimap** (the sibling Glades has one to port).
 - **Pond removal** for a beaver dam (§40, beavers' mood −20 for a year) — the
   op exists in KNOBS.COST.pond but not in ops.js.
-- (fire and police stations shipped 2026-09-02: `F` and `P` tools, crime field, heist)
-- **Money tuning after real play**: the scripted mayor nets +§3.7k/yr at
-  1,643 (balanced, no civics) and ~§0 at 1,850 with two parks and a zoo;
-  a real player spends differently. Re-measure with the input log of an
-  actual session before touching UPKEEP_*.
+- (fire and police stations shipped 2026-09-02: `F` and `P` tools, crime field, heist; rebalanced the same day — see the section above)
+- **Money tuning after real play**: re-measured 2026-09-02 after the crime
+  rebalance — the scripted mayor (balanced, no civics, disasters off, seed 7)
+  reaches **1,638 by y30 with §70.9k in hand**, down from 1,742 / §86.0k,
+  because an unpoliced town is now burgled (−§2,440 over the run) where it
+  used to be immune. That is the intended cost of having no police; a real
+  player spends differently. Re-measure with the input log of an actual
+  session before touching UPKEEP_*.
 
 ## L2 — bigger arcs
 - **Elevation** — Glades of Arcadia's level machinery (`LEVEL_H`, cliffs,

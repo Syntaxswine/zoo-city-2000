@@ -22,7 +22,7 @@ export const REASON = Object.freeze({
   GROWING: "growing",
   DECAYING: "decaying",
   STABLE: "stable",
-  RUBBLE: "rubble — bulldoze it",
+  RUBBLE: "rubble — it clears itself, or bulldoze it",
   BURNING: "on fire",
   FLOODED: "flooded",
   EMPTY: "zoned, waiting for demand",

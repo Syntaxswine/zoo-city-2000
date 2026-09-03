@@ -395,7 +395,7 @@ export function createUI(app) {
     const plaque = w.events.centenaries.find((c) => c.tile === i);
     if (plaque) lines.push(el("div", "dim", `plaque: ${plaque.name}, one hundred years. LV +${plaque.bonus} within ${plaque.radius}.`));
     if (w.burning[i]) lines.push(el("div", "warn", "ON FIRE — bulldoze a firebreak."));
-    if (w.rubble[i]) lines.push(el("div", "warn", "rubble — bulldoze it (§2); the zoning is kept."));
+    if (w.rubble[i]) lines.push(el("div", "warn", `rubble — the site clears itself in ${w.rubble[i]} month${w.rubble[i] === 1 ? "" : "s"} and rebuilds on its own; the zoning is kept. Bulldoze (§2) if you cannot wait.`));
     if (w.flooded[i]) lines.push(el("div", "warn", `flooded, ${w.flooded[i]} more month${w.flooded[i] === 1 ? "" : "s"}.`));
     if (w.terrain[i] === TERRAIN.TREE && !w.zone[i]) lines.push(el("div", "dim", "a tree: −4 pollution, +3 LV next door; zoning over it fells it at §4."));
     return lines;

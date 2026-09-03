@@ -70,6 +70,11 @@ export const KNOBS = {
   FIRE_SPREAD: 0.3,
   FIRE_SPREAD_COVERED: 0.1,
   FIRE_START_COVERED: 1 / 6, // a covered lot is picked as a fire's origin at one-sixth the weight: unlikely, never impossible
+  FIRE_SAVED: 0.7,          // and the engine SAVES the building: a covered lot that burns out loses one storey instead of
+                            // going to rubble. Until session 8 a covered lot burned down exactly as often as an uncovered
+                            // one — serviceprobe measured 1.00 buildings lost per fire at 0%, 28%, 71% and 100% cover.
+  RUBBLE_MONTHS: 6,         // rubble clears ITSELF after this long and the plot is eligible again (the owner: "it just takes
+                            // a few months before its eligible again"). The bulldozer is now a way to be impatient, not a tax.
   POLICE_RADIUS: 6,         // full effect within 3, half effect to 6 (Micropolis: an 8x8 cell smoothed three times)
   POLICE_NEAR: 3,
   POLICE_EFFECT: 60,
@@ -154,6 +159,10 @@ export const KNOBS = {
   FILE_CRIME: 15,           // an incident's file stains the crime field this much …
   FILE_RADIUS: 2,           // … over this radius …
   FILE_MONTHS: 24,          // … for this long; the INVESTIGATION lasts CASE_MONTHS of it
+  FILE_CRIME_MAX: 25,       // … and the stains of overlapping files CAP here: a street where three things happened is a bad
+                            // street, not three bad streets. Uncapped they stacked, and since the burglary rate reads the
+                            // hot-lot count, crime fed itself: serviceprobe measured 116 files in 40 years at one station
+                            // against 35 at four and 10 at twelve — the town with the least policing had the most crime to police.
   // The killing — any adult may kill a neighbour; weights, never gates.
   KILL_P: 0.00005,          // expected killings/month = KILL_P × Σ weights (≈ 0.3/yr in a fed, market-less town)
   KILL_DIET: { carn: 1, omni: 0.1, herb: 0.03 },
@@ -170,8 +179,16 @@ export const KNOBS = {
   MEAT_PRICE: 50,           // what the hall pays the mayor's cut for a body
   // The file, the arrest, the wrongful 5%.
   CASE_MONTHS: 6,
-  ARREST_BASE: 0.02,        // p/month = base + cover·policeCov/60 + prior·record → 11% / 50% / 74% over six months at cover 0 / 30 / 60
-  ARREST_COVER: 0.18,
+  // p/month = base + force·min(1, stations/N) + cover·policeCov/60 + prior·record, rolled on each of the five months
+  // between the file opening and CASE_MONTHS. The FORCE term is the detectives, and it is the answer to the owner's
+  // "even if you have a ton of them … most go unsolved": the cover term is read AT THE SCENE, and a crime scene is by
+  // construction the darkest tile in town — the burglary picks a lot with crime above CRIME_HIGH, and crime is high
+  // exactly where police cover is not. serviceprobe measured 97.4% of scenes at zero cover with one station and 44.8%
+  // with four, so `cover` was almost always multiplied by nothing and the base alone decided every case.
+  ARREST_BASE: 0.02,        // 10% of files closed over five months …
+  ARREST_FORCE: 0.10,       // … a town WITH a force works its files wherever they happened …
+  ARREST_FORCE_N: 4,        // … at full strength from this many stations (beyond it more stations buy cover, not detectives)
+  ARREST_COVER: 0.18,       // … and a scene on a beat is worked harder still
   ARREST_PRIOR: 0.05,
   WRONGFUL_P: 0.05,         // the owner's 5%: the wrong animal, random by proximity
   WRONGFUL_RADIUS: 4,
@@ -362,18 +379,18 @@ export const RULES = Object.freeze([
   },
   {
     id: "S1", title: "Crime",
-    formula: "crime = 40 − 0.5·LV + 0.4·animals in the 3×3 + 3·unemployed adults in the 3×3 (carnivores ×2) + 40·unemployed share + a meat hall's 10/18/25 over 1/2/3 + 15 within 2 of an open file − police ; above 60: LV −10, shops −0.2, a shop above 70 can be robbed ; mood −0.3 per point above 40 at home",
+    formula: "crime = 40 − 0.5·LV + 0.4·animals in the 3×3 + 3·unemployed adults in the 3×3 (carnivores ×2) + 40·unemployed share + a meat hall's 10/18/25 over 1/2/3 + up to 25 within 2 of open files (their stains cap there) − police ; above 60: LV −10, shops −0.2, a shop above 70 can be robbed ; mood −0.3 per point above 40 at home",
     live: (w) => `mean crime on built lots ${f1(w.last.census.meanCrime)} · max ${w.last.census.maxCrime} · unemployed share ${f2(w.last.census.W ? w.last.census.U / w.last.census.W : 0)}`,
   },
   {
     id: "S2", title: "Police cover",
-    formula: "a police station (§500, §400/yr, 4 jobs) takes 60 off crime within 3 tiles and 30 within 6",
-    live: (w) => `${w.last.census.policeStations} police station${w.last.census.policeStations === 1 ? "" : "s"}`,
+    formula: "a police station (§500, §400/yr, 4 jobs) takes 60 off crime within 3 tiles and 30 within 6 ; and the town's FORCE works every open file wherever it happened — p/month of an arrest = 0.02 + 0.10·min(1, stations/4) + 0.18·cover/60 + 0.05·record, and with no station at all nothing is investigated and every file goes cold",
+    live: (w) => `${w.last.census.policeStations} police station${w.last.census.policeStations === 1 ? "" : "s"} · arrest floor ${f2(w.last.census.policeStations ? KNOBS.ARREST_BASE + KNOBS.ARREST_FORCE * Math.min(1, w.last.census.policeStations / KNOBS.ARREST_FORCE_N) : 0)}/month`,
   },
   {
     id: "S3", title: "Fire cover",
-    formula: "a fire station (§500, §400/yr, 4 jobs) covers 6 tiles: a fire starts there one-sixth as often, burns one month instead of two, and spreads at 0.1 instead of 0.3 — unlikely, never impossible",
-    live: (w) => `${w.last.census.fireStations} fire station${w.last.census.fireStations === 1 ? "" : "s"} · ${w.last.census.burning} burning`,
+    formula: "a fire station (§500, §400/yr, 4 jobs) covers 6 tiles: a fire starts there one-sixth as often — and a fire is ROLLED at the town's own exposure, so covering the town makes fires rarer and not merely differently placed — it burns one month instead of two, spreads at 0.1 instead of 0.3, and 7 times in 10 the engine SAVES the building, which loses a storey instead of the lot. Unlikely, never impossible",
+    live: (w) => `${w.last.census.fireStations} fire station${w.last.census.fireStations === 1 ? "" : "s"} · ${w.last.census.burning} burning · fires roll at ×${f2(w.last.census.fireExposure)} of an uncovered town`,
   },
   {
     id: "M1", title: "A meat hall is grey commerce",

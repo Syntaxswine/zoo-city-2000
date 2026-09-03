@@ -221,6 +221,30 @@ export function computeCoverage(world) {
   }
 }
 
+/** Every lot with a building on it: not rubble, not alight. */
+export function builtLots(world) {
+  const out = [];
+  for (let i = 0; i < world.w * world.h; i++) if (world.tier[i] > 0 && !world.rubble[i] && !world.burning[i]) out.push(i);
+  return out;
+}
+
+/**
+ * The town's exposure to fire: every built lot's origin weight, 1 off a beat
+ * and FIRE_START_COVERED on one. `total` picks the lot a fire starts on and
+ * `share` (total / lots) scales how often a fire is rolled at all — the SAME
+ * number answering both, so no station can move a fire without also making it
+ * rarer. `share` is 1 in a town with no cover and FIRE_START_COVERED in one
+ * covered end to end: unlikely, never impossible. It lives here, beside the
+ * computeCoverage that makes world.fireCov, so the census can read it without
+ * importing events.js (which imports the census back).
+ */
+export function fireExposure(world) {
+  const lots = builtLots(world);
+  let total = 0;
+  for (const l of lots) total += world.fireCov[l] ? KNOBS.FIRE_START_COVERED : 1;
+  return { lots, total, share: lots.length ? total / lots.length : 0 };
+}
+
 /**
  * Crime, the Micropolis line at 0..100: base − land value + density +
  * unemployment − police. Unemployment is counted here (not read from a
@@ -259,10 +283,20 @@ export function computeCrime(world) {
     const t = world.tier[i];
     if (world.zone[i] === ZONE.M && t > 0) spread(world, near, i, KNOBS.CRIME_M[t] * mult, KNOBS.CRIME_M_RADIUS[t]);
   }
+  // The files' stain is capped at FILE_CRIME_MAX — a street where three things
+  // happened is a bad street, not three bad streets. Uncapped it stacked, and
+  // because burglaryTick draws its rate from the COUNT of hot lots, the stain
+  // of past crime manufactured the conditions for the next one: a burst of
+  // burglaries painted more lots hot, which raised the rate, which opened more
+  // files. Measured before the cap (serviceprobe, 4 seeds × 40y): 116 files
+  // with one police station against 35 with four and 10 with twelve.
+  const stain = world._cstain || (world._cstain = new Float32Array(n));
+  stain.fill(0);
   for (const f of world.events.files) {
     if (f.until <= world.tick) continue;
-    forEachWithin(world, f.tile, f.radius, (j) => { near[j] += f.crime; });
+    forEachWithin(world, f.tile, f.radius, (j) => { stain[j] += f.crime; });
   }
+  for (let i = 0; i < n; i++) if (stain[i]) near[i] += Math.min(KNOBS.FILE_CRIME_MAX, stain[i]);
   for (let i = 0; i < n; i++) {
     const tx = i % w;
     const ty = (i / w) | 0;

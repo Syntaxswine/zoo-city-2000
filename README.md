@@ -154,7 +154,7 @@ mill-town with a fox problem").
 
 - `tools/playtest.mjs --layout balanced|dormitory|millbelt --schedule 15:13,22:7`
   — a scripted mayor on the real map; the SPEC's acceptance targets.
-- `tools/check.mjs` — 139 checks: ledger conservation to the §, valves
+- `tools/check.mjs` — 159 checks: ledger conservation to the §, valves
   bounded, no NaN, the dangling-id law, rosters and capacities, commutes on
   roads, determinism, save → load → continue hash-equal, input-log replay,
   the crime-and-punishment invariants, the walls (the flood reproduces the
@@ -167,13 +167,25 @@ mill-town with a fox problem").
   a road rides at a known cost with the ride bit on the track and not at
   the platforms, traffic counts walking steps only, a wall across the line
   is a tunnel open along the track, bulldozing a station makes the commute
-  walk, riders on the scripted city each no slower than the walk), the
-  cheat op (booked under `cheat`,
+  walk, riders on the scripted city each no slower than the walk), what a
+  station buys (covering the town makes a fire rarer and not merely
+  differently placed; off a beat the building always goes and on one the
+  engine saves most of them; the rubble clock counts itself down and the
+  bulldozer is only impatience; a burglary needs no police station to happen
+  and none at all means nothing is investigated; the file stains cap; every
+  line the events tick says goes on the record), the cheat op (booked under `cheat`,
   logged, replayed, clamped, never undone, lifts a receivership at once),
   `budget.post` as the only cash mutator, relative imports, no
   `Math.random`, the sim blind to browser preferences, the title screen
   mounted over the owner's art, every sprite pixel a palette key, every
   anchor inside its sprite, 16/16 road masks, the painter key.
+- `tools/serviceprobe.mjs --only fire --forced 6` / `--only police` — what a
+  fire station and a police station actually BUY, over 40-year runs at 0 / 1 /
+  2 / 4 / 12 of each. Fire asks its two questions with two instruments,
+  because a fire is a supercritical branching process (two months × four
+  neighbours × 0.3) that eats a whole block or none of one, and a 40-year run
+  rolls about three: HOW OFTEN is exact arithmetic off `fireExposure()`, HOW
+  BAD is measured with fires forced through the real roster card.
 - `tools/shots.mjs --scene` — the depth-sort proof: a 12×12 block with every
   building family and twenty walkers at fractional positions, including one
   on a tile seam and one in front of the tallest tower.
