@@ -104,13 +104,10 @@ refusal must not lose work). The control city → `docs/fixtures/
 control-city.json`, the suite's first real-save regression and every
 probe's `--save`. This section (the title-screen one below) said "a
 save-as name field is not built" — S is that. And *"railroads and roads
-should be able to cross over each other perpendicularly"* → **X** the
-level crossing (plan §4-X): the commute graph ALREADY allows it (`dial`
-walks any road tile, rides any rail tile, meets only at a station) — v1's
-"no level crossings" is two refusals in `ops.js` and one draw line; the
-rule is two straight runs on different axes, not on a wall/water/station,
-a crossing stays straight, bulldoze takes the rail first; `art.crossing`.
-The rail line below ("level crossings … the graph allows both ways") is X.
+should be able to cross over each other perpendicularly"* → **X SHIPPED
+2026-09-03** the level crossing (its own section below; SPEC §7.9, §12.4c;
+26 checks; the three playtest gates byte-identical). **X2, the ride speed,
+is NOT shipped** and is the part's one open half.
 And *"citizens traveling on the rails should move 50% faster"* → X2:
 measured first, a rider moves at ×3.07 a walker on the map today, so read
 as ×4.5; WALK 10 → 9, RAIL_COST 3 → 2 (9/2 = 4.5 exactly), RIDE_SPEED
@@ -204,6 +201,63 @@ Files touched by two parts are touched in DIFFERENT hunks (`render.js`,
 another's. Git merges those. `citizens.js`, `justice.js` and `events.js`
 are the risk: B adds one-liners at call sites; A adds one function; H
 edits two `post` sites; F edits one advisor function; D never opens them.
+
+## The level crossing — SHIPPED 2026-09-03 (plan §4-X; SPEC §7.9, §12.4c; handoff §22; 34 checks, all mutation-tested)
+The owner: *"railroads and roads should be able to cross over each other
+perpendicularly."* A road and a line share ONE tile when they cross
+SQUARE-ON — after the op the tile's road runs straight on one axis and its
+line straight on the other, judged on the WHOLE DRAG (`js/sim/ops.js`
+`squareOn` / `maskAround` / `crossable` / `refuseCrossings`). Never on water
+or a bridge, never under a wall (a tunnel has one open axis; a crossing has
+two), never a station. A drag that stops on the line is refused there and
+lays the rest; a drag that runs along the line lays nothing and says
+`square-on`, and the prune REPEATS until it settles so a drag's own refused
+leg cannot condemn the crossing at its corner. Keeping the invariant takes a
+second clause, not a corollary: an op that would leave a NEIGHBOURING
+crossing crooked is refused too. The bulldozer may still leave one crooked by
+taking a neighbour away — no rule can stop that without trapping the player
+beside it — so the art draws the stub, and beside a crooked crossing only the
+ops that mend it are allowed. The commute graph was ALREADY right — `dial` walks any road tile
+and rides any rail tile — so a walker crosses on foot and a rider passes
+straight through, and nobody boards there. The art (`js/art/rail.js`
+`crossingKey`) composes the two families, never a third drawing: 16 road
+masks × 16 rail masks × busy = 512 ground diamonds, lazy and cached, each
+with its own 2× twin. The three standing playtest gates are byte-identical
+(`e1decbff / 6bcf6236 / 00d5e9c3`) — the rule accepts a case the scripted
+mayor never attempts.
+
+Left:
+- **X2, the ride speed** — the owner: *"citizens traveling on the rails
+  should move 50% faster."* Measured ×3.07 today, read as ×4.5: `WALK`
+  10 → 9, `RAIL_COST` 3 → 2, and `RIDE_SPEED` becomes DERIVED (`WALK /
+  RAIL_COST`) so the eye's number and the commute's can never drift apart
+  again. It moves the hash on rail towns only (walk-only towns are proved
+  neutral: every walk cost scales, and `searchJob`'s `d = c / WALK` is the
+  same integer). Plan §8 q8 is still open — if the owner meant ×1.5 of
+  WALKING (slower than today) it is `RAIL_COST` 6 instead. Also stale on
+  that day, every place the number is written out: the literal `10` in
+  `check.mjs`'s ride-time check; `rules.js` R1's formula AND the `RAIL_COST`
+  knob's own comment (`rules.js:242`); `js/ui.js`'s two card lines AND the
+  crossing line this session added (`ui.js:382`); `js/input.js:25`, the Rail
+  tool's hint, which the player reads; `citizens.js:914`'s comment; SPEC
+  §7.9's three numbers; README's rail ROW (line 72) and its rail PARAGRAPH
+  (line 125). And the structural obstacle nobody has written down: `WALK`
+  lives in `js/sim/fields.js` and `RAIL_COST`/`RIDE_SPEED` in `KNOBS` in
+  `js/sim/rules.js`, which imports nothing — so "`RIDE_SPEED` becomes
+  derived" cannot be written inside `KNOBS` without moving `WALK` into
+  `rules.js` (the clean move: it is a knob) or inverting the import.
+- Rail bridges (a deck sprite with rails) — still not built.
+- A two-car train walker on busy lines; a crossing has no gate, no lights
+  and no bell (it is one ground tile, and a moving barrier wants the
+  walker layer).
+- A refusal on a DRAG is silent at the point of release: `input.js:216`
+  returns without calling `app.doOp`, so `main.js:145` never flashes. The
+  strip is the whole channel — it now prints the reason itself (`input.js:113`
+  was `${name}: blocked` for every reason there has ever been; the old
+  reasons ARE the word "blocked", so nothing else reads differently) and
+  names a crossing in the parenthetical beside bridges and tunnels. What is
+  left: a flash on release would say it twice, which is probably right for a
+  rule this new — C owns that path.
 
 ## The shop pool — SHIPPED 2026-09-03 (SPEC §12.2d; handoff §20; 8 checks)
 The owner: *"unique low density shops would be a good target."* A tier-1 C
@@ -302,10 +356,11 @@ size-aware pull-back. What is left:
 - Phase B use-zoning + trespass SHIPPED (SPEC §7.8, §9d). Left: the trespass
   zot (a commuter's card says it; the map does not); a "stopped" walker
   glyph; per-species stop counts.
-- Phase C rail SHIPPED (SPEC §7.9). Left: rail bridges (a deck sprite with
-  rails) and level crossings (a crossing sprite + the graph allows both ways
-  on one tile); a two-car train walker on busy lines; a lone rail tile draws
-  a bare pad (the wall draws its straight run — do the same).
+- Phase C rail SHIPPED (SPEC §7.9); **level crossings SHIPPED 2026-09-03**
+  (their own section above). Left: rail bridges (a deck sprite with rails);
+  a two-car train walker on busy lines; a lone rail tile draws a bare pad
+  (the wall draws its straight run — do the same), and so does a crossing
+  whose line has been bulldozed off both sides.
 
 ## The title screen — SHIPPED 2026-09-02 (`js/title.js`; the owner's painting at `img/titlescreen.png`)
 - Built: NEW GAME · CONTINUE · LOAD · SAVE · OPTIONS on the painting; `Esc`

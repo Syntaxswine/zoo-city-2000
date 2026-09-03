@@ -202,7 +202,11 @@ trips; an old save loads with zeros.
 ## 3. Rail
 
 **Tile.** `rail[i]` ∈ {0, 1 rail, 2 station}, saved. Rail may run on grass or
-trees (felled) and through a wall (tunnel). **Ruling for v1:** not on water
+trees (felled) and through a wall (tunnel). **Superseded 2026-09-03 (SPEC §7.9):** level crossings SHIPPED — a road and
+a line share one tile when they cross square-on. The rest of this ruling
+stands: still not on water, so still no rail bridges.
+
+**Ruling for v1:** not on water
 (no rail bridge art yet) and not on a road tile (no level crossing yet) —
 both are one sprite each away and listed in BACKLOG.
 
@@ -301,5 +305,5 @@ Three commits, in this order, each with its suite and docs:
 - trespass needs police cover to be caught; the first two are the cells for
   a month; the third conviction meets the sentence table;
 - a repainted lot gives three months' notice; then rehome or leave;
-- no rail bridges and no level crossings in v1; a station is a click on
+- no rail bridges in v1 (level crossings SHIPPED 2026-09-03, SPEC §7.9); a station is a click on
   rail and needs a road neighbour.

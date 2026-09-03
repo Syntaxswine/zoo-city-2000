@@ -1615,3 +1615,82 @@ at port 8147. The installed Browser plugin again rejected its own
 localhost—the same infrastructure failure recorded in §17. No console/UI
 claim is inferred from that failure; the executable fallback is the real
 renderer check above plus the inspected four-line bubble sheet.
+
+---
+
+## 22. Session 14, in parallel — the level crossing: a road and a line, square-on, on one tile (2026-09-03)
+
+The owner: *"railroads and roads should be able to cross over each other
+perpendicularly."* Part X of the People plan, taken because another agent
+holds Part H and X shares not one function with it. Two commits:
+
+| commit | what | proof |
+|---|---|---|
+| (code) | `js/sim/ops.js` — `squareOn` / `maskAround` / `crossable` / `refuseCrossings`; the road and rail cases restructured from a per-tile `continue` into a whole-drag validation that iterates to a fixpoint; the wall op and the station op refuse a crossing. `js/art/roads.js` — `tarmacKey` extracted and exported. `js/art/rail.js` — `crossingKey`, a lazy 512-tile family, `squareOnCrossings()`. `js/art/index.js` — `art.crossing(roadMask, railMask, busy)`. `js/render.js` — one ground line. `js/ui.js` — the card's head and body name a crossing. `js/input.js` — the Rail and Road hints, and the cost strip prints the reason it already had. Part L' (34 checks) and the rail sheet. | suite 248 → **282**, 0 failures; **24 of 24 mutants red**, every one of them either a rule this change makes or a defect the hostile review found in the first draft of these checks; the three standing playtest gates BYTE-IDENTICAL (`e1decbff` / `6bcf6236` / `00d5e9c3`) before and after; `shots.mjs --sheet` re-rendered every sheet and only `sheet-rail.png` changed, so the `tarmacKey` extraction is inert; a browser round on a founded city at ×1 and ×2, 0 console messages |
+| (docs) | SPEC §7.9 (the rule, the fixpoint, the second clause, the bulldozer's one exception, the graph, the ledger), §12.4c (the art), §13, §16; the Rules tab's R1; README; `docs/PROPOSAL-ZONING-RAIL-WALLS.md` superseded where it forbade crossings; BACKLOG (a SHIPPED section, and X2 named with the full list of places the ride number is written); this section | — |
+
+### The design call: 512 sprites where the plan said 4
+
+The plan specified `art.crossing(axis, busy)` — four tiles, the line's axis ×
+busy, because the rule guarantees the road is straight one way and the line
+straight the other. That is true **at placement**, and it stops being true
+the moment a neighbour comes down: bulldoze the road one tile north of a
+crossing and its road mask is a stub, not a straight run. Four sprites would
+then draw a straight road that is no longer there — the art asserting a fact
+the world had dropped. So `art.crossing` takes BOTH live masks and composes
+them: 16 × 16 × busy = 512, built lazily and cached, and a city pays for the
+crossings it has. It cost nine lines over the four-sprite version, because
+`onRoad`/`roadKey` and `onRail`/`railKey` already take a mask and already do
+all the work — the crossing is the two families and a rule about their
+overlap, never a third drawing of a road. All 512 compose in 188 ms, which is
+what the suite spends walking them.
+
+### What the instruments caught
+
+| what it looked like | what it was | the rule |
+|---|---|---|
+| every one of 24 new checks green on the first run | nothing — but two of them could not fail. A mutant sweep found both, and a hostile review found four more the sweep had not thought to break | write the mutants BEFORE believing a green suite, and then have someone else write mutants you would not have thought of. Six of my own reading passes said the same checks were fine |
+| `crossing: the RENDERER draws it` green, and green again with `rebuildGround`'s crossing line replaced by `if (false)` | it compared the frame with the line and without it. Taking the line off the tile also changes the MASK of the two track tiles either side, so the picture changed whether or not the crossing sprite was ever chosen | a render check must NAME the sprite. First rewritten to count the crossing's concrete apron (palette key `^`, 36 px, in no road, rail or grass sprite in the game) — and the review then showed the apron count is IDENTICAL for the mask-swapped twin, because the four corners are symmetric. Now it matches every opaque pixel of `art.crossing(5, 10, false)` against the finished frame at `renderer.tileToScreen`, with a plain road tile in the same frame as the control: 1024/1024 for the right sprite, 635 misses for its transpose |
+| `crossable()` mutated to `return true` and the suite stayed green | nothing tested the two clauses the ops actually reach: a road across a rail TUNNEL, and a road across a STATION | a defensive predicate still needs its reachable half tested |
+| **`squareOn` mutated to accept two PARALLEL straight runs, and the suite stayed green** | the parallel case is UNREACHABLE through the ops. A crossing whose road and line run the same way needs both its neighbours on that axis to carry both layers — to be crossings — and those would have to be parallel too, all the way out. And the whole-drag prune erodes a road laid along a line from both ends until nothing is left, so even the mutant refuses it | when a law is stated more broadly than the ops can exercise, test the LAW where the law lives: `squareOn` is exported and now has its own arithmetic check |
+| `rail: no crossings and no bridges in v1 …` still PASSED after crossings shipped | for a different reason: the check lays ONE tile, and a single tile is never square-on. A green check whose title had become a lie — and its "no bridges" half was untestable on a fixture that is dry by construction, which it had been since the rail arc | retitled to what it holds; Part L' now finds real water, bridges it, and refuses a line on the deck |
+| a road dragged along the line: cash unchanged, nothing laid, no message | `input.js:216` returns silently when the plan carries a reason, and `input.js:113` printed the word `blocked` for every reason there has ever been. The rule was invisible | one line: the strip prints `plan.reason`. The old reasons ARE the string `"blocked"`, so every old case reads exactly as it did and the new one says *"Road: a crossing must be square-on — a straight road across a straight line"*, in red, while the drag is still live |
+| **"the invariant needs no second rule" — written into SPEC, BACKLOG and a check's comment, and false** | the argument was that an arm can only come from a neighbour carrying the other layer, which would have to be a parallel crossing. Two holes: (a) a road one tile ALONG the line is square-on on its OWN tile and still T-junctions its neighbour; (b) after the bulldozer takes the line east of a crossing, that tile is bare ground the first rule never looks at | the second clause exists now — an op is refused when it would leave a NEIGHBOURING crossing crooked. "It follows" is a proof, and a proof I wrote about my own code was wrong twice in one sentence |
+| a legal crossing silently dropped from an L-drag | the prune judged ONE downward pass. The drag's other leg, refused for running along the line, had put a phantom third arm on the corner tile, and a tile refused in round one was never looked at again | the prune re-judges every candidate until the answer settles (`CROSS_ROUNDS` 8, then a downward stabilise that only removes, so it always terminates). Legality is not monotone in the set, so the cap is real, not decoration |
+| a crossing whose line was bulldozed off BOTH sides drew as a plain road — pixel-identical, all 32 masks | with `railMask` 0 the bed is a bare centre pad with no direction, `armOf` returns `"pad"`, the rail test was skipped and it fell through to tarmac. The player went on paying `UPKEEP_RAIL`, the census went on counting it, riders went on riding it and the air went on smoking it, for a tile they could not see | the pad falls back to `railKey`, which is what `art.rail(0)` itself draws — a bare bed. The regression check sweeps all 32, busy and quiet |
+| `crossing: it smokes as both` green with the rail's emission deleted from the sim | it compared the crossing against a road four tiles up the column. `EMIT_ROAD` is 2 over radius 1, so a MID-column tile collects 2 + ½·2 + ½·2 = 4 and an END tile 3 — the comparison was won by road geometry before the line was consulted. The line's whole contribution is 1, and the margin was 3 | compare the SAME tile with the line and without it. It now asserts the difference is exactly `EMIT_RAIL` |
+| `built === 512` in the family check | arithmetic dressed as coverage — the counter is incremented inside a fixed 16 × 16 × 2 loop. Nothing tied the sprite handed back to the masks asked for, and a one-bit typo in the cache key returned the wrong sprite for 256 of them with the suite green | assert the NAME (identity, never an index), assert 512 distinct, and take the 2× twin for all 512, not the 256 quiet ones |
+| **the suite DIED on 19% of seeds** | Part L' searched for a clear 7 × 18 patch and, when a 64 × 64 map had none, went on to dereference a null commute — `TypeError` at line 720, no verdict printed at all, exit code from the crash rather than from the checks | a fixture must not be able to take the suite down. It now clears a patch by hand when the search fails, so the section runs on any seed |
+| — (not caught, avoided) | the mayor lays a road ring for every block she opens, so restructuring the road op's per-tile loop into a whole-drag validation is precisely the change that could move every gate silently | measured all three gates before AND after rather than reasoning that "a rule that accepts a new case cannot move a run that never attempts it" — the rule is neutral, the refactor is what needed proving |
+
+### Ammunition for the next arc
+
+- **X2, the ride speed, is the part's open half** and is an hour: `WALK`
+  10 → 9, `RAIL_COST` 3 → 2, `RIDE_SPEED` derived (`WALK / RAIL_COST` = 4.5)
+  so the eye's number and the commute's can never drift apart again.
+  Walk-only towns are hash-neutral by construction (every walk cost scales
+  and `searchJob`'s `d = c / WALK` is the same integer); rail towns move.
+  Plan §8 q8 is still open — ×1.5 of walking is `RAIL_COST` 6 instead.
+  BACKLOG lists every place the number is written out, and the obstacle:
+  `WALK` lives in `fields.js`, `RAIL_COST` in `rules.js`, and `rules.js`
+  imports nothing, so the derived line needs `WALK` moved into the knobs.
+- A crossing has no gate, no lights and no bell. It is one ground tile; a
+  barrier that drops when a train passes wants the walker layer and the
+  two-car train sprite BACKLOG already holds.
+- `js/sim/reach.js`'s `tunnelMask` still reads `onRoad ? roads : rail` — a
+  hard one-or-the-other. It is unreachable on a crossing (a crossing can
+  never be walled, and the suite asserts it), but Part R, which standardises
+  `served`, will be in that file and should leave it correct rather than
+  merely unreachable.
+- **Two mask functions, one law.** `ops.js`'s `maskAround` and `render.js`'s
+  `roadMask`/`railMask` compute the same 4-bit neighbourhood from different
+  inputs (the op needs a pending drag counted in; the renderer reads the live
+  world). They agree today and nothing proves they must. If a third caller
+  appears, give the law one home.
+- The crossing is the first tile that is a walk node AND a ride node, so a
+  stored path may name one tile twice. Nothing downstream doubles it today
+  (checked), but any future code that assumes a path's tiles are distinct is
+  now wrong.
+- Superseded by this section: §4's *"v1 limits … no level crossings"* and
+  §16's *"the art registry reserves … crossing with loud not-built errors"*.
+  Handoff sections are appended, never edited; read them with this one.

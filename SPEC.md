@@ -480,8 +480,8 @@ overlay's `use` mode tints predator-only rust and prey-only teal.
 The owner: *"rail … shortens commute times, lightens traffic, and allows
 neutral travel (as long as predators don't exit the train in a prey only
 zone)."* Tool `T` lays rail like a road (an L-drag, §20 a tile, §3 a year;
-grass or trees, across a wall — a tunnel; **not on water and not on a road
-in v1**: no bridges, no level crossings — BACKLOG); `G` makes a **station**
+grass or trees, across a wall — a tunnel; square-on across a road — a
+**level crossing**, below; **not on water**: no rail bridges — BACKLOG); `G` makes a **station**
 of a rail tile (§300, §100 a year). A station is a **door only when a road
 tile touches it** (the card says so). **The commute graph has two layers:**
 walk nodes on road tiles and station tiles (a step `WALK` 10, ×6 onto a
@@ -492,7 +492,47 @@ node for node. **The stored path** carries the ride bit (`fields.RIDE`, bit
 15 of the `Uint16`) on the tiles the citizen rode onto; a station collapses
 to one WALKED entry whether the animal boards or alights there, so
 "predators don't exit the train in a prey only zone" is the same rule as any
-forbidden tile. The owner's three verbs, one line each: *shortens commute
+forbidden tile. **The level crossing.** The owner: *"railroads and roads
+should be able to cross over each other perpendicularly."* A road and a line
+share ONE tile when they cross SQUARE-ON: after the op that tile's road runs
+straight on one axis (mask `N|S` or `E|W`) and its line straight on the
+other. The masks are judged AFTER THE WHOLE DRAG, never tile by tile — an
+L-drag's own arm is half of what makes its road straight, so a per-tile test
+would refuse every crossing a player ever draws. Never on water or a bridge,
+never under a wall (a tunnel is open along ONE axis; a crossing has two),
+never a station (the platform stands on the track). A drag that stops ON the
+line is refused at the line and lays the rest, the way any blocked tile in an
+L-drag behaves; a drag that runs ALONG the line lays nothing and gives the
+reason, because parallel is not square-on. Because a drag's own legs judge
+each other, the pass **repeats until it settles**: a tile refused for running
+along the line was counting toward its neighbour's mask, and the crossing at
+the corner must not be condemned by an arm the same op is throwing away.
+**A crossing KEEPS its two straight runs**, and that takes a second clause,
+not a corollary of the first: an op is refused when it would leave a
+NEIGHBOURING crossing crooked — a road one tile along the line is square-on
+on its own tile and still makes a T-junction of the crossing beside it. The
+one thing that can take square-on away is the **bulldozer** removing a road
+or a line beside a crossing; no rule can stop that without trapping the
+player there. So a crossing may be left crooked, the art draws the stub it
+has become (which is why the family is 512 tiles and not four), the graph
+does not mind, and while it is crooked the only ops allowed beside it are the
+ones that make it square-on again — or one press of the bulldozer on the
+crossing itself, which clears the line and leaves a plain road. **The graph needed no
+change:** `dial` walks any road tile and rides any rail tile and the layers
+meet only at a station, so an animal crosses on foot at `WALK` and a rider
+passes straight through at `RAIL_COST`, and nobody boards or alights there (a
+crossing is `rail` 1, never 2). It is the first tile in the game that is a
+walk node AND a ride node, so a stored path may name it TWICE — ridden
+between the stations, walked back to a door; `computeTraffic` counts the
+walked entry and not the ridden one, as it does everywhere. **It is a road
+and a line, and pays for both:** `roadDist` seeds from it and `hasAccess` is
+true on it (a lot's door may sit on a crossing — said here rather than
+forbidden); the ledger charges `UPKEEP_ROAD` **and** `UPKEEP_RAIL`; the air
+takes `EMIT_ROAD` with its traffic term **and** `EMIT_RAIL` — a ruling, not
+an accident: both things are on the tile, so both are maintained and both
+smoke. The bulldozer takes the LINE first (the cheaper, later layer) and
+leaves the road; a second press takes the road; one undo step each. The
+owner's three verbs, one line each: *shortens commute
 times* — `commuteTime` (a walking segment 1, a riding segment 0.3, never
 the trespass penalty) is what the mood's `≤ species.commute` reads;
 *lightens traffic* — `computeTraffic` counts walking entries only, and a
@@ -1105,6 +1145,21 @@ grass. The station is a standing solid over a rail tile — a platform slab
 along the +a side of a N–S track (+b of an E–W one) and a shelter of two
 posts and a roof — so the track shows under the canopy.
 
+The **level crossing** is one ground diamond composed from BOTH masks: the
+road's half by `roads.js`'s own predicate (`onRoad`/`roadKey`/`tarmacKey`)
+and the line's half by this file's (`onRail`/`railKey`), so a crossing can
+never disagree with the road beside it or the track beside it — and one whose
+neighbour came down draws the stub it has become rather than a straight run
+that is no longer there. Where the two overlap the ballast, the sleepers and
+the lane dash all stop and the two rails run flush in the tarmac; in each
+corner where the road's edge meets the bed's edge there is a concrete apron,
+composed from both masks so a stub grows only the corners it still has. The
+family is 16 road masks × 16 rail masks × busy = **512** tiles, so it is
+composed LAZILY and cached — a city pays for the crossings it has, and a city
+with none pays nothing — and each takes its 2× twin from its own recipe like
+every other ground tile. The four square-on tiles the rule allows are on the
+rail sheet with two stubs beside them.
+
 ### 12.5 Instruments
 `tools/shots.mjs --sheet` renders every family to a contact sheet PNG;
 `--scene` renders a 12×12 block with all 9 building families and 20 walkers
@@ -1163,7 +1218,7 @@ scaled ×2 beside their twins.
 
 ## 13. Rendering (`js/render.js`, the only canvas module)
 
-- Static layer: ground + chalk + roads + **rubble** + water + kerbs, drawn
+- Static layer: ground + chalk + roads + level crossings + **rubble** + water + kerbs, drawn
   back to front by (tx+ty) into an offscreen canvas the size of the viewport
   plus a margin; redrawn when the world changes (dirty flag) or the camera
   moves past the margin. Full redraw of 4,096 cells is a few ms.
@@ -1332,7 +1387,7 @@ createWalkers(world) → { update(dtSeconds, viewport), list() → [{ id, citize
 // js/render.js
 createRenderer(canvas, world, art) → { draw(camera, hover, walkers, overlays), invalidate(), pick(sx, sy) → [tx, ty]|null }
 // js/art/index.js
-art.building(zone, tier, variant, side = 1, theme = 0) /* variant: the tile's whole byte — & 1 the mirror, >> 1 the shop kind for C tier 1 */ / art.civic(kind) / art.road(mask, busy) / art.ground(kind, variant) / art.tree(kind)
+art.building(zone, tier, variant, side = 1, theme = 0) /* variant: the tile's whole byte — & 1 the mirror, >> 1 the shop kind for C tier 1 */ / art.civic(kind) / art.road(mask, busy) / art.crossing(roadMask, railMask, busy) / art.ground(kind, variant) / art.tree(kind)
 art.citizen(species, facing, frame, age) / art.overlay(kind, frame)   // each → { rows, anchor } (rasterised lazily by the renderer)
 ```
 
