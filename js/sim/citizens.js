@@ -74,6 +74,7 @@ export function citizenDefaults() {
     wrongful: false,
     wrongedBy: 0,
     exonerated: false,
+    burgled: false,
     moodPenalty: 0,
     moodPenaltyUntil: 0,
   };

@@ -384,6 +384,92 @@ check("determinism: same seed + same inputs ⇒ same hash", stateHash(A.world) =
   check("input-log replay hash-equals the run", stateHash(w2) === stateHash(A.world), `${stateHash(w2)} vs ${stateHash(A.world)}`);
 }
 
+// ---- VICTIMS: a burglary has a victim, and the victim stays one (docs/PROPOSAL-CAMERAS.md §4f) ----
+// Until this landed a burglary moved the treasury and named a thief; the
+// animals whose door was forced were never told. Everything below is written
+// so that deleting markBurgled, or narrowing it to the block, or reading the
+// flag back off the life ring instead of saving it, turns one of these red.
+{
+  const { KIND, remember, lifeLines } = await import("../js/sim/life.js");
+  const { ageYears } = await import("../js/sim/census.js");
+  const adultsAt = (w, lot) => w.citizens.filter((c) => !c.dead && c.home === lot && ageYears(w, c) >= KNOBS.ADULT_AGE);
+
+  // Force burglaries on a clone until one lands on an address with residents,
+  // then read the law off that one. The loop is bounded and the rig asserts it
+  // ARRIVED: without that, an empty candidate set would pass every line below.
+  const B = load(A.saved);
+  const saveP = KNOBS.BURGLARY_P;
+  const saveMax = KNOBS.BURGLARY_MAX;
+  let lot = -1, before = null, marked = null, tries = 0, withResidents = 0, burglaries = 0;
+  KNOBS.BURGLARY_P = 1;
+  KNOBS.BURGLARY_MAX = 1;
+  while (tries++ < 24 && lot < 0) {
+    const seen = new Set(B.events.files.map((f) => f));
+    const was = new Set(B.citizens.filter((c) => c.burgled).map((c) => c.id));
+    tick(B);
+    const fresh = B.events.files.filter((f) => !seen.has(f) && f.cause === "burglary");
+    if (!fresh.length) continue;
+    burglaries++;
+    const t = fresh[fresh.length - 1].tile;
+    const res = adultsAt(B, t);
+    if (!res.length) continue;
+    withResidents++;
+    // A hot lot can be picked twice; the second time its animals are already
+    // marked and there is no fresh mark to read the law off. Keep looking.
+    if (!res.some((c) => !was.has(c.id))) continue;
+    lot = t;
+    before = was;
+    marked = B.citizens.filter((c) => c.burgled && !was.has(c.id));
+  }
+  KNOBS.BURGLARY_P = saveP;
+  KNOBS.BURGLARY_MAX = saveMax;
+  check("VICTIMS rig: forcing BURGLARY_P reaches an address with adult residents", lot >= 0 && burglaries > 0, `${burglaries} burglaries in ${tries} months, ${withResidents} with residents`);
+
+  if (lot >= 0) {
+    const want = adultsAt(B, lot).filter((c) => !before.has(c.id));
+    const gotIds = new Set(marked.map((c) => c.id));
+    const wantIds = new Set(want.map((c) => c.id));
+    check("a burglary marks every adult living at the address", want.length > 0 && want.every((c) => gotIds.has(c.id)), `${want.length} at the address, ${marked.length} marked`);
+    check("a burglary marks NOBODY who lives elsewhere", marked.every((c) => wantIds.has(c.id)), `${marked.filter((c) => !wantIds.has(c.id)).length} strays`);
+    // Scope: the ADDRESS, not the block. If markBurgled ever widens to the
+    // 3×3, this catches it — the burgled block reaches 44-53% of the town's
+    // adults (measured, 4 seeds x 30y) against 5.3-6.5% for the lot.
+    const W = B.w;
+    const block = B.citizens.filter((c) => !c.dead && c.home >= 0 && c.home !== lot && Math.max(Math.abs((c.home % W) - (lot % W)), Math.abs(((c.home / W) | 0) - ((lot / W) | 0))) <= 1);
+    check("the mark does not spread to the neighbours", block.every((c) => !gotIds.has(c.id)), `${block.filter((c) => gotIds.has(c.id)).length} of ${block.length} neighbours marked`);
+    // Every line below reports rather than throws: a suite that crashes names
+    // no invariant and runs none of the checks after it.
+    const victim = marked[0] || null;
+    check("the burglary produced at least one fresh victim to read", !!victim, `${marked.length} marked`);
+    check("the victim carries a BURGLED life event naming the address", !!victim && (victim.life || []).some((e) => e[1] === KIND.BURGLED && e[2] === lot), victim ? "no BURGLED event" : "no victim");
+    check("the BURGLED event has a sentence", !!victim && lifeLines(B, victim).some((l) => /^Burgled at /.test(l)), victim ? "no line" : "no victim");
+
+    // THE POINT OF THE SAVED FLAG. remember() keeps the first two events and a
+    // rolling last ten, so a burglary at thirty is evicted by an ordinary life.
+    // Read the waiver off the life ring and the victim silently stops being
+    // one; this is the check that says so.
+    const V = load(save(B));
+    const v = victim ? V.byId.get(victim.id) : null;
+    check("the flag survives save and load", !!v && v.burgled === true, v ? `${v.burgled}` : "no victim");
+    if (v) for (let i = 0; i < 14; i++) remember(V, v, KIND.RETIRED);
+    check("the life ring evicts the BURGLED event", !!v && !(v.life || []).some((e) => e[1] === KIND.BURGLED), v ? "still in the ring" : "no victim");
+    check("but the victim is still burgled", !!v && v.burgled === true, v ? "the flag went with the line" : "no victim");
+  }
+
+  // The optional-field shape: a town where nobody has been broken into hashes
+  // and saves exactly as it did before victims existed (the `pen` precedent).
+  const clean = load(A.saved);
+  for (const c of clean.citizens) c.burgled = false;
+  const plain = toPlain(clean);
+  check("a never-burgled citizen carries no burgled key in the save", plain.citizens.every((c) => !("burgled" in c)), `${plain.citizens.filter((c) => "burgled" in c).length} carry it`);
+  const one = clean.citizens.find((c) => !c.dead);
+  const h0 = stateHash(clean);
+  one.burgled = true;
+  check("marking one citizen moves the hash", stateHash(clean) !== h0, "burgled is not in the canonical shape");
+  one.burgled = false;
+  check("and clearing it restores the hash exactly", stateHash(clean) === h0, "the shape is not reversible");
+}
+
 // ---- walls (docs/PROPOSAL-ZONING-RAIL-WALLS.md §1; SPEC §6b) ----------------------
 // The flood must reproduce the square before it is allowed to differ from it.
 {

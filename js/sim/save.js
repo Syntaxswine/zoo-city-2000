@@ -28,8 +28,11 @@ function canonicalCitizen(c) {
     moodPenalty: c.moodPenalty || 0, moodPenaltyUntil: c.moodPenaltyUntil || 0,
   };
   // Optional in old saves/hashes: a penned animal carries the market state;
-  // ordinary citizens retain the exact pre-H canonical shape.
+  // ordinary citizens retain the exact pre-H canonical shape. `burgled` joins
+  // on the same terms — a town where nobody has been broken into hashes
+  // exactly as it did before victims existed.
   if (c.pen) { out.pen = true; out.penSince = c.penSince || 0; }
+  if (c.burgled) out.burgled = true;
   return out;
 }
 

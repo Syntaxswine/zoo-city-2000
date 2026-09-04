@@ -27,6 +27,7 @@ export const KIND = Object.freeze({
   CENTENARY: 14,
   ZONED_OUT: 15,
   LOST_CHILD: 16,
+  BURGLED: 17,
 });
 
 const KIND_IDS = new Set(Object.values(KIND));
@@ -86,6 +87,7 @@ export function lifeLines(world, c) {
       case KIND.CENTENARY: lines.push(`Turned one hundred in ${year}.`); break;
       case KIND.ZONED_OUT: lines.push(`Zoned out of ${lotNow(world, arg)} in ${year}.`); break;
       case KIND.LOST_CHILD: lines.push(`Lost ${nameById(world, arg)} to the market in ${year}.`); break;
+      case KIND.BURGLED: lines.push(`Burgled at ${lotNow(world, arg)} in ${year}.`); break;
     }
   }
   return lines;

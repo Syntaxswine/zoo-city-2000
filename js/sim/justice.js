@@ -224,8 +224,35 @@ export function burglaryTick(world, cen, notices) {
   // sergeant. Whether anyone WORKS it is filesTick's question.
   const line = `BURGLARY — ${nameOf(thief)} ${where}. ${cen.policeStations ? "A file is open for six months." : "There is no station in town; the street remembers it and nobody comes looking."}`;
   openFile(world, { tile: lot, culpritId: thief.id, cause: "burglary", line });
+  markBurgled(world, lot);
   world.events.log.push({ t: world.tick, id: "burglary", line, links: [thief.id] });
   notices.push(line);
+}
+
+/**
+ * Everyone who lives at the address that was broken into is a victim, for good.
+ *
+ * Until now a burglary had no victim at all: it moved the treasury and named a
+ * thief, and the animals whose door was forced were not told. The flag is
+ * permanent and SAVED rather than read back off the life ring, because
+ * `remember` keeps the first two events and a rolling last ten (life.js
+ * LIFE_MAX) — a burglary at thirty is evicted by an ordinary life and the
+ * victim would quietly stop being one.
+ *
+ * Scope is the ADDRESS, not the block. Measured over 4 seeds x 30y: marking
+ * every adult on the burgled block reaches 44-53% of the town's living adults,
+ * which is most of it; the lot alone reaches 5.3-6.5%. Nobody is skipped for
+ * being in the cells — a house is burgled whether or not its animals are home.
+ * A shop, works or hall has nobody living there and marks nobody, so this asks
+ * who lives here rather than checking the zone.
+ */
+function markBurgled(world, lot) {
+  for (const c of world.citizens) {
+    if (c.dead || c.home !== lot || c.burgled) continue;
+    if (ageYears(world, c) < KNOBS.ADULT_AGE) continue;
+    c.burgled = true;
+    remember(world, c, KIND.BURGLED, lot);
+  }
 }
 
 // ---------------------------------------------------------------------------

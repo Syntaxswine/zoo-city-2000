@@ -546,6 +546,7 @@ export function createUI(app) {
       else if ((c.held || 0) > w.tick) status.push(c.heldAt >= 0 ? `at the Pacification Centre until ${dateOf(w, c.held).label}` : `in the cells until ${dateOf(w, c.held).label}`);
       if (c.fixed) status.push(`fixed${c.wrongful ? " — the wrong animal" : ""}${c.exonerated ? ", exonerated" : ""}`);
       if (c.record) status.push(`record ${c.record}`);
+      if (c.burgled) status.push("burgled");
       if (status.length) lines.push(el("div", "warn", status.join(" · ")));
       const targetLine = target?.line || (wk ? doingOf(wk) : "between walks");
       lines.push(el("div", "doing", `${target?.state || "walking"}: ${targetLine}${wk ? ` · ${doingOf(wk)}` : ""}${c.centenary ? " · wears the centenary hat" : ""}`));
