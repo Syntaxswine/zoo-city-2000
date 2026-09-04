@@ -49,9 +49,9 @@ toggles disasters for the current city.
 ## Controls
 
 The build remote on the left is the key: `1` Residential, `2` Commercial,
-`3` Industrial, `4` Meat, `5` Road, `6` Wall, `7` Rail, `8` Station, `9`
-Tree, `0` Park, `Z` Zoo, `V` Pacification, `P` Police, `F` Fire, `I` Inspect
-and `B` Bulldoze. `H` changes density and `U` cycles use-zoning. WASD and the
+`3` Industrial, `4` Meat, `5` Road, `6` Wall, `7` Rail, `8` Station, `E`
+Camera, `9` Tree, `0` Park, `Z` Zoo, `V` Pacification, `P` Police, `F` Fire,
+`I` Inspect and `B` Bulldoze. `H` changes density and `U` cycles use-zoning. WASD and the
 arrows only pan. `Backspace` or `Ctrl+Z` undoes; `Ctrl+S` opens save-as and
 `L` opens the saves list. The generated help line in the game carries the
 remaining pause, speed, overlay, news, zoom, new-city and menu keys.
@@ -189,7 +189,11 @@ mill-town with a fox problem").
 
 - `tools/playtest.mjs --layout balanced|dormitory|millbelt --schedule 15:13,22:7`
   — a scripted mayor on the real map; the SPEC's acceptance targets.
-- `tools/check.mjs` — 478 checks: ledger conservation to the §, valves
+- `tools/camprobe.mjs --cams 0,1,2,4,10,40 --police 1 [--cap 0]` — what a
+  camera network buys and what it costs: clearance, wrongful arrests,
+  exonerations, and the columns that must NOT move. `--cap 0` switches the
+  brake off so it can be A/B'd at the same camera count.
+- `tools/check.mjs` — 585 checks: ledger conservation to the §, valves
   bounded, no NaN, the dangling-id law, rosters and capacities, commutes on
   roads, determinism, save → load → continue hash-equal, input-log replay,
   the crime-and-punishment invariants, the walls (the flood reproduces the
@@ -271,6 +275,14 @@ mill-town with a fox problem").
 labelled later layers. The art is text: every sprite is rows of palette keys,
 built things are box solids through a z-buffer rasteriser, animals are
 hand-authored.
+
+The civic buildings are satire and are designed to earn it. The meat market,
+the police station, the Pacification Centre and the camera network are all
+optional, all expensive, and none of them fixes the thing it is sold against:
+a town blanketed in cameras solves nine crimes in ten instead of two, takes in
+ten times as many innocent animals, and its crime number falls only because a
+fifth of the animals have left. `docs/PROPOSAL-CAMERAS.md` is the design
+record for the newest of them; SPEC §9d is what shipped.
 
 ## Licence
 

@@ -927,6 +927,132 @@ prey-only ground at (x,y) on the way to work. A month in the cells; offence
 to the meat market" for the habitual trespasser. The pinned citizen card
 prints the exposure and the monthly chance.
 
+## 9d. The camera network (`js/sim/fields.js`, `justice.js`, `demand.js`, `ops.js`)
+
+The owner: *"flock style security cameras … placed along roads and
+intersections … crime fighting more effective but citizens less happy"*, then
+the framing that decides every knob below: *"this is an element of satire,
+there is nothing in the game saying that players need to add the meat markets,
+police, pacification, cameras. they are arguably an expensive overbearing
+element that does little to reduce crime"*, and *"one of the more effective
+crime SOLVERS at a social cost, but it doesnt get at the root of crime, the
+economic factors that caused one person to break the laws will still be
+present when he is gone."*
+
+**THE CAMERA CLEARS. IT NEVER DETERS.** `computeCrime` has no camera term, and
+neither does `computeLandValue` or `computeDread`; a check reads those three
+function bodies out of `fields.js` and asserts it. The whole feature is one
+term in `filesTick`'s arrest probability.
+
+THE TILE `world.cam`, `Uint8Array`, saved (player intent, not derived), in
+`TILE_ARRAYS` and elided from the hash while all-zero, so a town that never
+buys one keeps the identity it had before the network existed. Only `ops.js`
+writes it, as with `road`/`rail`/`wall`.
+
+PLACEMENT key `E`, an L-drag like the road tool, §100 a tile. On a plain road
+ONLY: never a bridge, never the rail half of a level crossing, never a tunnel
+(a camera under a wall sees the wall). It does not replace the road. A drag
+that crosses a street and then a field takes the street and stays silent; only
+a wholly refused drag gets a sentence. **The bulldozer takes the camera before
+the road under it**, one press, §2 — and the road-clearing arm in `apply()`
+also zeroes `cam`, so "no camera without a road under it" is true by
+construction.
+
+UPKEEP **§2,000 a year for the whole network, flat, however many cameras**
+(the owner's ruling). The step is the point: the first camera costs §2,000 and
+the fiftieth §100. `budget.js` and `ui.js` carry the row together or the panel
+silently absorbs the difference into another line.
+
+COVER `computeCamCover` fills `world.camCov` (derived, never saved). From each
+camera, walk **connected road tiles** up to `CAM_REACH` 2 steps and paint each
+road tile reached **and every tile within `ROAD_REACH` 3 of it** — the
+frontages that street serves — at `CAM_EFFECT` 60 within `CAM_NEAR` 1
+road-step and half beyond, keeping the maximum where two overlap. A wall
+across the street breaks the sight-line, which is the network's one piece of
+counterplay and costs §8.
+
+> **Why the paint radius is `ROAD_REACH` and not 1.** A crime scene is NEVER a
+> road tile: `burglaryTick` draws its candidates from `tier > 0` and a road
+> has tier 0, and a killing's scene is the victim's home. Measured over seeds
+> 7/3/5, 0 of 254 scenes were on a road; a radius of 1 reaches 46.7% of them,
+> 2 reaches 86.7%, 3 reaches all of them. A camera marking only its own tile
+> would read zero at every scene and the whole lever would be a dead knob.
+
+> **The visited set is stamped with a GENERATION, one per camera.** Stamped
+> with anything that repeats — the source tile — the first walk marks the
+> neighbours and every later call refuses to expand: the field is right once
+> and a single tile's halo for ever after (measured 91 tiles, then 49). One
+> generation per camera, not per call: two cameras sharing a set under-paint
+> the second, whose near tiles can be the first's far tiles.
+
+CLEARANCE in `filesTick`, and nowhere else:
+
+```
+    force = min(1, policeStations / ARREST_FORCE_N)
+    if (force <= 0) continue          ← no station, no roll, however watched
+    p = ARREST_BASE 0.02 + ARREST_FORCE 0.10·force
+      + ARREST_COVER 0.18·policeCov/60
+      + CAM_ARREST  0.30·camCov/60          ← the whole feature
+      + ARREST_PRIOR 0.05·record            capped 0.95
+    wrongfulP = WRONGFUL_P 0.05 + CAM_WRONGFUL 0.10·camCov/60
+```
+
+Neither term adds an RNG draw; both move the threshold of a draw that was
+already there. A camera-carried arrest prints `IDENTIFIED` (in
+`TICKER_FLASH`), which names the camera's tile, whoever was taken — right or
+wrong — and how long the file had been open. It does **not** say the file is
+closed: a wrongful arrest leaves it open (§9c) and the town does not know
+which kind it has just made.
+
+THE BRAKE is **one term in the capacity law** (`demand.js`):
+
+```
+    cap = (CAP_BASE 1200 + CAP_PARK 150·parks + CAP_ZOO 500·zoos
+           + festivalBonus − CAM_CAP 400·watchedShare) × (1 + CAP_H_GAIN 0.5·H)
+```
+
+`watchedShare` is the fraction of **occupied homes** (not tiles) at or above
+`CAM_EFFECT/2` cover. The R valve is gated on `P / cap`, so a falling cap
+closes the valve and the town plateaus and ages down.
+
+> **It is here because every comparative seam is a no-op under a blanket.**
+> `c.mood`'s only consumer is a departure roll gated on `V_R <= 0`, true on 0
+> of 1,440 ticks in a balanced town; `bestHome` is a pure argmax, so a uniform
+> penalty cancels exactly; a rehome wanting somewhere less watched finds
+> nowhere when everywhere is watched. Dread's seams work because a meat hall
+> is LOCAL AND FEW. **A global nuisance needs an ABSOLUTE brake.**
+
+MOOD `CAM_MOOD` 12, scaled by cover, is **characterisation and not the
+brake** — it exists so an animal can say what is wrong, through the `WATCHED`
+needs code (*"a camera watches this door"*) and its remedy (*"bulldoze the
+camera on this street"*). **Waived permanently for anyone already burgled**,
+the owner's ruling; `VICTIMS` (§9c) is what makes a burglary have a victim at
+all.
+
+LAND VALUE is deliberately **not** touched. The symmetry with dread's
+`−0.8·dread` is rejected because `computeCrime` reads `− CRIME_LV 0.5·lv`, so
+lowering land value would **raise** crime and cameras would increase the thing
+they are sold against.
+
+**WHAT IT ALL MEASURES TO** (`tools/camprobe.mjs`, 4 seeds × 30y, one station):
+
+| cameras | 0 | 1 | 2 | 4 | 8 | 10 | 20 | 40 |
+|---|---|---|---|---|---|---|---|---|
+| solved | 20.5% | 34.2% | 41.5% | 49.2% | 67.3% | 85.3% | 90.4% | 90.5% |
+| wrongful arrests | 1.5 | 2.8 | 5.3 | 7.5 | 8.3 | 15.3 | 11.5 | 11.5 |
+| exonerations | 0.0 | 1.3 | 2.8 | 3.3 | 4.5 | 8.8 | 9.0 | 8.5 |
+| homes watched | 0% | 18% | 35% | — | — | 93% | — | 99% |
+| population | 1221 | 1331 | 1192 | 1313 | — | 1053 | — | 1047 |
+| mean crime | 39.34 | 39.29 | 39.63 | — | — | 36.98 | 39.88* | 36.84 |
+
+\* the 20-camera crime figure is from the pre-brake sweep.
+
+One to four cameras buy clearance for nothing: crime flat, population fine.
+**A blanket costs a fifth of the town** — and its crime falls, 39.34 → 36.84,
+not because the camera deters but because a smaller town is less dense. The
+accurate statement of the joke is therefore: *a mayor who blankets the town in
+cameras lowers its crime by driving a fifth of the animals out of it.*
+
 ## 10. Goals and pacing
 
 - **Milestones** (plaque + advisor line, never a fail state): hamlet 50,

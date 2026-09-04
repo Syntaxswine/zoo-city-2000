@@ -35,6 +35,41 @@ worktree, because tranches R and F are in flight in the live tree (§10).
 
 ---
 
+
+## BUILT — what the measurement changed (2026-09-04)
+
+The whole design shipped, in six commits on this branch. Every figure below was
+re-measured on the built thing; where it disagrees with the section that
+proposed it, **the section is wrong and this note is right**.
+
+| the proposal said | what shipping it measured |
+|---|---|
+| §4e/§4f: the burgled-household waiver marks **5.3–6.5%** of adults | that was a different rule (ONE household per burglary, picked by `(tick + lot) % n`). A tier-3 lot holds several households and all of them had their door forced, so picking one by arithmetic is a fiction. What shipped marks everyone at the burgled ADDRESS: **9.5–12.5%** (135/1364, 158/1261, 125/1322). Still an order below the block's 44–53% |
+| §4c: "a town with ten cameras covers a small share of its lots, so the town-wide clear-up rate moves a little" | ten cameras cover **93% of homes** on this rig and clear **85%** of files. The coverage per camera is far higher than the section assumed |
+| §4c: solved% moves gradually | it does, but only a fine sweep shows it: 0/10/20/40 reads as a step at 10 and a flat line after. The real curve is 20.5 → 34.2 → 41.5 → 49.2 → 67.3 → 85.3 → 90.4 → 90.5 at 0/1/2/4/8/10/20/40. A knob, not a gate |
+| §9: "crime unchanged" as the headline invariant | **true only before the brake existed.** With `CAM_CAP` in, a blanketed town's crime FALLS 39.34 → 36.84, because the brake removes a fifth of the animals and a smaller town is less dense. The camera still never deters — `computeCrime` has no camera term and a check reads the function body to prove it. The honest claim is: *a mayor who blankets the town in cameras lowers its crime by driving a fifth of the animals out of it* |
+| §7: the sprite is "19×29 px, 188 opaque pixels" with the housing on the mast's top | the shipped sprite is 35×35, ink 173, and the head is a 4×2×5-unit body that OVERHANGS the mast — a squat head is all roof in this projection and has nowhere to put a lens. An `extent` box is load-bearing: without it `defineSprite` gets an anchor outside its own sprite |
+| §7: the depth claim is inherited from a prototype census | re-measured with the repo's own `auditDepth`: **0 mis-ordered pixels** over 132 walker positions and 2,552 overlapping pixels, the police station's score. The camera is in the suite's ray-audit gate now |
+| §10: `check.mjs:1336` is the gate the `cam` array breaks | wrong line, and it broke nothing: the all-zero hash elision was added in the same commit, so no gate moved |
+
+**Two bugs the design did not anticipate, both found by running it:**
+
+1. `computeCamCover` was **not idempotent** — 91 tiles on the first call, 49 on
+   every call after. Its visited set outlives the call and was stamped with the
+   source tile, which repeats. Generations now, one per camera.
+2. A face skin is called with coordinates **local to its own box**
+   (`side(a - a0, c1 - c)`), not world a/b/c. The first lens was written in
+   world units, so it painted nothing at all and nothing errored.
+
+**Two checks that could not fail, fixed in passing:** "every need code wins a
+focused truth fixture" iterates the fixture table, so a code with no fixture is
+skipped (WATCHED was); and the older grep guard allow-listed `fields.js`, where
+both `computeCrime` and `computeLandValue` live.
+
+Left open: the land-value term §4e argues against is still unbuilt, and still
+one knob and one line if the owner wants it.
+
+
 ## The recommendation in one paragraph
 
 A camera is a §100 fixture that stands **on** a road tile — a bit in a new
