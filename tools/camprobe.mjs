@@ -142,7 +142,7 @@ function run(seed, cams) {
   const seenArrest = new Set();
   const c = {
     opened: 0, arrests: 0, cold: 0, coldServing: 0, burglaries: 0, identified: 0,
-    crimeSum: 0, crimeN: 0, hotSum: 0, hotN: 0, sceneDark: 0, valveSum: 0, watchSum: 0,
+    crimeSum: 0, crimeN: 0, hotSum: 0, hotN: 0, sceneDark: 0, valveSum: 0, watchSum: 0, moodSum: 0,
   };
   const j0 = w.events.justice;
   const base = { wrongful: j0.wrongful || 0, exonerated: j0.exonerated || 0, cold: j0.cold || 0 };
@@ -178,6 +178,7 @@ function run(seed, cams) {
     if (lots) { c.hotSum += hot / lots; c.hotN++; }
     c.valveSum += w.valves.R;
     c.watchSum += w.last?.census?.watchedShare || 0;
+    c.moodSum += w.last?.census?.approval || 0;
   }
   const j = w.events.justice;
   const cen = census(w);
@@ -196,10 +197,11 @@ function run(seed, cams) {
     hot: c.hotN ? (100 * c.hotSum) / c.hotN : 0,
     valveR: c.valveSum / (YEARS * 12),
     watched: c.watchSum / (YEARS * 12),
+    approval: c.moodSum / (YEARS * 12),
   };
 }
 
-const FIELDS = ["P", "opened", "arrests", "wrongful", "exonerated", "cold", "coldServing", "identified", "burglaries", "solved", "sceneDark", "crime", "hot", "valveR", "watched"];
+const FIELDS = ["P", "opened", "arrests", "wrongful", "exonerated", "cold", "coldServing", "identified", "burglaries", "solved", "sceneDark", "crime", "hot", "valveR", "watched", "approval"];
 const rows = [];
 for (const seed of SEEDS) for (const n of CAMS) rows.push(run(seed, n));
 
@@ -222,9 +224,9 @@ if (CSV) {
   for (const n of CAMS) console.log(`| ${n} | ${r1(placedAt(n))} | ${Math.round(mean(n, "P"))} | ${r1(mean(n, "opened"))} | ${r1(mean(n, "arrests"))} | ${r1(mean(n, "solved"))}% | ${r1(mean(n, "cold"))} | ${r1(mean(n, "wrongful"))} | ${r1(mean(n, "exonerated"))} | ${r1(mean(n, "coldServing"))} |`);
   console.log("");
   console.log("DETERRENCE — the anti-claim: these columns must BARELY move (§3).");
-  console.log("| cams | mean crime | lots hot | burglaries | scenes dark | R valve | homes watched | pop |");
-  console.log("|---|---|---|---|---|---|---|---|");
-  for (const n of CAMS) console.log(`| ${n} | ${r2(mean(n, "crime"))} | ${r1(mean(n, "hot"))}% | ${r1(mean(n, "burglaries"))} | ${r1(mean(n, "sceneDark"))}% | ${r2(mean(n, "valveR"))} | ${r1(100 * mean(n, "watched"))}% | ${Math.round(mean(n, "P"))} |`);
+  console.log("| cams | mean crime | lots hot | burglaries | scenes dark | R valve | homes watched | APPROVAL | pop |");
+  console.log("|---|---|---|---|---|---|---|---|---|");
+  for (const n of CAMS) console.log(`| ${n} | ${r2(mean(n, "crime"))} | ${r1(mean(n, "hot"))}% | ${r1(mean(n, "burglaries"))} | ${r1(mean(n, "sceneDark"))}% | ${r2(mean(n, "valveR"))} | ${r1(100 * mean(n, "watched"))}% | ${r1(mean(n, "approval"))} | ${Math.round(mean(n, "P"))} |`);
   console.log("");
   console.log("A camera that lowers mean crime is off-thesis; one that does not raise arrests is cosmetic.");
 }
