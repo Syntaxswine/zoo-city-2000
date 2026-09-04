@@ -13,7 +13,7 @@ import { citizenDefaults, rebuildMaps } from "./citizens.js";
 import { refreshLast } from "./tick.js";
 import { migrateLegacyNames } from "./legacy.js";
 
-const TILE_ARRAYS = ["terrain", "road", "zone", "maxTier", "tier", "civic", "burning", "rubble", "variant", "flooded", "wall", "use", "rail", "meat", "big", "theme"];
+const TILE_ARRAYS = ["terrain", "road", "zone", "maxTier", "tier", "civic", "burning", "rubble", "variant", "flooded", "wall", "use", "rail", "meat", "big", "theme", "cam"];
 
 // This expanded shape is the pre-Part-B save shape. stateHash deliberately
 // keeps using it: storage compaction must not redefine simulation identity.
@@ -166,6 +166,7 @@ export function stateHash(world, { news = true } = {}) {
   }
   if (o.big.every((n) => n === 0)) delete o.big; // a town with no block yet hashes as it did before the blocks
   if (o.theme.every((n) => n === 0)) delete o.theme; // and one with no landmark as it did before the landmarks (SPEC §3c)
+  if (o.cam.every((n) => n === 0)) delete o.cam; // and one with no camera as it did before the network (SPEC §9d)
 
   for (const c of o.citizens) if (!c.life?.length) delete c.life;
   const s = JSON.stringify(o);

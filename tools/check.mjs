@@ -550,6 +550,201 @@ check("determinism: same seed + same inputs ⇒ same hash", stateHash(A.world) =
   }
 }
 
+// ---- CAMERAS: the array, the op, the sight-line, the bill (docs/PROPOSAL-CAMERAS.md §4a-4b, §7) ----
+// The camera EXISTS in this section and does nothing to crime, mood or the
+// capacity law — that is commits 4 and 5. What is asserted here is that it
+// goes only where a camera can stand, comes off before the road under it,
+// paints the street it watches, and costs what it says.
+{
+  const { computeCamCover } = await import("../js/sim/fields.js");
+  const { yearlyFigures } = await import("../js/sim/budget.js");
+  const { TOOLS, TOOL_BY_ID, PLACE_TOOLS } = await import("../js/tools.js");
+  const { TERRAIN: TERR } = await import("../js/sim/world.js");
+
+  const town = () => {
+    const w = createWorld({ seed: "7" });
+    w.cash = 200000;
+    const sx = w.start.tx, sy = w.start.ty;
+    const line = [];
+    for (let x = sx - 5; x <= sx + 5; x++) line.push(x + sy * w.w);
+    apply(w, { kind: "road", tiles: line });
+    return { w, sx, sy, at: sx + sy * w.w };
+  };
+
+  // ---- placement -----------------------------------------------------------
+  {
+    const { w, sx, sy, at } = town();
+    const cash0 = w.cash;
+    const r = apply(w, { kind: "camera", tiles: [at] });
+    check("a camera goes up on a street", r.ok === true && w.cam[at] === 1, JSON.stringify(r));
+    check("and costs COST.camera", cash0 - w.cash === KNOBS.COST.camera, `${cash0 - w.cash} vs ${KNOBS.COST.camera}`);
+    check("a camera does not replace the road it stands on", w.road[at] === ROAD.ROAD, `${w.road[at]}`);
+    const again = apply(w, { kind: "camera", tiles: [at] });
+    check("a second camera on the same tile is refused, not charged twice", again.ok === false && w.cam[at] === 1, JSON.stringify(again));
+
+    // Every refusal, each on a tile that is genuinely that thing. The bare
+    // tile is SEARCHED for rather than guessed: the first draft used (sx, sy-3)
+    // and that is part of the starting road, so the refusal check was passing
+    // a road tile to an op that accepts road tiles.
+    let grass = -1;
+    for (let i = 0; i < w.w * w.h && grass < 0; i++) if (w.road[i] === ROAD.NONE && w.terrain[i] !== TERR.WATER && !w.wall[i]) grass = i;
+    check("CAMERA rig: the refusal tile really is bare ground", grass >= 0 && w.road[grass] === ROAD.NONE && !w.cam[grass], `${grass} road ${grass >= 0 ? w.road[grass] : "-"}`);
+    const off = apply(w, { kind: "camera", tiles: [grass] });
+    check("a camera is refused off the road, with a sentence", off.ok === false && /street/.test(off.reason || ""), JSON.stringify(off));
+    check("and nothing was placed", w.cam[grass] === 0, "a camera stands on grass");
+
+    // A drag that crosses road AND field must go through at the road tiles and
+    // stay silent — the rule every other drag op follows.
+    const mixed = [sx + 1 + sy * w.w, grass];
+    const m = apply(w, { kind: "camera", tiles: mixed });
+    check("a drag that crosses a street and a field takes the street and says nothing", m.ok === true && !m.reason && w.cam[mixed[0]] === 1 && w.cam[mixed[1]] === 0, JSON.stringify(m));
+
+    // A tunnel: a camera under a wall would see the wall.
+    const tun = sx + 2 + sy * w.w;
+    apply(w, { kind: "wall", tiles: [tun] });
+    check("CAMERA rig: the tunnel tile really is a road under a wall", w.road[tun] !== ROAD.NONE && w.wall[tun] === 1, `road ${w.road[tun]} wall ${w.wall[tun]}`);
+    check("a camera is refused on a tunnel", apply(w, { kind: "camera", tiles: [tun] }).ok === false && w.cam[tun] === 0, "a camera stands in a tunnel");
+  }
+
+  // ---- the bulldozer, and the invariant it protects -------------------------
+  {
+    const { w, at } = town();
+    apply(w, { kind: "camera", tiles: [at] });
+    const plan = costOfOp(w, { kind: "bulldoze", x0: at % w.w, y0: (at / w.w) | 0, x1: at % w.w, y1: (at / w.w) | 0 });
+    check("the bulldozer takes the camera before the road under it", plan.tiles.length === 1 && plan.tiles[0].what === "camera", JSON.stringify(plan.tiles));
+    apply(w, { kind: "bulldoze", x0: at % w.w, y0: (at / w.w) | 0, x1: at % w.w, y1: (at / w.w) | 0 });
+    check("one press takes the camera and leaves the road", w.cam[at] === 0 && w.road[at] === ROAD.ROAD, `cam ${w.cam[at]} road ${w.road[at]}`);
+  }
+  {
+    // The reviewer's scenario in the proposal: sweep the bulldozer down a
+    // camera'd avenue twice and the cameras must not be left hanging over
+    // bare grass. Two presses, because the camera is a layer above the road.
+    const { w, sx, sy } = town();
+    const line = [];
+    for (let x = sx - 5; x <= sx + 5; x++) line.push(x + sy * w.w);
+    apply(w, { kind: "camera", tiles: line });
+    const rect = { x0: sx - 5, y0: sy, x1: sx + 5, y1: sy };
+    apply(w, { kind: "bulldoze", ...rect });
+    apply(w, { kind: "bulldoze", ...rect });
+    let hanging = 0;
+    for (const i of line) if (w.cam[i] && w.road[i] === ROAD.NONE) hanging++;
+    check("no camera is left hanging over bare grass", hanging === 0, `${hanging} of ${line.length}`);
+  }
+
+  // ---- undo ----------------------------------------------------------------
+  {
+    const { w, at } = town();
+    const cash0 = w.cash;
+    apply(w, { kind: "camera", tiles: [at] });
+    const u = undo(w);
+    check("undo takes the camera down", u.ok === true && w.cam[at] === 0, JSON.stringify(u));
+    check("and refunds the cash", w.cash === cash0, `${w.cash} vs ${cash0}`);
+    check("and the cover goes with it", w.camCov[at] === 0, `${w.camCov[at]}`);
+  }
+
+  // ---- the sight-line ------------------------------------------------------
+  {
+    const { w, sx, sy, at } = town();
+    apply(w, { kind: "camera", tiles: [at] });
+    const painted = () => { let k = 0; for (let i = 0; i < w.w * w.h; i++) if (w.camCov[i]) k++; return k; };
+    // THE BUG THIS CATCHES: the walk keeps a visited set that outlives the
+    // call. Stamped with anything that repeats — the source tile, say — the
+    // first pass marks the neighbours and every later pass refuses to expand,
+    // so the field is right once and is one tile's halo for ever after.
+    const runs = [painted()];
+    for (let k = 0; k < 3; k++) { computeCamCover(w); runs.push(painted()); }
+    check("the camera field is IDEMPOTENT — recomputing it does not shrink it", runs.every((v) => v === runs[0]) && runs[0] > 0, runs.join(" → "));
+
+    check("a camera paints its own tile at full effect", w.camCov[at] === KNOBS.CAM_EFFECT, `${w.camCov[at]}`);
+    // The walk runs along the STREET, so a tile CAM_REACH road-steps away is
+    // covered and one further along is not — that is what makes it a
+    // sight-line rather than a circle.
+    const far = sx + KNOBS.CAM_REACH + KNOBS.ROAD_REACH + sy * w.w;
+    const beyond = sx + KNOBS.CAM_REACH + KNOBS.ROAD_REACH + 1 + sy * w.w;
+    check("the sight-line reaches CAM_REACH road-steps plus the frontages that street serves", w.camCov[far] > 0, `${w.camCov[far]} at +${KNOBS.CAM_REACH + KNOBS.ROAD_REACH}`);
+    check("and stops there", w.camCov[beyond] === 0, `${w.camCov[beyond]} at +${KNOBS.CAM_REACH + KNOBS.ROAD_REACH + 1}`);
+    // Graded: full within CAM_NEAR road-steps, half beyond.
+    const seenEff = new Set();
+    for (let i = 0; i < w.w * w.h; i++) if (w.camCov[i]) seenEff.add(w.camCov[i]);
+    check("the field is graded, not flat", seenEff.has(KNOBS.CAM_EFFECT) && seenEff.has(KNOBS.CAM_EFFECT / 2), [...seenEff].join(","));
+  }
+  {
+    // A wall across the street breaks the sight-line. The one piece of
+    // counterplay the network has, and it costs §8.
+    const { w, sx, sy, at } = town();
+    apply(w, { kind: "camera", tiles: [at] });
+    const far = sx + KNOBS.CAM_REACH + KNOBS.ROAD_REACH + sy * w.w;
+    const before = w.camCov[far];
+    apply(w, { kind: "wall", tiles: [sx + 1 + sy * w.w] });
+    computeCamCover(w);
+    check("CAMERA rig: the wall really went up across the street", w.wall[sx + 1 + sy * w.w] === 1, "no wall");
+    check("a wall across the street breaks the sight-line", before > 0 && w.camCov[far] === 0, `${before} → ${w.camCov[far]}`);
+  }
+
+  // ---- storage: saved, hashed, and elided while the town has none ----------
+  {
+    const { w, at } = town();
+    const clean = stateHash(w);
+    const plainNone = toPlain(w);
+    check("cam is saved", Array.isArray(plainNone.cam) && plainNone.cam.length === w.w * w.h, `${plainNone.cam && plainNone.cam.length}`);
+    apply(w, { kind: "camera", tiles: [at] });
+    check("placing a camera moves the hash", stateHash(w) !== clean, "cam is not in the canonical shape");
+    const back = load(save(w));
+    check("and it survives save and load", back.cam[at] === 1 && stateHash(back) === stateHash(w), `${back.cam[at]}`);
+    check("camCov is DERIVED — never saved", !("camCov" in toPlain(w)), "camCov is in the save");
+    // The elision: an all-zero cam array is dropped from the hashed shape, so
+    // a town that never buys a camera keeps the identity it had before the
+    // network existed. Reversibility is the observable half of that.
+    // Written straight into the array, not through the op: the op also spends
+    // §100 and cash is hashed, so an op-based test would be measuring the
+    // treasury and calling it the elision.
+    const E = load(save(town().w));
+    const eClean = stateHash(E);
+    E.cam[at] = 1;
+    check("the elision is not a blanket — a camera in the array moves the hash", stateHash(E) !== eClean, "cam is elided even when set");
+    E.cam[at] = 0;
+    check("and an all-zero cam array hashes exactly as it did before the network existed", stateHash(E) === eClean, "the all-zero elision is not reversible");
+    // The reload rebuilds the field rather than carrying it: a loaded city
+    // opens paused, and the card and the overlay read it before the first tick.
+    computeFields(back);
+    check("a reloaded city rebuilds the same cover", back.camCov[at] === w.camCov[at], `${back.camCov[at]} vs ${w.camCov[at]}`);
+  }
+
+  // ---- the bill ------------------------------------------------------------
+  {
+    const { w, sx, sy } = town();
+    const before = yearlyFigures(w).upkeepYr;
+    apply(w, { kind: "camera", tiles: [sx + sy * w.w] });
+    const one = yearlyFigures(w);
+    check("one camera adds the whole network fee", one.upkeepYr - before === KNOBS.UPKEEP_CAM_NET, `${one.upkeepYr - before} vs ${KNOBS.UPKEEP_CAM_NET}`);
+    check("and the figures carry the count", one.cams === 1, `${one.cams}`);
+    const rest = [];
+    for (let x = sx - 5; x <= sx + 5; x++) if (x !== sx) rest.push(x + sy * w.w);
+    apply(w, { kind: "camera", tiles: rest });
+    const many = yearlyFigures(w);
+    check("THE FEE IS FLAT: eleven cameras cost the same a year as one", many.upkeepYr === one.upkeepYr && many.cams === rest.length + 1, `${many.cams} cameras, §${many.upkeepYr} vs §${one.upkeepYr}`);
+    check("the network fee is not charged when there is no camera", before === yearlyFigures(load(save(town().w))).upkeepYr, "a camera-free town pays the fee");
+  }
+
+  // ---- the tool ------------------------------------------------------------
+  {
+    const tool = TOOL_BY_ID.camera;
+    check("the camera is a tool on key E", !!tool && tool.key === "E" && tool.op.kind === "camera", JSON.stringify(tool && { key: tool.key, kind: tool.op.kind }));
+    // NOT in PLACE_TOOLS: that is the click set, and the camera is a drag.
+    check("and it is a drag, not a click", !PLACE_TOOLS.includes("camera"), "camera is in PLACE_TOOLS");
+    check("every tool id is still unique", new Set(TOOLS.map((t) => t.id)).size === TOOLS.length, `${TOOLS.length}`);
+  }
+
+  // ---- the overlay is registered in BOTH places main.js needs --------------
+  {
+    const mainSrc = readFileSync(path.join(ROOT, "js", "main.js"), "utf8");
+    check("the watch overlay is in the cycle", /const OVERLAYS = \[[^\]]*"watch"/.test(mainSrc), "not in OVERLAYS");
+    check("and in cycleOverlay's flash-label map, which is a SECOND edit", /watch:\s*"Overlay: camera cover/.test(mainSrc), "no flash label");
+    const renderSrc = readFileSync(path.join(ROOT, "js", "render.js"), "utf8");
+    check("and drawOverlay knows the mode", /mode === "watch"/.test(renderSrc), "drawOverlay has no watch branch");
+  }
+}
+
 // ---- walls (docs/PROPOSAL-ZONING-RAIL-WALLS.md §1; SPEC §6b) ----------------------
 // The flood must reproduce the square before it is allowed to differ from it.
 {
@@ -3344,16 +3539,16 @@ check("no Math.random under js/", mathRandom.length === 0, mathRandom.join(", ")
   const HC = await import("./headless-canvas.mjs");
   HC.installCanvas();
 
-  const ids = ["R", "C", "I", "M", "road", "wall", "rail", "station", "tree", "park", "zoo", "centre", "police", "fire", "inspect", "bulldoze"];
-  const keys = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "Z", "V", "P", "F", "I", "B"];
-  const orders = Array.from({ length: 16 }, (_, i) => i + 1);
-  check("palette: the canonical registry has the owner's exact sixteen tools, order and unique keys",
+  const ids = ["R", "C", "I", "M", "road", "wall", "rail", "station", "camera", "tree", "park", "zoo", "centre", "police", "fire", "inspect", "bulldoze"];
+  const keys = ["1", "2", "3", "4", "5", "6", "7", "8", "E", "9", "0", "Z", "V", "P", "F", "I", "B"];
+  const orders = Array.from({ length: 17 }, (_, i) => i + 1);
+  check("palette: the canonical registry has the owner's exact seventeen tools, order and unique keys",
     JSON.stringify(TOOLS.map((t) => t.id)) === JSON.stringify(ids)
       && JSON.stringify(TOOLS.map((t) => t.key)) === JSON.stringify(keys)
       && JSON.stringify(TOOLS.map((t) => t.order)) === JSON.stringify(orders)
-      && new Set(TOOLS.map((t) => t.key.toUpperCase())).size === 16
+      && new Set(TOOLS.map((t) => t.key.toUpperCase())).size === 17
       && TOOLS.every((t) => TOOL_BY_ID[t.id] === t && TOOL_BY_KEY[t.key.toUpperCase()] === t));
-  const expectedKinds = ["zone", "zone", "zone", "zone", "road", "wall", "rail", "station", "tree", "park", "zoo", "centre", "police", "fire", "inspect", "bulldoze"];
+  const expectedKinds = ["zone", "zone", "zone", "zone", "road", "wall", "rail", "station", "camera", "tree", "park", "zoo", "centre", "police", "fire", "inspect", "bulldoze"];
   check("palette: every ordered row carries its exact operation and the four zones keep R/C/I/M identity",
     JSON.stringify(TOOLS.map((t) => t.op.kind)) === JSON.stringify(expectedKinds)
       && JSON.stringify(TOOLS.slice(0, 4).map((t) => t.op.zone)) === JSON.stringify([ZONE.R, ZONE.C, ZONE.I, ZONE.M])
@@ -3386,7 +3581,7 @@ check("no Math.random under js/", mathRandom.length === 0, mathRandom.join(", ")
       iconRows.push(`${tool.id}:${sprite.name}`);
     } catch (e) { spriteFailures++; iconRows.push(`${tool.id}:ERROR ${e.message}`); }
   }
-  const expectedSprites = ["R1-cottage-0", "C1-shop-0", "I1-shed-0", "M1-stall-0", "road-5", "wall-5", "rail-5", "station-ns", "tree-round", "park", "zoo", "pacification-centre", "police-station", "fire-station", "cursor", "rubble"];
+  const expectedSprites = ["R1-cottage-0", "C1-shop-0", "I1-shed-0", "M1-stall-0", "road-5", "wall-5", "rail-5", "station-ns", "camera-0", "tree-round", "park", "zoo", "pacification-centre", "police-station", "fire-station", "cursor", "rubble"];
   const scaled = HC.createCanvas(1, 1);
   const scaledSprite = spriteForTool(art, "R");
   paintSprite(scaled, scaledSprite, 2);
@@ -3398,7 +3593,7 @@ check("no Math.random under js/", mathRandom.length === 0, mathRandom.join(", ")
       for (let c = 0; c < 4; c++) if (scaled._data[p + c] !== scaled._data[q + c]) nearest = false;
     }
   }
-  check("palette: all sixteen representative sprites resolve, paint nonblank once, and scale nearest-neighbour",
+  check("palette: all seventeen representative sprites resolve, paint nonblank once, and scale nearest-neighbour",
     spriteFailures === 0 && nearest && JSON.stringify(iconRows.map((row) => row.slice(row.indexOf(":") + 1))) === JSON.stringify(expectedSprites), iconRows.join(" · "));
 
   // A deliberately small DOM proves creation, click/focus parity and ARIA
@@ -3432,7 +3627,7 @@ check("no Math.random under js/", mathRandom.length === 0, mathRandom.join(", ")
   const { createPalette } = await import("../js/palette.js");
   const palette = createPalette({ input: fakeInput, ui: { setCost: (text, refused) => costs.push(`${text}:${refused}`) }, art });
   paletteRef = palette;
-  let clickParity = palette.buttons.size === 16;
+  let clickParity = palette.buttons.size === 17;
   for (const tool of TOOLS) {
     const button = palette.buttons.get(tool.id);
     button.events.pointerenter();
@@ -3463,9 +3658,9 @@ check("no Math.random under js/", mathRandom.length === 0, mathRandom.join(", ")
     && palette.buttons.get("bulldoze").classList.contains("on")
     && [...palette.buttons].filter(([, b]) => b.attributes["aria-pressed"] === "true").length === 1;
   globalThis.document = priorDocument;
-  check("palette: sixteen accessible buttons paint once; pointer, click, cost preview and active state stay synchronized",
-    clickParity && semanticActive && focusHoverStable && made.filter((e) => e.tagName === "CANVAS").length === 16
-      && costs.some((x) => x === "cost:bulldoze:true") && costs.filter((x) => x === "restore").length === 18,
+  check("palette: seventeen accessible buttons paint once; pointer, click, cost preview and active state stay synchronized",
+    clickParity && semanticActive && focusHoverStable && made.filter((e) => e.tagName === "CANVAS").length === 17
+      && costs.some((x) => x === "cost:bulldoze:true") && costs.filter((x) => x === "restore").length === 19, // one per tool row, plus the focus and hover releases below
     JSON.stringify({ buttons: palette.buttons.size, canvases: made.filter((e) => e.tagName === "CANVAS").length, selected, costs: costs.length, semanticActive, focusHoverStable }));
 
   const html = readFileSync(path.join(ROOT, "index.html"), "utf8");
@@ -3510,7 +3705,7 @@ check("no Math.random under js/", mathRandom.length === 0, mathRandom.join(", ")
   check("palette: input, palette and generated footer all read the one registry; build buttons are gone from the strip",
     /from "\.\/tools\.js"/.test(inputSrc) && /labelForOp\(op\)/.test(inputSrc)
       && /toolHelp\(\)/.test(uiSrc) && !/for \(const t of TOOLS\)/.test(uiSrc)
-      && /id="help"/.test(html) && toolHelp().split(" · ").length === 16);
+      && /id="help"/.test(html) && toolHelp().split(" · ").length === 17);
   check("palette: WASD has no command or news binding; S/D tap timing is gone; undo/save use their modifiers",
     !/case "Key[WASD]"/.test(newsSrc) && /case "ArrowRight"/.test(newsSrc)
       && !/TAP_MS|downAt|promoteHolds/.test(inputSrc) && /case "Backspace"/.test(inputSrc)
@@ -3636,6 +3831,14 @@ if (existsSync(artIndex)) {
       const oblongs = [];
       for (const { sprite } of allSprites()) { const [fw, fh] = sprite.footprint || [1, 1]; if (fw * fh > 1 && RECIPES.has(sprite)) oblongs.push(sprite); }
       oblongs.push(await probeSolid(3, 48), await probeSolid(2, 48));
+      // The CAMERA is 1x1 and still belongs in this audit, which is why the
+      // footprint filter above cannot find it: every other 1x1 solid stands on
+      // a LOT, and walkers do not cross lots. A camera stands on a ROAD, in the
+      // lane the animals actually walk, so it is the one 1x1 whose depth
+      // against a walker is a live question. Measured 0 mis-ordered over 132
+      // positions and 2,552 overlapping pixels — the police station's score.
+      const { CAMERAS } = await import("../js/art/buildings.js");
+      oblongs.push(...CAMERAS);
       const audited = [];
       const misordered = [];
       for (const sprite of oblongs) {
@@ -3643,7 +3846,7 @@ if (existsSync(artIndex)) {
         audited.push(`${sprite.name} ${res.overlaps}px`);
         if (res.bad) misordered.push(`${sprite.name}: ${res.bad} px at (${res.worst.wx.toFixed(2)}, ${res.worst.wy.toFixed(2)})`);
       }
-      check("painter: the ray audit — no oblong paints a pixel on the wrong side of a walker on its roads", oblongs.length >= 3 && misordered.length === 0, misordered.join("; ") || audited.join(", "));
+      check("painter: the ray audit — no oblong, and no camera in the road, paints a pixel on the wrong side of a walker", oblongs.length >= 3 && audited.some((a) => a.startsWith("camera-")) && misordered.length === 0, misordered.join("; ") || audited.join(", "));
       // painter.js FOOTPRINTS: back ∈ (s − 1.75, s − 0.44), kept at the zoo's margins by 0.7 + (s − 2).
       check("painter: the pull-back is 0 for a 1×1, 0.7 for a 2×2, 1.7 for a 3×3", pullbackOf(1) === 0 && pullbackOf(2) === 0.7 && Math.abs(pullbackOf(3) - 1.7) < 1e-9);
       // The 3×3 band, the 2×2 band's shape on the walkers' own convention (a

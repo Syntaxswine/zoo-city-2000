@@ -168,6 +168,7 @@ export function census(world) {
   let stations = 0;
   let fireStations = 0;
   let policeStations = 0;
+  let cams = 0;
   let burning = 0;
   let blocks2 = 0;
   let blocks3 = 0;
@@ -190,6 +191,7 @@ export function census(world) {
     if (world.zone[i] === ZONE.M && world.tier[i] > 0 && !isPart(world, i)) markets++; // a block is one hall
     if (world.big[i] === 2) blocks2++;
     else if (world.big[i] === 3) { blocks3++; const lm = landmarkOf(world.theme[i]); if (lm) { landmarks++; landmarkCounts[lm.name] = (landmarkCounts[lm.name] || 0) + 1; } }
+    if (world.cam[i]) cams++;
     if (world.dread[i] > maxDread) maxDread = world.dread[i];
     if (world.civic[i] === CIVIC.PARK) parks++;
     else if (world.civic[i] === CIVIC.ZOO) { if (served(world, i)) zoos++; else zoosNoRoad++; } // a zoo no road reaches is a fenced field: no halo, no cap, no jobs (SPEC 6c)
@@ -239,7 +241,7 @@ export function census(world) {
     approval: P ? moodSum / P : 50,
     native: P ? native / P : 0,
     parks, zoos, zoosNoRoad, lots, roads, walls, tunnels, usePred, usePrey, railTiles, stations, riders, commuteN, meanCommute: commuteN ? commuteSum / commuteN : 0, lotsNoRoad,
-    fireStations, policeStations, burning,
+    fireStations, policeStations, cams, burning,
     blocks2, blocks3, // the 2×2 and 3×3 blocks standing (anchors; SPEC §3b)
     landmarks, landmarkCounts, // the 3×3s that rose as a species' landmark, and which by name (SPEC §3c)
     // What covering the town is WORTH: the multiplier on how often a fire is

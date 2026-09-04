@@ -18,14 +18,15 @@ export const TOOLS = Object.freeze([
   row(6, "wall", "6", "Wall", { kind: "wall" }, { kind: "wall", args: [5] }, "L-drag; Shift = straight; a road or rail through it is a tunnel"),
   row(7, "rail", "7", "Rail", { kind: "rail" }, { kind: "rail", args: [5] }, "L-drag; Shift = straight; a square road makes a crossing"),
   row(8, "station", "8", "Station", { kind: "station" }, { kind: "station", args: ["ns"] }, "click a plain rail tile; it is a door wherever a road comes within 3 tiles, and riders walk the forecourt"),
-  row(9, "tree", "9", "Tree", { kind: "tree" }, { kind: "tree", args: ["round"] }, "plant trees (drag)"),
-  row(10, "park", "0", "Park", { kind: "park" }, { kind: "civic", args: ["park"] }, "place a 1×1 park"),
-  row(11, "zoo", "Z", "Zoo", { kind: "zoo" }, { kind: "civic", args: ["zoo"] }, "place a 2×2 zoo"),
-  row(12, "centre", "V", "Pacification", { kind: "centre" }, { kind: "civic", args: ["centre"] }, "place a pacification centre"),
-  row(13, "police", "P", "Police", { kind: "police" }, { kind: "civic", args: ["police"] }, "place a police station"),
-  row(14, "fire", "F", "Fire station", { kind: "fire" }, { kind: "civic", args: ["fire"] }, "place a fire station"),
-  row(15, "inspect", "I", "Inspect", { kind: "inspect" }, { kind: "overlay", args: ["cursor"] }, "pin a lot or citizen; left-drag pans"),
-  row(16, "bulldoze", "B", "Bulldoze", { kind: "bulldoze" }, { kind: "ground", args: ["rubble"] }, "clear (drag); occupied lots cannot be undone"),
+  row(9, "camera", "E", "Camera", { kind: "camera" }, { kind: "camera", args: [0] }, "L-drag along a street; needs a police station to do anything, and watches the lots the street serves"),
+  row(10, "tree", "9", "Tree", { kind: "tree" }, { kind: "tree", args: ["round"] }, "plant trees (drag)"),
+  row(11, "park", "0", "Park", { kind: "park" }, { kind: "civic", args: ["park"] }, "place a 1×1 park"),
+  row(12, "zoo", "Z", "Zoo", { kind: "zoo" }, { kind: "civic", args: ["zoo"] }, "place a 2×2 zoo"),
+  row(13, "centre", "V", "Pacification", { kind: "centre" }, { kind: "civic", args: ["centre"] }, "place a pacification centre"),
+  row(14, "police", "P", "Police", { kind: "police" }, { kind: "civic", args: ["police"] }, "place a police station"),
+  row(15, "fire", "F", "Fire station", { kind: "fire" }, { kind: "civic", args: ["fire"] }, "place a fire station"),
+  row(16, "inspect", "I", "Inspect", { kind: "inspect" }, { kind: "overlay", args: ["cursor"] }, "pin a lot or citizen; left-drag pans"),
+  row(17, "bulldoze", "B", "Bulldoze", { kind: "bulldoze" }, { kind: "ground", args: ["rubble"] }, "clear (drag); occupied lots cannot be undone"),
 ]);
 
 export const TOOL_BY_ID = Object.freeze(Object.fromEntries(TOOLS.map((tool) => [tool.id, tool])));

@@ -81,6 +81,13 @@ export const KNOBS = {
   POLICE_RADIUS: 6,         // full effect within 3, half effect to 6 (Micropolis: an 8x8 cell smoothed three times)
   POLICE_NEAR: 3,
   POLICE_EFFECT: 60,
+  // THE CAMERA NETWORK (SPEC §9d, docs/PROPOSAL-CAMERAS.md). A camera watches
+  // the STREET, not a circle: from the tile it stands on it walks connected
+  // road tiles CAM_REACH steps and paints each one and the frontages that
+  // street serves. It never enters computeCrime — clearance, never deterrence.
+  CAM_REACH: 2,             // road-steps the sight-line runs. 4 plus the ROAD_REACH-3 halo is an effective Chebyshev 7 — more ground than a §500 station's 6, for §100
+  CAM_NEAR: 1,              // full effect within one road-step, half beyond; at CAM_REACH 2 this is what makes the field graded at all
+  CAM_EFFECT: 60,           // the same scale as POLICE_EFFECT, so the card can print both and a player can compare them
   CRIME_BASE: 40,           // crime = 40 − 0.5·LV + 0.4·density3 + 40·(U/W) − police, 0..100 (Micropolis: 128 − LV + density − police)
   CRIME_LV: 0.5,
   CRIME_DENSITY: 0.4,
@@ -133,7 +140,7 @@ export const KNOBS = {
   UPKEEP_PARK: 300,
   UPKEEP_ZOO: 1500,
   UPKEEP_STATION: 400,
-  COST: { zoneR: 5, zoneC: 8, zoneI: 8, zoneM: 12, road: 10, bridge: 40, bulldoze: 2, bulldozeTree: 4, tree: 4, park: 150, zoo: 2500, pond: 40, fire: 500, police: 500, centre: 1500, wall: 8, use: 1, rail: 20, station: 300 },
+  COST: { zoneR: 5, zoneC: 8, zoneI: 8, zoneM: 12, road: 10, bridge: 40, bulldoze: 2, bulldozeTree: 4, tree: 4, park: 150, zoo: 2500, pond: 40, fire: 500, police: 500, centre: 1500, wall: 8, use: 1, rail: 20, station: 300, camera: 100 },
   // ---- crime and punishment (the owner, 2026-09-02; docs/PROPOSAL-CRIME-AND-PUNISHMENT.md) ----
   // Zone M — the grey-market meat hall: stall / meat hall / cold store.
   M_JOBS: [0, 3, 8, 16],
@@ -250,6 +257,7 @@ export const KNOBS = {
   // rail (SPEC §7.9; docs/PROPOSAL-ZONING-RAIL-WALLS.md §3)
   UPKEEP_RAIL: 3,           // a tile a year
   UPKEEP_STATION_RAIL: 100, // a station a year
+  UPKEEP_CAM_NET: 2000,     // the whole NETWORK a year, flat, while the town has one or more cameras — the owner's ruling. The step is the point: the first camera costs §2,000, the fiftieth §100
   RAIL_COST: 3,             // a ride step on the commute's integer scale (a walk step is fields.WALK = 10): 0.3 of a walk
   RIDE_SPEED: 3,            // the walker's speed on a riding step
   EMIT_RAIL: 1,             // a rail tile's pollution, flat over 1; no traffic term
@@ -418,6 +426,11 @@ export const RULES = Object.freeze([
     id: "S2", title: "Police cover",
     formula: "a police station (§500, §400/yr, 4 jobs) takes 60 off crime within 3 tiles and 30 within 6 ; and the town's FORCE works every open file wherever it happened — p/month of an arrest = 0.02 + 0.10·min(1, stations/4) + 0.18·cover/60 + 0.05·record, and with no station at all nothing is investigated and every file goes cold",
     live: (w) => `${w.last.census.policeStations} police station${w.last.census.policeStations === 1 ? "" : "s"} · arrest floor ${f2(w.last.census.policeStations ? KNOBS.ARREST_BASE + KNOBS.ARREST_FORCE * Math.min(1, w.last.census.policeStations / KNOBS.ARREST_FORCE_N) : 0)}/month`,
+  },
+  {
+    id: "S4", title: "The camera network",
+    formula: "a camera walks CAM_REACH 2 connected road tiles and paints each one and every tile within ROAD_REACH 3 of it — the lots that street serves — at CAM_EFFECT 60 within CAM_NEAR 1 road-step, half beyond ; a wall across the street breaks the sight-line ; it NEVER enters the crime field, only the arrest roll, and only where there is a police force to make one ; §100 a camera, §2,000 a year for the whole network however many there are",
+    live: (w) => `${w.last.budget.cams || 0} cameras · ${w.last.budget.cams ? `§${KNOBS.UPKEEP_CAM_NET} a year` : "no network fee"} · ${w.last.census.policeStations ? "a force to work the pictures" : "NO POLICE STATION — the pictures go nowhere"}`,
   },
   {
     id: "S3", title: "Fire cover",

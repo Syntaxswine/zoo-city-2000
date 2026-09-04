@@ -38,7 +38,7 @@ const TICK_SECONDS = 1.5;
 const SPEEDS = [1, 3, 10];
 const MAX_CATCHUP = 3;
 const AUTOSAVE_EVERY = 12;
-const OVERLAYS = ["off", "lv", "pol", "crime", "dread", "use", "access", "score"];
+const OVERLAYS = ["off", "lv", "pol", "crime", "dread", "use", "access", "score", "watch"];
 const META = (name) => `zoo.meta:${name}`;
 const LAST = "zoo.last";
 const PREF = "zoo.pref"; // UI preferences (the cheat switch, the news read marks) — this browser's, never the city's
@@ -247,7 +247,7 @@ app.togglePause = () => {
 app.resume = () => { app.paused = false; app.ui.refresh(); };
 app.cycleOverlay = () => {
   app.overlays = OVERLAYS[(OVERLAYS.indexOf(app.overlays) + 1) % OVERLAYS.length];
-  app.ui.flash(app.overlays === "off" ? "Overlay off" : { lv: "Overlay: land value (greener = higher)", pol: "Overlay: pollution (browner = worse)", crime: "Overlay: crime (redder = worse; blue = police cover; a ring = an open file)", dread: "Overlay: dread (wine = a meat hall's smell; herbivores keep away)", use: "Overlay: use — rust is predator-only, teal is prey-only, untinted is mixed (U paints it)", access: "Overlay: road access — untinted is on the road, then one, two and three tiles from it; red is out of reach and nothing grows there", score: "Overlay: lot score (blue grows, red decays)" }[app.overlays]);
+  app.ui.flash(app.overlays === "off" ? "Overlay off" : { lv: "Overlay: land value (greener = higher)", pol: "Overlay: pollution (browner = worse)", crime: "Overlay: crime (redder = worse; blue = police cover; a ring = an open file)", dread: "Overlay: dread (wine = a meat hall's smell; herbivores keep away)", use: "Overlay: use — rust is predator-only, teal is prey-only, untinted is mixed (U paints it)", access: "Overlay: road access — untinted is on the road, then one, two and three tiles from it; red is out of reach and nothing grows there", score: "Overlay: lot score (blue grows, red decays)", watch: "Overlay: camera cover (a ring is a camera; it solves crimes, it does not prevent them)" }[app.overlays]);
   app.ui.refresh();
 };
 app.zoomAt = (dir, sx, sy) => {

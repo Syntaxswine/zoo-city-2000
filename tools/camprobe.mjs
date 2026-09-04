@@ -113,8 +113,12 @@ function watch(w, n) {
   for (let k = 0; k < roads.length && placed < n; k += stride) {
     const i = roads[k];
     w.cash = 100000;
+    // The camera op is a DRAG (tiles), like the road and wall ops — not a
+    // click with tx/ty. This probe was written before the op existed and
+    // guessed the click shape; it reported `placed 0` rather than lying,
+    // which is the whole reason it degrades instead of throwing.
     let r = null;
-    try { r = apply(w, { kind: "camera", tx: i % w.w, ty: (i / w.w) | 0 }); } catch { return 0; }
+    try { r = apply(w, { kind: "camera", tiles: [i] }); } catch { return 0; }
     if (!r || !r.ok) continue;
     placed++;
   }

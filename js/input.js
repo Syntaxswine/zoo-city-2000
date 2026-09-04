@@ -96,6 +96,8 @@ export function createInput(canvas, app) {
         return { kind: "wall", tiles: roadL(w, d.ax, d.ay, d.bx, d.by, d.shift) };
       case "rail":
         return { kind: "rail", tiles: roadL(w, d.ax, d.ay, d.bx, d.by, d.shift) };
+      case "camera":
+        return { kind: "camera", tiles: roadL(w, d.ax, d.ay, d.bx, d.by, d.shift) };
       default:
         return null;
     }
@@ -112,7 +114,7 @@ export function createInput(canvas, app) {
     const kind = tool.op.kind;
     if (PLACE_TOOLS.includes(id)) return { kind, tx, ty };
     if (kind === "zone") return { kind, zone: tool.op.zone, x0: tx, y0: ty, x1: tx, y1: ty, density: state.density };
-    if (kind === "road" || kind === "wall" || kind === "rail") return { kind, tiles: [idx(world(), tx, ty)] };
+    if (kind === "road" || kind === "wall" || kind === "rail" || kind === "camera") return { kind, tiles: [idx(world(), tx, ty)] };
     return { kind, x0: tx, y0: ty, x1: tx, y1: ty };
   }
 
