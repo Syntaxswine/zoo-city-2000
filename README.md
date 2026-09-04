@@ -251,11 +251,15 @@ mill-town with a fox problem").
   the footprint rule lifts nothing and no animal ever crosses a forecourt.
   In the deep rig at its default thirty years: 418 zoned lots the rule
   refuses with the real distance on each, 2 of 2 platforms that are doors only
-  under the standard, and 20 commutes crossing 80 tiles of forecourt. (Those
-  last two move with `--years`: at 20 it is 12 crossing 48. A number quoted
-  beside a command has to be the number that command gives.) `--cost` times
-  the two hot paths and prints the town it timed them on; `--rig many` is a
-  cost worst case rather than a town.
+  under the standard, and **46 commutes crossing 184 tiles of forecourt** (at
+  `--years 20`, 39 crossing 156). Those last two move with the years, with the
+  rail knobs — a faster train carries more of the town — and with the weather,
+  because this rig runs WITH disasters: it exists for the case a fire moves a
+  forecourt, so switching fires off would be switching the case off. A number
+  quoted beside a command has to be the number that command gives, and these
+  were re-measured at HEAD. `--cost` times the two hot paths and prints the
+  town it timed them on; `--rig many` is a cost worst case rather than a
+  town.
 - `tools/accessprobe.mjs --layout millbelt` — what road access reaches and
   what it refuses: zoned lots by the distance the RULE reads beside the
   distance their own tile reads, how many sides each lot is entered from,

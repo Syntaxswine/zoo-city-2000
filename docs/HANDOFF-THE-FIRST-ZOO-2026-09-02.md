@@ -1981,3 +1981,42 @@ houses. Round two showed me a forecourt that CLOSED; I hashed the door list.
 Round three showed me a forecourt that MOVED. **Each fix was exactly the size
 of the example I was shown**, and the general question was available every
 time: *what else is derived from this, and who reads it?*
+
+## 24f. The fourth review: my own fix was the new bug (session 15, 2026-09-04)
+
+**7/10**, up from 6, 6.5, 6.5 — and the headline finding was the settle I added
+one section ago. **503 → 517 checks, 0 failures.**
+
+**The bug.** `settleDoors` runs three times a tick, and the third runs AFTER
+`citizensTick`. Its `invalidatePaths` therefore had no stale pass coming: the
+month ended with every commute null, and month +1 took traffic, riders and mean
+commute from NOTHING in the straight run while a reload took them from
+everything. §16's hash at the boundary is equal either way — `c.path` is not in
+`canonicalCitizen` — so the two cities parted a month later. **No op was
+involved and the save was at a clean tick boundary**, so this was not the
+same-month-op hole in BACKLOG; that hole's own stated workaround ("hash-equal
+from any TICK boundary") was false at `4b9b6d0`.
+
+The rule now has a name: **NOTHING MAY END A TICK STALE.** `citizens.replanStale`
+is exported and `settleDoors` calls it.
+
+### The traps, keyed by what you would see
+
+| what you see | what it is |
+|---|---|
+| an invalidation that is never repaired | it ran after the pass that repairs it. Ask WHERE IN THE TICK your invalidation sits relative to `citizensTick` — before it, the stale pass is coming; after it, you must re-plan yourself |
+| a hash equal at the save and different a month later | the thing that differs is DERIVED and unsaved. `c.path` is the standing example: the reload rebuilds it, the straight run carries it |
+| a fixture with `noDisasters = true` | ask whether the case you are testing needs a disaster. Thirteen access fixtures had it, including the rig built *because the mayor cannot build a forecourt* |
+| a fire fixture with no citizens | the claim is about stored paths and the rig has none. Count the population of every fixture whose claim is about people |
+| a mutation sweep with a clean sweep | check the suite for WALL CLOCKS. `check("tick cost", ms < 30)` fails under contention and exits 1 like any other failure; at fourteen lanes it turned eight survivors into "caught" |
+| a table in SPEC listing which rules ask a predicate | each ROW needs a pair of runs. Three of ours were spelling |
+
+### Two behaviour bugs the standard itself had
+
+The census counted jobs at sites nobody could reach — so an unreachable zoo
+moved the C and I valves exactly as a working one did, though no animal could
+ever take one of those jobs. And an unreachable pacification centre kept its
+van's land-value shadow while the zoo's halo was gated. Both fixed, both
+hash-neutral on all six published gates, because the mayor never builds an
+unreachable anything: **the gates cannot see this class of bug at all**, which
+is what `--rig deep` is for.

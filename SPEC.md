@@ -350,10 +350,12 @@ nearestRoad(i, reach = nearReach()) = the same search, further out; the CARD's s
 nearReach()    = ROAD_REACH + 5, read at CALL time — a constant froze the card's horizon at import
 ```
 
-Every one of these takes an optional caller-owned `seen` buffer. §14 forbids
-the draw and street layers a buffer on the world, and they are exactly who
-calls them — the access overlay asks `siteRoadDist` of every visible tile, and
-a platform's answer is a search.
+`served`, `siteRoadDist`, `doorsOf`, `doorOf` and `nearestRoad` each take an
+optional caller-owned `seen` buffer. §14 forbids the draw and street layers a
+buffer on the world, and they are exactly who calls them — the access overlay
+asks `siteRoadDist` of every visible tile, the score overlay reaches `served`
+through `lotScore`, the walker layer asks `doorsOf` for a doorstep — and a
+platform's answer to any of them is a search.
 
 **Two questions, not one.** A lot's access is a DISTANCE: nobody walks the
 gap, the animal appears at its door, and a river or a neighbour's terrace
@@ -453,12 +455,24 @@ standing — it is entered from either side — and moves every chain; a signatu
 over door lists sees nothing, and 99 animals keep walking through a police
 station.
 
-The flag is acted on in three places, all with the same `invalidatePaths` a
+The flag is acted on in four places, all with the same `invalidatePaths` a
 road edit uses: `ops.apply` after every op (and `ops.undo` after every undo),
-`tick.js` right after `lotsTick` (before the citizens run, so the stale pass
-re-plans in the same month), and `tick.js` again after `eventsTick`, because a
-fire, a flood or the bulldozer razes buildings at step 7 — three steps after
-the first settle, and everything below that line plans over the door graph.
+`tick.js` right after `lotsTick`, `tick.js` again after `eventsTick` — a fire
+razes buildings and a sinkhole opens WATER at step 7, three steps after the
+first settle, and everything below that line plans over the door graph — and
+`refreshLast`, which consumes the flag on a path where the ground cannot have
+moved (a rate op, a load) so that a raised flag is never left lying for the
+next tick to act on. The fourth never fires; it exists so that nothing else has
+to know it doesn't.
+
+**And a settle RE-PLANS, it does not merely invalidate.** One of those callers
+runs AFTER `citizensTick`, so no stale pass is coming: the month would end with
+every commute null, and next month's traffic, riders and mean commute would be
+taken from nothing in the straight run and from everything after a reload
+(`save.rebuildDerived` re-plans unconditionally). §16's hash at the boundary is
+equal either way — `c.path` is not in `canonicalCitizen` — so the two cities
+part a month later. **Nothing may end a tick stale**: `settleDoors` calls
+`citizens.replanStale`, which is the same pass `citizensTick` runs.
 Without any of this a straight run keeps the stale commutes while a reload
 re-plans, and the two part company a month later — hidden at first, because
 `c.path` is not in the saved citizen and §16's hash could not see it for two

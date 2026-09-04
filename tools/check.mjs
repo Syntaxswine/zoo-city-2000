@@ -88,7 +88,17 @@ const A = buildCity(SEED, YEARS, { withSave: Math.floor((YEARS * 12) / 2) });
 const world = A.world;
 const ms = (Date.now() - t0) / (YEARS * 12);
 console.log(`built ${YEARS} years: ${world.citizens.length} citizens, ${ms.toFixed(2)} ms/tick`);
-check("tick cost", ms < 30, `${ms.toFixed(1)} ms/tick`);
+// A WALL CLOCK INSIDE A DETERMINISM SUITE IS A TRAP, and it caught this
+// project: at 30 ms this line failed under CPU contention, `check.mjs` exited
+// 1 like any other failure, and a MUTATION SWEEP running many lanes at once
+// read that as "the mutant was caught". A fourth hostile review re-ran every
+// mutant whose failure count was low at four lanes instead of fourteen and
+// moved EIGHT verdicts from CAUGHT back to SURVIVED. So the number is the
+// instrument (it is printed above, every run) and the bound is only a net for
+// something catastrophically wrong: 250 ms is twenty-five times the ~10 ms
+// this actually costs, far outside anything a busy machine produces, and
+// still inside anything a real algorithmic regression would blow through.
+check("tick cost is not catastrophic (the printed number is the instrument; this bound is contention-proof on purpose)", ms < 250, `${ms.toFixed(1)} ms/tick`);
 // A CANARY, not a target. The suite had no guard on the scripted city's SIZE
 // at all: a hostile review re-introduced a frontage rule spelled another way,
 // the fixture town fell 41% (385 citizens to 226), and 464 checks stayed
@@ -2177,6 +2187,96 @@ check("determinism: same seed + same inputs ⇒ same hash", stateHash(A.world) =
     const P3 = load(save(P2));
     let apart = -1;
     for (let k = 0; k < 24 && apart < 0; k++) { tick(P2); tick(P3); if (stateHash(P2) !== stateHash(P3)) apart = k + 1; }
+    // A RIDING STEP IS NEUTRAL TRAVEL. SPEC 7.9 and 9c, the README and the
+    // Rules tab all say the trespass counts WALKING tiles only — an animal on
+    // a train is not trespassing on the line it rides — and nothing held it:
+    // deleting the ride test in `fields.exposure` left the suite green. A real
+    // rider from this town, with every tile it RIDES painted against it, is
+    // exposed to nothing; paint one road tile the same animal WALKS and it is
+    // exposed at once.
+    const { admits: admits4 } = await import("../js/sim/species.js");
+    const X4 = load(save(R4));
+    // A PREY animal that rides: use 1 is predator-only, so the paint has to
+    // exclude whoever we pick or the whole check would be measuring nothing.
+    const anyRider = X4.citizens.find((c) => !c.dead && !admits4(1, c.species) && c.path && Array.from(c.path).some((x) => x & RIDE));
+    const rode = anyRider ? Array.from(anyRider.path).filter((x) => x & RIDE).map((x) => x & TILE) : [];
+    const walked = anyRider ? Array.from(anyRider.path).filter((x) => !(x & RIDE)).map((x) => x & TILE) : [];
+    for (const t of rode) X4.use[t] = 1; // predator-only; the rider is whatever it is
+    computeFields(X4);
+    const ridingExposure = anyRider ? FI.exposure(X4, anyRider).e : -1;
+    const oneWalked = walked.find((t) => X4.road[t] !== ROAD.NONE && X4.use[t] === 0);
+    if (oneWalked !== undefined) X4.use[oneWalked] = 1;
+    computeFields(X4);
+    const walkingExposure = anyRider ? FI.exposure(X4, anyRider).e : -1;
+    check("access: a riding step is NEUTRAL TRAVEL — every tile a real commuter RIDES painted against its species costs it no exposure at all; paint one road tile the same animal walks and it is exposed at once. Three documents said so and no check did",
+      !!anyRider && rode.length > 2 && oneWalked !== undefined
+        && ridingExposure === 0 && walkingExposure > 0,
+      `${rode.length} ridden tiles painted → exposure ${ridingExposure} · one walked road tile painted → exposure ${walkingExposure}`);
+
+    // THE PLAYER'S LINE AND §16. Two mutants lived here and neither could be
+    // reached by any fixture in the suite, because no save/load check had ever
+    // PAINTED anything: `ops.apply`'s `else if (lines) invalidatePaths(world)`
+    // (delete it and a repaint leaves every commute crossing a road its
+    // species is now barred from, while a reload re-plans round it), and
+    // `save.js`'s `commutePath(world, c.species, a, b)` (drop the species and
+    // a loaded city takes the UNWEIGHTED route its own comment forbids). Both
+    // show as paths that differ live-vs-reload, and then as a divergence.
+    const L4 = load(save(R4));
+    const painted = [];
+    for (let x = 20; x <= 40; x++) painted.push(r4(x, 6));
+    apply(L4, { kind: "use", use: 1, x0: 20, y0: 6, x1: 40, y1: 6 }); // the north avenue, predator-only
+    tick(L4);
+    const L5 = load(save(L4));
+    const byId4 = new Map(L5.citizens.map((c) => [c.id, c]));
+    let pathsDiffer = 0;
+    let crossPainted = 0;
+    for (const c of L4.citizens) {
+      if (c.dead) continue;
+      const d = byId4.get(c.id);
+      if (!d) continue;
+      const a = c.path ? Array.from(c.path).join(",") : "-";
+      const b = d.path ? Array.from(d.path).join(",") : "-";
+      if (a !== b) pathsDiffer++;
+      if (c.path) for (let k = 0; k < c.path.length; k++) if (painted.includes(c.path[k] & TILE)) { crossPainted++; break; }
+    }
+    let apartL = -1;
+    for (let k = 0; k < 24 && apartL < 0; k++) { tick(L4); tick(L5); if (stateHash(L4) !== stateHash(L5)) apartL = k + 1; }
+    check("access: save → load → two more years on a town with THE PLAYER'S LINE painted across it — a repaint re-plans every commute at the op, and a reload rebuilds them weighted by species as the live city did; no save/load check in the suite had ever painted a tile, so both halves of that were free",
+      L4.use[r4(30, 6)] === 1 && pathsDiffer === 0 && apartL === -1,
+      `${painted.length} tiles painted · ${crossPainted} commutes still cross them · ${pathsDiffer} paths differ at the save · ${apartL < 0 ? "no divergence in 24 months" : `DIVERGED at month +${apartL}`}`);
+
+    // NOTHING MAY END A TICK STALE. The settle after `eventsTick` runs AFTER
+    // the citizens have, so its invalidation has no stale pass coming: the
+    // month would end with every commute null, and next month's traffic,
+    // riders and mean commute would be taken from NOTHING in the straight run
+    // and from everything in a reload, which re-plans on load. The hash at the
+    // boundary is equal either way — `c.path` is not in `canonicalCitizen` —
+    // so the two cities part a month later. A fourth hostile review measured
+    // it on this very rig: traffic 0 against 3796, and ff0656b1 against
+    // 4a6abbbb at 24 months. NO OP IS INVOLVED, and the save is taken at a
+    // clean tick boundary, so this is not the same-month-op hole in BACKLOG.
+    const Q2 = load(save(R4));
+    for (const t of [r4(30, 7), r4(30, 8)]) { Q2.zone[t] = ZONE.R; Q2.maxTier[t] = 3; Q2.tier[t] = 2; }
+    tick(Q2);                                    // the forecourt closes; the 4b settle re-plans round it
+    BL.ignite(Q2, r4(30, 8), 1);
+    BL.ignite(Q2, r4(30, 7), 1);
+    let burned = -1;
+    for (let k = 0; k < 12 && burned < 0; k++) { tick(Q2); if (Q2.tier[r4(30, 7)] === 0 && Q2.tier[r4(30, 8)] === 0) burned = k + 1; }
+    const stranded = (w) => w.citizens.filter((c) => !c.dead && c.job >= 0 && c.home >= 0 && !c.path).length;
+    const employed = Q2.citizens.filter((c) => !c.dead && c.job >= 0 && c.home >= 0).length;
+    const strandedAtBoundary = stranded(Q2);
+    const Q3 = load(save(Q2));
+    const hashAtSave = stateHash(Q2) === stateHash(Q3);
+    tick(Q2); tick(Q3);
+    const trafficQ2 = Q2.traffic.reduce((a, b) => a + b, 0);
+    const trafficQ3 = Q3.traffic.reduce((a, b) => a + b, 0);
+    let apartQ = -1;
+    for (let k = 0; k < 24 && apartQ < 0; k++) { tick(Q2); tick(Q3); if (stateHash(Q2) !== stateHash(Q3)) apartQ = k + 1; }
+    check("access: and NOTHING MAY END A TICK STALE — a fire razes a house off a forecourt at step 7, three steps after the citizens have run, and the month still ends with every commute planned; the straight run and a reload count the same traffic next month, and hold for two years",
+      burned > 0 && employed > 50 && strandedAtBoundary === 0 && hashAtSave
+        && trafficQ2 > 0 && trafficQ2 === trafficQ3 && apartQ === -1,
+      `burnt after ${burned} month${burned === 1 ? "" : "s"} · ${strandedAtBoundary} of ${employed} employed animals end the month with no commute · traffic next month ${trafficQ2} vs ${trafficQ3} · ${apartQ < 0 ? "no divergence in 24 months" : `DIVERGED at month +${apartQ}`}`);
+
     check("access: a forecourt REROUTED under an unchanged door — a police station on the tile both of a platform's doors were reached through leaves both doors standing and moves every chain, and every commute that walked the old way re-plans at the op; nobody is left walking through the station, and save → load → two more years holds",
       before >= 50 && rp.ok && doorsBefore.length === 2 && doorsAfter.length === 2
         && doorsBefore.join(",") === doorsAfter.join(",") && stillOnIt === 0 && apart === -1,
@@ -2495,6 +2595,113 @@ check("determinism: same seed + same inputs ⇒ same hash", stateHash(A.world) =
     check("access: and the door READERS take the caller's scratch too — `doorsOf` and `nearestRoad` fill the buffer they are handed and leave the world's alone, which is the law the walker layer lives under and the overlay's check does not reach",
       gotDoors === 2 && gotNear === 2 && kept === stamp && usedMine,
       `${gotDoors} doors · ${gotNear} from nearestRoad · the world's stamp ${stamp} → ${kept} · the caller's buffer was written ${usedMine}`);
+  }
+
+  // ---- WHAT A ROAD ACTUALLY BUYS, ARM BY ARM -------------------------------
+  {
+    // SPEC 6c's table says which rule reads `served`, and a fourth hostile
+    // review showed three of its rows were spelling: the importer list in
+    // Part M' pins WHO asks, and a mutant can keep the import and shadow it.
+    // So each arm gets a PAIR OF RUNS - the same buildings, one road tile
+    // apart - because a list of callers says who asks and only a pair of runs
+    // says what the answer does.
+    const arms = (reach) => {
+      const E = createWorld({ seed: "arms" });
+      const e = (x, y) => y * E.w + x;
+      for (let y = 2; y <= 26; y++) for (let x = 2; x <= 40; x++) {
+        const i = e(x, y);
+        E.terrain[i] = TERRAIN.GRASS; E.road[i] = ROAD.NONE; E.zone[i] = ZONE.NONE;
+        E.tier[i] = 0; E.wall[i] = 0; E.rail[i] = 0; E.civic[i] = 0; E.big[i] = 0; E.use[i] = 0;
+      }
+      E.cash = 900000;
+      E.events.noDisasters = true;
+      const rr = [];
+      for (let x = 4; x <= 36; x++) rr.push(e(x, 6));
+      if (reach) for (let x = 10; x <= 30; x++) rr.push(e(x, 15)); // the one difference between the two runs
+      apply(E, { kind: "road", tiles: rr });
+      apply(E, { kind: "zoo", tx: 12, ty: 17 });
+      apply(E, { kind: "centre", tx: 18, ty: 17 });
+      apply(E, { kind: "police", tx: 22, ty: 17 });
+      apply(E, { kind: "fire", tx: 24, ty: 17 });
+      apply(E, { kind: "zone", zone: ZONE.M, x0: 28, y0: 17, x1: 28, y1: 17, density: 3 });
+      E.tier[e(28, 17)] = 2;
+      computeFields(E);
+      recountRosters(E);
+      const cen = census(E);
+      const covered = (f) => { let k = 0; for (let i = 0; i < E.w * E.h; i++) k += f[i] ? 1 : 0; return k; };
+      // The licence is offered deterministically the month a hall reaches
+      // tier 2 - and only a hall a road reaches.
+      let licence = false;
+      for (let k = 0; k < 6 && !licence; k++) { tick(E); if (E.events.choice && E.events.choice.id === "licence") licence = true; }
+      return {
+        E, e, cen,
+        zooServed: sv(E, e(12, 17)), jobs: cen.J, zoos: cen.zoos, zoosNoRoad: cen.zoosNoRoad,
+        police: covered(E.policeCov), fire: covered(E.fireCov),
+        // The van's shadow, measured the only honest way: the same tile with
+        // and without the centre standing. A centre nobody can reach sends no
+        // van, so it should darken nothing.
+        vanShadow: (() => {
+          const near = e(18, 19);
+          const withIt = E.lv[near];
+          const C = load(save(E));
+          apply(C, { kind: "bulldoze", x0: 18, y0: 17, x1: 18, y1: 17, what: "civic" });
+          computeFields(C);
+          return C.lv[near] - withIt;
+        })(),
+        licence,
+      };
+    };
+    const off = arms(false);
+    const on = arms(true);
+    check("access: what a road actually buys, arm by arm — a zoo, a pacification centre, a police and a fire station and a tier-2 meat hall, all out of reach: no jobs on the census (so no demand either), no cover on a single tile, no van shadow on the land value, and no Butchers' licence; lay the road that reaches them and every one of the five arrives",
+      off.jobs === 0 && off.zoos === 0 && off.zoosNoRoad === 1 && off.police === 0 && off.fire === 0 && off.vanShadow === 0 && !off.licence
+        && on.jobs > 0 && on.zoos === 1 && on.zoosNoRoad === 0 && on.police > 0 && on.fire > 0 && on.vanShadow > 0 && on.licence,
+      `out of reach: ${off.jobs} jobs · ${off.zoos}/${off.zoosNoRoad} zoos served/not · ${off.police} police tiles · ${off.fire} fire tiles · van shadow ${off.vanShadow} · licence ${off.licence}`
+        + ` || in reach: ${on.jobs} jobs · ${on.zoos}/${on.zoosNoRoad} · ${on.police} · ${on.fire} · ${on.vanShadow} · ${on.licence}`);
+
+    // And the CARTS: every side of a hall is a loading bay, so a cart coming
+    // from the east leaves by the east door. `meat.hallCandidates` indexes a
+    // hall under EVERY door for that reason, and nothing had asked it for a
+    // hall with more than one - so a mutant that indexed only the first one
+    // lived, and every cart in the game would have driven round the building.
+    const ME2 = await import("../js/sim/meat.js");
+    const H4 = createWorld({ seed: "hall-doors" });
+    const h4 = (x, y) => y * H4.w + x;
+    for (let y = 2; y <= 20; y++) for (let x = 2; x <= 30; x++) {
+      const i = h4(x, y);
+      H4.terrain[i] = TERRAIN.GRASS; H4.road[i] = ROAD.NONE; H4.zone[i] = ZONE.NONE;
+      H4.tier[i] = 0; H4.wall[i] = 0; H4.rail[i] = 0; H4.civic[i] = 0; H4.big[i] = 0; H4.use[i] = 0;
+    }
+    H4.events.noDisasters = true;
+    const hroad = [];
+    for (let x = 4; x <= 20; x++) if (x !== 12) hroad.push(h4(x, 10)); // one road, straight through, with the hall in it
+    apply(H4, { kind: "road", tiles: hroad });
+    apply(H4, { kind: "zone", zone: ZONE.M, x0: 12, y0: 10, x1: 12, y1: 10, density: 3 });
+    H4.tier[h4(12, 10)] = 2;
+    apply(H4, { kind: "zone", zone: ZONE.R, x0: 6, y0: 11, x1: 6, y1: 11, density: 3 });
+    apply(H4, { kind: "zone", zone: ZONE.R, x0: 18, y0: 11, x1: 18, y1: 11, density: 3 });
+    H4.tier[h4(6, 11)] = 1;
+    H4.tier[h4(18, 11)] = 1;
+    computeFields(H4);
+    const hallDoors = doors(H4, h4(12, 10));
+    const west = ME2.hallReach(H4, h4(6, 11));
+    const east = ME2.hallReach(H4, h4(18, 11));
+    check("access: and every side of a MEAT HALL is a loading bay — a cart coming from the west arrives at the west door and one from the east at the east door, for the same money; the freight index lists a hall under every door it has, not the lowest-numbered one",
+      hallDoors.length === 2 && hallDoors[0] === h4(11, 10) && hallDoors[1] === h4(13, 10)
+        && !!west && !!east && west.hall === h4(12, 10) && east.hall === h4(12, 10)
+        && west.door === h4(11, 10) && east.door === h4(13, 10)
+        && west.walkSteps === east.walkSteps,
+      `doors ${hallDoors.map(xy).join(" ")} · from the west ${west ? xy(west.door) : "NO ROUTE"} in ${west && west.walkSteps} · from the east ${east ? xy(east.door) : "NO ROUTE"} in ${east && east.walkSteps}`);
+    // AND THE FREIGHT CACHE IS RESET AT THE OP, not at the next month.
+    // `hallReach` memoises per tick, so a cart asked after a player op would
+    // otherwise be answered from a map that no longer exists - `ops.apply`
+    // calls `resetMeatRoutes` for that reason and nothing held it.
+    const staleRoute = ME2.hallReach(H4, h4(18, 11));       // fills the cache
+    apply(H4, { kind: "bulldoze", x0: 12, y0: 10, x1: 12, y1: 10, what: "building" });
+    const afterRaze = ME2.hallReach(H4, h4(18, 11));
+    check("access: a cart asked after a player op is answered from the city as it is NOW — raze the only meat hall and the very next route request says there is nowhere to take the meat, because ops resets the freight cache at the op rather than at the next month",
+      !!staleRoute && staleRoute.hall === h4(12, 10) && H4.tier[h4(12, 10)] === 0 && afterRaze === null,
+      `before, the hall at ${staleRoute ? xy(staleRoute.hall) : "none"} · after razing it, ${afterRaze ? xy(afterRaze.hall) : "no route"}`);
   }
 
   // ---- A LOT NOBODY CAN REACH IS NOT SWALLOWED INTO A BLOCK -----------------
@@ -4869,8 +5076,10 @@ if (existsSync(artIndex)) {
   const thoughtT0 = performance.now();
   for (let i = 0; i < 100; i++) renderer.drawBubbles(eightSpeakers);
   const thoughtMs = (performance.now() - thoughtT0) / 100;
-  check("needs: the cached eight-bubble pass adds under 1 ms per frame",
-    thoughtMs < 1, `${thoughtMs.toFixed(3)} ms`);
+  // Contention-proof for the same reason as "tick cost" above: ~0.17 ms real,
+  // and a bound a hundred times that. The printed line below is the measurement.
+  check("needs: the cached eight-bubble pass is not catastrophic (the printed number is the instrument)",
+    thoughtMs < 25, `${thoughtMs.toFixed(3)} ms`);
   console.log(`needs: 8-bubble pass ${thoughtMs.toFixed(3)} ms · zoom boxes ${bubbleAt1.join("×")} / ${bubbleAt2.join("×")}`);
 
   // Two layers, two rules, and the difference is the whole reason play.mjs

@@ -179,7 +179,14 @@ export function census(world) {
   let meatOnHand = 0;
   for (let i = 0; i < n; i++) {
     meatOnHand += world.meat?.[i] || 0;
-    const jobs = jobsOf(world, i);
+    // JOBS NOBODY CAN REACH ARE NOT JOBS. `jobSearch` lists a workplace under
+    // its DOORS, so an unserved one is already invisible to every animal
+    // looking for work - but the census counted its places anyway and moved
+    // the C and I valves with them, so a zoo no road reached grew the town
+    // exactly as a working one did. SPEC 6c says the predicate gates "jobs,
+    // the LV halo and the census the cap reads - one predicate, three
+    // effects"; this is the first of the three, and it was the one missing.
+    const jobs = served(world, i) ? jobsOf(world, i) : 0;
     if (jobs) {
       J += jobs;
       const jz = jobZone(world, i);

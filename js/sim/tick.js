@@ -6,7 +6,7 @@ import { census, needCensus, notables } from "./census.js";
 import { updateDemand, peekDemand, neutralRate } from "./demand.js";
 import { yearlyFigures } from "./budget.js";
 import { lotsTick } from "./lots.js";
-import { citizensTick, compact, invalidatePaths } from "./citizens.js";
+import { citizensTick, compact, invalidatePaths, replanStale } from "./citizens.js";
 import { budgetTick } from "./budget.js";
 import { eventsTick } from "./events.js";
 import { justiceTick } from "./justice.js";
@@ -150,6 +150,15 @@ function settleDoors(world) {
   if (!world.doorsMoved) return false;
   world.doorsMoved = false;
   invalidatePaths(world);
+  // AND RE-PLAN THEM NOW, not at the next citizens pass. One of the three
+  // callers runs AFTER `citizensTick`, so a stale pass is not coming: the
+  // month would end with every commute null, and next month's traffic, riders
+  // and mean commute would be taken from nothing in the straight run and from
+  // everything in a reload (`save.rebuildDerived` re-plans unconditionally).
+  // The hash at the boundary is equal either way - `c.path` is not in
+  // `canonicalCitizen` - so the two cities part a month later. Nothing may end
+  // a tick stale.
+  replanStale(world);
   return true;
 }
 

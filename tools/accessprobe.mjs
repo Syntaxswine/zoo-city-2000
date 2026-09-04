@@ -86,7 +86,12 @@ function deepRig(seed, years) {
     w.tier[i] = 0; w.wall[i] = 0; w.rail[i] = 0; w.civic[i] = 0; w.big[i] = 0;
   }
   w.cash = 900000;
-  w.events.noDisasters = true;
+  // NO `noDisasters` HERE, deliberately. This rig exists because the scripted
+  // mayor cannot build a forecourt - and a fire is the only thing that moves
+  // one after the tick has settled the doors. A rig built for the case that
+  // switched off the case would be a rig that could not see it. (A fourth
+  // hostile review counted thirteen `noDisasters = true` in the access
+  // fixtures and found this one among them.)
   // Three avenues and one spine. The quarters between them are SEVEN deep and
   // roaded on one side only, so their far rows sit four and five tiles out -
   // the case the mayor's ringed 6x6 can never make.
@@ -109,8 +114,12 @@ function deepRig(seed, years) {
 }
 
 /**
- * A WORST CASE FOR COST, and nothing else: as many platforms as the map will
- * hold, each three tiles off a road so each one's doors are a real search.
+ * A WORST CASE FOR COST, and nothing else: SEVEN lines with a platform every
+ * six tiles - 56 of them - each three tiles off its road so every one's doors
+ * are a real search. Not the theoretical maximum: `ops` will take a station on
+ * any plain rail tile, and this map would hold 357. Cost is linear in
+ * platforms, so 56 reads across (a fourth hostile review measured 357 at
+ * 0.482 ms/tick against this rig's 0.098, and the conclusion held).
  * The scripted mayor builds two; a town nobody would play might build fifty.
  * Cost scales with platforms - every one is a bounded BFS with two O(tiles)
  * fills - so a figure quoted from a two-platform town says nothing about a

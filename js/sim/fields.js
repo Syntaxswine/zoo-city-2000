@@ -138,9 +138,19 @@ export function asksAccess(world, i) {
   return c === CIVIC.ZOO || c === CIVIC.ZOO_PART || isCivicEmployer(c);
 }
 
-export const served = (world, i) => siteRoadDist(world, i) <= KNOBS.ROAD_REACH;
+/**
+ * IS THERE A ROAD? The one predicate (SPEC 6c). `seen` is the caller-owned
+ * scratch every reader here takes: `lotScore` reaches this from the score
+ * overlay, and 14 forbids the draw layer a buffer on the world.
+ */
+export const served = (world, i, seen = null) => siteRoadDist(world, i, seen) <= KNOBS.ROAD_REACH;
 
-/** Traffic: number of commuter paths through each road tile (readout only). */
+/**
+ * Traffic: the number of commuter paths through each tile they WALK - roads,
+ * and since Part R the forecourt tiles between a platform and its door, which
+ * are walked and drawn like any other step. A ride makes none (SPEC 7.9).
+ * Readout only, and `census.maxTraffic` reads it.
+ */
 export function computeTraffic(world) {
   world.traffic.fill(0);
   for (const c of world.citizens) {
@@ -265,7 +275,13 @@ export function computeLandValue(world) {
   for (let i = 0; i < n; i++) {
     const c = world.civic[i];
     if (c !== CIVIC.PARK && c !== CIVIC.ZOO && c !== CIVIC.CENTRE) continue;
-    if (c === CIVIC.ZOO && !served(world, i)) continue; // nobody can visit it, so no street is worth more for it (SPEC 6c)
+    // Nobody can reach it, so it does nothing to the street: no visitors for a
+    // zoo, and no van leaving a pacification centre. A PARK is not gated -
+    // SPEC 6c says a park is a place and not a service, and it never asks.
+    // (The centre's shadow was ungated while the zoo's halo was: an
+    // unreachable centre took no prisoners, employed nobody, and still put
+    // six points of land value on every street round it.)
+    if ((c === CIVIC.ZOO || c === CIVIC.CENTRE) && !served(world, i)) continue;
     const r = c === CIVIC.PARK ? KNOBS.LV_PARK_RADIUS : c === CIVIC.ZOO ? KNOBS.LV_ZOO_RADIUS : KNOBS.LV_VAN_RADIUS;
     const mask = c === CIVIC.PARK ? nearPark : c === CIVIC.ZOO ? nearZoo : nearVan;
     forEachWithin(world, i, r, (j) => { mask[j] = 1; }); // round a wall, not through it

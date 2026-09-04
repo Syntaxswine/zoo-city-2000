@@ -1021,6 +1021,41 @@ function moods(world) {
 // Jobs
 // ---------------------------------------------------------------------------
 
+/**
+ * EVERY STALE COMMUTE, RE-PLANNED NOW. A path is stale when the thing at
+ * either end changed shape (a merge, a split, a rehome) or when the ground
+ * under it moved (a road drawn, a forecourt closed or REROUTED). It keeps its
+ * job if the commute still exists and loses it if it does not.
+ *
+ * It is a FUNCTION because two callers need it, and the second one is the
+ * reason: `tick.js`'s `settleDoors` runs once before the citizens and once
+ * AFTER them, because `eventsTick` razes buildings and opens water at step 7.
+ * An invalidation after the citizens have run would otherwise end the month
+ * with every commute null - the straight run computing next month's traffic,
+ * riders and mean commute from NO paths while a reload computes them from all
+ * of them, because `save.rebuildDerived` re-plans unconditionally. `c.path` is
+ * not in `canonicalCitizen`, so the hash at the boundary is equal and the two
+ * cities part company a month later. A fourth hostile review measured it:
+ * traffic 0 against 3796, and `ff0656b1` against `4a6abbbb` at 24 months.
+ *
+ * So the rule is simply: NOTHING MAY END A TICK STALE.
+ */
+export function replanStale(world) {
+  for (const c of world.citizens) {
+    if (!c.stale || c.dead) continue;
+    c.stale = false;
+    if (c.job < 0 || c.home < 0) continue;
+    // The player's line: a lot repainted against its workers releases them (they search again under the gate).
+    if (!admits(world.use[c.job], c.species)) { releaseJob(world, c); continue; }
+    const a = doorsOf(world, c.home);
+    const b = doorsOf(world, c.job);
+    const r = a.length && b.length ? commutePath(world, c.species, a, b) : null;
+    const path = r ? r.path : null;
+    if (path) c.path = path;
+    else releaseJob(world, c);
+  }
+}
+
 function jobSearch(world, out) {
   const cs = world.citizens;
   const N = cs.length;
@@ -1047,20 +1082,7 @@ function jobSearch(world, out) {
   const start = world._jobCursor || 0;
   let searches = 0;
   let looked = 0;
-  // Stale paths first: keep the job if the commute still exists.
-  for (const c of cs) {
-    if (!c.stale || c.dead) continue;
-    c.stale = false;
-    if (c.job < 0 || c.home < 0) continue;
-    // The player's line: a lot repainted against its workers releases them (they search again under the gate).
-    if (!admits(world.use[c.job], c.species)) { releaseJob(world, c); continue; }
-    const a = doorsOf(world, c.home);
-    const b = doorsOf(world, c.job);
-    const r = a.length && b.length ? commutePath(world, c.species, a, b) : null;
-    const path = r ? r.path : null;
-    if (path) c.path = path;
-    else releaseJob(world, c);
-  }
+  replanStale(world); // stale paths first: keep the job if the commute still exists
   for (let k = 0; k < N && searches < KNOBS.JOB_SEARCHES; k++) {
     const c = cs[(start + k) % N];
     looked = k + 1;

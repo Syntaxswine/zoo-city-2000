@@ -239,7 +239,7 @@ another's. Git merges those. `citizens.js`, `justice.js` and `events.js`
 are the risk: B adds one-liners at call sites; A adds one function; H
 edits two `post` sites; F edits one advisor function; D never opens them.
 
-## Road access, standardized — SHIPPED 2026-09-04 (plan §4-R; SPEC §6c, §5, §7.9, §9b, §11; handoff §24, §24b, §24c, §24d, §24e; `tools/accessprobe.mjs`; the suite went 428 → 503 across THREE hostile reviews)
+## Road access, standardized — SHIPPED 2026-09-04 (plan §4-R; SPEC §6c, §5, §7.9, §9b, §11; handoff §24–§24f; `tools/accessprobe.mjs`; the suite went 428 → 517 across FOUR hostile reviews, 6 → 6.5 → 6.5 → 7)
 
 The owner: *"as long as a tile is within 1-3 tiles of the road it has road
 access"*, *"the 6x6 squares have roads around the whole perimeter, so nothing
@@ -332,6 +332,15 @@ paths are stale (it would have to tick or wait); or accept it and say so in
 SPEC §15. The suite's own convention is already the third - every save/load
 check ticks before it saves - so today the law is really "hash-equal from any
 TICK boundary", and §16 does not say that.
+
+**And that workaround was itself false for one commit.** At `4b9b6d0` a settle
+placed after `citizensTick` left the tick BOUNDARY stale too, so "hash-equal
+from any tick boundary" was untrue as well — a fourth hostile review caught it
+(`ff0656b1` vs `4a6abbbb`, no op anywhere near). Fixed by `settleDoors` calling
+`citizens.replanStale`: **nothing may end a tick stale.** The op-time hole
+above is still open and still a rule call, but the boundary claim is true
+again, and there is now a named function (`replanStale`) that the first of the
+three ways out would be built from.
 
 ## The second hostile review — all thirteen, closed (2026-09-04)
 
@@ -441,6 +450,77 @@ doors itself. So the check was watching the wrong half of its own fix: deleting
 the op-time settle left it green with 317 animals walking through a police
 station. The measurement is taken before the tick now. **A line added for one
 reason can take the teeth out of a check written for another.**
+
+## The FOURTH hostile review — my own fix was the new bug (2026-09-04)
+
+A fourth adversarial reader scored `4b9b6d0` **7/10** (up from 6, 6.5, 6.5) and
+found that **the settle added for the third review's finding 2 was itself a
+§16 break**. 92 mutants of their own: 71 died by a named check, 17 survived.
+
+1. **NOTHING MAY END A TICK STALE.** `settleDoors` runs three times, and the
+   third runs AFTER `citizensTick` — so its `invalidatePaths` had no stale pass
+   coming, and the month ended with every commute null. Next month the straight
+   run took traffic, riders and mean commute from NOTHING while a reload took
+   them from everything (`save.rebuildDerived` re-plans unconditionally); §16's
+   hash at the boundary is equal either way, because `c.path` is not in
+   `canonicalCitizen`, so the two cities parted a month later. Measured on this
+   part's own rig with **no op at all** and a save at a clean TICK BOUNDARY:
+   traffic 0 against 3796, `ff0656b1` against `4a6abbbb` at 24 months. Fixed:
+   `citizens.replanStale` is a function now, and `settleDoors` calls it. The
+   check burns a house off a forecourt and demands the month still end with
+   every commute planned and the same traffic counted next month.
+2. **The fifth check that cannot fail, and it was structural.** Thirteen
+   `noDisasters = true` across the access fixtures — including
+   `accessprobe --rig deep`, the rig that exists *because the mayor cannot
+   build a forecourt*, with the only thing that moves one after the settle
+   switched off. And the one fixture that did light a fire had **zero
+   citizens**, so "the doors settle in the same month" was asserted about the
+   graph and never about a stored path. `deepRig` runs with weather now.
+3. **Three rows of SPEC §6c's own table were spelling, not behaviour** — fire
+   and police cover, the Butchers' licence, and the carts' every-side rule all
+   survived a mutant. One check now runs the whole table as a PAIR: a zoo, a
+   centre, a police and a fire station and a tier-2 hall, all out of reach —
+   no jobs, no cover, no van shadow, no licence — then one road, and all five
+   arrive. Plus a cart from the west arriving at the west door and one from the
+   east at the east door, for the same money.
+4. **Two behaviour bugs in the standard itself, both fixed.** The census
+   counted jobs at sites nobody could reach, so a zoo no road reached moved the
+   C and I valves exactly as a working one did (SPEC says the predicate gates
+   "jobs, the LV halo and the census the cap reads — one predicate, three
+   effects"; it was two). And an unreachable pacification centre kept its van's
+   land-value shadow while the zoo's halo was gated. **Both are hash-neutral on
+   all six published gates** — the mayor's towns have no unreachable sites.
+5. **A wall clock inside a determinism suite is a trap, and it caught us.**
+   `check("tick cost", ms < 30)` fails under CPU contention, `check.mjs` exits
+   1, and a parallel MUTATION SWEEP reads that as "caught". The reviewer re-ran
+   every low-failure mutant at four lanes instead of fourteen and moved **eight
+   verdicts from CAUGHT back to SURVIVED**. Both timing gates are now bounds no
+   contention can reach (250 ms against ~10; 25 ms against ~0.17) with the
+   printed number as the instrument — and earlier sweep claims in this file
+   were made under the old gate, so treat their counts as upper bounds.
+6. **`§16` had never been asked of a town with the PLAYER'S LINE painted** —
+   two mutants lived there (`ops.apply`'s `else if (lines) invalidatePaths` and
+   `save.js`'s species-weighted reload), each worth 135–218 differing paths and
+   a divergence at month +1. Now checked on a 346-animal town.
+7. **A riding step is neutral travel** — SPEC §7.9, §9c, the README and the
+   Rules tab all say the trespass counts walking tiles only, and deleting the
+   ride test in `exposure` left the suite green. Checked with a real rider.
+8. Smaller: the freight cache is reset at the op (checked by razing the only
+   hall and asking again); `served` takes a caller-owned buffer like the other
+   four readers; SPEC says four settle sites, not three, and says which one
+   never fires; the traffic comment admits it counts forecourt tiles too;
+   `--rig many` says what it builds (56 platforms, not the 357 the map would
+   hold); and the README's deep-rig numbers are re-measured at HEAD — they had
+   moved with the rail knobs in `341baf8` underneath.
+
+**Found SOUND by the fourth reader** — do not re-verify: all six gate hashes
+reproduce byte-for-byte; the whole `--cost` table reproduces on an idle
+machine; `accessprobe --layout millbelt` reproduces exactly; Law 6 holds
+behaviourally; §14 holds for `render.js`; the core is mutation-proof (every
+mutant on `passable`, `doorSearch`, the signature, `nodePath`, `dial`, both
+tick settles, the ops settles, the undo settle, the merge/split re-plans,
+`footprintOf`, `zooTiles`, the job index, all four overlay mutants and the
+card's three refusals dies by a NAMED check).
 
 ## The THIRD hostile review — the same bug one level down (2026-09-04)
 
