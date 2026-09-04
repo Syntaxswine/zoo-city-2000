@@ -46,8 +46,9 @@ builds in ~30 ms. Old object graveyards migrate once. SPEC §§7.10, 11c;
 bought at the door, killings, convicted sales and livestock raised to
 sixteen, with carnivore meals out, explicit spoilage and a hard 40-unit cap.
 H carts and sacks traverse a real road/station/rail path, but all rail and
-transfer edges count as zero reach; citizen commutes stay at 0.3 and
-property/amenity/smell distance stays geographic. The card, Census, Rules
+transfer edges count as zero reach; citizen commutes price a ride at 2/9
+(0.22) of a walk after X2; property/amenity/smell distance stays geographic.
+The card, Census, Rules
 M4–M6 and news expose it. Exact stored RIDE paths drive the visible handcart,
 cub companion, pen and sack-to-hall walkers. `--layout estate` reserves exactly
 two hall lots, 6×6 interiors and ≥37 physical tiles R→M; four 15-year seeds build
@@ -142,14 +143,14 @@ probe's `--save`. This section (the title-screen one below) said "a
 save-as name field is not built" — S is that. And *"railroads and roads
 should be able to cross over each other perpendicularly"* → **X SHIPPED
 2026-09-03** the level crossing (its own section below; SPEC §7.9, §12.4c;
-26 checks; the three playtest gates byte-identical). **X2, the ride speed,
-is NOT shipped** and is the part's one open half.
-And *"citizens traveling on the rails should move 50% faster"* → X2:
-measured first, a rider moves at ×3.07 a walker on the map today, so read
-as ×4.5; WALK 10 → 9, RAIL_COST 3 → 2 (9/2 = 4.5 exactly), RIDE_SPEED
-DERIVED = WALK/RAIL_COST so the eye and the Rules tab are one number; the
-hash moves on rail towns only. Plan §8 q8 asks whether ×1.5 of walking was
-meant instead. And *"road access should not be limited to one side of a
+26 checks; the three playtest gates byte-identical). **X2 SHIPPED
+2026-09-04:** *"citizens traveling on the rails should move 50% faster"*
+lands as a 50% increase over the former ×3: `WALK` 9, `RAIL_COST` 2 and
+derived `RIDE_SPEED = WALK / RAIL_COST = 4.5`. Commute scoring and the eye
+now share one law; a large frame is re-priced at every walk/rail boundary.
+Against its Part R parent, the rail-less 30-year gate stays `8707f655`; H
+freight still uses zero-cost rail and property distance stays geographic.
+And *"road access should not be limited to one side of a
 tile, as long as a tile is within 1-3 tiles of the road it has road
 access"* → **R** (plan §4-R): the code ALREADY says so (`computeRoadDist`
 = a BFS through any tile, any direction, ≤ ROAD_REACH 3; only a bare wall
@@ -525,26 +526,22 @@ with its own 2× twin. The three standing playtest gates are byte-identical
 (`e1decbff / 6bcf6236 / 00d5e9c3`) — the rule accepts a case the scripted
 mayor never attempts.
 
+**X2, the ride speed — SHIPPED 2026-09-04.** The focused display probe reads
+1.00 tile/s walking and 4.50 riding. Exact-boundary and one-large-frame vs
+200-small-frame checks close the old bug where the speed at the start of a
+frame leaked across every later segment. The same probe carries unused time
+through a platform stand and onto the return leg. Felt commute time now sums
+integer Dial costs before dividing once, so an exact threshold cannot drift
+a few floating-point ulps over it. `WALK` now lives in the one knob registry;
+`fields.WALK` is its alias. The targeted two-walk +
+27-ride tortoise commute moves from 11 to 8 walk-steps, exactly its comfort
+threshold. The integration review with Part R also caught the station-door
+signature recording endpoints but not the exact forecourt chain: an equally
+short reroute to the same door left live paths walking through a new building.
+The chain is now signed, invalidated, replanned and save/continued in the
+regression. The integrated canonical suite is 497 checks.
+
 Left:
-- **X2, the ride speed** — the owner: *"citizens traveling on the rails
-  should move 50% faster."* Measured ×3.07 today, read as ×4.5: `WALK`
-  10 → 9, `RAIL_COST` 3 → 2, and `RIDE_SPEED` becomes DERIVED (`WALK /
-  RAIL_COST`) so the eye's number and the commute's can never drift apart
-  again. It moves the hash on rail towns only (walk-only towns are proved
-  neutral: every walk cost scales, and `searchJob`'s `d = c / WALK` is the
-  same integer). Plan §8 q8 is still open — if the owner meant ×1.5 of
-  WALKING (slower than today) it is `RAIL_COST` 6 instead. Also stale on
-  that day, every place the number is written out: the literal `10` in
-  `check.mjs`'s ride-time check; `rules.js` R1's formula AND the `RAIL_COST`
-  knob's own comment (`rules.js:242`); `js/ui.js`'s two card lines AND the
-  crossing line this session added (`ui.js:382`); `js/input.js:25`, the Rail
-  tool's hint, which the player reads; `citizens.js:914`'s comment; SPEC
-  §7.9's three numbers; README's rail ROW (line 72) and its rail PARAGRAPH
-  (line 125). And the structural obstacle nobody has written down: `WALK`
-  lives in `js/sim/fields.js` and `RAIL_COST`/`RIDE_SPEED` in `KNOBS` in
-  `js/sim/rules.js`, which imports nothing — so "`RIDE_SPEED` becomes
-  derived" cannot be written inside `KNOBS` without moving `WALK` into
-  `rules.js` (the clean move: it is a knob) or inverting the import.
 - Rail bridges (a deck sprite with rails) — still not built.
 - A two-car train walker on busy lines; a crossing has no gate, no lights
   and no bell (it is one ground tile, and a moving barrier wants the

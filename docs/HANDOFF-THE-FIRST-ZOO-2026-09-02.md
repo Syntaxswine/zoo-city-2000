@@ -671,8 +671,8 @@ Suite 91 → 103.
 - **Riders are counted at the census, which runs before the job search**:
   after a rail op (paths invalidated) the first tick's census sees no
   paths and no riders; the second tick's does. Traffic likewise.
-- **v1 limits (BACKLOG):** no rail bridges, no level crossings, no train
-  sprite (riders sit 3 px up at ×3).
+- **v1 limits (BACKLOG):** no rail bridges and no train sprite (level
+  crossings have since shipped; riders sit 3 px up at X2's derived ×4.5).
 
 Suite 103 → 113. The tranche is complete: walls (A), use-zoning and
 trespass (B), rail (C) — three commits on the proposal.
@@ -1663,15 +1663,14 @@ what the suite spends walking them.
 
 ### Ammunition for the next arc
 
-- **X2, the ride speed, is the part's open half** and is an hour: `WALK`
-  10 → 9, `RAIL_COST` 3 → 2, `RIDE_SPEED` derived (`WALK / RAIL_COST` = 4.5)
-  so the eye's number and the commute's can never drift apart again.
-  Walk-only towns are hash-neutral by construction (every walk cost scales
-  and `searchJob`'s `d = c / WALK` is the same integer); rail towns move.
-  Plan §8 q8 is still open — ×1.5 of walking is `RAIL_COST` 6 instead.
-  BACKLOG lists every place the number is written out, and the obstacle:
-  `WALK` lives in `fields.js`, `RAIL_COST` in `rules.js`, and `rules.js`
-  imports nothing, so the derived line needs `WALK` moved into the knobs.
+- **X2, the ride speed, shipped 2026-09-04:** `WALK` moved into the knob
+  registry at 9, `RAIL_COST` is 2, and `RIDE_SPEED` is derived as their
+  reciprocal ×4.5 — a 50% increase over the old ×3. The implementation also
+  re-prices every segment crossed by a large frame and synchronizes exact
+  walk/rail boundary poses; felt commute sums integer costs before dividing,
+  so an exact comfort threshold stays exact. Focused motion, threshold,
+  H-free-rail and rail-less-hash checks are in the 497-check suite; PLAN §4-X
+  records the evidence.
 - A crossing has no gate, no lights and no bell. It is one ground tile; a
   barrier that drops when a train passes wants the walker layer and the
   two-car train sprite BACKLOG already holds.
@@ -1831,6 +1830,7 @@ keeping is the SHAPE of each miss.
 | a park was told it had no road | **Two copies of "who is asking"**, one in the card and one in the overlay, and I wrote the second one wider than the first. One predicate now |
 | the overlay's meaning inverted at `ROAD_REACH` 5 | **A table counted out to the length of today's constant.** Every check ran at 3, so nothing saw it. Index and clamp |
 | the door a station link LANDS on was unpriced | **I tested the interesting half.** The fixture painted the forecourt and never the door, so the chain's price was pinned and the landing's was not |
+| a new building rerouted a station to the SAME door at the SAME distance, yet commuters kept walking through it | The door-graph signature recorded station and door endpoint ids but not the exact forecourt chain copied into stored paths. Equal endpoint and equal distance do not mean equal derived state. The signature now includes every stable door→chain mapping; the regression proves live invalidation, the alternate path and save → load → continue |
 | `splitLot`'s re-plan was never exercised | **My check said `commuters.length === 0 \|\| ...` on a fixture with no citizens.** A guard that can never be false is not a check — the second one I wrote this session |
 | a tile sealed inside a wall had a door | `computeRoadDist` refuses to ENTER a barrier; the door search started INSIDE one and walked out. The agreement sweep ran on a rig with no walls in it |
 | `computeStationDoors` at the op was provably inert | **Insurance is not behaviour.** Deleting it passed. Either delete it or make it load-bearing with a check; I made it load-bearing — and the first draft of THAT check did not discriminate either, because moving a road AWAY leaves the walk stuck on a dead door and falling back to the road, which is what it does with the links rebuilt too. Move the road CLOSER |

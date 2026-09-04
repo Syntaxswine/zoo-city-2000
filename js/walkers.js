@@ -591,48 +591,56 @@ export function createWalkers(initialWorld) {
   }
 
   function step(w, dt) {
-    const leg = w.legs[w.leg];
-    if (!leg) { w.done = true; return; }
-    if (w.standUntil > 0) {
-      w.standUntil -= dt;
-      w.idle += dt;
-      w.frame = w.idle > 1 ? 3 : 0;
-      if (w.kind === "predation" && w.leg === 0) w.bag = Math.min(1, Math.max(0, 1 - w.standUntil / BAG_STAND));
-      if (w.standUntil > 0) return;
-      // Stand over: next leg, or done.
-      if (w.release) { w.done = true; return; }
-      if (w.kind === "scout") {
-        const p = leg.path;
-        w.legs = [{ path: scoutLeg(w, p[p.length - 1], p.length > 1 ? p[p.length - 2] : -1), stand: 0 }];
-        w.leg = 0; w.seg = 0; w.t = 0;
-        return;
+    let seconds = dt;
+    while (seconds > 1e-12 && !w.done) {
+      const leg = w.legs[w.leg];
+      if (!leg) { w.done = true; return; }
+      if (w.standUntil > 0) {
+        w.riding = false;
+        const used = Math.min(seconds, w.standUntil);
+        w.standUntil -= used;
+        w.idle += used;
+        seconds -= used;
+        w.frame = w.idle > 1 ? 3 : 0;
+        if (w.kind === "predation" && w.leg === 0) w.bag = Math.min(1, Math.max(0, 1 - w.standUntil / BAG_STAND));
+        if (w.standUntil > 1e-12) return;
+        // Stand over: next leg, or done. A long frame keeps its unused time,
+        // so an arrival at a platform cannot donate walk-speed time to rail.
+        w.standUntil = 0;
+        if (w.release) { w.done = true; return; }
+        if (w.kind === "scout") {
+          const p = leg.path;
+          w.legs = [{ path: scoutLeg(w, p[p.length - 1], p.length > 1 ? p[p.length - 2] : -1), stand: 0 }];
+          w.leg = 0; w.seg = 0; w.t = 0;
+          continue;
+        }
+        w.leg++;
+        w.seg = 0;
+        w.t = 0;
+        w.idle = 0;
+        if (w.kind === "predation" && w.leg === 1) {
+          // The sack is tied: it goes over the shoulder, the neighbour is not drawn again.
+          w.bag = null;
+          w.prey = null;
+          w.carry = "sack";
+          w.speed *= CARRY_SPEED;
+        }
+        if (w.leg >= w.legs.length) w.done = true;
+        continue;
       }
-      w.leg++;
-      w.seg = 0;
-      w.t = 0;
+      const path = leg.path;
+      if (path.length < 2) { w.standUntil = leg.stand || 0.01; w.idle = 0; continue; }
       w.idle = 0;
-      if (w.kind === "predation" && w.leg === 1) {
-        // The sack is tied: it goes over the shoulder, the neighbour is not drawn again.
-        w.bag = null;
-        w.prey = null;
-        w.carry = "sack";
-        w.speed *= CARRY_SPEED;
-      }
-      if (w.leg >= w.legs.length) w.done = true;
-      return;
-    }
-    const path = leg.path;
-    if (path.length < 2) { w.standUntil = leg.stand || 0.01; w.idle = 0; return; }
-    w.idle = 0;
-    const rd = leg.ride;
-    const onRail = !!(rd && (rd[w.seg] || rd[w.seg + 1])); // a segment touching a ridden tile is a ride
-    let d = w.speed * dt * (onRail ? KNOBS.RIDE_SPEED : 1);
-    while (d > 0) {
+      const rd = leg.ride;
+      const onRail = !!(rd && (rd[w.seg] || rd[w.seg + 1])); // a segment touching a ridden tile is a ride
+      w.riding = onRail;
+      const speed = w.speed * (onRail ? KNOBS.RIDE_SPEED : 1);
       const rem = 1 - w.t;
-      const s = Math.min(d, rem);
-      w.t += s;
-      d -= s;
-      w.dist += s;
+      const used = Math.min(seconds, rem / speed);
+      const distance = used * speed;
+      w.t += distance;
+      seconds -= used;
+      w.dist += distance;
       if (w.t >= 1 - 1e-9) {
         w.seg++;
         w.t = 0;
@@ -640,16 +648,26 @@ export function createWalkers(initialWorld) {
         if (w.seg >= path.length - 1) {
           [w.tx, w.ty] = centre(path[path.length - 1]);
           w.standUntil = Math.max(leg.stand, 0.01);
+          w.riding = false;
           w.frame = 0;
           w.idle = 0;
           if (w.kind === "scout") w.standUntil = 0.4;
-          return;
+          continue;
         }
+        continue;
       }
     }
+    // The interval may end exactly on a segment boundary. Resolve pose from
+    // the new segment after the loop so the figure never spends a frame at
+    // its previous coordinate or with the previous segment's ride state.
+    if (w.done || w.standUntil > 0) { w.riding = false; return; }
+    const leg = w.legs[w.leg];
+    const path = leg?.path;
+    if (!path || path.length < 2 || w.seg >= path.length - 1) return;
+    const rd = leg.ride;
+    w.riding = !!(rd && (rd[w.seg] || rd[w.seg + 1]));
     const a = path[w.seg];
     const b = path[w.seg + 1];
-    w.riding = !!(rd && (rd[w.seg] || rd[w.seg + 1]));
     const [ax, ay] = centre(a);
     const [bx, by] = centre(b);
     const dx = bx - ax;

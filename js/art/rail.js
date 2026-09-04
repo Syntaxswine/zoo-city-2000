@@ -11,8 +11,9 @@
 // one side of the track and a shelter — two posts and a roof — on it, so the
 // track sprite shows under the canopy. Its axis is the track's ("ns" runs
 // along b); the platform sits on the +a side of a N–S track and the +b side
-// of an E–W one. A station is a DOOR only when a road tile touches it
-// (sim/fields.js): the art does not know, the card says.
+// of an E–W one. A station is served when a road reaches it within
+// ROAD_REACH; passengers walk the intervening forecourt (sim/fields.js).
+// The art does not know, and the card says.
 
 import { defineSprite } from "./format.js";
 import { keysOf } from "./palette.js";

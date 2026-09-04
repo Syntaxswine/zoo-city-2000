@@ -79,7 +79,7 @@ them on the real map):
 | dread | a meat hall spreads 40/70/105 over 2/3/4 tiles; LV −0.8·dread (twice a works); herbivores mind it, carnivores do not |
 | use-zoning | `U` paints lots and roads predator-only / prey-only / mixed; a gate on homes and jobs (the player's line, not the species'); a forbidden road step costs ×6 in the commute search; a repainted household has 3 months to rehome or leaves |
 | trespass | `E` forbidden walking tiles on the commute (+4 for a forbidding home or job); `p = min(0.3, 0.02·E·cover/60)` a month — no police, no stop; the cells for a month and a record; the third offence meets the sentence table |
-| rail | a commute is the cheapest walk-and-ride: a step 1, a ride 0.3 between stations a road touches; traffic and trespass count walking steps only — neutral travel until you step off; a road and a line cross square-on on one tile |
+| rail | a commute is the cheapest walk-and-ride: a step 1, a ride 2/9 (0.22) between stations served by a road within 3 tiles (the forecourt is walked); riders move at ×4.5, 50% faster than before; traffic and trespass count walking steps only — neutral travel until you step off; a road and a line cross square-on on one tile |
 | walls | every area effect radiates by flood fill; a wall blocks it and receives nothing; a road through it is a tunnel, open along the road; a killer's reach stops at a wall (Glades of Arcadia's law) |
 
 The hover card's **WHY NOT** line is computed by the same function that
@@ -146,14 +146,15 @@ months to find a home within twelve road tiles or it leaves. Commutes
 prefer the legal way round — a forbidden road step costs six legal ones in
 the search — but an animal whose only way to work crosses the line walks
 it, and under police cover it is stopped: a month in the cells and a record,
-and the third offence meets the sentence table. Rail (coming) is neutral
+and the third offence meets the sentence table. Rail is neutral
 travel; only where you step off counts. The `O` overlay shows the line in
 rust and teal.
 
 **Rail.** `7` lays track and `8` makes a station of any rail tile a road
 reaches (three tiles is near enough; the animals cross the forecourt on
-foot). A commute is the cheapest walk-and-ride: a ride costs 0.3 of a walk,
-makes no road traffic, and is neutral ground for the player's line — a
+foot). A commute is the cheapest walk-and-ride: a ride costs 2/9 (0.22) of a walk,
+and its walker moves at ×4.5, a 50% increase over the former ×3. It
+makes no road traffic and is neutral ground for the player's line — a
 wolf may ride through prey-only streets, and is only stopped where it
 steps off. Riders are counted on the census; the walkers sit up on the
 train. A road and a line may cross on ONE tile when they cross square-on —
@@ -193,7 +194,7 @@ mill-town with a fox problem").
 
 - `tools/playtest.mjs --layout balanced|dormitory|millbelt --schedule 15:13,22:7`
   — a scripted mayor on the real map; the SPEC's acceptance targets.
-- `tools/check.mjs` — 478 checks: ledger conservation to the §, valves
+- `tools/check.mjs` — 497 checks: ledger conservation to the §, valves
   bounded, no NaN, the dangling-id law, rosters and capacities, commutes on
   roads, determinism, save → load → continue hash-equal, input-log replay,
   the crime-and-punishment invariants, the walls (the flood reproduces the

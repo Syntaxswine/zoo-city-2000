@@ -30,7 +30,7 @@ import { createWorld, ZONE, ROAD, capacityOf, jobsOf } from "../js/sim/world.js"
 import { tick } from "../js/sim/tick.js";
 import { apply, replay, undo, costOf as costOfOp } from "../js/sim/ops.js";
 import { save, load, stateHash, stateHashNoNews, toPlain } from "../js/sim/save.js";
-import { KNOBS } from "../js/sim/rules.js";
+import { KNOBS, RULES } from "../js/sim/rules.js";
 import { post } from "../js/sim/budget.js";
 import { doorOf, doorsOf, served, computeFields, commuteTime } from "../js/sim/fields.js";
 import { census } from "../js/sim/census.js";
@@ -482,7 +482,7 @@ check("determinism: same seed + same inputs ⇒ same hash", stateHash(A.world) =
   const rabbit = commutePath(F, "rabbit", a, b), fox = commutePath(F, "fox", a, b);
   check("use: painting five road tiles predator-only costs §1 a tile and is undoable", ru.ok && ru.cost === 5 * KNOBS.COST.use && ru.undoable === true, `${ru.cost}`);
   check("use: a rabbit takes the legal way round (11 tiles), a fox the short predator-only way (7)", !!rabbit && !!fox && rabbit.path.length === 11 && fox.path.length === 7, `rabbit ${rabbit && rabbit.path.length} · fox ${fox && fox.path.length}`);
-  check("use: the rabbit's way has no forbidden tile; the fox's cost is the plain walk", !!rabbit && !!fox && Array.from(rabbit.path).every((t) => admits(F.use[t], "rabbit")) && fox.cost === 60, `${fox && fox.cost}`);
+  check("use: the rabbit's way has no forbidden tile; the fox's cost is the plain walk", !!rabbit && !!fox && Array.from(rabbit.path).every((t) => admits(F.use[t], "rabbit")) && fox.cost === 6 * KNOBS.WALK, `${fox && fox.cost}`);
   // The gate, the notice and the stop on the scripted city: R prey-only, C predator-only, the ring's north row and east column predator-only.
   const G = load(save(A.world));
   const sx = G.start.tx, sy = G.start.ty;
@@ -537,7 +537,7 @@ check("determinism: same seed + same inputs ⇒ same hash", stateHash(A.world) =
 
 // ---- rail (docs/PROPOSAL-ZONING-RAIL-WALLS.md §3; SPEC §7.9) ------------------------------
 {
-  const { commutePath, computeTraffic, rides, roadPath } = await import("../js/sim/fields.js");
+  const { commutePath, computeTraffic, rides, roadPath, WALK } = await import("../js/sim/fields.js");
   const { computeOcclusion, AXIS_EW } = await import("../js/sim/reach.js");
   // A fresh map: a 14-tile road and, one row over, a 14-tile line with a station at each end beside the road's ends.
   const F = createWorld({ seed: SEED });
@@ -566,10 +566,92 @@ check("determinism: same seed + same inputs ⇒ same hash", stateHash(A.world) =
   computeFields(F);
   const a = at(px, py), b = at(px + 13, py);
   const ride = commutePath(F, "rabbit", a, b);
-  const walkOnly = 13 * 10;
+  const walkOnly = 13 * WALK;
   const riding = ride ? Array.from(ride.path).filter((p) => p & 0x8000).length : 0;
-  check("rail: the commute rides — cheaper than the walk, riding on the 12 tiles between the stations and walking at them", !!ride && ride.cost === 10 + 13 * KNOBS.RAIL_COST + 10 && ride.cost < walkOnly && riding === 12 && ride.path.length === 16 && !(ride.path[1] & 0x8000) && !(ride.path[14] & 0x8000), `cost ${ride && ride.cost} vs walk ${walkOnly} · riding ${riding} · tiles ${ride && ride.path.length}`);
-  check("rail: commute time counts a ride at 0.3 of a walk", !!ride && Math.abs(commuteTime(ride.path) - (2 + 13 * KNOBS.RAIL_COST / 10)) < 1e-6, `${ride && commuteTime(ride.path)}`);
+  check("rail: the commute rides — cheaper than the walk, riding on the 12 tiles between the stations and walking at them", !!ride && ride.cost === WALK + 13 * KNOBS.RAIL_COST + WALK && ride.cost < walkOnly && riding === 12 && ride.path.length === 16 && !(ride.path[1] & 0x8000) && !(ride.path[14] & 0x8000), `cost ${ride && ride.cost} vs walk ${walkOnly} · riding ${riding} · tiles ${ride && ride.path.length}`);
+  check("rail X2: WALK and RAIL_COST are positive integers and the visual ×4.5 is their exact reciprocal — 50% faster than the old ×3",
+    Number.isInteger(WALK) && WALK > 0 && WALK === KNOBS.WALK && Number.isInteger(KNOBS.RAIL_COST) && KNOBS.RAIL_COST > 0
+      && WALK === 9 && KNOBS.RAIL_COST === 2 && KNOBS.RIDE_SPEED === WALK / KNOBS.RAIL_COST
+      && Math.round((KNOBS.RIDE_SPEED / 3 - 1) * 100) === 50,
+    `walk ${WALK} · rail ${KNOBS.RAIL_COST} · visual ×${KNOBS.RIDE_SPEED}`);
+  check("rail X2: commute time reads the same 2/9 law as the visual speed and the Rules tab prints both live numbers",
+    !!ride && Math.abs(commuteTime(ride.path) - (2 + 13 / KNOBS.RIDE_SPEED)) < 1e-9
+      && RULES.find((r) => r.id === "R1")?.formula.includes("ride 0.22")
+      && RULES.find((r) => r.id === "R1")?.formula.includes("visually ×4.5"),
+    `${ride && commuteTime(ride.path)} · ${RULES.find((r) => r.id === "R1")?.formula}`);
+  // Two walking segments plus 27 ridden ones: X2 brings this exact tortoise
+  // commute onto its 8-step comfort boundary; the former 3/10 law did not.
+  const thresholdPath = Uint16Array.from(Array.from({ length: 30 }, (_, k) => k | (k >= 3 && k <= 28 ? 0x8000 : 0)));
+  const fastThreshold = commuteTime(thresholdPath);
+  const { moodTerms } = await import("../js/sim/citizens.js");
+  const thresholdWorld = createWorld({ seed: "x2-threshold" });
+  const thresholdCitizen = { id: 1, species: "tortoise", name: "Test", surname: "Threshold", born: -360,
+    home: -1, job: 0, path: thresholdPath, friends: [], stale: false, dead: false,
+    held: 0, heldAt: -1, pen: false, fixed: false };
+  thresholdWorld.citizens = [thresholdCitizen];
+  thresholdWorld.byId = new Map([[1, thresholdCitizen]]);
+  const fastComfort = moodTerms(thresholdWorld, thresholdCitizen).some((t) => t.code === "COMMUTE");
+  const currentRailCost = KNOBS.RAIL_COST;
+  let oldThreshold, derivedOldSpeed, oldComfort;
+  try {
+    KNOBS.RAIL_COST = 3;
+    oldThreshold = commuteTime(thresholdPath);
+    derivedOldSpeed = KNOBS.RIDE_SPEED;
+    oldComfort = moodTerms(thresholdWorld, thresholdCitizen).some((t) => t.code === "COMMUTE");
+  } finally { KNOBS.RAIL_COST = currentRailCost; }
+  check("rail X2: the faster law crosses the tortoise's exact eight-step commute threshold and the visual factor stays derived under mutation",
+    fastThreshold === 8 && oldThreshold === 11 && derivedOldSpeed === 3 && KNOBS.RIDE_SPEED === 4.5,
+    `new ${fastThreshold} · old ${oldThreshold} · derived old ×${derivedOldSpeed}`);
+  check("rail X2: crossing that threshold has the real mood consequence — COMMUTE comfort now, none under the former law",
+    fastComfort && !oldComfort,
+    `new comfort ${fastComfort} · old comfort ${oldComfort}`);
+
+  // Measure the real display layer, not only the knobs. Each fixture has one
+  // adult rabbit commuter on a straight row. The tiny first update admits the
+  // deterministic sampler; the remaining updates are the interval under test.
+  const { createWalkers } = await import("../js/walkers.js");
+  const { hash01 } = await import("../js/sim/rng.js");
+  function measuredWalker(rideFlags, seconds, chunks = 1) {
+    const V = createWorld({ seed: "x2-speed" });
+    V.tick = 12;
+    let id = 1;
+    while (hash01(V.tick, id, 0x77) >= 0.78) id++;
+    const path = Array.from({ length: rideFlags.length }, (_, x) => 5 * V.w + 5 + x);
+    const c = { id, species: "rabbit", name: "Test", surname: "Rider", born: -240,
+      home: path[0], job: path.at(-1), path: Uint16Array.from(path, (p, k) => p | (rideFlags[k] ? 0x8000 : 0)),
+      stale: false, dead: false, held: 0, heldAt: -1, pen: false, centenary: false };
+    V.citizens = [c];
+    V.byId = new Map([[id, c]]);
+    const layer = createWalkers(V);
+    const viewport = { x0: 0, y0: 0, x1: V.w, y1: V.h };
+    layer.update(1e-9, viewport);
+    for (let k = 0; k < chunks; k++) layer.update(seconds / chunks, viewport);
+    return layer.list().find((w) => w.citizen === id);
+  }
+  const flags = Array(20).fill(false);
+  const walkMotion = measuredWalker(flags, 1);
+  const rideMotion = measuredWalker(flags.map(() => true), 1);
+  check("rail X2: the real walker moves one tile per second on foot and 4.5 on a ridden segment",
+    Math.abs(walkMotion.dist - 1) < 1e-9 && Math.abs(rideMotion.dist - KNOBS.RIDE_SPEED) < 1e-9,
+    `walk ${walkMotion?.dist} · ride ${rideMotion?.dist} · ratio ${rideMotion?.dist / walkMotion?.dist}`);
+  const walkThenRide = flags.map((_, k) => k >= 2);
+  const railThenWalk = flags.map((_, k) => k < 2);
+  const atWalkRail = measuredWalker(walkThenRide, 1);
+  const atRailWalk = measuredWalker(railThenWalk, 2 / KNOBS.RIDE_SPEED);
+  check("rail X2: an update ending exactly on walk→rail or rail→walk synchronizes the boundary tile and next ride state",
+    atWalkRail.seg === 1 && atWalkRail.t === 0 && Math.abs(atWalkRail.tx - 6.5) < 1e-9 && atWalkRail.riding
+      && atRailWalk.seg === 2 && atRailWalk.t === 0 && Math.abs(atRailWalk.tx - 7.5) < 1e-9 && !atRailWalk.riding,
+    `walk→rail seg ${atWalkRail?.seg} x ${atWalkRail?.tx} ride ${atWalkRail?.riding} · rail→walk seg ${atRailWalk?.seg} x ${atRailWalk?.tx} ride ${atRailWalk?.riding}`);
+  const wrOne = measuredWalker(walkThenRide, 2, 1), wrMany = measuredWalker(walkThenRide, 2, 200);
+  const rwOne = measuredWalker(railThenWalk, 2 / KNOBS.RIDE_SPEED + 1, 1), rwMany = measuredWalker(railThenWalk, 2 / KNOBS.RIDE_SPEED + 1, 200);
+  check("rail X2: a large frame crossing walk↔rail re-prices at each boundary and is identical to 200 small frames",
+    Math.abs(wrOne.dist - 5.5) < 1e-9 && Math.abs(wrOne.dist - wrMany.dist) < 1e-9
+      && Math.abs(rwOne.dist - 3) < 1e-9 && Math.abs(rwOne.dist - rwMany.dist) < 1e-9,
+    `walk→rail ${wrOne?.dist}/${wrMany?.dist} · rail→walk ${rwOne?.dist}/${rwMany?.dist}`);
+  const overStand = measuredWalker([false, false], 3);
+  check("rail X2: a large frame keeps unused time through the job stand and onto the return leg",
+    !!overStand && overStand.leg === 1 && Math.abs(overStand.dist - 1.5) < 1e-9,
+    `leg ${overStand?.leg} · distance ${overStand?.dist} · stand ${overStand?.standUntil}`);
   {
     const keep = F.citizens;
     F.citizens = [{ path: ride.path }];
@@ -2044,6 +2126,55 @@ check("determinism: same seed + same inputs ⇒ same hash", stateHash(A.world) =
         && !!anchorIn.win && anchorIn.win.side === 2
         && Math.abs(cornerIn.fill - anchorIn.fill) < 1e-9,
       `corner ${cornerOut.corner} → ${cornerOut.win ? "MERGED" : "no window"} · corner ${cornerIn.corner} → ${cornerIn.win ? `${cornerIn.win.side}×${cornerIn.win.side}` : "NO WINDOW"} · anchor ${anchorOut.anchor} → ${anchorOut.win ? "MERGED" : "no window"} · anchor ${anchorIn.anchor} → ${anchorIn.win ? `${anchorIn.win.side}×${anchorIn.win.side}` : "NO WINDOW"} · fill ${cornerIn.fill && cornerIn.fill.toFixed(3)}/${anchorIn.fill && anchorIn.fill.toFixed(3)}`);
+  }
+
+  // ---- the SAME door, by a different forecourt chain -----------------------
+  {
+    // Endpoint and distance stay identical while N,E,S,W reroutes around a
+    // new building. The exact chain is part of the graph identity because it
+    // is copied into each stored citizen path.
+    const C2 = createWorld({ seed: "forecourt-same-door" });
+    const c2 = (x, y) => y * C2.w + x;
+    for (let y = 4; y <= 10; y++) for (let x = 6; x <= 23; x++) {
+      const i = c2(x, y);
+      C2.terrain[i] = TERRAIN.GRASS; C2.road[i] = ROAD.NONE; C2.zone[i] = ZONE.NONE;
+      C2.tier[i] = 0; C2.wall[i] = 0; C2.rail[i] = 0; C2.civic[i] = 0;
+      C2.big[i] = 0; C2.rubble[i] = 0; C2.burning[i] = 0; C2.flooded[i] = 0;
+    }
+    C2.cash = 600000;
+    C2.events.noDisasters = true;
+    apply(C2, { kind: "road", tiles: [c2(10, 6)] });
+    apply(C2, { kind: "road", tiles: [c2(20, 6)] });
+    apply(C2, { kind: "rail", tiles: Array.from({ length: 12 }, (_, k) => c2(9 + k, 8)) });
+    apply(C2, { kind: "station", tx: 9, ty: 8 });
+    apply(C2, { kind: "station", tx: 20, ty: 8 });
+    computeFields(C2);
+    const platform = c2(9, 8), from = c2(10, 6), to = c2(20, 6);
+    const route0 = commutePath(C2, "rabbit", from, to);
+    const sig0 = C2._stationDoorSig;
+    const doors0 = doors(C2, platform).join(",");
+    const sentinel = { path: route0?.path, stale: false };
+    C2.citizens = [sentinel];
+    const block = apply(C2, { kind: "police", tx: 9, ty: 7 });
+    const route1 = commutePath(C2, "rabbit", from, to);
+    const sig1 = C2._stationDoorSig;
+    const doors1 = doors(C2, platform).join(",");
+    const tiles0 = route0 ? Array.from(route0.path, (p) => p & TILE) : [];
+    const tiles1 = route1 ? Array.from(route1.path, (p) => p & TILE) : [];
+    const rerouted = tiles0.includes(c2(9, 7)) && !tiles1.includes(c2(9, 7))
+      && [c2(10, 8), c2(10, 7)].every((i) => tiles1.includes(i));
+    const invalidated = sentinel.path === null && sentinel.stale === true;
+    C2.citizens = [];
+    C2.byId = new Map();
+    const C3 = load(save(C2));
+    const route2 = commutePath(C3, "rabbit", from, to);
+    const reloadPath = !!route1 && !!route2 && Array.from(route1.path).join(",") === Array.from(route2.path).join(",");
+    const same0 = stateHash(C2) === stateHash(C3);
+    for (let k = 0; k < 12; k++) { tick(C2); tick(C3); }
+    check("access: a forecourt reroute to the SAME door at the SAME distance changes the graph signature, invalidates the live path, avoids the new building and survives save → load → continue",
+      block.ok && doors0 === `${from}` && doors1 === doors0 && sig1 !== sig0
+        && invalidated && rerouted && reloadPath && same0 && stateHash(C2) === stateHash(C3),
+      `door ${doors0}→${doors1} · sig moved ${sig1 !== sig0} · invalidated ${invalidated} · rerouted ${rerouted} · reload ${reloadPath} · hash ${stateHash(C2)}/${stateHash(C3)}`);
   }
 
   // ---- WAREHOUSES: the frontage rule is gone --------------------------------
@@ -4725,7 +4856,7 @@ function costOfBulldoze(w, x, y) { return (0, costOfOp)(w, { kind: "bulldoze", x
     return { w, at, home, hall };
   };
 
-  // One graph, two explicit policies: citizen rail still costs 0.3; freight
+  // One graph, two explicit policies: citizen rail costs 2/9; freight
   // boards, rides any physical length and alights for zero measured distance.
   const R = flatFreight();
   const route = ME.hallReach(R.w, R.home, 8);
@@ -4736,8 +4867,8 @@ function costOfBulldoze(w, x, y) { return (0, costOfOp)(w, { kind: "bulldoze", x
   check("meat route: the same hall is beyond seven walked steps but reachable at Infinity",
     ME.hallReach(R.w, R.home, 7) === null && ME.hallReach(R.w, R.home, Infinity)?.hall === R.hall);
   const commute = FI.commutePath(R.w, "rabbit", FI.doorOf(R.w, R.home), FI.doorOf(R.w, R.hall), 60);
-  check("meat route: free freight does not mutate ordinary 0.3-cost commuting",
-    !!commute && commute.cost > route.walkSteps * FI.WALK && KNOBS.RAIL_COST === 3 && KNOBS.MEAT_RAIL_COST === 0,
+  check("meat route: free freight does not mutate ordinary 2/9-cost commuting",
+    !!commute && commute.cost > route.walkSteps * FI.WALK && KNOBS.RAIL_COST === 2 && KNOBS.MEAT_RAIL_COST === 0 && KNOBS.RIDE_SPEED === FI.WALK / KNOBS.RAIL_COST,
     `freight ${route.walkSteps * FI.WALK} · commute ${commute?.cost}`);
   R.w.use.fill(WO.USE.PREY); ME.resetMeatRoutes(R.w);
   check("meat route: neutral freight crosses use-zoned roads without borrowing a citizen diet", ME.hallReach(R.w, R.home, 8)?.walkSteps === 8);

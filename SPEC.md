@@ -420,7 +420,10 @@ those into the stored path, so every consecutive pair of walked entries is
 still orthogonally adjacent: the gap costs a walk, `commuteTime` prices it
 per tile, traffic counts it, and the walker crosses it on foot. Move a line
 from three tiles off the road to one and the same journey loses exactly four
-steps.
+steps. The derived graph signature contains each station, door and exact
+forecourt chain — not just the endpoints. If new construction reroutes an
+equally short approach to the same door, `doorsMoved` still invalidates every
+stored commute before anyone can keep walking through the new building.
 
 **A shape change is a re-plan.** Merging or splitting a block changes the
 site, so it changes the doors: `blocks.replanOn` marks everyone living or
@@ -591,8 +594,8 @@ against its occupants gives the household `ZONED_OUT_MONTHS` 3 of notice
 leaves town ("ZONED OUT — …", `last.zonedOut`); its workers are released at
 the next tick's stale pass and search again. Nobody moves in the month of
 the click. **Commutes prefer the legal way:** the search is Dial's buckets
-(`fields.dial`, integer costs: a step 10, a step onto a forbidden road
-`TRESPASS_STEP` × 10 = 60), so a citizen detours up to six times longer
+(`fields.dial`, integer costs: a step `WALK` 9, a step onto a forbidden road
+`TRESPASS_STEP` × `WALK` = 54), so a citizen detours up to six times longer
 before it trespasses and trespasses when that is the only way to work. With
 no line every step costs the same and the settle order is the BFS's, so the
 paths — and the traffic — are the ones the BFS made; the suite holds every
@@ -613,9 +616,9 @@ of a rail tile (§300, §100 a year). A station is **served like any lot**
 tile at a time (the card says which sides, and how far). Until session 15
 the graph stepped onto a platform only from a tile ORTHOGONALLY beside it,
 which is the d = 1 case of the same rule. **The commute graph has two layers:**
-walk nodes on road tiles and station tiles (a step `WALK` 10, ×6 onto a
-road the line forbids), ride nodes on rail tiles (`RAIL_COST` 3 a step —
-0.3 of a walk); the layers meet only at a station (board and alight, free).
+walk nodes on road tiles and station tiles (a step `WALK` 9, ×6 onto a
+road the line forbids), ride nodes on rail tiles (`RAIL_COST` 2 a step —
+2/9, or 0.22, of a walk); the layers meet only at a station (board and alight, free).
 `dial` settles nodes in cost order; with no rail and no line it is the BFS
 node for node. **The stored path** carries the ride bit (`fields.RIDE`, bit
 15 of the `Uint16`) on the tiles the citizen rode onto; a station collapses
@@ -662,11 +665,13 @@ an accident: both things are on the tile, so both are maintained and both
 smoke. The bulldozer takes the LINE first (the cheaper, later layer) and
 leaves the road; a second press takes the road; one undo step each. The
 owner's three verbs, one line each: *shortens commute
-times* — `commuteTime` (a walking segment 1, a riding segment 0.3, never
-the trespass penalty) is what the mood's `≤ species.commute` reads;
+times* — `commuteTime` (a walking segment 1, a riding segment 2/9, never
+the trespass penalty) sums the integer costs and divides by `WALK` once, so
+an exact threshold stays exact; it is what the mood's `≤ species.commute` reads;
 *lightens traffic* — `computeTraffic` counts walking entries only, and a
 rail tile emits `EMIT_RAIL` 1 flat with no traffic term; *neutral travel* —
-`exposure` counts walking entries only. Walkers ride at `RIDE_SPEED` ×3
+`exposure` counts walking entries only. `RIDE_SPEED` is derived as
+`WALK / RAIL_COST`, so walkers ride at ×4.5 — 50% faster than the former ×3 —
 and sit 3 px up on the train (no train sprite in v1 — BACKLOG).
 
 ### 7.10 Lives and remembrance
@@ -911,7 +916,7 @@ boarding, alighting and every rail edge cost **zero**: an arbitrarily long
 ride adds physical path tiles and `RIDE` tags but no measured reach. The
 nearest hall is by walked steps, then anchor tile id. A missing station, cut
 track, disconnected door, or more than 60 walked steps gives no hall.
-Ordinary citizen `commutePath` still uses `RAIL_COST` 3/10. Land value,
+Ordinary citizen `commutePath` uses `RAIL_COST / WALK` = 2/9. Land value,
 parks, the Zoo, centre/plaque halos and dread never read `hallReach` or Dial:
 their distance is geographic/wall-aware and rail gives no distance discount
 (rail smoke and a physical rail tunnel retain their separately stated

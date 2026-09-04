@@ -638,15 +638,21 @@ export function computeStationDoors(world) {
     // walk to, and the tiles it walks are tiles it can stand on.
     const { d, doors } = doorSearch(world, i, seen, { prev, passable });
     if (d < 1 || !doors.length) continue; // d === 0 cannot happen: ops.js refuses a station on a road
+    const shape = [];
     for (const j of doors) {
       const chain = [];
       for (let k = prev[j]; k !== -1 && k !== i; k = prev[k]) chain.push(k);
       chain.reverse(); // platform-first
       add(i, j, chain);
       add(j, i, chain.slice().reverse());
+      // Endpoint identity is not enough: a new building can make the same
+      // equally near door reroute across different forecourt tiles. Those
+      // tiles are stored in citizen paths, so their exact stable chain is
+      // part of the derived graph's identity and must invalidate the paths.
+      shape.push(`${j}>${chain.join(",")}`);
       world._hasStationDoors = true;
     }
-    sig.push(`${i}:${doors.join(",")}`);
+    sig.push(`${i}:${shape.join(";")}`);
   }
   markDoorsMoved(world, sig.join("|"));
 }
@@ -694,7 +700,7 @@ export function edgeRoads(world) {
 // ---------------------------------------------------------------------------
 
 /** One road step, in integer cost units; a ride step is KNOBS.RAIL_COST on the same scale. */
-export const WALK = 10;
+export const WALK = KNOBS.WALK;
 /** A path entry is a tile index with bit 15 set when the citizen RODE onto it (rail between stations). */
 export const RIDE = 0x8000;
 export const TILE = 0x7fff;
@@ -864,9 +870,12 @@ export function commutePath(world, species, from, to, max = KNOBS.COMMUTE_MAX) {
 
 /** How long a commute feels, in walk steps: a walking segment 1, a riding segment RAIL_COST/WALK — never the trespass penalty (that is the search's preference, not time). */
 export function commuteTime(path) {
-  let t = 0;
-  for (let k = 1; k < path.length; k++) t += (path[k] & RIDE) || (path[k - 1] & RIDE) ? KNOBS.RAIL_COST / WALK : 1;
-  return t;
+  // Accumulate on Dial's integer scale and divide once. Repeatedly adding the
+  // fractional ride share can put an exactly-on-the-limit commute a few ulps
+  // over its species threshold (for example 2 walks + 27 rides = 8 exactly).
+  let cost = 0;
+  for (let k = 1; k < path.length; k++) cost += (path[k] & RIDE) || (path[k - 1] & RIDE) ? KNOBS.RAIL_COST : WALK;
+  return cost / WALK;
 }
 
 /** Does the commute ride at all? */

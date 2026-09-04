@@ -47,6 +47,8 @@ const el = (tag, cls, text) => {
 };
 const money = (v) => `§${Math.round(v).toLocaleString()}`;
 const f2 = (v) => (v >= 0 ? "+" : "−") + Math.abs(v).toFixed(2);
+const railShare = () => (KNOBS.RAIL_COST / KNOBS.WALK).toFixed(2);
+const rideFactor = () => KNOBS.RIDE_SPEED.toFixed(1);
 const pct = (v) => `${Math.round(v * 100)}%`;
 const PLURAL = { mouse: "mice", fox: "foxes", tortoise: "tortoises" };
 const plural = (n, s) => `${n} ${n === 1 ? s : PLURAL[s] || `${s}s`}`;
@@ -455,9 +457,9 @@ export function createUI(app) {
       // access line above has already given the distance and the direction,
       // and saying "no road within 3" twice in one card is a stutter.
       lines.push(el("div", rep.served ? "dim" : "warn", rep.served
-        ? `a station: riders board from ${rep.doors.length === 1 ? "the road at" : `${rep.doors.length} sides,`} ${rep.doors.slice(0, 4).map((t) => `(${t % w.w},${(t / w.w) | 0})`).join(" ")}${court > 0 ? `, crossing ${court} tile${court === 1 ? "" : "s"} of forecourt on foot` : ""}; a citizen's ride costs 0.3 of a walk, while a hall cart's ride is free distance; neither changes property-value distance`
+        ? `a station: riders board from ${rep.doors.length === 1 ? "the road at" : `${rep.doors.length} sides,`} ${rep.doors.slice(0, 4).map((t) => `(${t % w.w},${(t / w.w) | 0})`).join(" ")}${court > 0 ? `, crossing ${court} tile${court === 1 ? "" : "s"} of forecourt on foot` : ""}; a citizen's ride costs ${railShare()} of a walk (×${rideFactor()} speed), while a hall cart's ride is free distance; neither changes property-value distance`
         : "a station nobody can board: with no door on it the line runs straight past, and no commute may use it"));
-    } else if (w.rail[i]) lines.push(el("div", "dim", w.road[i] !== ROAD.NONE ? "a level crossing: the road and the line share this tile square-on — animals walk across it, anything on the line passes straight through without stopping, and the city maintains both" : "rail: citizen commutes price it at 0.3 of a walk; hall logistics count it as free travel; it never shortens property-value distance"));
+    } else if (w.rail[i]) lines.push(el("div", "dim", w.road[i] !== ROAD.NONE ? "a level crossing: the road and the line share this tile square-on — animals walk across it, anything on the line passes straight through without stopping, and the city maintains both" : `rail: citizen commutes price it at ${railShare()} of a walk (×${rideFactor()} speed); hall logistics count it as free travel; it never shortens property-value distance`));
     if (w.wall[i]) lines.push(el("div", "dim", w.road[i] !== ROAD.NONE ? "a tunnel: the road runs through the wall; smells, dread and cover pass along it and nowhere else" : "a wall: smells, dread, cover and land-value halos go round it, and a killer's reach stops at it; a road through it is a tunnel"));
     if (rep.dread) lines.push(el("div", "dim", `dread ${rep.dread}: herbivores −${Math.min(KNOBS.DREAD_MOOD_CAP, Math.round(KNOBS.DREAD_MOOD_HERB * rep.dread))} mood and −${Math.round(KNOBS.DREAD_HOME_HERB * rep.dread)} on the home score; LV −${Math.round(KNOBS.LV_DREAD * rep.dread)}; carnivores do not mind`));
     for (const f of w.events.files) {
@@ -726,7 +728,7 @@ export function createUI(app) {
     tr("stations", `${c.fireStations} fire · ${c.policeStations} police${c.centres ? ` · ${c.centres} pacification` : ""}`);
     if (c.walls) tr("walls · tunnels", `${c.walls} · ${c.tunnels}`);
     if (c.railTiles || c.stations) tr("rail · stations · riders", `${c.railTiles} · ${c.stations} · ${c.riders}`);
-    if (c.commuteN) tr("mean commute (walk-steps; a ride is 0.3)", c.meanCommute.toFixed(1));
+    if (c.commuteN) tr(`mean commute (walk-steps; a ride is ${railShare()})`, c.meanCommute.toFixed(1));
     if (c.markets) {
       tr("meat halls", `${c.markets} (${c.Jm} jobs) · ${c.herbNear} herbivores within the smell`);
       tr("meat on hand · sold this year", `${c.meatOnHand || 0} · ${c.meatSold || 0}`);

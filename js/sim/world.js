@@ -48,7 +48,7 @@ export function createWorld({ seed = "zoo", w = 64, h = 64 } = {}) {
     flooded: new Uint8Array(n),
     wall: new Uint8Array(n), // a wall tile; with a road or rail on it, a tunnel (SPEC §6b, sim/reach.js)
     use: new Uint8Array(n), // the player's line: 0 mixed · 1 predator-only · 2 prey-only, on lots AND roads (SPEC §7.8)
-    rail: new Uint8Array(n), // 0 none · 1 rail · 2 station (SPEC §7.9); a station is a door only beside a road
+    rail: new Uint8Array(n), // 0 none · 1 rail · 2 station (SPEC §7.9); served from road within ROAD_REACH across a walked forecourt
     meat: new Uint16Array(n), // units on hand at a meat hall; Part H supplies the flows
     big: new Uint8Array(n), // a BLOCK (SPEC §3b, sim/blocks.js): 0 a lot of its own · 2 | 3 the anchor of a 2×2 | 3×3 · PART | dx | dy << 2 a part pointing at its anchor
     theme: new Uint8Array(n), // a LANDMARK (SPEC §3c, sim/landmarks.js): on a 3×3's anchor, the id of the species' landmark it rose as; 0 the plain block

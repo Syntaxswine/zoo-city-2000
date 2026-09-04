@@ -206,27 +206,30 @@ trees (felled) and through a wall (tunnel). **Superseded 2026-09-03 (SPEC §7.9)
 a line share one tile when they cross square-on. The rest of this ruling
 stands: still not on water, so still no rail bridges.
 
-**Ruling for v1:** not on water
-(no rail bridge art yet) and not on a road tile (no level crossing yet) —
-both are one sprite each away and listed in BACKLOG.
+**Ruling for v1:** still not on water (no rail bridge art yet). A rail and
+a road may share a square-on level crossing; a station cannot stand on that
+shared tile because its platform would stand in the road.
 
-**Tools.** `T` Rail — the road's L-drag, §20 a tile, upkeep §3 a tile a year.
-`G` Station — click on a rail tile, §300, upkeep §100 a year; a station is a
-**door** only if a road tile touches it (4-neighbour); the card says
-"station — no road: nobody can reach the platform" otherwise.
+**Tools.** `7` Rail — the road's L-drag, §20 a tile, upkeep §3 a tile a year.
+`8` Station — click on a rail tile, §300, upkeep §100 a year. A station is
+served like a lot when a road lies within `ROAD_REACH` 3; every nearest road
+tile is a door, and passengers walk the passable forecourt between it and
+the platform. The card names the doors and distance, or says nobody can
+reach the platform.
 
 **The commute graph.** Two layers: *walk* nodes on road tiles (and station
-tiles), cost `WALK_COST` 10 a step; *ride* nodes on rail and station tiles,
-cost `RAIL_COST` 3 a step; the two layers meet only at a station tile
+tiles), cost `WALK` 9 a step; *ride* nodes on rail and station tiles,
+cost `RAIL_COST` 2 a step; the two layers meet only at a station tile
 (board/alight, cost 0). A commute is the cheapest path from the home's door
-to the job's door within `COMMUTE_MAX × WALK_COST`; the search is Dial's
+to the job's door within `COMMUTE_MAX × WALK`; the search is Dial's
 bucket queue (integer costs), replacing the BFS in `searchJob` and
 `roadPath` — on a city with no rail the graph is the road graph and the
 result is the BFS path, so nothing moves (frame proof in the suite).
 
 **What it does** (the owner's three verbs, each one line):
-- *shortens commute times*: `c.commute = cost/WALK_COST` is what the mood
-  test (`≤ species.commute → +10`) and the job score's `d` read;
+- *shortens commute times*: `commuteTime` sums integer walk/ride costs and
+  divides by `WALK` once; the mood test (`≤ species.commute → +10`) reads it
+  without floating drift at an exact boundary;
 - *lightens traffic*: traffic counts walking steps only, so a road paralleled
   by a line loses its commuters to it; rail tiles emit `EMIT_RAIL` 1 flat,
   no traffic term;
@@ -239,7 +242,8 @@ line, the suite's "every commute lies on roads" check, the trespass count)
 goes through them.
 
 **Walkers.** A commuter follows the whole path; on riding steps it moves at
-×3 and is drawn two pixels up (on the rail bed); no train sprite in v1
+the derived `WALK / RAIL_COST` = ×4.5 and is drawn three pixels up (on the rail
+bed); no train sprite in v1
 (BACKLOG: a two-car train walker on busy lines).
 
 **Art.** 16 rail masks from the road's arm predicate at width 4: a bed of
@@ -248,18 +252,20 @@ asphalt ramp's lightest key; the station a standing solid — a platform slab
 9×16 beside the track and a canopy on two posts — so the track sprite shows
 under it. A rail tunnel reuses the wall's tunnel with the rail's axis.
 
-**UI.** Hover: "Rail" / "Station · door: road at (x,y)" / "no road";
+**UI.** Hover: "Rail" / a station's road doors, sides and walked forecourt /
+"no road within 3";
 Budget: rail and stations upkeep; Census: rail tiles, stations, **riders**
 (commuters with any riding step) and mean commute; Rules tab R1: *"a commute
-is the cheapest walk-and-ride; ride 0.3 of a step"* with the live rider
+is the cheapest walk-and-ride; ride 0.22 of a step"* with the live rider
 count.
 
 **Suite.** (1) frame proof: on the scripted (rail-less) city the bucket
 search returns the BFS path for every commuter; (2) a straight line with two
 stations beside two blocks: the commute cost falls below the road-only cost,
-riders > 0, and the parallel road's traffic falls; (3) a station with no road
-neighbour is never boarded; (4) rail through a wall = tunnel and the ride
-passes; rail refused on water and on a road; (5) every riding step is on a
+riders > 0, and the parallel road's traffic falls; (3) a station beyond road
+reach is never boarded; (4) rail through a wall = tunnel and the ride passes;
+rail is refused on water and only shares a road at a square-on crossing;
+(5) every riding step is on a
 rail tile and every walking step on a road tile; save/load/continue and
 replay with rail hash-equal.
 
@@ -272,8 +278,8 @@ replay with rail hash-equal.
 | `COST.wall` / `UPKEEP_WALL` | 8 / 1 | a tile; a year |
 | `COST.use` | 1 | a repaint |
 | `COST.rail` / `UPKEEP_RAIL` | 20 / 3 | a tile; a year |
-| `COST.station` / `UPKEEP_STATION_RAIL` | 300 / 100 | click on rail; needs a road neighbour to be a door |
-| `WALK_COST` / `RAIL_COST` | 10 / 3 | integer costs; a ride is 0.3 of a walk |
+| `COST.station` / `UPKEEP_STATION_RAIL` | 300 / 100 | click on rail; served from road within `ROAD_REACH` across a walked forecourt |
+| `WALK` / `RAIL_COST` | 9 / 2 | integer costs; a ride is 2/9 of a walk and the reciprocal visual speed is ×4.5 |
 | `TRESPASS_STEP` | 6 | a forbidden walking step costs six legal ones in the search |
 | `TRESPASS_P` / `TRESPASS_MAX` | 0.02 / 0.3 | per forbidden tile under full cover; the cap |
 | `TRESPASS_HOME` | 4 | living or working on a forbidding lot counts as four tiles |
@@ -305,5 +311,5 @@ Three commits, in this order, each with its suite and docs:
 - trespass needs police cover to be caught; the first two are the cells for
   a month; the third conviction meets the sentence table;
 - a repainted lot gives three months' notice; then rehome or leave;
-- no rail bridges in v1 (level crossings SHIPPED 2026-09-03, SPEC §7.9); a station is a click on
-  rail and needs a road neighbour.
+- no rail bridges in v1 (level crossings SHIPPED 2026-09-03, SPEC §7.9); a
+  station is a click on rail and is served from road within `ROAD_REACH`.

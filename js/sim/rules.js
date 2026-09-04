@@ -250,8 +250,9 @@ export const KNOBS = {
   // rail (SPEC §7.9; docs/PROPOSAL-ZONING-RAIL-WALLS.md §3)
   UPKEEP_RAIL: 3,           // a tile a year
   UPKEEP_STATION_RAIL: 100, // a station a year
-  RAIL_COST: 3,             // a ride step on the commute's integer scale (a walk step is fields.WALK = 10): 0.3 of a walk
-  RIDE_SPEED: 3,            // the walker's speed on a riding step
+  WALK: 9,                  // one walking step on Dial's integer commute scale
+  RAIL_COST: 2,             // one ordinary citizen ride step: 2/9 of a walk
+  get RIDE_SPEED() { return KNOBS.WALK / KNOBS.RAIL_COST; }, // visual motion is the exact reciprocal: ×4.5
   EMIT_RAIL: 1,             // a rail tile's pollution, flat over 1; no traffic term
   LV_VAN: 6,                // land value near the centre
   LV_VAN_RADIUS: 2,
@@ -331,7 +332,7 @@ export const RULES = Object.freeze([
   },
   {
     id: "R1", title: "Rail: a commute is the cheapest walk-and-ride",
-    formula: "walk 1 a step (×6 onto a road the line forbids), ride 0.3 a step between stations; board and alight free at a station a road touches; a level crossing is walked and ridden through, and boards nobody; traffic and trespass count walking steps only — neutral travel, until you step off",
+    formula: `walk 1 a step (×${KNOBS.TRESPASS_STEP} onto a road the line forbids), ride ${f2(KNOBS.RAIL_COST / KNOBS.WALK)} a step between stations (visually ×${f1(KNOBS.RIDE_SPEED)}); a station served by road within ${KNOBS.ROAD_REACH} tiles is reached across its forecourt on foot, then boarding and alighting are free; a level crossing is walked and ridden through, and boards nobody; traffic and trespass count walking steps only — neutral travel, until you step off`,
     live: (w) => `${w.last.census.railTiles || 0} rail tiles · ${w.last.census.stations || 0} stations · ${w.last.census.riders || 0} riders · mean commute ${(w.last.census.meanCommute || 0).toFixed(1)} walk-steps`,
   },
   {
@@ -446,7 +447,7 @@ export const RULES = Object.freeze([
   },
   {
     id: "M5", title: "The hall buys by a real service route",
-    formula: "nearest hall within 60 WALKED road steps; board, alight and every rail edge cost ZERO for meat carts and sacks, and their visible path carries those rail tiles. Citizen commutes still price rail at 0.3. Property value, parks, Zoo, plaques and smell use geographic distance — rail never shortens them",
+    formula: `nearest hall within 60 WALKED road steps; board, alight and every rail edge cost ZERO for meat carts and sacks, and their visible path carries those rail tiles. Citizen commutes price rail at ${f2(KNOBS.RAIL_COST / KNOBS.WALK)} of a walk. Property value, parks, Zoo, plaques and smell use geographic distance — rail never shortens them`,
     live: (w) => `${w.last.census.railTiles || 0} rail tiles · freight rail distance 0 · property distance unchanged`,
   },
   {

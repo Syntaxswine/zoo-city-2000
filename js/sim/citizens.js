@@ -997,7 +997,7 @@ export function moodTerms(world, c, context = moodContext(world)) {
     const value = e.moodBySpecies && e.moodBySpecies[c.species];
     if (value) terms.push({ code: "EVENT", arg: e.id, value });
   }
-  if (c.path && commuteTime(c.path) <= sp.commute) terms.push({ code: "COMMUTE", value: 10 }); // a ride is 0.3 of a walk step
+  if (c.path && commuteTime(c.path) <= sp.commute) terms.push({ code: "COMMUTE", value: 10 }); // a ride is KNOBS.RAIL_COST / WALK of a walk step
   if (c.grief && c.grief > world.tick) terms.push({ code: "GRIEF", value: -10 });
   if (c.moodPenalty && c.moodPenaltyUntil > world.tick) terms.push({ code: "PENALTY", value: c.moodPenalty });
   if (c.fixed) terms.push({ code: "FIXED", value: -KNOBS.FIXED_MOOD });
@@ -1096,9 +1096,10 @@ function jobSearch(world, out) {
 }
 
 function searchJob(world, doors, sp, openByDoor, rng) {
-  // Dial's buckets from the door (fields.js): a legal step 10, a step onto a
-  // road the player's line forbids 60 — so a citizen takes a detour up to
-  // six times longer before it trespasses, and trespasses when that is the
+  // Dial's buckets from the door (fields.js): a legal step WALK = 9, a step
+  // onto a road the player's line forbids TRESPASS_STEP × WALK = 54 — so a
+  // citizen takes a detour up to six times longer before it trespasses, and
+  // trespasses when that is the
   // only way to work. With no use-zoning this is the BFS it replaced, node
   // for node (the suite holds every commuter's path to roadPath's).
   let best = null;

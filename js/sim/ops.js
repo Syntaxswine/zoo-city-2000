@@ -279,7 +279,8 @@ export function costOf(world, op) {
       break;
     }
     case "station": {
-      // A station is a click on a plain rail tile; it is a door only when a road tile touches it (the card says).
+      // A station is a click on a plain rail tile; it becomes usable when a
+      // road reaches it within ROAD_REACH across passable forecourt ground.
       const i = inBounds(world, op.tx, op.ty) ? idx(world, op.tx, op.ty) : -1;
       if (i < 0 || world.rail[i] !== 1) return { cost: 0, tiles, reason: "blocked" };
       if (world.road[i]) return { cost: 0, tiles, reason: "a station cannot stand on a level crossing" }; // the platform would sit in the road
