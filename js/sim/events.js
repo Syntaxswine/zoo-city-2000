@@ -65,7 +65,7 @@ function saveFromFire(world, i) {
 /** The roster. `gate(world, cen)` arms; `weight`; `fire(world, cen)` applies and returns the ticker line. */
 export const ROSTER = [
   {
-    id: "fire", kind: DISASTER,
+    id: "fire", kind: DISASTER, news: ["FIRE", "bad", true],
     // The roster weight is the town's own exposure, so covering the town makes
     // a fire LESS LIKELY and not merely differently placed. Until session 8 the
     // weight was a flat 3: the origin weighting moved the fire onto whatever
@@ -87,7 +87,7 @@ export const ROSTER = [
     },
   },
   {
-    id: "flood", kind: DISASTER, weight: () => 2,
+    id: "flood", kind: DISASTER, news: ["FLOOD", "bad", true], weight: () => 2,
     gate: (w) => anyWater(w),
     fire: (w) => {
       const { w: W, h } = w;
@@ -111,7 +111,7 @@ export const ROSTER = [
     },
   },
   {
-    id: "tornado", kind: DISASTER, weight: () => 1,
+    id: "tornado", kind: DISASTER, news: ["TORNADO", "bad", true], weight: () => 1,
     gate: () => true,
     fire: (w) => {
       // The path runs through a random BUILT lot (a tornado over empty
@@ -137,7 +137,7 @@ export const ROSTER = [
     },
   },
   {
-    id: "beaverDam", kind: BOON, weight: () => 2,
+    id: "beaverDam", kind: BOON, news: ["The Gnawleys", "good", true], weight: () => 2,
     // At most one dam a decade: four in forty years ate the riverside.
     gate: (w, c) => c.shares.beaver >= 0.12 && anyWater(w) && w.tick - (w.events.lastDam ?? -100000) >= 120,
     fire: (w) => {
@@ -181,17 +181,17 @@ export const ROSTER = [
     },
   },
   {
-    id: "smogBank", kind: DISASTER, weight: () => 2, duration: 6,
+    id: "smogBank", kind: DISASTER, news: ["A SMOG", "bad", true], weight: () => 2, duration: 6,
     gate: (w, c) => c.meanPol > 35,
     fire: () => `A SMOG BANK settles over the town for six months. Raccoons are delighted.`,
   },
   {
-    id: "mouseBoom", kind: BOON, weight: () => 2, duration: 12, birthMult: 3,
+    id: "mouseBoom", kind: BOON, news: ["MOUSE", "good", true], weight: () => 2, duration: 12, birthMult: 3,
     gate: (w, c) => c.shares.mouse >= 0.35,
     fire: () => `MOUSE BOOM — the Whiskertons are having litters. Zone housing ahead of it.`,
   },
   {
-    id: "taxRevolt", kind: DISASTER, weight: () => 4,
+    id: "taxRevolt", kind: DISASTER, news: ["TAX REVOLT", "bad", true], weight: () => 4,
     gate: (w) => w.events.revoltArmed >= 12,
     fire: (w) => {
       const hhs = w.households.filter((h) => !h.gone && h.home >= 0
@@ -218,42 +218,42 @@ export const ROSTER = [
     },
   },
   {
-    id: "boom", kind: BOON, weight: () => 3, durationRange: [12, 24], extMult: 1.3,
+    id: "boom", kind: BOON, news: ["BOOM", "good", true], weight: () => 3, durationRange: [12, 24], extMult: 1.3,
     gate: (w) => !w.events.active.some((e) => e.id === "recession"),
     fire: () => `BOOM — the outside world is buying. Zone industry and housing ahead.`,
   },
   {
-    id: "recession", kind: DISASTER, weight: () => 2, durationRange: [18, 30], extMult: 0.6,
+    id: "recession", kind: DISASTER, news: ["RECESSION", "bad", true], weight: () => 2, durationRange: [18, 30], extMult: 0.6,
     gate: (w) => !w.events.active.some((e) => e.id === "boom"),
     fire: () => `RECESSION — the outside market shrinks. Cut rates two or three points and ride it out.`,
   },
   {
-    id: "foxFair", kind: BOON, weight: () => 2, duration: 6, valveBoost: { C: 0.4 },
+    id: "foxFair", kind: BOON, news: ["FOX", "good", true], weight: () => 2, duration: 6, valveBoost: { C: 0.4 },
     gate: (w, c) => c.shares.fox >= 0.10 && hasCTier(w, 2),
     fire: (w) => { post(w, "grant", 1500); return `FOX MARKET FAIR — the Slyfields run a fair; shops boom for six months and the till rings §1,500.`; },
   },
   {
-    id: "rabbitWarren", kind: BOON, weight: () => 2, duration: 12, birthMult: 2,
+    id: "rabbitWarren", kind: BOON, news: ["RABBIT", "good", true], weight: () => 2, duration: 12, birthMult: 2,
     gate: (w, c) => c.shares.rabbit >= 0.25 && c.parks >= 2,
     fire: () => `RABBIT WARREN — the Burroweses have found the parks. Births double for a year.`,
   },
   {
-    id: "truffles", kind: BOON, weight: () => 2,
+    id: "truffles", kind: BOON, news: ["TRUFFLE", "good", true], weight: () => 2,
     gate: (w, c) => c.shares.pig >= 0.15 && treeShare(w) >= 0.08 && w.tick - (w.events.lastTruffle ?? -100000) >= 60,
     fire: (w) => { post(w, "grant", 2000); w.events.lastTruffle = w.tick; return `TRUFFLE SEASON — the Trotters came back from the woods with §2,000 worth.`; },
   },
   {
-    id: "dairyFair", kind: BOON, weight: () => 2, duration: 6, valveBoost: { C: 0.3 },
+    id: "dairyFair", kind: BOON, news: ["DAIRY", "good", true], weight: () => 2, duration: 6, valveBoost: { C: 0.3 },
     gate: (w, c) => c.shares.cow >= 0.15 && c.parks >= 2,
     fire: (w) => { post(w, "grant", 1000); return `DAIRY FAIR — the Cudworths' cheese draws a crowd; shops boom for six months and the till rings §1,000.`; },
   },
   {
-    id: "wolfMoon", kind: BOON, weight: () => 2, duration: 3, friendMult: 2,
+    id: "wolfMoon", kind: BOON, news: ["WOLF MOON", "good", true], weight: () => 2, duration: 3, friendMult: 2,
     gate: (w, c) => c.shares.wolf >= 0.10,
     fire: () => `WOLF MOON — the Greybacks howl all month. The rabbits lie awake; half the town goes out to listen, and friendships form twice as fast.`,
   },
   {
-    id: "heist", kind: DISASTER, weight: () => 3,
+    id: "heist", kind: DISASTER, news: ["HEIST", "bad", true], weight: () => 3,
     gate: (w, c) => robbable(w).length > 0,
     fire: (w) => {
       const lot = w.rng.pick(robbable(w));
@@ -265,21 +265,21 @@ export const ROSTER = [
       lowerTier(w, lot);
       const line = `HEIST — ${thief.name} ${thief.surname} (${thief.species}) cleaned out the shop at (${lot % w.w},${(lot / w.w) | 0}): −§${loss}, a storey gone. A file is open for six months.`;
       openFile(w, { tile: lot, culpritId: thief.id, cause: "heist", line });
-      return line;
+      return { line, links: [thief.id] };
     },
   },
   {
-    id: "skunked", kind: BOON, weight: () => 2, duration: 3,
+    id: "skunked", kind: BOON, news: ["SKUNK INCIDENT", "bad", true], weight: () => 2, duration: 3,
     gate: (w, c) => c.shares.skunk >= 0.05 && w.citizens.some((x) => SPECIES_BY_ID[x.species].predator),
     fire: (w) => {
       const skunk = w.rng.pick(w.citizens.filter((x) => x.species === "skunk"));
       const victim = w.rng.pick(w.citizens.filter((x) => SPECIES_BY_ID[x.species].predator));
       w.events.active.push({ id: "skunkedMood", until: w.tick + 3, moodBySpecies: { fox: -15, wolf: -15, cat: -15, hawk: -15, owl: -15 } });
-      return `SKUNK INCIDENT — ${skunk.name} ${skunk.surname} sprayed ${victim.name} ${victim.surname} (${victim.species}). Every predator in town is sulking for three months.`;
+      return { line: `SKUNK INCIDENT — ${skunk.name} ${skunk.surname} sprayed ${victim.name} ${victim.surname} (${victim.species}). Every predator in town is sulking for three months.`, links: [skunk.id, victim.id] };
     },
   },
   {
-    id: "founders", kind: BOON, weight: () => 6,
+    id: "founders", kind: BOON, news: ["FOUNDERS", "good", true], weight: () => 6,
     gate: (w, c) => c.speciesPresent >= 5 && c.H >= 0.5 && c.friendships >= c.P / 4 && w.tick - w.events.lastFestival >= 120,
     fire: (w) => {
       w.festivalBonus += 200;
@@ -289,13 +289,13 @@ export const ROSTER = [
     },
   },
   {
-    id: "grant", kind: BOON, weight: () => 3,
+    id: "grant", kind: BOON, news: ["COUNTY", "good", true], weight: () => 3,
     gate: (w, c) => w.cash < 2000 && c.approval >= 50 && w.tick - w.events.lastGrant >= 120,
     fire: (w) => { post(w, "grant", 5000); w.events.lastGrant = w.tick; return `COUNTY GRANT — a liked but poor mayor gets §5,000.`; },
   },
   {
     // The raid: the police working, so a BOON kind — the No-disasters toggle must not mask it.
-    id: "raid", kind: BOON, weight: () => 3,
+    id: "raid", kind: BOON, news: ["RAID", "bad", true], weight: () => 3,
     gate: (w) => !w.events.licence && w.tick - (w.events.lastRaid ?? -100000) >= 24 && raidable(w).length > 0,
     fire: (w) => {
       const lot = w.rng.pick(raidable(w));
@@ -309,11 +309,11 @@ export const ROSTER = [
       const who = last ? ` ${last.name} ${last.surname} (${last.species}) was seen leaving by the back.` : "";
       const line = `RAID — the constables went through the meat hall at (${lot % w.w},${(lot / w.w) | 0}): a storey shut, §${KNOBS.RAID_FINE * tier} in fines.${who}`;
       if (last && !last.dead) openFile(w, { tile: lot, culpritId: last.id, cause: "raid", line });
-      return line;
+      return { line, links: last ? [last.id] : [] };
     },
   },
   {
-    id: "greensLeague", kind: BOON, weight: () => 2, duration: 6, valveBoost: { C: -0.3 },
+    id: "greensLeague", kind: BOON, news: ["THE GREENS", "good", true], weight: () => 2, duration: 6, valveBoost: { C: -0.3 },
     gate: (w, c) => c.markets >= 1 && herbShare(c) >= 0.40 && w.events.files.some((f) => f.cause === "killing" && f.until > w.tick),
     fire: (w, c) => {
       const top = SPECIES.filter((s) => s.diet === "herb").sort((a, b) => c.shares[b.id] - c.shares[a.id]).slice(0, 2);
@@ -324,7 +324,7 @@ export const ROSTER = [
     },
   },
   {
-    id: "scrubbers", kind: BOON, weight: () => 2, choice: true,
+    id: "scrubbers", kind: BOON, news: ["The Scrubbers", "good", true], weight: () => 2, choice: true,
     gate: (w, c) => !w.events.scrubbers && countI(w) >= 15 && !w.events.choice,
     fire: (w) => {
       w.events.choice = { id: "scrubbers", title: "The Scrubbers Offer", text: "A firm offers to fit smoke scrubbers on every factory: industrial emissions ×0.7, permanently.", cost: 1500, accept: "Pay §1,500", decline: "Decline" };
@@ -382,15 +382,30 @@ export const EVENT_TITLES = Object.freeze({
 export const eventTitle = (id) => EVENT_TITLES[id] || id;
 
 /**
- * Ticker prefixes — ONE source for ui.js (colour, flash) and playtest.mjs
- * (print). Three regexes lived in three files and none of them knew the
- * heist: HEIST, SKUNK INCIDENT, WOLF MOON, TRUFFLE and DAIRY lines were
- * logged and never shown or counted (found by the predation research,
- * 2026-09-02). A new event line adds its prefix here and nowhere else.
+ * The roster-to-news contract. Primary chip and headline status live here,
+ * then the exported regexes are generated from it. A new roster card without
+ * one row fails the suite instead of silently landing only under "all".
  */
-export const TICKER_BAD = /^(FIRE|FLOOD|TORNADO|TAX REVOLT|RECESSION|RECEIVERSHIP|A SMOG|HEIST|KILLING|BURGLARY|SOLD|CELLS|TAKEN IN|RAID|EMPTY HOOKS)/;
-export const TICKER_GOOD = /^(MILESTONE|BOOM|FOUNDERS|COUNTY|FOX|RABBIT|MOUSE|TRUFFLE|DAIRY|HOME|EXONERATED|SAVED|LANDMARK)/;
-export const TICKER_FLASH = /^(MILESTONE|FIRE|FLOOD|TORNADO|TAX REVOLT|RECESSION|BOOM|FOUNDERS|COUNTY|BEAR|RECEIVERSHIP|The Gnawleys|A SMOG|MOUSE|RABBIT|FOX|The Scrubbers|HEIST|SKUNK INCIDENT|WOLF MOON|TRUFFLE|DAIRY|KILLING|BURGLARY|SOLD|CELLS|TAKEN IN|HOME|RELEASED|EXONERATED|COLD|RAID|THE GREENS|The Butchers|SAVED|LANDMARK|EMPTY HOOKS)|ONE HUNDRED/;
+export const NEWS_ROSTER = Object.freeze(ROSTER.map((event) => Object.freeze([event.id, ...event.news])));
+
+const NEWS_EXTRA = Object.freeze([
+  ["milestone", "MILESTONE", "good", true], ["bearWinter", "BEAR", "bad", true], ["receivership", "RECEIVERSHIP", "bad", true],
+  ["licence", "The Butchers", "good", true], ["killing", "KILLING", "bad", true], ["burglary", "BURGLARY", "bad", true],
+  ["sold", "SOLD", "bad", true], ["cells", "CELLS", "bad", true], ["takenIn", "TAKEN IN", "bad", true],
+  ["home", "HOME", "good", true], ["released", "RELEASED", "good", true], ["exonerated", "EXONERATED", "good", true],
+  ["cold", "COLD", "bad", true], ["saved", "SAVED", "good", true], ["landmark", "LANDMARK", "good", true],
+  ["emptyHooks", "EMPTY HOOKS", "bad", true], ["market", "THE MARKET", "good", false],
+  ["bought", "BOUGHT", "bad", false], ["pen", "THE PEN", "bad", false], ["trespass", "TRESPASS", "bad", false],
+  ["cold-file", "The file", "bad", false],
+  ["story-obituary", "OBITUARY", "bad", false], ["story-litter", "LITTER", "good", false], ["story-centenary", "CENTENARY", "good", false],
+]);
+const NEWS_ALL = [...NEWS_ROSTER, ...NEWS_EXTRA];
+const esc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const prefixRx = (rows) => new RegExp(`^(?:${rows.map((r) => esc(r[1])).join("|")})`);
+export const TICKER_BAD = prefixRx(NEWS_ALL.filter((r) => r[2] === "bad"));
+export const TICKER_GOOD = prefixRx(NEWS_ALL.filter((r) => r[2] === "good"));
+const FLASH_PREFIX = prefixRx(NEWS_ALL.filter((r) => r[3]));
+export const TICKER_FLASH = new RegExp(`${FLASH_PREFIX.source}|^OBITUARY 100 —`);
 
 /** Resolve the choice card. */
 export function resolveChoice(world, accept) {
@@ -422,7 +437,10 @@ export function eventsTick(world, cen, dem) {
   // nothing else, so bear winter, the tortoise centenary and the licence card
   // flashed over the map and were never in the log at all. The news reader
   // (SPEC §11b) reads the log, so those three could not be read back.
-  const say = (id, line) => { notices.push(line); ev.log.push({ t: world.tick, id, line }); };
+  const say = (id, line, links = []) => {
+    notices.push(line);
+    ev.log.push(links.length ? { t: world.tick, id, line, links: [...new Set(links)] } : { t: world.tick, id, line });
+  };
 
   // Rubble ages out FIRST, so a lot that burns down further down this same
   // function gets the whole of its RUBBLE_MONTHS and not one month less.
@@ -491,7 +509,6 @@ export function eventsTick(world, cen, dem) {
       c.centenary = true;
       ev.centenaries.push({ tile: c.home, radius: 3, bonus: 8, name: `${c.name} ${c.surname}` });
       remember(world, c, KIND.CENTENARY);
-      say("centenary", `${c.name} ${c.surname} is ONE HUNDRED. A plaque goes up; the street is worth more for it.`);
     }
   }
 
@@ -520,7 +537,9 @@ export function eventsTick(world, cen, dem) {
       let r = world.rng.next() * total;
       let pick = armed[armed.length - 1];
       for (let k = 0; k < armed.length; k++) { r -= ws[k]; if (r <= 0) { pick = armed[k]; break; } }
-      const line = pick.fire(world, cen);
+      const result = pick.fire(world, cen);
+      const line = typeof result === "string" ? result : result?.line;
+      const links = typeof result === "string" ? [] : result?.links || [];
       if (line) {
         if (pick.duration || pick.durationRange) {
           const d = pick.duration || (pick.durationRange[0] + world.rng.int(pick.durationRange[1] - pick.durationRange[0] + 1));
@@ -532,7 +551,7 @@ export function eventsTick(world, cen, dem) {
           ev.active.push(eff);
         }
         if (pick.kind === DISASTER) ev.cooldown = KNOBS.DISASTER_COOLDOWN;
-        say(pick.id, line);
+        say(pick.id, line, links);
       }
     }
   }

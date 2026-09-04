@@ -29,7 +29,7 @@ import { fileURLToPath } from "node:url";
 import { createWorld, ZONE, ROAD, capacityOf, jobsOf } from "../js/sim/world.js";
 import { tick } from "../js/sim/tick.js";
 import { apply, replay, undo, costOf as costOfOp } from "../js/sim/ops.js";
-import { save, load, stateHash, toPlain } from "../js/sim/save.js";
+import { save, load, stateHash, stateHashNoNews, toPlain } from "../js/sim/save.js";
 import { KNOBS } from "../js/sim/rules.js";
 import { post } from "../js/sim/budget.js";
 import { doorOf, hasAccess, computeFields, commuteTime } from "../js/sim/fields.js";
@@ -1187,10 +1187,13 @@ check("determinism: same seed + same inputs ⇒ same hash", stateHash(A.world) =
   // and a hundred-year-old rolls against its species' lifespan before it can
   // have its birthday.
   const cRes = EV.eventsTick(C, cenC, C.last ? C.last.demand : { n: 8 });
-  const hundred = cRes.find((l) => /ONE HUNDRED/.test(l));
-  check("events: the centenary reaches the LOG and not only the map — the reader reads the log",
-    !!hundred && C.events.log.some((e) => e.t === C.tick && e.line === hundred),
-    hundred ? "said but never written down" : "no centenary line at all");
+  const { storyTick } = await import("../js/sim/story.js");
+  const storyFlash = storyTick(C);
+  const hundred = C.events.log.find((e) => e.t === C.tick && e.id === `story-centenary:${old.id}`);
+  check("events: the centenary has ONE writer in storyTick and reaches the reader without flashing",
+    !!hundred && /CENTENARY.*ONE HUNDRED/.test(hundred.line) && hundred.who?.[0] === old.id
+      && !cRes.some((l) => /ONE HUNDRED/.test(l)) && storyFlash.length === 0,
+    hundred?.line || "no centenary row");
   let orphan = 0, said = 0;
   const L = load(A.saved);
   for (let t = 0; t < 120; t++) {
@@ -1332,8 +1335,8 @@ check("no Math.random under js/", mathRandom.length === 0, mathRandom.join(", ")
   check("lives: compact save round-trips without changing canonical state",
     stateHash(migrated) === stateHash(load(compactJson)));
   for (let t = 0; t < 10 * 12; t++) tick(migrated);
-  check("lives: v1 plain fixture continues ten years at its pre-Part-B hash",
-    stateHash(migrated) === "688bc6ed", stateHash(migrated));
+  check("lives: v1 plain fixture continues ten years at its pre-Part-F simulation hash",
+    stateHashNoNews(migrated) === "566f48db", `${stateHashNoNews(migrated)} without news · ${stateHash(migrated)} with news`);
 }
 
 // ---- Part B'': lives, graveyard, memorial, and the call-site mutation run ---
@@ -2008,14 +2011,10 @@ check("no Math.random under js/", mathRandom.length === 0, mathRandom.join(", ")
 {
   const { newsRows, keyOf } = await import("../js/news.js");
   const { TICKER_FLASH } = await import("../js/sim/events.js");
-  // The tortoise centenary's line begins with a CITIZEN'S NAME, which is in no
-  // list. It reaches the flash run and the reader's "headlines" chip only
-  // because TICKER_FLASH's last alternative, ONE HUNDRED, sits OUTSIDE the
-  // ^(...) group and so matches anywhere. Anchoring it to tidy the regex kills
-  // the plaque line in silence, so the suite holds the exception open.
-  check("news: the centenary flashes though its line starts with a name",
-    TICKER_FLASH.test("Ada Shellworth is ONE HUNDRED. A plaque goes up; the street is worth more for it.")
-    && !TICKER_FLASH.test("Ada Shellworth is ninety-nine. Nothing goes up."));
+  check("news: ordinary people stories stay in the reader; only a centenarian obituary flashes",
+    !TICKER_FLASH.test("CENTENARY — Ada Shellworth is ONE HUNDRED. A plaque goes up.")
+    && !TICKER_FLASH.test("OBITUARY — Fenpa Howell, 61, a wolf of (12,30), mourned by 4.")
+    && TICKER_FLASH.test("OBITUARY 100 — Ada Shellworth, 100, a tortoise of (12,30), mourned by 4."));
   const rows = newsRows(A.world);
   const logN = A.world.events.log.length;
   check("news: the feed is the city's own log, line for line — no synthesized second copy",
@@ -2081,6 +2080,206 @@ check("no Math.random under js/", mathRandom.length === 0, mathRandom.join(", ")
   check("news: a save carries no read mark",
     !saveText.includes('"news"') && !saveKeys.some((k) => /^(news|read)/i.test(k)),
     saveKeys.filter((k) => /^(news|read)/i.test(k)).join(", "));
+}
+
+// ---- Part F: selected people stories, named reports and linked reader ------------------------
+{
+  const { storyTick, STORY_PREFIXES } = await import("../js/sim/story.js");
+  const { KIND } = await import("../js/sim/life.js");
+  const { createHousehold, placeHousehold, removeCitizen } = await import("../js/sim/citizens.js");
+  const { legacyOf } = await import("../js/sim/legacy.js");
+  const { notables } = await import("../js/sim/census.js");
+  const { newsRows, createNews, FILTERS, keyOf } = await import("../js/news.js");
+  const { pinAndCentre } = await import("../js/person-link.js");
+  const { toScreen, HALF_H } = await import("../js/iso/iso.js");
+  const FEV = await import("../js/sim/events.js");
+
+  const F = createWorld({ seed: "part-f-stories", w: 12, h: 12 });
+  const home = 5 * F.w + 5;
+  const hh = createHousehold(F, "rabbit", 4);
+  placeHousehold(F, hh, home);
+  const [dead, ...friends] = hh.members.map((id) => F.byId.get(id));
+  F.tick = 61 * 12;
+  dead.born = 0;
+  dead.friends = friends.map((c) => c.id);
+  for (const c of friends) c.friends = [dead.id];
+  F.lifeEvents = [];
+  removeCitizen(F, dead, "died");
+  const beforeStory = stateHash(F);
+  const beforeStoryNoNews = stateHashNoNews(F);
+  const ordinaryFlash = storyTick(F);
+  const obituary = F.events.log.filter((e) => e.id.startsWith("story-obituary:"));
+  check("story: three distinct mourners produce one truthful, linked obituary",
+    obituary.length === 1 && obituary[0].who?.join() === String(dead.id)
+      && obituary[0].line === `OBITUARY — ${dead.name} ${dead.surname}, 61, a rabbit of (5,5), mourned by 3.`
+      && legacyOf(F, dead.id)?.home === home && ordinaryFlash.length === 0,
+    obituary.map((x) => x.line).join(" | "));
+  check("story: its only simulation difference is the saved news row",
+    stateHash(F) !== beforeStory && stateHashNoNews(F) === beforeStoryNoNews,
+    `${beforeStory}→${stateHash(F)} · no-news ${beforeStoryNoNews}→${stateHashNoNews(F)}`);
+  storyTick(F);
+  check("story: retrying the editor cannot duplicate an obituary", F.events.log.filter((e) => e.id.startsWith("story-obituary:")).length === 1);
+
+  const X = createWorld({ seed: "part-f-collisions", w: 12, h: 12 });
+  const xh = createHousehold(X, "wolf", 6);
+  placeHousehold(X, xh, home);
+  X.tick = 61 * 12;
+  const xs = xh.members.map((id) => X.byId.get(id));
+  const subjects = xs.slice(0, 3), witnesses = xs.slice(3);
+  for (const c of subjects) { c.name = "Same"; c.surname = "Record"; c.born = 0; c.friends = witnesses.map((m) => m.id); }
+  for (const c of witnesses) c.friends = subjects.map((s) => s.id);
+  X.lifeEvents = [];
+  removeCitizen(X, subjects[0], "died");
+  removeCitizen(X, subjects[1], "killed");
+  removeCitizen(X, subjects[2], "sold");
+  storyTick(X); storyTick(X);
+  const collisions = newsRows(X).filter((r) => r.id.startsWith("story-obituary:"));
+  check("story: identical rendered obituaries retain two subject identities; killing counts, sale does not",
+    collisions.length === 2 && collisions[0].text === collisions[1].text
+      && new Set(collisions.map((r) => r.id)).size === 2 && new Set(collisions.map((r) => keyOf(r))).size === 2
+      && collisions.some((r) => r.who[0] === subjects[0].id) && collisions.some((r) => r.who[0] === subjects[1].id)
+      && !collisions.some((r) => r.who[0] === subjects[2].id),
+    collisions.map((r) => `${r.id}/${keyOf(r)}`).join(" | "));
+
+  const Y = createWorld({ seed: "part-f-name-punctuation", w: 12, h: 12 });
+  const yh = createHousehold(Y, "tortoise", 4);
+  placeHousehold(Y, yh, home);
+  Y.tick = 100 * 12;
+  const [centenarian, ...ym] = yh.members.map((id) => Y.byId.get(id));
+  centenarian.name = "Ada, 61"; centenarian.surname = "Shellworth"; centenarian.born = 0;
+  centenarian.friends = ym.map((c) => c.id);
+  for (const c of ym) c.friends = [centenarian.id];
+  Y.lifeEvents = [];
+  removeCitizen(Y, centenarian, "died");
+  const oldFlash = storyTick(Y);
+  check("story: centenarian flashing is a structural prefix, not age parsed behind a free-form name",
+    oldFlash.length === 1 && /^OBITUARY 100 — Ada, 61 Shellworth, 100,/.test(oldFlash[0]) && FEV.TICKER_FLASH.test(oldFlash[0])
+      && !FEV.TICKER_FLASH.test("OBITUARY — Young, 100 Trickname, 61, a rabbit of (5,5), mourned by 3."));
+
+  const parents = friends.slice(0, 2);
+  const child = friends[2];
+  F.lifeEvents = [
+    { id: parents[0].id, kind: KIND.LITTER, arg: 1 },
+    { id: parents[1].id, kind: KIND.LITTER, arg: 1 },
+    { id: child.id, kind: KIND.BORN, arg: home },
+  ];
+  storyTick(F);
+  check("story: two parent witnesses to one singleton birth do NOT invent a litter of two",
+    F.events.log.filter((e) => e.id.startsWith("story-litter:")).length === 0);
+  F.lifeEvents[0].arg = 3;
+  F.lifeEvents[1].arg = 3;
+  storyTick(F);
+  const litter = F.events.log.filter((e) => e.id.startsWith("story-litter:"));
+  check("story: two witnesses to a true litter coalesce once at the declared size, never their sum",
+    litter.length === 1 && /A litter of 3/.test(litter[0].line) && !/litter of 6/.test(litter[0].line)
+      && litter[0].who?.includes(parents[0].id) && litter[0].who?.includes(parents[1].id) && litter[0].who?.includes(child.id),
+    litter.map((x) => x.line).join(" | "));
+
+  F.lifeEvents = [{ id: parents[0].id, kind: KIND.CENTENARY, arg: null }];
+  storyTick(F); storyTick(F);
+  const centuries = F.events.log.filter((e) => e.id.startsWith("story-centenary:"));
+  check("story: CENTENARY moved to one story writer and is idempotent",
+    centuries.length === 1 && centuries[0].who?.join() === String(parents[0].id) && /^CENTENARY/.test(centuries[0].line));
+
+  const obit61 = obituary[0].line;
+  const obit100 = obit61.replace("OBITUARY —", "OBITUARY 100 —").replace(", 61,", ", 100,");
+  check("story: prefixes classify consistently and ordinary stories never flash",
+    STORY_PREFIXES.join() === "OBITUARY,LITTER,CENTENARY"
+      && FEV.TICKER_BAD.test(obit61) && !FEV.TICKER_GOOD.test(obit61) && !FEV.TICKER_FLASH.test(obit61)
+      && FEV.TICKER_BAD.test(obit100) && FEV.TICKER_FLASH.test(obit100)
+      && FEV.TICKER_GOOD.test(litter[0].line) && !FEV.TICKER_BAD.test(litter[0].line) && !FEV.TICKER_FLASH.test(litter[0].line)
+      && FEV.TICKER_GOOD.test(centuries[0].line) && !FEV.TICKER_BAD.test(centuries[0].line) && !FEV.TICKER_FLASH.test(centuries[0].line));
+  const rosterIds = FEV.ROSTER.map((r) => r.id).sort();
+  const registeredIds = FEV.NEWS_ROSTER.map((r) => r[0]).sort();
+  check("story: every event roster id has exactly one generated primary-chip registration",
+    new Set(registeredIds).size === registeredIds.length && JSON.stringify(rosterIds) === JSON.stringify(registeredIds)
+      && FEV.ROSTER.every((event) => String(event.fire).includes(event.news[0]))
+      && FEV.NEWS_ROSTER.every((r) => (Number(FEV.TICKER_BAD.test(r[1])) + Number(FEV.TICKER_GOOD.test(r[1]))) === 1 && FEV.TICKER_FLASH.test(r[1])),
+    `${rosterIds.join()} vs ${registeredIds.join()}`);
+
+  const notable = notables(F);
+  check("story: census.notables deterministically names the oldest resident and largest household",
+    notable.oldest?.id === parents[0].id || notable.oldest?.id === parents[1].id || notable.oldest?.id === child.id
+      ? notable.largest?.household === hh.id && notable.largest.size === 3 && notable.largest.member === Math.min(...friends.map((c) => c.id))
+      : false,
+    JSON.stringify(notable));
+
+  const J = createWorld({ seed: "part-f-january", w: 12, h: 12 });
+  const jHome = 5 * J.w + 5;
+  J.terrain[jHome] = 0;
+  J.zone[jHome] = ZONE.R; J.maxTier[jHome] = 3; J.tier[jHome] = 1;
+  J.road[jHome - 1] = ROAD.NS | ROAD.EW;
+  const jh = createHousehold(J, "rabbit", 3);
+  placeHousehold(J, jh, jHome);
+  J.tick = 120;
+  J.events.noDisasters = true;
+  const [doomed, survivor] = jh.members.map((id) => J.byId.get(id));
+  doomed.name = "Doomed"; doomed.surname = "January"; doomed.born = -1200; doomed.deathAge = J.tick - doomed.born;
+  survivor.name = "Living"; survivor.surname = "February"; survivor.born = -600; survivor.deathAge = 99999;
+  tick(J);
+  const januaryReport = J.events.log.find((r) => r.t === 120 && /^REPORT /.test(r.line));
+  check("story: a January death is recomputed out of that same month's named REPORT",
+    januaryReport && !januaryReport.line.includes("Doomed January") && !januaryReport.who?.includes(doomed.id)
+      && januaryReport.line.includes("Living February") && januaryReport.who?.includes(survivor.id),
+    januaryReport?.line || "no report");
+
+  F.events.log.push({ t: F.tick, id: "named-operation", line: `KILLING — ${parents[0].name} ${parents[0].surname} was seen.`, links: [parents[0].id] });
+  const feed = newsRows(F);
+  const restoredFeed = newsRows(load(save(F)));
+  check("story: every who id resolves, and save/load preserves the ordered arrays",
+    feed.filter((r) => r.people).length === 3
+      && feed.every((r) => r.who.every((id) => F.byId.has(id) || legacyOf(F, id)))
+      && feed.every((r) => r.links.every((id) => F.byId.has(id) || legacyOf(F, id)))
+      && JSON.stringify(feed.map((r) => [r.who, r.links])) === JSON.stringify(restoredFeed.map((r) => [r.who, r.links])));
+  check("story: the fifth news chip is the exact who.length people filter",
+    FILTERS.length === 5 && FILTERS[4][0] === "people" && feed.filter(FILTERS[4][2]).every((r) => r.who.length)
+      && feed.some((r) => r.id === "named-operation" && !r.people && r.links[0] === parents[0].id));
+
+  const target = { target: { tx: 2, ty: 3, citizen: { home } }, citizen: dead.id };
+  const camera = { x: 99, y: 99 };
+  let pinned = null, painted = null;
+  const linkedApp = { world: F, camera, input: { pinCitizen: (id) => { pinned = id; return true; }, hoverInfo: () => target }, ui: { updateHover: (x) => { painted = x; } } };
+  const expected = toScreen(home % F.w, (home / F.w) | 0);
+  check("story: the shared name action pins the exact id, centres its home rather than a walker and refreshes the card",
+    pinAndCentre(linkedApp, dead.id) && pinned === dead.id && camera.x === expected[0] && camera.y === expected[1] + HALF_H && painted === target);
+
+  const { installDom, stubApp } = await import("./dom-shim.mjs");
+  const doc = installDom();
+  const clicked = [];
+  let pref = { news: { "check-city": [] } };
+  const readerApp = stubApp(F, {
+    ui: { refresh() {} },
+    prefs: { get: () => pref, set: (patch) => { pref = { ...pref, ...patch }; } },
+    pinCitizen: (id) => { clicked.push(id); return true; },
+  });
+  const reader = createNews(readerApp);
+  readerApp.news = reader;
+  reader.open();
+  const host = doc.getElementById("news");
+  const links = host.querySelectorAll("button.person-link");
+  const peopleChip = host.querySelectorAll("button").find((b) => /^people /.test(b.textContent));
+  const beforeUnread = reader.unread();
+  const clickedLink = links.at(-1);
+  if (clickedLink) clickedLink.dispatch("click");
+  check("story: the real reader handler renders safe name buttons, marks the linked row read, pins its id and closes",
+    links.length > 1 && peopleChip && clicked[0] === Number(clickedLink.dataset.citizen) && host.hidden === true
+      && reader.unread() === beforeUnread - 1,
+    `${links.length} links · clicked ${clicked.join()} · unread ${beforeUnread}→${reader.unread()} · hidden ${host.hidden}`);
+
+  X.events.log.push({ t: X.tick, id: "same-name-links", line: "DUPLICATES — Same Record met Same Record.", links: [subjects[0].id, subjects[1].id] });
+  const sameApp = stubApp(X, { ui: { refresh() {} }, pinCitizen: () => true });
+  const sameReader = createNews(sameApp); sameApp.news = sameReader; sameReader.open();
+  const sameRow = host.querySelectorAll("li.nrow").find((li) => /DUPLICATES/.test(li.textContent));
+  const sameButtons = sameRow?.querySelectorAll("button.person-link") || [];
+  check("story: equal printed names bind successive occurrences to their exact linked citizen ids",
+    sameButtons.length === 2 && Number(sameButtons[0].dataset.citizen) === subjects[0].id && Number(sameButtons[1].dataset.citizen) === subjects[1].id,
+    sameButtons.map((b) => b.dataset.citizen).join(","));
+  sameReader.close();
+
+  const reports = newsRows(A.world).filter((r) => r.report && r.people);
+  check("story: populated yearly REPORTs name both notables and carry their ids",
+    reports.length > 0 && reports.every((r) => /Oldest resident:/.test(r.text) && /Largest household:/.test(r.text) && r.who.length >= 1),
+    `${reports.length} named reports`);
 }
 
 // ---- Part P: one tool registry, left palette and collision-free keys -------------------------
@@ -3389,9 +3588,11 @@ function costOfBulldoze(w, x, y) { return (0, costOfOp)(w, { kind: "bulldoze", x
     K.w.road[K.at(30, 7)] = ROAD.ROAD; K.w.rail[K.at(30, 6)] = 1; ME.resetMeatRoutes(K.w);
     KNOBS.KILL_P = 1 / JU.killTotal(K.w);
     const killLines = []; JU.killingTick(K.w, census(K.w), killLines);
+    const killRecord = K.w.events.log.find((r) => r.id === "killing");
     check("meat killing: a forced distant killing stocks exactly one unit and publishes the selected rail hall-leg for the sack",
       K.w.meatStats.total.killed === 1 && ME.hallStock(K.w, K.hall) === 1 && K.w.predations.length === 1 && K.w.predations[0].hall === K.hall
-      && K.w.predations[0].sackPath.some((p) => p & FI.RIDE) && K.w.ledger.cut === KNOBS.MEAT_PRICE);
+      && K.w.predations[0].sackPath.some((p) => p & FI.RIDE) && K.w.ledger.cut === KNOBS.MEAT_PRICE
+      && killRecord?.links?.includes(K.w.predations[0].killer) && killRecord?.links?.includes(K.w.predations[0].victim.id));
     KNOBS.KILL_P = old.kill;
 
     const S = flatFreight("h-sentence");
@@ -3399,9 +3600,10 @@ function costOfBulldoze(w, x, y) { return (0, costOfOp)(w, { kind: "bulldoze", x
     const convict = S.w.byId.get(soldHh.members[0]), soldLines = [];
     const soldFile = JU.openFile(S.w, { tile: S.home, culpritId: convict.id, cause: "burglary" });
     JU.arrest(S.w, soldFile, convict, false, soldLines);
+    const soldRecord = S.w.events.log.find((r) => r.id === "arrest" && /^SOLD/.test(r.line));
     check("meat sentence: SOLD increments convict count and convicted stock exactly once, with its §100 cut distinct from meatSold",
       !S.w.byId.has(convict.id) && S.w.events.justice.sold === 1 && S.w.meatStats.total.convicted === 1 && ME.hallStock(S.w, S.hall) === 1
-      && S.w.ledger.cut === KNOBS.SOLD_PRICE && (S.w.last?.census?.meatSold || 0) === 0);
+      && S.w.ledger.cut === KNOBS.SOLD_PRICE && (S.w.last?.census?.meatSold || 0) === 0 && soldRecord?.links?.includes(convict.id));
 
     const wolves = CI.createHousehold(E.w, "wolf", 2); for (const id of wolves.members) E.w.byId.get(id).deathAge = 1e9;
     CI.placeHousehold(E.w, wolves, E.home);

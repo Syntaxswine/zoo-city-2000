@@ -4,7 +4,21 @@ Open work, ranked. The design record is `SPEC.md`; the numbers are in
 `js/sim/rules.js` (KNOBS). Later layers were labelled at design time so v1
 could ship whole.
 
-## The People — IN PROGRESS 2026-09-03 (`docs/PLAN-THE-PEOPLE-2026-09-02.md`); Parts K, A, C, D, H, P and S shipped
+## The People — IN PROGRESS 2026-09-03 (`docs/PLAN-THE-PEOPLE-2026-09-02.md`); Parts K, A, C, D, F, H, P and S shipped
+
+**Part F SHIPPED 2026-09-03:** the paper now selects permanent-id people
+stories from the monthly biography bus: one obituary after three mourners,
+true declared litters without double-counting the two parent witnesses, and
+one centenary writer. The fifth People chip exposes saved `who` links; a name
+marks its row read, pins the living or archived citizen, centres their home
+and opens the card/epitaph. January REPORTs recompute and name the current
+oldest resident and largest household after removals. Existing named
+crime/meat rows carry separate link ids, so their citizens are clickable
+without misclassifying operational dispatches as People stories. A generated roster
+registry prevents unclassified event prefixes; ordinary stories stay quiet
+and only `OBITUARY 100 —` flashes. Four 30-year probe towns spend 5.6–15.4%
+of rows on people with 0 dangling/lost ids. The year-30 hash moves only in
+news (`stateHashNoNews` remains `7efe937b`); 428 canonical checks pass.
 
 **Part P SHIPPED 2026-09-03:** the sixteen build tools now live in one
 DOM-free registry and one 2×8 sprite palette left of the map (4×4 below 720
@@ -72,7 +86,7 @@ thing to do is reuse the inspect button. also the meat market should have
 more meat on hand. out of 2,800 animals they only sold 20 units of meat in
 the whole history of the town and have 15 in cells."* The shared keel and
 the independent parts: **K** the keel (`moodTerms`, `life.js` API,
-`world.majority`, `world.meat`, `storyTick` stub, reserved art names —
+`world.majority`, `world.meat`, the shipped `storyTick` bridge, reserved art names —
 lands FIRST, ½ session) then **A** needs (under the Inspect tool, the
 animals near the cursor say what they want — every line is a sim term that
 hurts, with the remedy under it on the card; the Census gains "what the

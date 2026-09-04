@@ -30,6 +30,7 @@ import { createUI } from "./ui.js";
 import { createPalette } from "./palette.js";
 import { createTitle } from "./title.js";
 import { createNews } from "./news.js";
+import { pinAndCentre } from "./person-link.js";
 import { KNOBS } from "./sim/rules.js";
 import { listSlots, listAllSlots, writeSlot, readSlot, deleteSlot, bytesUsed, migrate } from "./slots.js";
 
@@ -93,6 +94,11 @@ function centreOn(tx, ty) {
   app.camera.x = sx;
   app.camera.y = sy + HALF_H;
 }
+
+/** One citizen-link action for News and every future named surface. */
+app.pinCitizen = (id) => {
+  return pinAndCentre(app, id);
+};
 
 function adopt(world, name, { paused = false } = {}) {
   app.world = world;

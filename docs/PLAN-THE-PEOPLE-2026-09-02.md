@@ -228,9 +228,9 @@ No call sites yet — Part B adds them.
 none), recomputed each tick in `census.js` from occupants (R) or staff
 (C/I/M). Not saved; `rebuildDerived` recomputes it. Part E reads it.
 
-**K4. `storyTick(world)` stub in `js/sim/story.js`,** called at the end of
-`tick()` after justice. Part F fills it. It reads `world.lifeEvents` and
-writes log rows; it is the ONLY place a life event becomes news.
+**K4. `storyTick(world)` in `js/sim/story.js`,** called at the end of
+`tick()` after justice. Part F shipped it: it reads `world.lifeEvents` and
+writes linked log rows; it is the ONLY place a life event becomes news.
 
 **K5. Registry names reserved in `js/art/index.js`:** `art.bubble(w, h)`,
 `art.portrait(species, opts)`, `art.mark(species)`, `art.look(id)`,
@@ -678,11 +678,31 @@ not per family.
 **Size.** ≈ 500 lines of plans + 100 marks + 40 render + 60 shots; ~8
 checks; one session, two if wear is in.
 
-### F. The story channel — being told
+### F. The story channel — SHIPPED 2026-09-03 — being told
 
 **Goal.** The news tells the town's people-stories (an obituary, a litter,
 a first job for a starred family's cub), every named row is clickable, and
 the yearly REPORT names the year's people.
+
+**Status.** `storyTick` now coalesces three-mourner obituaries and declared
+true litters into stable-subject `who` rows, and is the centenary's only news
+writer. Ordinary singleton births remain ordinary: their two parent
+`LITTER(1)` records are witnesses to the same one cub and must never be
+summed into a fictitious litter of two. January REPORTs recompute after that
+month's removals and name the current oldest resident and largest household.
+The fifth People chip links through one tested pin-and-centre action to C's
+living card or permanent epitaph. Existing named operational rows keep their
+own `links` ids and are clickable too; only editorial `who` rows enter the
+People chip, preserving its measured budget. C's optional browser-only star/follow
+stretch remains deliberately unshipped, so the “starred family's first job”
+variant is deferred: letting sim news read `zoo.pref` would violate §0.4.
+
+Four 30-year `newsprobe` towns measured people shares of 6.0%, 6.4%, 15.4%
+and 5.6%, with no unresolved or save-lost ids. Seed 7's ordinary year-30
+hash moved from `e2352679` to `771239e1`; its `stateHashNoNews` stayed at the
+pre-F `7efe937b`. The 428-check suite includes identical-text obituary
+collisions, killed-versus-sold policy, comma-bearing centenarians, a January
+death/report race, real reader click/read/close handlers, and old saves.
 
 **Design.**
 - Fill K4. `storyTick` reads `world.lifeEvents` and writes log rows with a

@@ -150,7 +150,7 @@ function kill(world, killer, victim, notices) {
   const wake = mourners.length >= 3 ? ` ${mourners.length} friends held a wake.` : "";
   const line = `KILLING — ${nameOf(victim)} did not come home to ${at(world, victimHome)}. ${nameOf(killer)} of ${at(world, killer.home)}${since} was seen on the street${bought}.${wake}`;
   openFile(world, { tile: victimHome, culpritId: killer.id, victimId: victim.id, cause: "killing", line });
-  ev.log.push({ t: tick, id: "killing", line });
+  ev.log.push({ t: tick, id: "killing", line, links: [victim.id, killer.id] });
   notices.push(line);
 }
 
@@ -224,7 +224,7 @@ export function burglaryTick(world, cen, notices) {
   // sergeant. Whether anyone WORKS it is filesTick's question.
   const line = `BURGLARY — ${nameOf(thief)} ${where}. ${cen.policeStations ? "A file is open for six months." : "There is no station in town; the street remembers it and nobody comes looking."}`;
   openFile(world, { tile: lot, culpritId: thief.id, cause: "burglary", line });
-  world.events.log.push({ t: world.tick, id: "burglary", line });
+  world.events.log.push({ t: world.tick, id: "burglary", line, links: [thief.id] });
   notices.push(line);
 }
 
@@ -273,7 +273,7 @@ function exonerate(world, culprit, notices) {
     const first = a.name.split(" ")[0];
     const tail = wronged ? `There is no way to unfix ${first}.` : `${first} was sold; there is no way to unsell anyone.`;
     const line = `EXONERATED — ${a.name} was the wrong animal; ${nameOf(culprit)} was taken in today for the same ${a.cause}. The city pays §${KNOBS.COMPENSATION}. ${tail}`;
-    ev.log.push({ t: world.tick, id: "exonerated", line });
+    ev.log.push({ t: world.tick, id: "exonerated", line, links: [...new Set([a.citizenId, culprit.id])] });
     notices.push(line);
   }
 }
@@ -338,7 +338,8 @@ export function arrest(world, f, c, wrongful, notices, opts = {}) {
       line = `CELLS — ${nameOf(c)} is in the cells until ${monthName(tick + KNOBS.CELLS_MONTHS)} ${why}. No centre in town; ${c.name} comes home as ${c.name} went.${tail}`;
     }
   }
-  ev.log.push({ t: tick, id: "arrest", line });
+  const links = [...new Set([c.id, wrongful ? culprit?.id : null].filter(Number.isInteger))];
+  ev.log.push({ t: tick, id: "arrest", line, links });
   notices.push(line);
   return line;
 }
@@ -362,7 +363,7 @@ export function filesTick(world, cen, notices) {
       const line = f.cause === "killing"
         ? `COLD — the file on the ${f.cause} at ${at(world, f.tile)} closed without an arrest. ${nameOf(culprit)} is still at ${at(world, culprit.home)}.`
         : `The file on the ${f.cause} at ${at(world, f.tile)} closed after ${KNOBS.CASE_MONTHS} months. ${nameOf(culprit)} was never charged.`;
-      ev.log.push({ t: tick, id: "cold", line });
+      ev.log.push({ t: tick, id: "cold", line, links: [culprit.id] });
       notices.push(line);
       continue;
     }
@@ -415,7 +416,7 @@ export function custodyTick(world, notices) {
     } else {
       line = `RELEASED — ${nameOf(c)} is home at ${at(world, c.home)} with a record.`;
     }
-    ev.log.push({ t: tick, id: fromCentre ? "home" : "released", line });
+    ev.log.push({ t: tick, id: fromCentre ? "home" : "released", line, links: [c.id] });
     notices.push(line);
   }
 }

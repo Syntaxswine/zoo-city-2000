@@ -28,12 +28,13 @@
 // way round: a cheat is an OP because it changes the city; being caught up on
 // the news changes nothing, so it is a preference).
 //
-//   newsRows(world) → [{ t, id, label, text, bad, good, flash, report }]
+//   newsRows(world) → [{ t, id, label, text, who, links, people, bad, good, flash, report }]
 //                     (a row's NAME is keyOf() — its month and its words)
 //   createNews(app) → { open, close, toggle, key, isOpen, unread, invalidate }
 
 import { dateOf } from "./sim/tick.js";
 import { TICKER_BAD, TICKER_GOOD, TICKER_FLASH } from "./sim/events.js";
+import { legacyOf, personName } from "./sim/legacy.js";
 
 const el = (tag, cls, text) => {
   const e = document.createElement(tag);
@@ -57,7 +58,17 @@ const LEAD = /^([A-Z][A-Z0-9'’ ]*[A-Z0-9])(?=[ —:,.]|$)/;
 export function newsRows(world) {
   if (!world) return [];
   const rows = [];
-  for (const e of world.events?.log || []) rows.push({ t: e.t, id: e.id || "notice", text: e.line });
+  for (const e of world.events?.log || []) {
+    const resolve = (values) => [...new Set((Array.isArray(values) ? values : []).map(Number)
+      .filter((id) => Number.isInteger(id) && id >= 0 && (world.byId?.has(id) || legacyOf(world, id))))];
+    const rawWho = Array.isArray(e.who) ? e.who : [];
+    const rawLinks = Array.isArray(e.links) ? e.links : [];
+    const who = resolve(rawWho);
+    // Explicit link order follows printed mention order (important when two
+    // citizens share a name); editorial who ids remain a stable set.
+    const links = resolve([...rawLinks, ...rawWho]);
+    rows.push({ t: e.t, id: e.id || "notice", text: String(e.line || ""), who, links });
+  }
   rows.sort((a, b) => a.t - b.t); // stable: within a month the log's own order stands
   for (const r of rows) {
     r.label = dateOf(world, r.t).label;
@@ -65,6 +76,7 @@ export function newsRows(world) {
     r.good = TICKER_GOOD.test(r.text);
     r.flash = TICKER_FLASH.test(r.text); // "the updates that pop up on the screen"
     r.report = /^REPORT /.test(r.text);  // the year's own summing-up, set quieter
+    r.people = r.who.length > 0;
   }
   return rows;
 }
@@ -83,13 +95,21 @@ function fnv(s) {
   return (h >>> 0).toString(16).padStart(8, "0");
 }
 
-export const keyOf = (r) => `${r.t}.${fnv(r.text)}`;
+export const keyOf = (r) => {
+  // Preserve every historical non-people key byte-for-byte. Named rows add
+  // subject identity so two citizens with identical printed words do not
+  // share one browser read mark.
+  const linked = r.links?.length ? r.links : r.who || [];
+  const subject = linked.length ? `\0${r.id || "notice"}\0${linked.join(",")}` : "";
+  return `${r.t}.${fnv(r.text + subject)}`;
+};
 
-const FILTERS = [
+export const FILTERS = [
   ["all", "all", () => true],
   ["flash", "headlines", (r) => r.flash],
   ["bad", "trouble", (r) => r.bad],
   ["good", "good", (r) => r.good],
+  ["people", "people", (r) => r.people],
 ];
 
 export function createNews(app) {
@@ -172,7 +192,7 @@ export function createNews(app) {
     for (const [id, label, fn] of FILTERS) {
       const n = rows.filter(fn).length;
       const b = el("button", "chip" + (filter === id ? " on" : ""), `${label} ${n}`);
-      b.title = id === "flash" ? "only the lines that popped up over the map" : id === "bad" ? "fires, floods, crime, the books" : id === "good" ? "milestones, fairs, festivals, homecomings" : "every dispatch, including the yearly report";
+      b.title = id === "flash" ? "only the lines that popped up over the map" : id === "bad" ? "fires, floods, crime, the books" : id === "good" ? "milestones, fairs, festivals, homecomings" : id === "people" ? "dispatches naming citizens you can inspect" : "every dispatch, including the yearly report";
       b.addEventListener("click", () => { const at = view[cursor]; filter = id; build(); jumpNear(at); });
       chips.append(b);
     }
@@ -206,10 +226,67 @@ export function createNews(app) {
     li.append(el("span", "when", r.label));
     const txt = el("span", "txt");
     const m = LEAD.exec(r.text);
-    if (m) { txt.append(el("b", "", m[1]), r.text.slice(m[1].length)); } else txt.textContent = r.text;
+    const lead = m?.[1] || "";
+    if (lead) txt.append(el("b", "", lead));
+    appendPeople(txt, r.text.slice(lead.length), r, i);
     li.append(txt);
     li.addEventListener("click", () => { cursor = i; markThrough(); paint(true); });
     return li;
+  }
+
+  /** Render links with textContent only: citizen names are data, never HTML. */
+  function appendPeople(txt, words, row, rowIndex) {
+    const links = row.links.map((id) => ({ id, name: personName(app.world, id) }))
+      .filter((x) => x.name && x.name !== "someone");
+    const groups = new Map();
+    for (const link of links) {
+      if (!groups.has(link.name)) groups.set(link.name, []);
+      groups.get(link.name).push(link);
+    }
+    const consumed = new Map();
+    const used = new Set();
+    let at = 0;
+    while (at < words.length) {
+      let next = null;
+      for (const [name, same] of groups) {
+        const found = words.indexOf(name, at);
+        if (found < 0 || (next && (found > next.at || (found === next.at && name.length <= next.name.length)))) continue;
+        const n = consumed.get(name) || 0;
+        const link = same.length === 1 ? same[0] : same[Math.min(n, same.length - 1)];
+        next = { ...link, name, at: found };
+      }
+      if (!next) break;
+      if (next.at > at) txt.append(words.slice(at, next.at));
+      txt.append(personButton(next, rowIndex));
+      used.add(next.id);
+      consumed.set(next.name, (consumed.get(next.name) || 0) + 1);
+      at = next.at + next.name.length;
+    }
+    if (at < words.length) txt.append(words.slice(at));
+    const rest = links.filter((x) => !used.has(x.id));
+    if (rest.length) {
+      txt.append(" · ");
+      for (let i = 0; i < rest.length; i++) {
+        if (i) txt.append(", ");
+        txt.append(personButton(rest[i], rowIndex));
+      }
+    }
+  }
+
+  function personButton(person, rowIndex) {
+    const b = el("button", "person-link", person.name);
+    b.type = "button";
+    b.dataset.citizen = String(person.id);
+    b.title = `Inspect ${person.name} and centre the map`;
+    b.addEventListener("click", (e) => {
+      e.stopPropagation();
+      if (app.pinCitizen?.(person.id)) {
+        cursor = rowIndex;
+        markThrough();
+        close();
+      }
+    });
+    return b;
   }
 
   /** Reading a dispatch marks THAT dispatch read — never the ones you skipped past. */

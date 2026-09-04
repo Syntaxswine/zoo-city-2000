@@ -61,6 +61,28 @@ export function needCensus(world) {
   return counts;
 }
 
+/** Stable people named by the yearly report; derived, never saved. */
+export function notables(world) {
+  const byId = world.byId || new Map((world.citizens || []).filter((c) => !c.dead).map((c) => [c.id, c]));
+  let oldest = null;
+  for (const c of world.citizens || []) {
+    if (c.dead) continue;
+    if (!oldest || c.born < oldest.born || (c.born === oldest.born && c.id < oldest.id)) oldest = c;
+  }
+  let largest = null;
+  for (const hh of world.households || []) {
+    if (hh.gone) continue;
+    const members = (hh.members || []).map((id) => byId.get(id)).filter((c) => c && !c.dead).sort((a, b) => a.id - b.id);
+    if (!members.length) continue;
+    const candidate = { household: hh.id, surname: hh.surname, size: members.length, home: hh.home, member: members[0].id, name: `${members[0].name} ${members[0].surname}` };
+    if (!largest || candidate.size > largest.size || (candidate.size === largest.size && candidate.household < largest.household)) largest = candidate;
+  }
+  return {
+    oldest: oldest ? { id: oldest.id, name: `${oldest.name} ${oldest.surname}`, age: ageYears(world, oldest), born: oldest.born, home: oldest.home } : null,
+    largest,
+  };
+}
+
 export function census(world) {
   recountMajority(world);
   const { citizens, w, h } = world;
@@ -231,5 +253,6 @@ export function census(world) {
     maxTraffic,
     vacantR: Math.max(0, rCap - P),
     rCap,
+    notables: notables(world),
   };
 }

@@ -278,6 +278,12 @@ li.nrow .gut { width: 12px; flex: none; text-align: center; color: var(--accent)
 li.nrow .when { width: 96px; flex: none; color: var(--dim); }
 li.nrow .txt { flex: 1; min-width: 0; }
 li.nrow .txt b { font-weight: 600; letter-spacing: 1px; }
+li.nrow .person-link {
+  appearance: none; border: 0; border-bottom: 1px dotted currentColor;
+  padding: 0; color: inherit; background: transparent; font: inherit;
+  cursor: pointer;
+}
+li.nrow .person-link:hover, li.nrow .person-link:focus-visible { color: var(--ink); outline: 1px solid currentColor; outline-offset: 2px; }
 li.nrow.bad .txt { color: var(--bad); }
 li.nrow.good .txt { color: var(--accent); }
 li.nrow.report .txt { color: var(--dim); }

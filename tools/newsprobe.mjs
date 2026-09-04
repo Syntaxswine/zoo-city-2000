@@ -1,41 +1,39 @@
-// newsprobe.mjs — how much of what a city says ever reaches the player.
-// SPEC §11b; the table in handoff §13 is this tool's output.
+// newsprobe.mjs — measure Part F's people-story budget and identity contract.
 //
-// An INSTRUMENT: it reports and never halts, never gates, exit 0 always.
+//   node tools/newsprobe.mjs [--years 30] [--seeds 7,3,5,11] [--csv]
 //
-// The question it answers. Only lines matching TICKER_FLASH pop up over the
-// map; everything else the city says goes straight to the log. So:
-//   · how many dispatches does a city make in thirty years?
-//   · how many of them did the player ever SEE?
-//   · how often did a month pop more than one, which is where the old
-//     self-overwriting flash() dropped headlines on the floor?
-//
-// Session 6 first answered these from a six-line month it had built BY HAND,
-// wrote "five in six headlines were never seen" into a commit message, and
-// was wrong: the overwrite costs about one headline per thirty city-years.
-// The real case for the reader is the never-popped column. This file exists
-// so the next reader does not have to take that on trust, and so the handoff
-// table has a command under it.
-//
-//   node tools/newsprobe.mjs [--years 30] [--seeds newsroom,7,3,5] [--csv]
-//
-// The layout is this tool's own — eight 6-tile blocks spiralling off the
-// start road, R R C I R C M I, with a fire station and a police station —
-// chosen because it zones a meat market and staffs it, which is where the
-// justice lines (KILLING, SOLD, TAKEN IN, CELLS, COLD) come from. It is NOT
-// playtest.mjs's layout and the two do not produce the same counts.
+// The layout is the news instrument's established eight-block town, with a
+// fire and police station. We retain EVERY row as it is emitted, even after
+// the live 400-row cap rolls, so the people percentage is a true 30-year
+// editorial budget rather than a flattering measurement of the final page.
 
 import { createWorld, ZONE, TERRAIN, CIVIC } from "../js/sim/world.js";
 import { tick } from "../js/sim/tick.js";
 import { apply } from "../js/sim/ops.js";
-import { newsRows } from "../js/news.js";
+import { newsRows, keyOf } from "../js/news.js";
+import { legacyOf } from "../js/sim/legacy.js";
+import { save, load, stateHashNoNews } from "../js/sim/save.js";
 
 const argv = process.argv.slice(2);
-const arg = (k, d) => { const i = argv.indexOf(k); return i >= 0 ? argv[i + 1] : d; };
-const YEARS = Number(arg("--years", 30));
-const SEEDS = String(arg("--seeds", "newsroom,7,3,5")).split(",");
-const CSV = argv.includes("--csv");
+const value = (key, fallback) => {
+  const i = argv.indexOf(key);
+  if (i < 0) return fallback;
+  const v = argv[i + 1];
+  if (v == null || v.startsWith("--")) throw new Error(`${key} needs a value`);
+  return v;
+};
 
+let YEARS, SEEDS;
+try {
+  YEARS = Number(value("--years", 30));
+  SEEDS = String(value("--seeds", "7,3,5,11")).split(",").filter(Boolean);
+  if (!Number.isInteger(YEARS) || YEARS < 1 || YEARS > 200) throw new Error("--years must be an integer from 1 to 200");
+  if (!SEEDS.length) throw new Error("--seeds must name at least one seed");
+} catch (e) {
+  console.error(`newsprobe: ${e.message}`);
+  process.exit(2);
+}
+const CSV = argv.includes("--csv");
 const BLOCK = 6;
 const ZONES = [ZONE.R, ZONE.R, ZONE.C, ZONE.I, ZONE.R, ZONE.C, ZONE.M, ZONE.I];
 
@@ -54,11 +52,10 @@ function build(seed) {
     if (X0 < 1 || Y0 < 1 || X0 + BLOCK >= w.w - 1 || Y0 + BLOCK >= w.h - 1) continue;
     let wet = 0;
     for (let y = Y0; y <= Y0 + BLOCK; y++) for (let x = X0; x <= X0 + BLOCK; x++) if (w.terrain[idx(x, y)] === TERRAIN.WATER) wet++;
-    if (wet > 3) continue; // a block that is mostly river never builds
+    if (wet > 3) continue;
     const ring = [];
     for (let x = X0; x <= X0 + BLOCK; x++) { ring.push(idx(x, Y0)); ring.push(idx(x, Y0 + BLOCK)); }
     for (let y = Y0; y <= Y0 + BLOCK; y++) { ring.push(idx(X0, y)); ring.push(idx(X0 + BLOCK, y)); }
-    // and a spine back to the start road, or the block has no access
     for (let k = 0; k <= BLOCK * 3; k++) ring.push(idx(Math.min(w.w - 2, Math.max(1, S.tx + inx * k)), S.ty));
     apply(w, { kind: "road", tiles: ring });
     apply(w, { kind: "zone", zone: ZONES[b], x0: X0 + 1, y0: Y0 + 1, x1: X0 + BLOCK - 1, y1: Y0 + BLOCK - 1, density: 3 });
@@ -66,49 +63,58 @@ function build(seed) {
   }
   apply(w, { kind: "civic", civic: CIVIC.FIRE, tile: idx(S.tx + inx * 3, S.ty + iny * 3) });
   apply(w, { kind: "civic", civic: CIVIC.POLICE, tile: idx(S.tx + inx * 4, S.ty + iny * 3) });
-  for (let t = 0; t < YEARS * 12; t++) tick(w);
-  return { w, blocks };
+  const emitted = [];
+  for (let n = 0; n < YEARS * 12; n++) {
+    const month = w.tick;
+    tick(w);
+    for (const row of w.events.log) if (row.t === month) emitted.push(JSON.parse(JSON.stringify(row)));
+  }
+  return { w, blocks, emitted };
 }
 
 function measure(seed) {
-  const { w, blocks } = build(seed);
-  const rows = newsRows(w);
-  const flashed = rows.filter((r) => r.flash);
+  const { w, blocks, emitted } = build(seed);
+  const all = newsRows({ ...w, events: { ...w.events, log: emitted } });
+  const people = all.filter((r) => r.people);
+  const unresolved = emitted.flatMap((r) => [...(Array.isArray(r.who) ? r.who : []), ...(Array.isArray(r.links) ? r.links : [])])
+    .filter((id) => !w.byId.has(id) && !legacyOf(w, id));
+  const flashed = all.filter((r) => r.flash);
   const perMonth = new Map();
   for (const r of flashed) perMonth.set(r.t, (perMonth.get(r.t) || 0) + 1);
-  const counts = [...perMonth.values()];
-  // Each month that popped n > 1 lost n-1 lines to the old overwriting flash().
-  const lost = counts.reduce((s, n) => s + (n - 1), 0);
+  const current = newsRows(w);
+  const loaded = newsRows(load(save(w)));
+  const currentByKey = new Map(current.map((r) => [keyOf(r), JSON.stringify([r.who, r.links])]));
+  const whoLost = loaded.filter((r) => currentByKey.get(keyOf(r)) !== JSON.stringify([r.who, r.links]));
   return {
-    seed, blocks,
-    pop: w.citizens.length,
-    dispatches: rows.length,
-    popped: flashed.length,
-    never: rows.length - flashed.length,
-    neverPct: rows.length ? Math.round((100 * (rows.length - flashed.length)) / rows.length) : 0,
-    monthsPopping: perMonth.size,
-    monthsPoppingMulti: counts.filter((n) => n > 1).length,
-    busiest: counts.length ? Math.max(...counts) : 0,
-    lost,
+    seed, blocks, pop: w.citizens.length, rows: all.length, people: people.length,
+    pct: all.length ? (100 * people.length) / all.length : 0,
+    obituary: all.filter((r) => r.id.startsWith("story-obituary:")).length,
+    litter: all.filter((r) => r.id.startsWith("story-litter:")).length,
+    centenary: all.filter((r) => r.id.startsWith("story-centenary:")).length,
+    reports: all.filter((r) => r.report).length,
+    flashed: flashed.length,
+    multi: [...perMonth.values()].filter((n) => n > 1).length,
+    unresolved: unresolved.length,
+    whoLost: whoLost.length,
+    noNews: stateHashNoNews(w),
   };
 }
 
-const out = SEEDS.map(measure);
-
+const rows = SEEDS.map(measure);
 if (CSV) {
-  console.log("seed,pop,dispatches,popped,never,neverPct,monthsPopping,monthsPoppingMulti,busiest,lostToOldFlash");
-  for (const r of out) console.log([r.seed, r.pop, r.dispatches, r.popped, r.never, r.neverPct, r.monthsPopping, r.monthsPoppingMulti, r.busiest, r.lost].join(","));
+  console.log("seed,pop,dispatches,people,peoplePct,obituary,litter,centenary,reports,flashed,multiFlashMonths,unresolved,whoLost,noNewsHash");
+  for (const r of rows) console.log([r.seed, r.pop, r.rows, r.people, r.pct.toFixed(1), r.obituary, r.litter, r.centenary, r.reports, r.flashed, r.multi, r.unresolved, r.whoLost, r.noNews].join(","));
 } else {
-  console.log(`newsprobe: ${YEARS} years, eight-block layout (R R C I R C M I) + fire + police\n`);
-  console.log("| seed | dispatches | popped up | never popped | months popping >1 | lost to the old flash() |");
-  console.log("|---|---|---|---|---|---|");
-  for (const r of out) {
-    console.log(`| ${r.seed} | ${r.dispatches} | ${r.popped} | ${r.never} (${r.neverPct}%) | ${r.monthsPoppingMulti} | ${r.lost}${r.busiest > 1 ? ` (max ${r.busiest} in a month)` : ""} |`);
-  }
-  const lo = Math.min(...out.map((r) => r.neverPct));
-  const hi = Math.max(...out.map((r) => r.neverPct));
-  const totLost = out.reduce((s, r) => s + r.lost, 0);
-  console.log(`\n${lo}–${hi}% of a city's dispatches never popped up at all — that share is what the reader is for.`);
-  console.log(`The old self-overwriting flash() dropped ${totLost} across ${out.length} × ${YEARS} = ${out.length * YEARS} city-years: real, and rare.`);
-  console.log(`Look for it where the sentence table fires (SOLD / TAKEN IN / CELLS in one month), not in a balanced town.`);
+  console.log(`newsprobe: ${YEARS} years · eight-block news town + fire + police`);
+  console.log("| seed | rows | people | share | obit / litter / 100 | reports | flashed | unresolved / lost | no-news hash |");
+  console.log("|---|---:|---:|---:|---:|---:|---:|---:|---|");
+  for (const r of rows) console.log(`| ${r.seed} | ${r.rows} | ${r.people} | ${r.pct.toFixed(1)}% | ${r.obituary} / ${r.litter} / ${r.centenary} | ${r.reports} | ${r.flashed} | ${r.unresolved} / ${r.whoLost} | ${r.noNews} |`);
+}
+
+const bad = rows.filter((r) => r.pct > 40 || r.unresolved || r.whoLost || r.blocks < 1);
+if (bad.length) {
+  console.error(`newsprobe: FAIL ${bad.map((r) => r.seed).join(", ")} (people must be <=40%; every who must resolve and survive save/load)`);
+  process.exitCode = 1;
+} else if (!CSV) {
+  console.log(`PASS: ${rows.length}/${rows.length} cities stay at or below the 40% people budget; every named id resolves and survives the saved tail.`);
 }

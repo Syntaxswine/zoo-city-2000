@@ -144,11 +144,12 @@ export function rebuildDerived(world) {
 }
 
 /** FNV-1a over the canonical state (everything but the input log and history). */
-export function stateHash(world) {
+export function stateHash(world, { news = true } = {}) {
   const o = toPlain(world);
   o.citizens = world.citizens.filter((c) => !c.dead).map(canonicalCitizen);
   delete o.log;
   delete o.history;
+  if (!news) delete o.events.log;
   // Part K adds empty, backward-compatible save fields without changing the
   // standing simulation hash. Once Parts B/H put state in them, it is hashed.
   if (!Object.keys(o.names || {}).length) delete o.names;
@@ -171,4 +172,9 @@ export function stateHash(world) {
     h = Math.imul(h, 0x01000193);
   }
   return (h >>> 0).toString(16).padStart(8, "0");
+}
+
+/** The simulation identity with the saved news feed removed (Part F proof). */
+export function stateHashNoNews(world) {
+  return stateHash(world, { news: false });
 }

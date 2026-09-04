@@ -110,13 +110,15 @@ class El {
   getBoundingClientRect() { return { left: 0, top: 0, width: 0, height: 0, right: 0, bottom: 0 }; }
   getContext() { return null; }
 
-  /** Depth-first search over the tree by "#id", ".class" or "tag". */
+  /** Depth-first search over the tree by "#id", ".class", "tag" or "tag.class". */
   querySelector(sel) { return this.querySelectorAll(sel)[0] || null; }
   querySelectorAll(sel) {
     const out = [];
     const want = (e) => {
       if (sel.startsWith("#")) return e.id === sel.slice(1);
       if (sel.startsWith(".")) return e.classList.contains(sel.slice(1));
+      const dot = sel.indexOf(".");
+      if (dot > 0) return e.tagName === sel.slice(0, dot).toUpperCase() && e.classList.contains(sel.slice(dot + 1));
       return e.tagName === sel.toUpperCase();
     };
     const walk = (e) => { for (const c of e.children) { if (typeof c === "string") continue; if (want(c)) out.push(c); walk(c); } };
@@ -149,7 +151,7 @@ export function installDom(ids = []) {
   const root = new El("body");
   const byId = new Map();
   const make = (id) => { const e = new El("div"); e.id = id; byId.set(id, e); root.append(e); return e; };
-  for (const id of ["strip", "tools", "cost", "clock", "flash", "bars", "stats", "banner", "card", "tabs", "tabBody", "help", "choice", "newcity", "panel", "map", "reader", "readerBody", "portBox", "savesList", ...ids]) make(id);
+  for (const id of ["strip", "tools", "cost", "clock", "flash", "bars", "stats", "banner", "card", "tabs", "tabBody", "help", "choice", "news", "newcity", "panel", "map", "reader", "readerBody", "portBox", "savesList", ...ids]) make(id);
   const doc = {
     __shim: true,
     body: root,
@@ -201,6 +203,7 @@ export function stubApp(world, over = {}) {
     input: { tool: "R", setTool: noop, state: { tool: "R" }, hover: () => null, hoverInfo: () => null },
     title: { isOpen: () => false, open: noop, close: noop, say: noop },
     news: { isOpen: () => false, toggle: noop, close: noop, invalidate: noop, unread: () => 0 },
+    pinCitizen: () => false,
     doOp: () => ({ ok: true, cost: 0 }),
     undo: () => ({ ok: true }),
     save: () => ({ ok: true }),

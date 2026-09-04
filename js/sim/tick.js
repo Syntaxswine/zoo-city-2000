@@ -2,7 +2,7 @@
 
 import { KNOBS } from "./rules.js";
 import { computeFields, recountRosters } from "./fields.js";
-import { census, needCensus } from "./census.js";
+import { census, needCensus, notables } from "./census.js";
 import { updateDemand, peekDemand, neutralRate } from "./demand.js";
 import { yearlyFigures } from "./budget.js";
 import { lotsTick } from "./lots.js";
@@ -70,10 +70,14 @@ export function tick(world) {
   meatNotices.push(...monthMeat);
   notices.push(...monthMeat);
   Object.assign(cen, meatCensus(world));
-  storyTick(world);
+  const storyNotices = storyTick(world);
+  notices.push(...storyNotices);
   // Events can remove households (revolt, rubble, a killing, a sale); compact
   // before anything counts or saves — a dead citizen must never survive a tick boundary.
   compact(world);
+  // The report speaks after this month's removals. A January death must not
+  // leave a departed citizen named as the current oldest resident.
+  cen.notables = notables(world);
   // 8. history, report, advisor, milestones
   world.last = { census: cen, demand: dem, budget: bud.fig, grew: lots.grew, decayed: lots.decayed, arrived: cit.arrived, left: cit.left, births: cit.births, deaths: cit.deaths, funerals: cit.funerals, littersLost: cit.littersLost, rehomed: cit.rehomed, zonedOut: cit.zonedOut };
   world.notices = notices;
@@ -91,7 +95,14 @@ export function tick(world) {
   if (ms) notices.push(ms);
   // Every line the ticker shows goes into the log too, so a loaded city can
   // show its own history (rolled events already logged themselves).
-  for (const line of notices) if (!evNotices.includes(line) && !jNotices.includes(line) && !meatNotices.includes(line) && !lots.landmarks.includes(line)) world.events.log.push({ t: world.tick, id: "notice", line });
+  for (const line of notices) {
+    if (evNotices.includes(line) || jNotices.includes(line) || meatNotices.includes(line) || lots.landmarks.includes(line) || storyNotices.includes(line)) continue;
+    const report = /^REPORT /.test(line);
+    const notable = cen.notables || {};
+    const links = report ? [...new Set([notable.oldest?.id, notable.largest?.member].filter(Number.isInteger))] : [];
+    const who = links.slice().sort((a, b) => a - b);
+    world.events.log.push(who.length ? { t: world.tick, id: "notice", line, who, links } : { t: world.tick, id: "notice", line });
+  }
   if (world.events.log.length > 400) world.events.log.splice(0, world.events.log.length - 400);
   world.tick++;
   world.last.needs = needCensus(world); // cards and walkers now read this same tick
@@ -153,7 +164,11 @@ function advisor(world, cen, dem, fig) {
   const net = fig.incomeYr + (fig.cutYr || 0) - fig.upkeepYr;
   const j = world.events.justice;
   const justice = j && (j.pacified || j.sold) ? ` · pacified ${j.pacified} (${j.wrongful} wrongful) · sold ${j.sold}` : "";
-  out.push(`REPORT ${year}: ${cen.P} animals · approval ${Math.round(cen.approval)} · unemployed ${cen.U} · net ${net < 0 ? "−" : "+"}§${Math.abs(net).toLocaleString("en-US")}/yr · Zoo City index ${(cen.H * 100).toFixed(0)}%${cen.markets ? ` · ${cen.markets} meat hall${cen.markets === 1 ? "" : "s"}` : ""}${justice} · ${characterLine(cen)}.`);
+  let report = `REPORT ${year}: ${cen.P} animals · approval ${Math.round(cen.approval)} · unemployed ${cen.U} · net ${net < 0 ? "−" : "+"}§${Math.abs(net).toLocaleString("en-US")}/yr · Zoo City index ${(cen.H * 100).toFixed(0)}%${cen.markets ? ` · ${cen.markets} meat hall${cen.markets === 1 ? "" : "s"}` : ""}${justice} · ${characterLine(cen)}.`;
+  const notable = cen.notables || {};
+  if (notable.oldest) report += ` Oldest resident: ${notable.oldest.name}, age ${notable.oldest.age}, at ${lotAt(world, notable.oldest.home)}.`;
+  if (notable.largest) report += ` Largest household: the ${notable.largest.surname} family, ${notable.largest.size} animals at ${lotAt(world, notable.largest.home)}, including ${notable.largest.name}.`;
+  out.push(report);
   if (cen.P === 0 && lots === 0) out.push("ADVISOR: zone R, C and I within 3 tiles of a road. Animals arrive when there are jobs.");
   if (world.valves.R > 0.3 && cen.vacantR < 10) out.push("ADVISOR: the animals want more housing.");
   if (world.valves.C > 0.3 && lotsC < lotsR / 4) out.push("ADVISOR: the town wants shops.");
@@ -184,3 +199,5 @@ function advisor(world, cen, dem, fig) {
   if (cen.centres > 0 && cen.held >= KNOBS.CENTRE_BEDS * cen.centres) out.push("ADVISOR: the centre is full — the next one goes to the cells.");
   return out;
 }
+
+const lotAt = (world, i) => Number.isInteger(i) && i >= 0 ? `(${i % world.w},${(i / world.w) | 0})` : "no settled address";

@@ -970,7 +970,11 @@ that pop up on the screen in a sequential order."*
   printed each year twice**, with two different net figures because the two
   were computed from different books. There is one narrator, and it is the
   richer one: the line the city actually said at the time.
-- **A row's name is its words, never its place**: `keyOf(r) = t.fnv32(text)`.
+- **A row's name is its words, never its place**: old/plain rows retain
+  `keyOf(r) = t.fnv32(text)`; a named row adds its stable story id and sorted
+  `who` ids to that hash. Thus two different citizens with identical printed
+  obituaries do not share a read mark. The 400/200 cap may cut a month in
+  half without rebinding either kind of row.
   tick.js caps the log at 400 and save.js keeps 200, so a roll can cut a
   month in half; a positional name would come back bound to its neighbour
   and every read mark in that month would point at the wrong dispatch.
@@ -984,10 +988,11 @@ that pop up on the screen in a sequential order."*
   city in a browser starts you CAUGHT UP: a loaded 40-year city must not
   open with a badge of 300 things you lived through.
 - **The reader** (`R`, or the strip's `news`): the feed oldest first, a
-  cursor stepped with ← →, ↑ ↓, and W A S D as well — panning a map you
-  cannot see is not a thing anyone meant to do — PgUp/PgDn by ten, Home/End,
-  `mark all read`, and four chips: all · headlines (only what popped up over
-  the map, `TICKER_FLASH`) · trouble (`TICKER_BAD`) · good (`TICKER_GOOD`).
+  cursor stepped with ← → and ↑ ↓, PgUp/PgDn by ten, Home/End,
+  `mark all read`, and five chips: all · headlines (only what popped up over
+  the map, `TICKER_FLASH`) · trouble (`TICKER_BAD`) · good (`TICKER_GOOD`) ·
+  people (rows carrying a nonempty `who`). WASD belongs only to map movement
+  and is swallowed while the modal reader stands (Part P).
   It opens on the FIRST UNREAD — and opening MARKS that row read, so the badge
   drops by one the moment you look. A row is read when the cursor LANDS on it,
   never when it is stepped over, which is why the mark is a set and not a
@@ -1003,6 +1008,33 @@ that pop up on the screen in a sequential order."*
   for a run, labelled `(2/6)`, five at most and then `+N more this month — R
   opens the news`. A flash the player caused (a refused op, a save, an undo) preempts
   the run: feedback on what you just did wins.
+- **People stories (Part F).** `storyTick`, after justice, is the sole bridge
+  from this month's `lifeEvents` to named news rows. Three distinct
+  `LOST_FRIEND` witnesses produce one obituary for a natural death or
+  killing; sale/slaughter do not. Two parent `LITTER(1)` entries are two
+  witnesses to the sim's one ordinary cub and produce no false “litter of
+  two”; a declared `LITTER(n>=2)` is coalesced by household using `max(n)`,
+  never a sum. The centenary plaque remains gameplay in `events.js`, while
+  its one dispatch is written here. Rows save sorted stable `who` ids.
+- **Named reports and links.** January recomputes `census.notables` after
+  deaths/removals, then REPORT names the current oldest resident and largest
+  household. Every rendered name is a real button created with `textContent`:
+  it marks that row read, pins the durable citizen id, centres the home (or a
+  gone citizen's last home), opens C's card/epitaph, and closes the reader.
+  `who` is deliberately editorial—it is what puts a row under People.
+  Existing operational rows such as KILLING, BURGLARY, arrest/release, HEIST,
+  SKUNK INCIDENT, RAID, BOUGHT and THE PEN save the same ids as `links`: their
+  printed citizens are clickable without turning two-thirds of an event-heavy
+  paper into the People section.
+  `NEWS_ROSTER` generates the primary trouble/good and flash regexes, so a
+  roster card cannot silently miss every chip. Ordinary people stories never
+  interrupt play; only the structurally tagged `OBITUARY 100 —` flashes.
+- **Budget and neutrality.** `newsprobe` retains all emitted rows beyond the
+  live cap. Over seeds 7/3/5/11 × 30 years, people rows were 59/990 (6.0%),
+  71/1,104 (6.4%), 53/345 (15.4%) and 62/1,111 (5.6%); every id resolved and
+  survived the saved tail. Seed 7's 30-year normal hash moved
+  `e2352679 → 771239e1`; `stateHashNoNews` stayed exactly `7efe937b`, proving
+  that the newspaper is the only simulation-identity difference.
 
 ---
 

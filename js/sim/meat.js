@@ -343,7 +343,7 @@ export function penMaturityTick(world) {
       if (member && !member.dead) remember(world, member, KIND.LOST_CHILD, c.id);
     }
     removeCitizen(world, c, "slaughtered");
-    world.events.log.push({ t: world.tick, id: "pen", line });
+    world.events.log.push({ t: world.tick, id: "pen", line, links: [c.id] });
     notices.push(line);
   }
   return notices;
@@ -390,7 +390,7 @@ function buyNaturalDeaths(world) {
     if (!addStock(world, route.hall, "bought", 1)) continue;
     post(world, "cut", KNOBS.MEAT_PRICE);
     const line = `BOUGHT — the cart from the hall at ${at(world, route.hall)} called at ${at(world, body.home)} for ${body.name}.`;
-    world.events.log.push({ t: world.tick, id: "bought", line });
+    world.events.log.push({ t: world.tick, id: "bought", line, links: [body.id] });
     notices.push(line);
     queueTrip(world, "body", route, { subject: body });
   }
@@ -416,7 +416,7 @@ function buyPens(world) {
     note(world, route.hall, "penBought", 1);
     post(world, "cut", KNOBS.PEN_PRICE);
     const line = `THE PEN — ${nameOf(c)}, ${ageYears(world, c)}, was bought from the ${hh.surname} family for the hall at ${at(world, route.hall)}.`;
-    world.events.log.push({ t: world.tick, id: "pen", line });
+    world.events.log.push({ t: world.tick, id: "pen", line, links: [c.id] });
     notices.push(line);
     queueTrip(world, "pen", route, { citizen: c.id, subject: { id: c.id, name: nameOf(c), species: c.species } });
     resetMeatRoutes(world);
