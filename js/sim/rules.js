@@ -342,7 +342,7 @@ export const RULES = Object.freeze([
   },
   {
     id: "G1", title: "Road access: one rule, asked of the whole building, and every side is a way in",
-    formula: "served ⇔ min roadDist over the FOOTPRINT ≤ 3 (BFS through any tile, round a bare wall) — a lot, a block, a hall, a station, a zoo, all the same question; doors = every road tile at that distance",
+    formula: "served ⇔ min roadDist over the FOOTPRINT ≤ 3 (BFS through any tile, round a bare wall) — a lot, a block, a hall, a zoo, one question. A STATION is asked the same question a different way: nobody walks a lot's gap, but a platform's forecourt is walked tile by tile, so it is a search over ground an animal can stand on (not water, not a wall, not a building) rather than a distance; doors = every road tile at that distance",
     live: (w) => `${w.last.census.lotsNoRoad} zoned lots have no road${w.last.census.zoosNoRoad ? ` · ${w.last.census.zoosNoRoad} zoo${w.last.census.zoosNoRoad === 1 ? "" : "s"} no road reaches (no keepers, no halo, no room on the cap)` : ""}`,
   },
   {

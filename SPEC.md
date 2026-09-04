@@ -353,9 +353,18 @@ nearReach()    = ROAD_REACH + 5, read at CALL time — a constant froze the card
 `served`, `siteRoadDist`, `doorsOf`, `doorOf` and `nearestRoad` each take an
 optional caller-owned `seen` buffer. §14 forbids the draw and street layers a
 buffer on the world, and they are exactly who calls them — the access overlay
-asks `siteRoadDist` of every visible tile, the score overlay reaches `served`
-through `lotScore`, the walker layer asks `doorsOf` for a doorstep — and a
-platform's answer to any of them is a search.
+asks `siteRoadDist` of every tile in its screen-space bounding box (it does not
+carry the per-tile cull the building pass uses, so roughly twice the visible
+tiles; the whole-map figure in BACKLOG bounds it), the score overlay reaches
+`served` through `lotScore`, the walker layer asks `doorsOf` for a doorstep —
+and a platform's answer to any of them is a search.
+
+One reader outside `js/sim` DECIDES with the raw field: `js/ui.js` chooses
+which of the three refusals to print from `rep.roadDist`. That is deliberate
+and it is the only one — the raw field is clamped at `ROAD_REACH + 1`, so it
+can say "a road is right there" and nothing else, which is exactly the
+distinction the middle refusal draws. Part M's Law 6 grep scans `js/sim` only,
+so this line is held by the card checks instead.
 
 **Two questions, not one.** A lot's access is a DISTANCE: nobody walks the
 gap, the animal appears at its door, and a river or a neighbour's terrace
@@ -431,7 +440,7 @@ stored commute before anyone can keep walking through the new building.
 **A shape change is a re-plan.** Merging or splitting a block changes the
 site, so it changes the doors: `blocks.replanOn` marks everyone living or
 working there stale. Without it a straight run kept a legal older path while
-a reload computed the new one, and §16's save/load law caught it — the same
+a reload computed the new one, and §15's save/load law caught it — the same
 trap `placeHousehold` was fixed for.
 
 **Live at the op.** `ops.apply` recomputes `roadDist` (and the station doors)
@@ -469,13 +478,13 @@ to know it doesn't.
 runs AFTER `citizensTick`, so no stale pass is coming: the month would end with
 every commute null, and next month's traffic, riders and mean commute would be
 taken from nothing in the straight run and from everything after a reload
-(`save.rebuildDerived` re-plans unconditionally). §16's hash at the boundary is
+(`save.rebuildDerived` re-plans unconditionally). §15's hash at the boundary is
 equal either way — `c.path` is not in `canonicalCitizen` — so the two cities
 part a month later. **Nothing may end a tick stale**: `settleDoors` calls
 `citizens.replanStale`, which is the same pass `citizensTick` runs.
 Without any of this a straight run keeps the stale commutes while a reload
 re-plans, and the two part company a month later — hidden at first, because
-`c.path` is not in the saved citizen and §16's hash could not see it for two
+`c.path` is not in the saved citizen and §15's hash could not see it for two
 years.
 
 **What the card may say.** Three refusals, and each is true of a different
@@ -1638,12 +1647,14 @@ apply(world, op) → { ok, cost, reason, replaced, evicts, undoable }   // op.ki
 undo(world) → { ok }
 costOf(world, op) → { cost, tiles }        // for the live strip
 // js/sim/fields.js — access, one standard (§6c)
-served(world, i) → bool                     // THE predicate: siteRoadDist ≤ ROAD_REACH, over the whole footprint
-siteRoadDist(world, i) → 0..ROAD_REACH+1    // min roadDist over world.siteTiles(i)
-doorsOf(world, i) → [tile]                  // every road tile at that distance, ascending; [] when unserved
-doorOf(world, i) → tile|null                // the lowest-numbered one, for readers that want a single tile
-doorSearch(world, i, seen, { reach, prev }) → { d, doors }   // caller-owned scratch (the walker layer owns its own)
-nearestRoad(world, i, reach = 8) → { d, doors }              // the card's second question; no rule asks it
+served(world, i, seen?) → bool               // THE predicate: siteRoadDist ≤ ROAD_REACH, over the whole footprint
+siteRoadDist(world, i, seen?) → 0..ROAD_REACH+1  // min roadDist over world.siteTiles(i) — except a PLATFORM (§6c)
+doorsOf(world, i, seen?) → [tile]            // every road tile at that distance, ascending; [] when unserved
+doorOf(world, i, seen?) → tile|null          // the lowest-numbered one, for readers that want a single tile
+passable(world, j) → bool                   // ground a citizen may stand on; the question a FORECOURT is asked
+nearReach() → ROAD_REACH + 5                // read at CALL time; a constant froze the card's horizon at import
+doorSearch(world, i, seen, { reach, prev, passable }) → { d, doors }  // caller-owned scratch (§14: the draw and street layers own theirs)
+nearestRoad(world, i, reach?, seen?) → { d, doors }          // the card's second question; no rule asks it
 dial(world, species, from, maxCost, settle, policy)          // `from` is ONE road tile or a LIST of doors
 commutePath(world, species, from, to, max) → { path, cost }  // a list at each end; the cheapest pairing wins
 // js/sim/world.js — what a footprint is

@@ -1408,7 +1408,7 @@ state". Half right. One commit of code and one of docs:
 | commit | what | proof |
 |---|---|---|
 | b042d0d | `js/sim/landmarks.js` (the roster, `chooseTheme`, the ticker line), `world.theme` (one saved byte, all-zero left out of the hash), the merge/split/bulldoze/undo/save wiring, census + Rules G6, the card; `js/art/landmarks.js` — eleven 3×3s × two variants on `BLOCK_KIT` + `KIT`; `blockSprite(zone, side, variant, theme)`; Part L (17 checks); `sheet-landmarks.png`, `landmark-mews.png` | suite 204 → 221, 0 failures; seed 7 balanced plain 30 y ee47f999 UNCHANGED; seed 7 + markets raises the Mews at month 54 (65 of 129 cats and foxes); the browser at zoom 2 on the imported ten-year town: the Mews at (18,4), G6's live line, the News row, and the hover card on a PART of it |
-| (docs) | SPEC §3c, §5 LANDMARK, §12.2c, §15, §16; BACKLOG; the proposal's status; the plan's Part E; this section | — |
+| (docs) | SPEC §3c, §5 LANDMARK, §12.2c, §15, §15; BACKLOG; the proposal's status; the plan's Part E; this section | — |
 
 ### What was measured before the rule was written
 
@@ -1501,7 +1501,7 @@ shops would be a good target."* One commit of code and one of docs:
 | commit | what | proof |
 |---|---|---|
 | 03a639c | `js/sim/shops.js` — the pool of eleven, `shopKind(variant) = (variant >> 1) % 11`, `shopOf` (kind + keepers by `world.majority`); `js/art/shops.js` — ten new 1×1 solids × two variants on the corner shop's footprint; `buildingSprite` takes the WHOLE variant byte (render.js passes it for every lot; every other family still masks `& 1`); the card names the shop and its keepers; Part S (8 checks); `sheet-shops.png` | suite 240 → 248, 0 failures; every one of the 256 variant bytes maps to a kind with both mirrors, none under 10 of 128; variants 0 and 1 still the corner shop; the browser on the imported ten-year town at zoom 2: a street of tier-1 shops each its own kind, the card reading the kind and the keepers |
-| (docs) | SPEC §12.2 row, §12.2d, §16; BACKLOG; this section | — |
+| (docs) | SPEC §12.2 row, §12.2d, §15; BACKLOG; this section | — |
 
 ### The design call: by position, not by species — and why
 
@@ -1625,7 +1625,7 @@ holds Part H and X shares not one function with it. Two commits:
 | commit | what | proof |
 |---|---|---|
 | (code) | `js/sim/ops.js` — `squareOn` / `maskAround` / `crossable` / `refuseCrossings`; the road and rail cases restructured from a per-tile `continue` into a whole-drag validation that iterates to a fixpoint; the wall op and the station op refuse a crossing. `js/art/roads.js` — `tarmacKey` extracted and exported. `js/art/rail.js` — `crossingKey`, a lazy 512-tile family, `squareOnCrossings()`. `js/art/index.js` — `art.crossing(roadMask, railMask, busy)`. `js/render.js` — one ground line. `js/ui.js` — the card's head and body name a crossing. `js/input.js` — the Rail and Road hints, and the cost strip prints the reason it already had. Part L' (34 checks) and the rail sheet. | suite 248 → **282**, 0 failures; **24 of 24 mutants red**, every one of them either a rule this change makes or a defect the hostile review found in the first draft of these checks; the three standing playtest gates BYTE-IDENTICAL (`e1decbff` / `6bcf6236` / `00d5e9c3`) before and after; `shots.mjs --sheet` re-rendered every sheet and only `sheet-rail.png` changed, so the `tarmacKey` extraction is inert; a browser round on a founded city at ×1 and ×2, 0 console messages |
-| (docs) | SPEC §7.9 (the rule, the fixpoint, the second clause, the bulldozer's one exception, the graph, the ledger), §12.4c (the art), §13, §16; the Rules tab's R1; README; `docs/PROPOSAL-ZONING-RAIL-WALLS.md` superseded where it forbade crossings; BACKLOG (a SHIPPED section, and X2 named with the full list of places the ride number is written); this section | — |
+| (docs) | SPEC §7.9 (the rule, the fixpoint, the second clause, the bulldozer's one exception, the graph, the ledger), §12.4c (the art), §13, §15; the Rules tab's R1; README; `docs/PROPOSAL-ZONING-RAIL-WALLS.md` superseded where it forbade crossings; BACKLOG (a SHIPPED section, and X2 named with the full list of places the ride number is written); this section | — |
 
 ### The design call: 512 sprites where the plan said 4
 
@@ -1689,7 +1689,7 @@ what the suite spends walking them.
   (checked), but any future code that assumes a path's tiles are distinct is
   now wrong.
 - Superseded by this section: §4's *"v1 limits … no level crossings"* and
-  §16's *"the art registry reserves … crossing with loud not-built errors"*.
+  §15's *"the art registry reserves … crossing with loud not-built errors"*.
   Handoff sections are appended, never edited; read them with this one.
 
 ---
@@ -1946,7 +1946,7 @@ tiles between a platform and its door — was not in it, and the chain is what
 walker is drawn standing on. So a civic dropped on the tile both of a
 platform's doors were reached through left **both doors standing** — the
 platform is entered from either side — moved every chain, and raised nothing.
-99 commutes kept walking through a police station; §16 broke a month after a
+99 commutes kept walking through a police station; §15 broke a month after a
 tick-boundary save. The signature is `platform > door : chain` per edge now.
 
 **And the check written for exactly that claim performed the counterexample
@@ -1991,7 +1991,7 @@ one section ago. **503 → 517 checks, 0 failures.**
 `citizensTick`. Its `invalidatePaths` therefore had no stale pass coming: the
 month ended with every commute null, and month +1 took traffic, riders and mean
 commute from NOTHING in the straight run while a reload took them from
-everything. §16's hash at the boundary is equal either way — `c.path` is not in
+everything. §15's hash at the boundary is equal either way — `c.path` is not in
 `canonicalCitizen` — so the two cities parted a month later. **No op was
 involved and the save was at a clean tick boundary**, so this was not the
 same-month-op hole in BACKLOG; that hole's own stated workaround ("hash-equal
@@ -2020,3 +2020,52 @@ van's land-value shadow while the zoo's halo was gated. Both fixed, both
 hash-neutral on all six published gates, because the mayor never builds an
 unreachable anything: **the gates cannot see this class of bug at all**, which
 is what `--rig deep` is for.
+
+## 24g. The fifth review: the fix was still the size of the example (2026-09-04)
+
+**7/10 again**, and the finding was that round four's law was not the law.
+**517 → 523 checks, 0 failures**, all six gate hashes unchanged.
+
+**The bug.** Round four's `replanStale` went INSIDE `settleDoors`, which only
+runs its body when the door graph moved. But `c.stale` is written in three
+places and only one of them is about doors. The reachable one has nothing to do
+with stations at all: `eventsTick` razes a home at step 7, `evictFromLot`
+rehomes the family, `placeHousehold` marks them stale — and `citizensTick`, the
+pass that repairs a stale commute, ran two steps earlier. 53 employed animals
+ending the month with no commute on a town whose only event was one fire, and
+`9324161b` against `9e3e5077` a month after a reload. What diverges is **mood**,
+which is saved.
+
+`replanStale(world)` is unconditional at the end of `tick()` now, after
+everything that can mark an animal stale. **The law is a property of the
+BOUNDARY, so it belongs at the boundary** — not inside whichever mechanism
+happened to be under review.
+
+### Enumerate the writers, not the example
+
+The general question, asked properly this time: `c.stale = true` appears in
+exactly three places — `citizens.placeHousehold`, `citizens.invalidatePaths`,
+`blocks.replanOn` — and the only caller of any of them that runs after
+`citizensTick` is `eventsTick`. That enumeration took two minutes and would
+have closed this in round three.
+
+### The traps, keyed by what you would see
+
+| what you see | what it is |
+|---|---|
+| a repair placed inside a condition | the condition is about the MECHANISM you were reviewing; the law is about the state. Ask what else writes that state, and grep for it |
+| a fixture that cannot reach the case | check the DEFAULTS one level up. `tools/mayor.mjs` defaults `disasters` false, so every published gate for this part runs with nothing ever burning |
+| a card guarded on a raw field | `computeRoadDist` clamps at `ROAD_REACH + 1`. Any guard of the form `raw <= n` can only see the clamp's own range, and everything beyond it falls to the else |
+| a sentence in the Rules tab | the player reads it. G1 described a platform's access as a distance through any tile; it is a search over ground it can stand on |
+| "every mutant on X dies" | count them. Ours said "both tick settles" and one of them had nothing behind it |
+| a section number in a citation | §16 is *Module contracts*; the save/load law is §15. Seventeen citations were wrong, in four files, including this handoff |
+
+### What is held structurally rather than behaviourally
+
+The settle after `lotsTick`. Its only consequence is timing — an animal whose
+route closed this month is released before the job search rather than after —
+worth 40 animals over 60 months on one fixture and two in the month itself.
+Too small and too seed-fragile to assert without pinning a golden number to a
+seed, so the ORDER of the three settles is checked against `tick.js`'s source
+and the number is written beside it. That is a spelling-level tripwire and it
+says so.

@@ -141,9 +141,10 @@ export function rebuildDerived(world) {
     const b = doorsOf(world, c.job);
     c.path = a.length && b.length ? (commutePath(world, c.species, a, b) || { path: null }).path : null; // the weighted commute (use-zoning), never the unit BFS: a loaded city must take the roads the live one took
   }
-  computeFields(world);
   // A loaded city reads complete at once (the play-tester saw placeholders
-  // in the header until the first tick).
+  // in the header until the first tick). `refreshLast` recomputes the fields
+  // itself, so the paths rebuilt above are in the traffic it counts - there is
+  // no second `computeFields` here, and a mutant deleting one proved it.
   refreshLast(world);
 }
 

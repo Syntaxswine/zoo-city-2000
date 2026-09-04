@@ -187,6 +187,12 @@ function hallCandidates(world, opts) {
       list.push(hall);
     }
   }
+  // The lists come out in anchor order already - the loop above walks `hall`
+  // from 0 upward - so this sort cannot currently reorder anything, and a
+  // mutant deleting it lives. It stays because "ties are settled by hall
+  // anchor, never by discovery order" is the CLAIM, and the day that loop
+  // stops being a raster scan is the day the claim would quietly stop being
+  // true. Named here rather than left looking load-bearing.
   for (const list of byDoor.values()) list.sort((a, b) => a - b);
   return byDoor;
 }

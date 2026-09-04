@@ -123,6 +123,24 @@ export function tick(world) {
     world.events.log.push(who.length ? { t: world.tick, id: "notice", line, who, links } : { t: world.tick, id: "notice", line });
   }
   if (world.events.log.length > 400) world.events.log.splice(0, world.events.log.length - 400);
+  // NOTHING MAY END A TICK STALE, and this is where that is true rather than
+  // hoped. `c.stale` is written in three places - `citizens.placeHousehold`,
+  // `citizens.invalidatePaths` and `blocks.replanOn` - and only one of their
+  // callers runs after `citizensTick`: `eventsTick` at step 7, where a fire
+  // razes a home, the family is evicted and rehomed, and the commute it was
+  // holding is thrown away with nobody left to rebuild it. A door-graph settle
+  // cannot cover that: no door moved. So the re-plan is UNCONDITIONAL and it
+  // is here, at the boundary, after everything that can mark an animal stale.
+  //
+  // Without it the month ends with those commutes null, `moods` reads them as
+  // no commute at all (mood is SAVED, and drives departures and approval), and
+  // next month's traffic is taken from nothing in the straight run and from
+  // everything after a reload, which re-plans on load. The hash at the
+  // boundary is equal either way, so the two cities part a month later:
+  // measured 53 pathless workers and `9324161b` against `9e3e5077` on a
+  // balanced town whose only event was one fire. It predates this part - it is
+  // reproducible on 411d903 - but Part R is what claimed the law.
+  replanStale(world);
   world.tick++;
   world.last.needs = needCensus(world); // cards and walkers now read this same tick
   return { notices, events: evNotices };

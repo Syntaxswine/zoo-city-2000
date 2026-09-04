@@ -239,7 +239,7 @@ another's. Git merges those. `citizens.js`, `justice.js` and `events.js`
 are the risk: B adds one-liners at call sites; A adds one function; H
 edits two `post` sites; F edits one advisor function; D never opens them.
 
-## Road access, standardized — SHIPPED 2026-09-04 (plan §4-R; SPEC §6c, §5, §7.9, §9b, §11; handoff §24–§24f; `tools/accessprobe.mjs`; the suite went 428 → 517 across FOUR hostile reviews, 6 → 6.5 → 6.5 → 7)
+## Road access, standardized — SHIPPED 2026-09-04 (plan §4-R; SPEC §6c, §5, §7.9, §9b, §11; handoff §24–§24g; `tools/accessprobe.mjs`; the suite went 428 → 523 across FIVE hostile reviews, 6 → 6.5 → 6.5 → 7 → 7)
 
 The owner: *"as long as a tile is within 1-3 tiles of the road it has road
 access"*, *"the 6x6 squares have roads around the whole perimeter, so nothing
@@ -297,7 +297,7 @@ Every gate hash moved and each is recorded in the commit.
 Two defects the standard turned up on its way in:
 - **A merge or a split changes a building's doors, and nothing re-planned.**
   A straight run kept a legal older path while a reload computed the new one
-  — §16's save/load law caught it. `blocks.replanOn` marks everyone living or
+  — §15's save/load law caught it. `blocks.replanOn` marks everyone living or
   working on the footprint stale, exactly as `placeHousehold` was fixed to.
 - **The scripted mayor built an unreachable zoo.** `--layout estate --zoo 12`
   put it at (26,0), five tiles from the nearest road, where it had been
@@ -331,7 +331,7 @@ job is lost, which is a rule change); make `save` refuse to serialise while
 paths are stale (it would have to tick or wait); or accept it and say so in
 SPEC §15. The suite's own convention is already the third - every save/load
 check ticks before it saves - so today the law is really "hash-equal from any
-TICK boundary", and §16 does not say that.
+TICK boundary", and §15 does not say that.
 
 **And that workaround was itself false for one commit.** At `4b9b6d0` a settle
 placed after `citizensTick` left the tick BOUNDARY stale too, so "hash-equal
@@ -451,17 +451,92 @@ the op-time settle left it green with 317 animals walking through a police
 station. The measurement is taken before the tick now. **A line added for one
 reason can take the teeth out of a check written for another.**
 
+## The FIFTH hostile review — the fix was still the size of the example (2026-09-04)
+
+A fifth adversarial reader scored `c90574b` **7/10** and found that round
+four's law was still not the law. 93 mutants of their own: 74 died by a named
+check, 16 survived, seven of those provably not equivalent.
+
+1. **"NOTHING MAY END A TICK STALE" WAS STILL FALSE.** Round four put
+   `replanStale` inside `settleDoors`, which only runs its body when the DOOR
+   GRAPH moved — and `c.stale` is written in three places, only one of which is
+   about doors. The reachable one: `eventsTick` razes a home at step 7,
+   `evictFromLot` rehomes the family, `placeHousehold` marks every one of them
+   stale, and `citizensTick` — the pass that repairs a stale commute — ran two
+   steps earlier. Measured on a balanced town whose only event was one fire and
+   **no op at all**: 53 employed animals ending the month with no commute,
+   traffic 12495 against 13261, `9324161b` against `9e3e5077` at month +1. What
+   diverges is **mood**, which is saved and drives departures and approval.
+   Fixed by moving the re-plan OUT of the flag: `replanStale(world)` runs
+   unconditionally at the end of every tick, after everything that can mark an
+   animal stale. (It reproduces at `411d903` too, so it is not a regression
+   Part R caused — but Part R is what claimed the law.)
+2. **The instrument the law never had.** Every boundary of a real town with the
+   WEATHER ON, asserting that no animal with a home and a job is carrying no
+   commute and none is left flagged — plus the case forced, because a canary
+   waits for weather: burn down the fullest house in the city and check the
+   same thing. That is the check that would have caught every version of this
+   across five reviews.
+3. **Every published gate for this part runs with the weather off.**
+   `tools/mayor.mjs` defaults `disasters` false, so all six gate hashes, the
+   regression table and every `accessprobe --layout` figure are measured on
+   towns where nothing ever burns — i.e. with the whole `eventsTick` half of
+   this part switched off. Round four found thirteen fixtures doing it and
+   fixed the deep rig; the mayor's own default, one level up, went unnoticed.
+   The new instrument runs on a town with weather; the gates stay as they are,
+   deliberately, as a controlled baseline — but they cannot see this class of
+   bug and that is now written down rather than assumed.
+4. **The card printed a false sentence one ring out from where round three
+   fixed it.** The middle refusal is guarded on `rep.roadDist <= ROAD_REACH`,
+   and `computeRoadDist` CLAMPS that field at `ROAD_REACH + 1` — so a road four
+   to eight tiles off that nothing can walk to fell through to "no road within
+   8 tiles in any direction", which was false. The horizon line now says what
+   it means: *no road within N tiles **that anything could walk to***. Also not
+   platform-only, as SPEC claimed: a lot behind a bare wall does it too.
+5. **The Rules tab told the player the rule wrongly.** G1 said `served ⇔ min
+   roadDist over the FOOTPRINT ≤ 3 (BFS through any tile)` — both halves false
+   for a platform, whose access is a search over ground it can stand on. SPEC's
+   own heading two sections up is "Two questions, not one".
+6. **Five more live rules with nothing behind them**, each now a check: the
+   player's line releasing animals ALREADY in work (178 kept forbidden jobs on
+   a real town with the suite green); the home-and-job half of the trespass; a
+   RAIL tunnel carrying reach through a wall; a zoo paying its keepers once
+   rather than four times; and the card's door ORDER.
+7. **The `4b` settle survived mutation and BACKLOG said it could not.** Its
+   only consequence is timing — an animal whose route closed this month is
+   released before the job search rather than after — worth 40 animals over 60
+   months on one fixture and two in the month itself: too small and too
+   seed-fragile to assert without pinning a golden number. So the ORDER of the
+   three settles is held structurally, the number is written beside it, and the
+   false "every mutant on both tick settles dies by a named check" is gone.
+8. Smalls: the save/load law is **§15**, not §16 (17 mis-citations across four
+   files, corrected); §16's `fields.js` contract block re-asserted the frozen
+   `reach = 8` round three removed; `meat.js`'s hall-door sort cannot currently
+   reorder anything and says so instead of looking load-bearing; `save.js` had
+   a `computeFields` that `refreshLast` repeats two lines later; and SPEC now
+   admits the overlay iterates its bounding box rather than the visible tiles,
+   and that `js/ui.js` is a second reader of the raw field that DECIDES with it.
+
+**Found SOUND by the fifth reader** — do not re-verify: both path laws hold on
+every stored commute in four layouts with disasters on (0 non-adjacent steps, 0
+unwalkable tiles, out of 1120 / 573 / 1014 / 17 paths); input-log replay is
+exact with rail, a station, a civic on a forecourt, an undo and a repaint in
+the log; a save written at `411d903` loads at HEAD with the same hash and holds
+24 months; the cost table and every `accessprobe` number reproduce; no access
+claim leaks into the news or story modules; Law 6 and §14 hold; and the whole
+core dies under mutation by NAMED checks.
+
 ## The FOURTH hostile review — my own fix was the new bug (2026-09-04)
 
 A fourth adversarial reader scored `4b9b6d0` **7/10** (up from 6, 6.5, 6.5) and
 found that **the settle added for the third review's finding 2 was itself a
-§16 break**. 92 mutants of their own: 71 died by a named check, 17 survived.
+§15 break**. 92 mutants of their own: 71 died by a named check, 17 survived.
 
 1. **NOTHING MAY END A TICK STALE.** `settleDoors` runs three times, and the
    third runs AFTER `citizensTick` — so its `invalidatePaths` had no stale pass
    coming, and the month ended with every commute null. Next month the straight
    run took traffic, riders and mean commute from NOTHING while a reload took
-   them from everything (`save.rebuildDerived` re-plans unconditionally); §16's
+   them from everything (`save.rebuildDerived` re-plans unconditionally); §15's
    hash at the boundary is equal either way, because `c.path` is not in
    `canonicalCitizen`, so the two cities parted a month later. Measured on this
    part's own rig with **no op at all** and a save at a clean TICK BOUNDARY:
@@ -498,7 +573,7 @@ found that **the settle added for the third review's finding 2 was itself a
    contention can reach (250 ms against ~10; 25 ms against ~0.17) with the
    printed number as the instrument — and earlier sweep claims in this file
    were made under the old gate, so treat their counts as upper bounds.
-6. **`§16` had never been asked of a town with the PLAYER'S LINE painted** —
+6. **`§15` had never been asked of a town with the PLAYER'S LINE painted** —
    two mutants lived there (`ops.apply`'s `else if (lines) invalidatePaths` and
    `save.js`'s species-weighted reload), each worth 135–218 differing paths and
    a divergence at month +1. Now checked on a 346-animal town.
@@ -527,10 +602,12 @@ it for one.
 reproduce byte-for-byte; the whole `--cost` table reproduces on an idle
 machine; `accessprobe --layout millbelt` reproduces exactly; Law 6 holds
 behaviourally; §14 holds for `render.js`; the core is mutation-proof (every
-mutant on `passable`, `doorSearch`, the signature, `nodePath`, `dial`, both
-tick settles, the ops settles, the undo settle, the merge/split re-plans,
-`footprintOf`, `zooTiles`, the job index, all four overlay mutants and the
-card's three refusals dies by a NAMED check).
+mutant on `passable`, `doorSearch`, the signature, `nodePath`, `dial`, the 7c
+settle and the end-of-tick re-plan, the ops settles, the undo settle, the
+merge/split re-plans, `footprintOf`, `zooTiles`, the job index, all four
+overlay mutants and the card's refusals dies by a NAMED check). **The `4b`
+settle is the exception, and it is held structurally** — the fifth review
+pulled that sentence for saying "both tick settles"; see its finding 7.
 
 ## The THIRD hostile review — the same bug one level down (2026-09-04)
 
@@ -545,7 +622,7 @@ patched.
    flagship fixture with this part's own op — a police station on the tile both
    of a platform's doors were reached through, both doors surviving because the
    platform is entered from either side — **99 commutes left walking through
-   it**, and §16 broken a month after a tick-boundary save (`86db0002` vs
+   it**, and §15 broken a month after a tick-boundary save (`86db0002` vs
    `375be68d`) with no op at all. **The check written for exactly this claim
    performed the counterexample and asserted past it**: it compared door lists
    and never looked at the chains. Fixed: the signature is `platform > door :
@@ -598,7 +675,7 @@ reproduces byte-for-byte (`8707f655` balanced · `f86913c3` dormitory ·
 `a20db622` millbelt · `df5631eb` estate · `aaac75f4` balanced --stations --zoo
 12 · `418c5b2c` estate --zoo 12); every `accessprobe --layout millbelt` number
 reproduces exactly; Law 6 holds behaviourally, not only by grep (one raw
-`roadDist` read outside `fields.js`, the allowed one); §16 holds on the deep
+`roadDist` read outside `fields.js`, the allowed one); §15 holds on the deep
 rig across four seeds, 20 years then save → load → 36 months; §14 holds for
 `render.js`; the rulings table is real at 14 rows; the town canary is genuinely
 narrow.

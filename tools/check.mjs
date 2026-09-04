@@ -99,6 +99,63 @@ console.log(`built ${YEARS} years: ${world.citizens.length} citizens, ${ms.toFix
 // this actually costs, far outside anything a busy machine produces, and
 // still inside anything a real algorithmic regression would blow through.
 check("tick cost is not catastrophic (the printed number is the instrument; this bound is contention-proof on purpose)", ms < 250, `${ms.toFixed(1)} ms/tick`);
+// NOTHING MAY END A TICK STALE, asked of EVERY TICK BOUNDARY of a real town
+// with the weather on. This is the two-line universal instrument the law never
+// had, and it is what five hostile reviews of the access work kept walking
+// past: a commute is marked stale in three places, and one of their callers -
+// `eventsTick`, at step 7, where a fire razes a home and the family is evicted
+// and rehomed - runs AFTER the pass that repairs them. The month then ends
+// with those commutes null; `moods` reads that as no commute at all (mood is
+// SAVED, and drives departures and approval), and next month's traffic comes
+// from nothing in the straight run and from everything after a reload.
+//
+// It has to run with DISASTERS ON. Every published gate for road access runs
+// with them off (`tools/mayor.mjs` defaults `disasters` false), which is
+// exactly why none of them could see this: no building ever burns in them.
+{
+  const BL2 = await import("../js/sim/blocks.js");
+  const B = load(A.saved);
+  let worst = null;
+  let staleLeft = 0;
+  let boundaries = 0;
+  for (let t = 0; t < 15 * 12; t++) {
+    tick(B);
+    boundaries++;
+    let pathless = 0;
+    for (const c of B.citizens) {
+      if (c.dead || c.home < 0 || c.job < 0) continue;
+      if (!c.path) pathless++;
+      if (c.stale) staleLeft++;
+    }
+    if (pathless && (!worst || pathless > worst.n)) worst = { n: pathless, month: t };
+  }
+  // AND THE CASE FORCED, because the passive walk is a canary and a canary
+  // waits for weather. The reachable trigger is a FIRE ON A FULL HOME: the
+  // eviction rehomes the family at step 7, `placeHousehold` marks every one of
+  // them stale, and `citizensTick` - the pass that repairs stale commutes -
+  // ran two steps earlier. Measured with the boundary re-plan removed: ten
+  // employed animals end that month with no commute and eleven are still
+  // flagged. No op, no station, no forecourt: this is why the law cannot live
+  // in a door-graph settle.
+  const BF = load(A.saved);
+  for (let t = 0; t < 90; t++) tick(BF);
+  let fattest = -1;
+  let fattestN = 0;
+  for (let i = 0; i < BF.w * BF.h; i++) {
+    if (BF.zone[i] !== ZONE.R || BF.tier[i] === 0) continue;
+    const n = BF.citizens.filter((c) => !c.dead && c.home === i && c.job >= 0).length;
+    if (n > fattestN) { fattestN = n; fattest = i; }
+  }
+  BL2.ignite(BF, fattest, 1);
+  let razedAt = -1;
+  for (let k = 0; k < 12 && razedAt < 0; k++) { tick(BF); if (BF.tier[fattest] === 0) razedAt = k + 1; }
+  const burntPathless = BF.citizens.filter((c) => !c.dead && c.home >= 0 && c.job >= 0 && !c.path).length;
+  const burntStale = BF.citizens.filter((c) => !c.dead && c.stale).length;
+  check("NOTHING MAY END A TICK STALE — 180 tick boundaries of a real town with the weather on, AND the case forced: burn down the fullest house in the city and the month still ends with every employed animal carrying a commute and nobody left flagged. A fire evicts and rehomes at step 7, two steps after the pass that repairs a stale commute",
+    !worst && staleLeft === 0 && fattestN >= 5 && razedAt > 0 && burntPathless === 0 && burntStale === 0,
+    `${boundaries} boundaries · ${worst ? `WORST month ${worst.month}: ${worst.n} employed animals with no commute` : "0 pathless at every boundary"} · ${staleLeft} left flagged · the fire: ${fattestN} employed animals burnt out, razed after ${razedAt} month${razedAt === 1 ? "" : "s"}, ${burntPathless} left with no commute and ${burntStale} still flagged`);
+}
+
 // A CANARY, not a target. The suite had no guard on the scripted city's SIZE
 // at all: a hostile review re-introduced a frontage rule spelled another way,
 // the fixture town fell 41% (385 citizens to 226), and 464 checks stayed
@@ -2019,6 +2076,35 @@ check("determinism: same seed + same inputs ⇒ same hash", stateHash(A.world) =
       `${grew} houses grew on the forecourt · ${stillWalking2} commutes still walk through one · ${apart2 < 0 ? "no divergence in 24 months" : `DIVERGED at month +${apart2}`}`);
   }
 
+  // ---- WHERE THE THREE SETTLES SIT, AND WHY -------------------------------
+  {
+    // A SPELLING-LEVEL TRIPWIRE, and it says so. Two of the three settles have
+    // behavioural checks below (the 7c one and the end-of-tick re-plan); the
+    // one after `lotsTick` does not, and here is the honest reason. Its only
+    // consequence is TIMING: an animal whose route this month's building just
+    // closed is released before the job search rather than after it, so it can
+    // be re-employed the same month. Deleting it moved one fixture by 40
+    // animals over 60 months and two jobless animals in the month itself -
+    // real, but too small and too seed-fragile to assert without pinning a
+    // golden number to a seed. So the ORDER is held instead, and the number is
+    // written here rather than asserted.
+    const tickSrc = readFileSync(path.join(ROOT, "js", "sim", "tick.js"), "utf8");
+    const at = (re) => { const m = tickSrc.match(re); return m ? m.index : -1; };
+    const lots = at(/const lots = lotsTick\(world\);/);
+    const settle1 = tickSrc.indexOf("settleDoors(world);", lots);
+    const citizens = at(/const cit = citizensTick\(world, cen, dem\);/);
+    const events = at(/const evNotices = eventsTick\(world, cen, dem\);/);
+    const settle2 = tickSrc.indexOf("settleDoors(world);", events);
+    const justice = at(/const jNotices = justiceTick\(world, cen\);/);
+    const bump = at(/^ {2}world\.tick\+\+;/m);
+    const replan = tickSrc.lastIndexOf("replanStale(world);", bump); // the one inside tick(), not settleDoors' own
+    check("access: the three settles are in the three places that make them mean anything — after lotsTick and BEFORE the citizens (so a route closed this month is not walked by this month's decisions), after eventsTick and before the freight and the killer (a fire razes at step 7), and an unconditional re-plan at the very end (nothing may end a tick stale, whatever marked it)",
+      lots > 0 && settle1 > lots && citizens > settle1
+        && events > citizens && settle2 > events && justice > settle2
+        && replan > settle2 && bump > replan,
+      `lotsTick@${lots} → settle@${settle1} → citizens@${citizens} → events@${events} → settle@${settle2} → justice@${justice} → replan@${replan} → tick++@${bump}`);
+  }
+
   // ---- THE SIGNATURE, ONE TRANSITION PER ROW -------------------------------
   {
     // `markDoorsMoved` is the whole of "a move is a re-plan": every stale
@@ -2213,7 +2299,7 @@ check("determinism: same seed + same inputs ⇒ same hash", stateHash(A.world) =
         && ridingExposure === 0 && walkingExposure > 0,
       `${rode.length} ridden tiles painted → exposure ${ridingExposure} · one walked road tile painted → exposure ${walkingExposure}`);
 
-    // THE PLAYER'S LINE AND §16. Two mutants lived here and neither could be
+    // THE PLAYER'S LINE AND §15. Two mutants lived here and neither could be
     // reached by any fixture in the suite, because no save/load check had ever
     // PAINTED anything: `ops.apply`'s `else if (lines) invalidatePaths(world)`
     // (delete it and a repaint leaves every commute crossing a road its
@@ -2596,6 +2682,97 @@ check("determinism: same seed + same inputs ⇒ same hash", stateHash(A.world) =
     check("access: and the door READERS take the caller's scratch too — `doorsOf` and `nearestRoad` fill the buffer they are handed and leave the world's alone, which is the law the walker layer lives under and the overlay's check does not reach",
       gotDoors === 2 && gotNear === 2 && gotServed === true && kept === stamp && usedMine,
       `${gotDoors} doors · ${gotNear} from nearestRoad · served ${gotServed} · the world's stamp ${stamp} → ${kept} · the caller's buffer was written ${usedMine}`);
+  }
+
+  // ---- FIVE MORE LIVE RULES THAT HAD NOTHING BEHIND THEM -------------------
+  {
+    // Every one of these survived a mutant on a 519-check suite, and every one
+    // is a rule a player can watch happen.
+    const { admits: admits5 } = await import("../js/sim/species.js");
+    const F6 = createWorld({ seed: "five-rules" });
+    const f6 = (x, y) => y * F6.w + x;
+    for (let y = 2; y <= 26; y++) for (let x = 2; x <= 40; x++) {
+      const i = f6(x, y);
+      F6.terrain[i] = TERRAIN.GRASS; F6.road[i] = ROAD.NONE; F6.zone[i] = ZONE.NONE;
+      F6.tier[i] = 0; F6.wall[i] = 0; F6.rail[i] = 0; F6.civic[i] = 0; F6.big[i] = 0; F6.use[i] = 0;
+    }
+    F6.cash = 400000;
+    F6.valves.R = 0.5;
+    F6.events.noDisasters = true;
+    const frow = [];
+    for (let x = 4; x <= 36; x++) frow.push(f6(x, 6));
+    apply(F6, { kind: "road", tiles: frow });
+    apply(F6, { kind: "zone", zone: ZONE.R, x0: 8, y0: 7, x1: 12, y1: 7, density: 3 });
+    apply(F6, { kind: "zone", zone: ZONE.C, x0: 16, y0: 7, x1: 20, y1: 7, density: 3 });
+    for (let x = 8; x <= 12; x++) F6.tier[f6(x, 7)] = 2;
+    for (let x = 16; x <= 20; x++) F6.tier[f6(x, 7)] = 2;
+    computeFields(F6);
+    recountRosters(F6);
+    for (let k = 0; k < 8; k++) placeHousehold(F6, createHousehold(F6, "rabbit", 4), f6(8 + (k % 5), 7));
+    for (let k = 0; k < 24; k++) tick(F6);
+    const employedAt = (w, lo, hi) => w.citizens.filter((c) => !c.dead && c.job >= lo && c.job <= hi).length;
+    const before = employedAt(F6, f6(16, 7), f6(20, 7));
+
+    // (1) THE PLAYER'S LINE RELEASES ANIMALS ALREADY IN WORK. `replanStale` is
+    // the only place that happens - the hiring gate covers new hires only -
+    // and a mutant that dropped it kept 178 animals at lots painted against
+    // them on a real town, with the suite green.
+    apply(F6, { kind: "use", use: 1, x0: 16, y0: 7, x1: 20, y1: 7 }); // the shops, predator-only
+    tick(F6);
+    const stillThere = F6.citizens.filter((c) => !c.dead && c.job >= f6(16, 7) && c.job <= f6(20, 7) && !admits5(F6.use[c.job], c.species)).length;
+    check("access: the player's line takes work away from animals ALREADY IN IT, not only from the next hire — paint a row of shops predator-only and every prey animal employed there has lost the job a month later",
+      before >= 4 && stillThere === 0,
+      `${before} employed there before the paint · ${stillThere} still employed at a lot that forbids them`);
+
+    // (2) THE HOME AND JOB HALF OF THE TRESPASS. `exposure` adds
+    // TRESPASS_HOME for a home or a job lot that forbids the species, on top
+    // of the walked tiles - and the whole loop could be deleted unnoticed.
+    const homeR = F6.citizens.find((c) => !c.dead && c.home >= f6(8, 7) && c.home <= f6(12, 7));
+    const beforeE = homeR ? FI.exposure(F6, homeR).e : -1;
+    apply(F6, { kind: "use", use: 1, x0: 8, y0: 7, x1: 12, y1: 7 }); // their HOMES, predator-only
+    computeFields(F6);
+    const afterE = homeR ? FI.exposure(F6, homeR).e : -1;
+    check("access: and a trespass is where you LIVE and WORK as well as where you walk — paint a prey animal's own home predator-only and its exposure rises even if it never leaves the doorstep",
+      !!homeR && afterE > beforeE && afterE >= KNOBS.TRESPASS_HOME,
+      `exposure ${beforeE} → ${afterE} (a home or job that forbids is worth ${KNOBS.TRESPASS_HOME} each)`);
+
+    // (3) A RAIL TUNNEL CARRIES REACH THROUGH A WALL, exactly as a road one
+    // does. `reach.isBarrier` asks `hasWay`, and dropping that took a served
+    // lot behind a walled line out of reach entirely.
+    const T6 = createWorld({ seed: "rail-tunnel" });
+    const t6 = (x, y) => y * T6.w + x;
+    for (let y = 2; y <= 20; y++) for (let x = 2; x <= 30; x++) {
+      const i = t6(x, y);
+      T6.terrain[i] = TERRAIN.GRASS; T6.road[i] = ROAD.NONE; T6.zone[i] = ZONE.NONE;
+      T6.tier[i] = 0; T6.wall[i] = 0; T6.rail[i] = 0; T6.civic[i] = 0; T6.big[i] = 0; T6.use[i] = 0;
+    }
+    T6.events.noDisasters = true;
+    apply(T6, { kind: "road", tiles: [t6(10, 8), t6(11, 8), t6(12, 8)] });
+    const wall6 = [];
+    for (let x = 8; x <= 14; x++) wall6.push(t6(x, 10));
+    apply(T6, { kind: "wall", tiles: wall6 });
+    apply(T6, { kind: "zone", zone: ZONE.R, x0: 11, y0: 11, x1: 11, y1: 11, density: 3 });
+    computeFields(T6);
+    const walled = { d: siteRoadDist(T6, t6(11, 11)), served: sv(T6, t6(11, 11)), doors: doors(T6, t6(11, 11)).length };
+    const rail6 = [];
+    for (let y = 9; y <= 12; y++) rail6.push(t6(11, y));
+    apply(T6, { kind: "rail", tiles: rail6 }); // a LINE through the wall: a tunnel
+    computeFields(T6);
+    const tunnelled = { d: siteRoadDist(T6, t6(11, 11)), served: sv(T6, t6(11, 11)), doors: doors(T6, t6(11, 11)).length };
+    check("access: a RAIL tunnel is a way through a wall too — a lot walled off from its road is out of reach until a line runs through the wall, and then it is served with a door, the same as a road tunnel",
+      !walled.served && walled.doors === 0 && tunnelled.served && tunnelled.doors === 1 && tunnelled.d === 3,
+      `walled ${walled.d}/${walled.doors} doors · with a rail tunnel ${tunnelled.d}/${tunnelled.doors}`);
+
+    // (4) A ZOO'S JOBS ARE THE ZOO'S, ONCE. `world.jobsOf` answers for the
+    // ANCHOR only; letting a ZOO_PART answer too would pay a zoo four times.
+    const Z6 = load(save(T6));
+    apply(Z6, { kind: "zoo", tx: 20, ty: 6 });
+    apply(Z6, { kind: "road", tiles: [t6(20, 5), t6(21, 5)] });
+    computeFields(Z6);
+    const zooTilesJobs = siteTiles(Z6, t6(20, 6)).map((i) => jobsOf(Z6, i));
+    check("access: a zoo pays for its keepers ONCE — the anchor holds all four tiles' jobs and the three parts hold none, so a 2×2 is one employer and not four",
+      zooTilesJobs.length === 4 && zooTilesJobs[0] === KNOBS.ZOO_JOBS && zooTilesJobs.slice(1).every((j) => j === 0),
+      `the four tiles hold ${zooTilesJobs.join(", ")} jobs (ZOO_JOBS is ${KNOBS.ZOO_JOBS})`);
   }
 
   // ---- WHAT A ROAD ACTUALLY BUYS, ARM BY ARM -------------------------------
@@ -6060,10 +6237,10 @@ function costOfBulldoze(w, x, y) { return (0, costOfOp)(w, { kind: "bulldoze", x
         && /road 2/.test(stranded),
       `raw ${V.roadDist[v(24, 14)]} · "${(stranded.match(/road access:[^·]*/) || ["(nothing)"])[0].trim()}"`);
     const twoSided = cardAt(v(26, 7));
-    check("panel: and a lot entered from two sides SAYS both — the card lists every door, because \"all sides are access points\" is a promise to the player and not only to the pathfinder",
+    check("panel: and a lot entered from two sides SAYS both, IN ORDER — the card lists every door and lists them the way the rule gives them, because \"all sides are access points\" is a promise to the player and not only to the pathfinder",
       FI2.doorsOf(V, v(26, 7)).length === 2
         && /2 doors, every side counts:/.test(twoSided)
-        && /\(26,6\)/.test(twoSided) && /\(27,7\)/.test(twoSided),
+        && /\(26,6\) \(27,7\)/.test(twoSided),
       `${FI2.doorsOf(V, v(26, 7)).length} doors · "${(twoSided.match(/road access:[^·]*/) || ["(nothing)"])[0].trim()}"`);
   }
 
