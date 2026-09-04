@@ -1230,7 +1230,7 @@ ride cost is `10 + 13·2 + 10`… in the new units `9 + 13·2 + 9`; the
 mayor's balanced hash (no rail) is unchanged — only rail towns move.
 An hour.
 
-### R. Road access, seen — *"as long as a tile is within 1-3 tiles of the road it has road access"*
+### R. Road access, seen — SHIPPED 2026-09-04 — *"as long as a tile is within 1-3 tiles of the road it has road access"*
 
 **What the code says tonight (§1).** `computeRoadDist` is a breadth-first
 distance from every road tile through any tile, in all four directions,

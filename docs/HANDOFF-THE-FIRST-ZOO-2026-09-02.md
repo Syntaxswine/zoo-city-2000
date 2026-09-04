@@ -1743,3 +1743,67 @@ hang. It threw, once, and the throw took the game with it.
   know what a BUTTON does can override one and press it (`El.dispatch`).
 - The frame guard counts faults. If a future session wants a real telemetry
   line — "the panel stumbled N times this session" — the counter is there.
+
+## 24. Road access, standardized — Part R (session 15, 2026-09-04)
+
+The owner asked four things in four sentences, and they turn out to be one
+rule: *"as long as a tile is within 1-3 tiles of the road it has road
+access"*, *"the 6x6 squares have roads around the whole perimeter, so nothing
+is more than 3 tiles away"*, *"i want that rule standardized, including rail
+and warehouses, and zoos"*, *"the other way to think about it is that all
+sides have access points."*
+
+**The standard.** `fields.served(world, i)` — the nearest road distance over
+the whole FOOTPRINT (`world.siteTiles`: a block's tiles, a zoo's four, or the
+tile itself) is `<= ROAD_REACH` 3. `hasAccess` is deleted; nothing in
+`js/sim` outside `fields.js` reads `world.roadDist` for itself except the
+hover card, which prints the tile's own number beside the site's and decides
+nothing with it. `doorSearch` returns `{ d, doors }` — every road tile at
+that distance, ascending — because all sides are access points.
+
+**What moved, by rule**
+
+| rule | was | is |
+|---|---|---|
+| R/C/I/M growth, decay | `hasAccess` on the tile | `served` — identical for a 1×1 |
+| a 2×2 or 3×3 block | `hasAccess` on the tile | `served` on the block |
+| industry above tier 2 | `roadDist <= 1` (SC2000 frontage) | `served`. **Deleted.** 11 more tier-3 works in the millbelt |
+| a rail station | a road tile ORTHOGONALLY beside the platform | `served`, and the forecourt is walked |
+| the zoo | jobs on the anchor; halo and cap ungated | `served` on all four, gating all three |
+| meat hall, centre, fire, police | `hasAccess` | `served` |
+| doors | ONE road tile, first in N-E-S-W order | every road tile at the site's distance |
+
+**Measured** (`tools/accessprobe.mjs --layout millbelt`, seed 7, 30 years):
+mean **1.42 doors a lot**, **37% of lots leavable by more than one side**,
+**11 industrial lots at tier 3 that the frontage rule capped at 2**, 0 lots
+out of reach (the mayor's 6×6 estates are ringed, exactly as the owner said).
+
+### The traps, by what each one LOOKED like
+
+| it looked like | it was |
+|---|---|
+| `save → load → continue` diverged by ONE mood point in three animals | Nine commuters' paths started one tile earlier in the straight run than after a reload. A 2×2 merge had changed their home's DOOR SET, and nothing marked them stale — the straight run kept a legal older path, the reload computed the new one. `blocks.replanOn`. The same class as `placeHousehold`'s fixed comment |
+| the landmark check said "no landmark in ten years" | It never was a fixture; it was a coin flip that seed 7 happened to win in year 7. Four seeds × two layouts: TWO of eight raise a 3×3 in 30 years, before the change and after. The check now forces `BIG_P` inside a real `tick` |
+| "the centre fixes — fixed 0 · pacified 1" | A snapshot at the end of a 24-month window cannot see an animal fixed in month 3 that died in month 20. Count over the window |
+| "the killer's own walker — 136 vs 136" | The check paired the FIRST predation record with the LAST walker seen. One killer killing twice makes those different sacks. Capture the pairing, do not infer it |
+| the mayor's zoo bought a +500 cap for nothing | `--layout estate --zoo 12` placed it at (26,0), five tiles from the nearest road. It had never had jobs (those were gated); the halo and the cap were not. The mayor now takes the first free 2×2 a road REACHES |
+| the overlay check read `9e7d52` — an earth ramp — where a green band should be | The building. Every overlay is painted on the ground and then built over, so a block hides its own tile's tint. The check takes the storeys down to photograph the band; the limitation is real and is in the BACKLOG |
+| the commute fixture said "no way" | `COMMUTE_MAX` is 40 walk steps. A detour built to be *long* was built too long to exist |
+
+### The three shapes worth keeping
+
+**A quantity that decides something must be asked of the whole thing it
+decides about.** `hasAccess(anchor)` was not wrong for a 1×1 and was wrong
+for everything else; the bug was invisible for as long as every site was one
+tile. When a footprint concept arrives (blocks, session 9), every predicate
+that takes a tile index has to be re-read.
+
+**Changing a thing's SHAPE changes its derived state.** A merge changes the
+doors; a split changes them back. Anything cached from the old shape — a
+path, a route, a door — is now stale and the save/load law is what finds it.
+
+**The forecourt is laid into the path.** A graph edge that skips tiles is
+cheap to write and lies to everything downstream: `commuteTime`, the traffic
+count, the walker's line of travel and the "every path tile is a road" check
+all assume consecutive entries are neighbours. `nodePath` expands the
+station link so that assumption stays true — and a new check asserts it.

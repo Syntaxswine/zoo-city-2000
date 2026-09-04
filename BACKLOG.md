@@ -238,6 +238,63 @@ another's. Git merges those. `citizens.js`, `justice.js` and `events.js`
 are the risk: B adds one-liners at call sites; A adds one function; H
 edits two `post` sites; F edits one advisor function; D never opens them.
 
+## Road access, standardized — SHIPPED 2026-09-04 (plan §4-R; SPEC §6c, §5, §7.9, §9b, §11; handoff §24; `tools/accessprobe.mjs`; 33 checks, 16 of 16 mutants caught)
+
+The owner: *"as long as a tile is within 1-3 tiles of the road it has road
+access"*, *"the 6x6 squares have roads around the whole perimeter, so nothing
+is more than 3 tiles away"*, *"i want that rule standardized, including rail
+and warehouses, and zoos"*, and *"the other way to think about it is that all
+sides have access points."*
+
+One predicate now, `fields.served`, asked of the whole FOOTPRINT
+(`world.siteTiles`: a block's tiles, a zoo's four, or the tile itself).
+`hasAccess` is gone from the tree, and no module in `js/sim` outside
+`fields.js` tests a road's nearness for itself — a check greps for a second
+one and the mutation sweep proves the first. Doors are every road tile at
+the site's distance, so all sides are access points: `dial` takes a list of
+sources, `commutePath` a list at each end, and a citizen leaves by whichever
+side its work is on. A station is served like a lot (three tiles is near
+enough), and the forecourt between platform and door is laid into the stored
+path tile by tile, so it is walked, priced and drawn as the walk it is.
+SC2000's industrial frontage rule (`roadDist <= 1` for tier 3) is deleted.
+An unserved zoo loses its jobs, its halo and its place on the cap together.
+
+Measured (`tools/accessprobe.mjs --layout millbelt`, seed 7, 30 years):
+**37% of zoned lots can be left by more than one side** (mean 1.42 doors),
+and **11 industrial lots stand at tier 3 that the frontage rule capped at 2**.
+Every gate hash moved and each is recorded in the commit.
+
+Two defects the standard turned up on its way in:
+- **A merge or a split changes a building's doors, and nothing re-planned.**
+  A straight run kept a legal older path while a reload computed the new one
+  — §16's save/load law caught it. `blocks.replanOn` marks everyone living or
+  working on the footprint stale, exactly as `placeHousehold` was fixed to.
+- **The scripted mayor built an unreachable zoo.** `--layout estate --zoo 12`
+  put it at (26,0), five tiles from the nearest road, where it had been
+  paying a +500 cap and a land-value halo for a place no animal could enter.
+  The mayor now takes the first free 2×2 a road REACHES; a rig that cannot
+  build a working zoo cannot measure one.
+
+Left:
+- **A landmark is a coin flip, and the suite used to bet on seed 7.** A
+  census of eight scripted 30-year towns (4 seeds × 2 layouts) finds a 3×3
+  landmark in TWO of them — seed 7 at month 78 and seed 3 at 233 before Part
+  R, seed 3 at 310 and seed 11 at 291 after. The rate did not move; which
+  town wins did. The check now forces the merge roll inside a real tick
+  instead. Whether nine tier-3 lots of one kind SHOULD be that rare is a
+  design question for the owner, not a bug.
+- **An overlay is painted on the ground, so a building hides its own tile's
+  band.** True of every overlay in the game, and most visible on the access
+  one, where the interesting tiles are exactly the built ones. A tint drawn
+  over the building (a roof wash, or the zot) would fix it for all six.
+- `ROAD_REACH` stays 3 and is not exposed as a knob. The owner's blocks never
+  need more.
+- The forecourt is priced at `WALK` a tile and carries no use-zoning: a
+  station forecourt is nobody's lot. If the line is ever painted across one,
+  that ruling has to be made explicit.
+- Rail bridges are still refused (no rail on water), so a station can be
+  cut off by a channel the road crosses. Unchanged by this part.
+
 ## The freeze on a freshly zoned lot — FIXED 2026-09-03 (handoff §23; `tools/dom-shim.mjs`; 4 checks, both mutation-tested)
 The owner: *"the game hangs on placement of residential tiles."* It was not a
 hang: hovering a lot you had just zoned THREW. `TIER_NAME` has rows 1, 2, 3

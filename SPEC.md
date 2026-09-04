@@ -238,12 +238,12 @@ months) → −36% I jobs, −10% P, no ringing.
 
 ```
 roadDist(i) = BFS distance (4-neighbour, through any tile) to the nearest road/bridge, capped 4
-access      = roadDist <= 3                                        (SC2000, exact)
+served(i)   = min roadDist over the SITE's footprint <= 3          §6c — one standard, for every rule that asks
 local_R = clamp((LV − Pol − 40) / LOCAL_SCALE, −0.3, 0.3)        LOCAL_SCALE = 200 (pre-registered knob; D0 used 60, judged too wide)
           growth REFUSED if Pol > 60                               (Micropolis DoResIn at 0..100 scale)
 local_C = 0.6·clamp(Rnear/80 − 0.5, −0.3, 0.3) + 0.4·(LV − 50)/200    Rnear = citizens housed within Chebyshev 5
-local_I = 0.4·(50 − LV)/200                                        industry likes cheap land; tier 3 needs roadDist <= 1
-score   = V_zone + local ;  if !access → score = −1 (reason NO_ROAD)
+local_I = 0.4·(50 − LV)/200                                        industry likes cheap land (SC2000's tier-3 frontage rule is GONE — §6c)
+score   = V_zone + local ;  if !served → score = −1 (reason NO_ROAD)
 maxTierByLV: R and C: LV < 30 → 1, < 60 → 2, else 3 ; I: 3.  Effective max = min(maxTierByLV, lot.maxTier)
 fill    = occupants/capacity (R) or workers/jobs (C, I)
 GROW  if tier < max && score > GROW_THRESH(0.05) && (tier == 0 || fill >= 0.7):
@@ -324,6 +324,72 @@ centroid term of LV (not a source) and `nature8` (the eight neighbours).
 cross (0xFF open, 0x00 a wall, the two bits of its axis for a tunnel — a
 crossing a → b needs a's bit and b's opposite, so a gate never has to know
 which side you came from).
+
+### 6c. Access — ONE standard, asked of the whole footprint (`fields.served`, `fields.doorSearch`; session 15, 2026-09-04)
+
+The owner: *"as long as a tile is within 1-3 tiles of the road it has road
+access"*, then *"the 6x6 squares have roads around the whole perimeter, so
+nothing is more than 3 tiles away"*, then *"i want that rule standardized,
+including rail and warehouses, and zoos"*, and *"the other way to think about
+it is that all sides have access points."*
+
+```
+siteTiles(i)   = the tiles of the THING at i: a block's footprint (§3b), a zoo's four (§2), or [i]
+siteRoadDist(i)= min roadDist over siteTiles(i)
+served(i)      ⇔ siteRoadDist(i) <= ROAD_REACH (3)
+doorSearch(i)  = a multi-source BFS out of siteTiles(i), through any tile a BARE WALL does not block
+                 (§6b), stopping at the first depth that reaches road → { d, doors }
+doorsOf(i)     = every road tile at that depth, ascending — ALL SIDES ARE ACCESS POINTS
+nearestRoad(i, reach = 8) = the same search, further out; the CARD's second question, asked by no rule
+```
+
+`served` is the only test of a road's nearness in `js/sim`; `hasAccess` is
+gone. Part M' greps for a second one (the one allowed reader of the raw
+field is `lotReport`, which prints the tile's own number beside the site's
+and decides nothing with it) and mutation-tests the rest. What each rule
+became:
+
+| asks | reads |
+|---|---|
+| R / C / I / M growth and decay (`lotScore`) | `served` — unchanged for a 1×1 |
+| a 2×2 or 3×3 **block** (`joinable`, `troubled`) | `served` on the block: a 3×3 whose far corner is 4 from the road is served if any corner is 3 |
+| **industry above tier 2** | `served`. SC2000's frontage rule (`roadDist <= 1`) is DELETED — the inside of an industrial block may now stand as tall as its edge; the millbelt gains 11 tier-3 works |
+| a **rail station** | `served`. It was "a road tile ORTHOGONALLY beside the platform", which is the d = 1 case of the same rule |
+| the **zoo** (2×2) | `served` on all four tiles, gating jobs, the LV halo and the census the cap reads — one predicate, three effects. The census reports `zoos` (served) and `zoosNoRoad` |
+| a **meat hall**, the pacification centre, fire and police cover | `served` |
+| a **park** | nothing. A park is a place, not a service; the owner did not list it |
+| **doors** (job search, walkers, carts, the station) | `doorsOf` — every side |
+
+**All sides.** `dial` takes one road tile or a LIST, and `commutePath` takes
+a list at each end, so a commute is the cheapest pairing of any home door
+with any job door: a citizen with roads north and south leaves by whichever
+side its work is on. The open-job index lists a workplace under every door
+it has and scores it ONCE, at the first (therefore cheapest) one the search
+settles — a second door must not draw a second random weight.
+
+**The platform's forecourt.** `computeStationDoors` (derived with `roadDist`,
+never saved) gives every station tile an edge to each of its doors at `WALK`
+per tile of the gap, and carries the tiles BETWEEN them. `nodePath` lays
+those into the stored path, so every consecutive pair of walked entries is
+still orthogonally adjacent: the gap costs a walk, `commuteTime` prices it
+per tile, traffic counts it, and the walker crosses it on foot. Move a line
+from three tiles off the road to one and the same journey loses exactly four
+steps.
+
+**A shape change is a re-plan.** Merging or splitting a block changes the
+site, so it changes the doors: `blocks.replanOn` marks everyone living or
+working there stale. Without it a straight run kept a legal older path while
+a reload computed the new one, and §16's save/load law caught it — the same
+trap `placeHousehold` was fixed for.
+
+**Live at the op.** `ops.apply` recomputes `roadDist` (and the station doors)
+the moment a road, wall or rail is drawn, not at the next tick: every loaded
+city opens PAUSED, and the card used to read "no road within 3" beside a
+brand-new road until the player pressed Space. Hash-neutral — it is the same
+field the tick would have built.
+
+**Not access.** A building's drawn door is on its south face whatever side
+the road is on (art, §12.2). `ROAD_REACH` stays 3.
 
 ---
 
@@ -482,8 +548,12 @@ neutral travel (as long as predators don't exit the train in a prey only
 zone)."* Tool `7` lays rail like a road (an L-drag, §20 a tile, §3 a year;
 grass or trees, across a wall — a tunnel; square-on across a road — a
 **level crossing**, below; **not on water**: no rail bridges — BACKLOG); `8` makes a **station**
-of a rail tile (§300, §100 a year). A station is a **door only when a road
-tile touches it** (the card says so). **The commute graph has two layers:**
+of a rail tile (§300, §100 a year). A station is **served like any lot**
+(§6c): its doors are every road tile at its road distance, up to
+`ROAD_REACH` 3, and the walk layer crosses the forecourt between them one
+tile at a time (the card says which sides, and how far). Until session 15
+the graph stepped onto a platform only from a tile ORTHOGONALLY beside it,
+which is the d = 1 case of the same rule. **The commute graph has two layers:**
 walk nodes on road tiles and station tiles (a step `WALK` 10, ×6 onto a
 road the line forbids), ride nodes on rail tiles (`RAIL_COST` 3 a step —
 0.3 of a walk); the layers meet only at a station (board and alight, free).
@@ -635,7 +705,9 @@ school.
 ## 9b. Services — fire and police (`js/sim/fields.js`, `events.js`)
 
 The owner: *"police and fire is noticeably absent."* Two 1×1 civics, §500
-each, §400/yr each, four C-type jobs each, effective only with road access.
+each, §400/yr each, four C-type jobs each, effective only where `served`
+(§6c) — unchanged in effect for a 1×1, and now the same sentence as every
+other rule in the game.
 
 ```
 fireCov(i)   = 1 within Chebyshev 6 of a fire station
@@ -862,7 +934,12 @@ WASD and the arrows only pan the map; the news reader steps on arrows, never
 WASD. A focused form control owns its editing keys, so Space cannot both
 activate a button and pause the city. The `O` overlay cycle is off → LV →
 pollution → crime (an open file is a ring) → dread → use (rust predator-only,
-teal prey-only) → score.
+teal prey-only) → **access** → score. Access paints `siteRoadDist` (§6c) —
+the number the RULE reads, not the tile's own — in five bands: the road
+untinted, then three DIFFERENT greens for one, two and three tiles (not one
+green at three alphas: a band told apart only by strength stops being a band
+on asphalt), then the zot red for out of reach. Like every overlay it is
+painted on the GROUND, so a building hides its own tile's band.
 
 - **Zones, trees, bulldoze:** rectangle drag; live cost in the strip
   ("R ×36 = §180"); an unaffordable drag draws the refused hatch and does
@@ -1459,6 +1536,18 @@ tick(world) → { notices: [string], events: [eventRecord] }   // one month
 apply(world, op) → { ok, cost, reason, replaced, evicts, undoable }   // op.kind ∈ zone (with density)|road|bulldoze|tree|park|zoo|fire|police|rate|toggle|choice ; logs to world.log; deducts cash
 undo(world) → { ok }
 costOf(world, op) → { cost, tiles }        // for the live strip
+// js/sim/fields.js — access, one standard (§6c)
+served(world, i) → bool                     // THE predicate: siteRoadDist ≤ ROAD_REACH, over the whole footprint
+siteRoadDist(world, i) → 0..ROAD_REACH+1    // min roadDist over world.siteTiles(i)
+doorsOf(world, i) → [tile]                  // every road tile at that distance, ascending; [] when unserved
+doorOf(world, i) → tile|null                // the lowest-numbered one, for readers that want a single tile
+doorSearch(world, i, seen, { reach, prev }) → { d, doors }   // caller-owned scratch (the walker layer owns its own)
+nearestRoad(world, i, reach = 8) → { d, doors }              // the card's second question; no rule asks it
+dial(world, species, from, maxCost, settle, policy)          // `from` is ONE road tile or a LIST of doors
+commutePath(world, species, from, to, max) → { path, cost }  // a list at each end; the cheapest pairing wins
+// js/sim/world.js — what a footprint is
+siteTiles(world, i) → [tile]                // a block's tiles, a zoo's four, or [i]
+zooAnchorOf(world, i) → tile|−1 ; zooTiles(world, anchor) → [tile]
 // js/sim/lots.js
 lotScore(world, i) → { score, reason, p, parts: {valve, local} }
 lotReport(world, i) → hover-card data (uses lotScore; households + names)

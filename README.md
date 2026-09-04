@@ -112,6 +112,19 @@ unemployment): high crime drags land value and mood, keeps shops from
 growing, and lets a named fox, raccoon or cat rob a store. The `O` overlay
 shows crime in red and police cover in blue.
 
+**Road access.** A building is served when a road comes within three tiles
+of ANY part of it, and every side it touches a road is a way in. A 6×6
+estate ringed by roads is served all the way to its middle; a 3×3 block
+whose far corner is four tiles out is served because its near corner is
+three; a station three tiles off the road is a station, and its passengers
+walk the forecourt; a zoo no road reaches is a fenced field — no keepers, no
+land value, no room on the population cap. Warehouses are no exception any
+more: the inside of an industrial block stands as tall as its edge. One
+rule, asked of a lot, a block, a hall, a platform and a zoo alike, and a
+citizen leaves home by whichever side its work is on. Press `O` to the
+**access** overlay and you can point at the tile: untinted on the road,
+three greens for one, two and three tiles out, red where nothing will grow.
+
 **Walls.** `6` lays a wall like a road (§8 a tile). Smells, dread, the
 crime a hall casts, fire and police cover and the land value a park lends
 all go *round* a wall instead of through it, and so does a killer's reach —
@@ -131,8 +144,9 @@ and the third offence meets the sentence table. Rail (coming) is neutral
 travel; only where you step off counts. The `O` overlay shows the line in
 rust and teal.
 
-**Rail.** `7` lays track and `8` makes a station of a rail tile beside a
-road. A commute is the cheapest walk-and-ride: a ride costs 0.3 of a walk,
+**Rail.** `7` lays track and `8` makes a station of any rail tile a road
+reaches (three tiles is near enough; the animals cross the forecourt on
+foot). A commute is the cheapest walk-and-ride: a ride costs 0.3 of a walk,
 makes no road traffic, and is neutral ground for the player's line — a
 wolf may ride through prey-only streets, and is only stopped where it
 steps off. Riders are counted on the census; the walkers sit up on the
@@ -198,6 +212,13 @@ mill-town with a fox problem").
   does; a blit scales by the transform; `rgba()` fills blend instead of
   painting black; both instruments import the one mayor), the cheat op (booked under `cheat`,
   logged, replayed, clamped, never undone, lifts a receivership at once),
+  road access as ONE standard (the field and the door search are the same
+  number two ways; a block is asked about the whole of it and a zoo about all
+  four of its tiles; every side is a door and a citizen leaves by the near
+  one; a platform three tiles off the road is a door and its forecourt is
+  walked tile by tile; a bare wall shuts a door and a tunnel opens it; no
+  module outside `fields.js` tests a road's nearness for itself; the overlay
+  really paints four bands and the card says the distance in words),
   `budget.post` as the only cash mutator, relative imports, no
   `Math.random`, the sim blind to browser preferences, the title screen
   mounted over the owner's art, every sprite pixel a palette key, every
@@ -211,6 +232,12 @@ mill-town with a fox problem").
   fires on a ticker line, points the camera at the coordinates that line
   carries, and comes back months later to the same spot. Every shot is
   captioned with the town and the watched tile in words.
+- `tools/accessprobe.mjs --layout millbelt` — what road access reaches and
+  what it refuses: zoned lots by the distance the RULE reads beside the
+  distance their own tile reads, how many sides each lot is entered from,
+  the works the old frontage rule capped, every platform and whether the old
+  adjacency rule would have reached it, served and unserved zoos, and the
+  reason on every lot the rule refuses. `--save FILE` reads a real town.
 - `tools/mayor.mjs` — the scripted mayor, hers alone. `playtest.mjs` prints her
   curves and `play.mjs` photographs her town; when the two disagree it is a
   flag and never a second mayor.
