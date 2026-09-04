@@ -116,8 +116,10 @@ shows crime in red and police cover in blue.
 of ANY part of it, and every side it touches a road is a way in. A 6×6
 estate ringed by roads is served all the way to its middle; a 3×3 block
 whose far corner is four tiles out is served because its near corner is
-three; a station three tiles off the road is a station, and its passengers
-walk the forecourt; a zoo no road reaches is a fenced field — no keepers, no
+three, though a block never GROWS across that line — it is what keeps a
+building standing when you take its road away; a station three tiles off the
+road is a station, and its passengers walk the forecourt, which therefore has
+to be ground they can stand on (never water, never through a house); a zoo no road reaches is a fenced field — no keepers, no
 land value, no room on the population cap. Warehouses are no exception any
 more: the inside of an industrial block stands as tall as its edge. One
 rule, asked of a lot, a block, a hall, a platform and a zoo alike, and a
@@ -187,7 +189,7 @@ mill-town with a fox problem").
 
 - `tools/playtest.mjs --layout balanced|dormitory|millbelt --schedule 15:13,22:7`
   — a scripted mayor on the real map; the SPEC's acceptance targets.
-- `tools/check.mjs` — 428 checks: ledger conservation to the §, valves
+- `tools/check.mjs` — 478 checks: ledger conservation to the §, valves
   bounded, no NaN, the dangling-id law, rosters and capacities, commutes on
   roads, determinism, save → load → continue hash-equal, input-log replay,
   the crime-and-punishment invariants, the walls (the flood reproduces the
@@ -213,12 +215,15 @@ mill-town with a fox problem").
   painting black; both instruments import the one mayor), the cheat op (booked under `cheat`,
   logged, replayed, clamped, never undone, lifts a receivership at once),
   road access as ONE standard (the field and the door search are the same
-  number two ways; a block is asked about the whole of it and a zoo about all
-  four of its tiles; every side is a door and a citizen leaves by the near
-  one; a platform three tiles off the road is a door and its forecourt is
-  walked tile by tile; a bare wall shuts a door and a tunnel opens it; no
-  module outside `fields.js` tests a road's nearness for itself; the overlay
-  really paints four bands and the card says the distance in words),
+  number two ways, walls and all; a block is asked about the whole of it and a
+  zoo about all four of its tiles; every side is a door and a citizen leaves by
+  the near one; a platform three tiles off the road is a door, its forecourt is
+  walked tile by tile and priced by who is crossing, and it is refused if that
+  ground is a river or a house; a bare wall shuts a door and a tunnel opens it;
+  the growth rule reads the road ONLY through `served` — two lots at one and
+  three tiles cap and score alike; `ROAD_REACH` is a knob and the overlay
+  survives it moving; the overlay really paints four bands, reddens only what
+  asked, and the card says the distance in words),
   `budget.post` as the only cash mutator, relative imports, no
   `Math.random`, the sim blind to browser preferences, the title screen
   mounted over the owner's art, every sprite pixel a palette key, every
@@ -232,6 +237,13 @@ mill-town with a fox problem").
   fires on a ticker line, points the camera at the coordinates that line
   carries, and comes back months later to the same spot. Every shot is
   captioned with the town and the watched tile in words.
+- `tools/accessprobe.mjs --rig deep` — a town the scripted mayor would NOT
+  build (quarters seven deep roaded on one side, a line set three tiles back),
+  because she rings every 6×6 and lays her line along a ring, so in her towns
+  the footprint rule lifts nothing and no animal ever crosses a forecourt.
+  In the deep rig: 418 zoned lots the rule refuses with the real distance on
+  each, 2 of 2 platforms that are doors only under the standard, and 12
+  commutes crossing 48 tiles of forecourt.
 - `tools/accessprobe.mjs --layout millbelt` — what road access reaches and
   what it refuses: zoned lots by the distance the RULE reads beside the
   distance their own tile reads, how many sides each lot is entered from,

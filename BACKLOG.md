@@ -238,7 +238,7 @@ another's. Git merges those. `citizens.js`, `justice.js` and `events.js`
 are the risk: B adds one-liners at call sites; A adds one function; H
 edits two `post` sites; F edits one advisor function; D never opens them.
 
-## Road access, standardized — SHIPPED 2026-09-04 (plan §4-R; SPEC §6c, §5, §7.9, §9b, §11; handoff §24; `tools/accessprobe.mjs`; 33 checks, 16 of 16 mutants caught)
+## Road access, standardized — SHIPPED 2026-09-04 (plan §4-R; SPEC §6c, §5, §7.9, §9b, §11; handoff §24; `tools/accessprobe.mjs`; Part M' is 49 checks, and the suite went 428 → 478; 28 of 28 mutants caught)
 
 The owner: *"as long as a tile is within 1-3 tiles of the road it has road
 access"*, *"the 6x6 squares have roads around the whole perimeter, so nothing
@@ -258,6 +258,28 @@ enough), and the forecourt between platform and door is laid into the stored
 path tile by tile, so it is walked, priced and drawn as the walk it is.
 SC2000's industrial frontage rule (`roadDist <= 1` for tier 3) is deleted.
 An unserved zoo loses its jobs, its halo and its place on the cap together.
+
+**The gates, reproducible.** Measured on `46770c0` against the parent
+`411d903` (which carries Parts F and P but not R). The hashes an earlier
+commit message quoted were taken on a DIFFERENT parent, before the rebase,
+and are not reproducible from anything on `main`; these are.
+
+| command (all with `--years 30 --quiet`) | 411d903 | Part R |
+|---|---|---|
+| `node tools/playtest.mjs --layout balanced` | `771239e1` | `8707f655` |
+| `node tools/playtest.mjs --layout dormitory` | `27376829` | `f86913c3` |
+| `node tools/playtest.mjs --layout millbelt` | `10a8a697` | `a20db622` |
+| `node tools/playtest.mjs --layout estate` | `e48a4e21` | `df5631eb` |
+| `node tools/playtest.mjs --layout balanced --stations --zoo 12` | `8ee1a3dc` | `aaac75f4` |
+| `node tools/playtest.mjs --layout estate --zoo 12` | `7a719fce` | `418c5b2c` |
+
+Every one moves, on purpose, and the balanced gate moves for the same three
+reasons as the rest: commutes redistribute over the doors a lot now has, the
+industrial frontage rule is gone so works stand taller (and smoke more), and
+a merge re-plans the people on it. Not a regression: over four seeds × two
+layouts at year 30, mean population 1692 → 1645 (−2.8%, and the SIGN varies by
+seed: −11% on balanced 11, +3% on millbelt 5), mean approval 61 → 64, mean
+pollution 13.0 → 12.1, mean land value 38.1 → 38.6.
 
 R1 — recomputing the road field AT THE OP — was proved hash-neutral on its
 own, the way the plan asked, and not merely argued: applied alone to
@@ -282,23 +304,46 @@ Two defects the standard turned up on its way in:
   The mayor now takes the first free 2×2 a road REACHES; a rig that cannot
   build a working zoo cannot measure one.
 
+A HOSTILE REVIEW scored the first draft 6/10 and named eleven things; all of
+them are in `46770c0`, and the review's own reproductions are fixtures now.
+The four worst were real behaviour: a forecourt that walked through houses and
+across rivers; a park being told it had no road; the overlay inverting if
+`ROAD_REACH` moved; and the flagship "one implementation" check being one
+spelling deep — a frontage rule written as an N4 scan over `world.road`
+dropped the fixture town 41% and left 464 checks green. The suite now asks the
+question behaviourally (two lots at one and three tiles must cap alike) and
+carries a CANARY on the town's size, which it had never had.
+
 Left:
-- **A landmark is a coin flip, and the suite used to bet on seed 7.** A
-  census of eight scripted 30-year towns (4 seeds × 2 layouts) finds a 3×3
-  landmark in TWO of them — seed 7 at month 78 and seed 3 at 233 before Part
-  R, seed 3 at 310 and seed 11 at 291 after. The rate did not move; which
-  town wins did. The check now forces the merge roll inside a real tick
-  instead. Whether nine tier-3 lots of one kind SHOULD be that rare is a
-  design question for the owner, not a bug.
+- **A landmark is rare, and how rare is not settled.** The suite used to bet
+  on seed 7, which raised one in year 7; that was luck, and the check now
+  forces the merge roll inside a real tick instead. But the follow-up claim
+  ("the rate did not move") does not survive re-measurement: the count runs
+  2–6 of eight scripted 30-year towns depending on the seed set and on
+  `--markets`, and the direction of the change flips with a flag that has
+  nothing to do with access. n = 8 cannot decide it. What IS clear: 2×2
+  blocks rise 29–41% with the industrial frontage rule gone, which is an
+  unremarked consequence of this part. Whether nine tier-3 lots of one kind
+  should be as rare as they are is a design question for the owner.
 - **An overlay is painted on the ground, so a building hides its own tile's
   band.** True of every overlay in the game, and most visible on the access
   one, where the interesting tiles are exactly the built ones. A tint drawn
   over the building (a roof wash, or the zot) would fix it for all six.
 - `ROAD_REACH` stays 3 and is not exposed as a knob. The owner's blocks never
   need more.
-- The forecourt is priced at `WALK` a tile and carries no use-zoning: a
-  station forecourt is nobody's lot. If the line is ever painted across one,
-  that ruling has to be made explicit.
+- **Neither headline mechanism can happen in a town the mayor builds.** She
+  rings every 6×6, so the footprint rule lifts nothing; she lays her line
+  along a ring, so no animal crosses a forecourt. `--rig deep` builds a town
+  she would not, and reports both; the gates still cannot see either, and
+  saying so is better than pretending. If the owner's control city has deep
+  quarters or a set-back line, it becomes the gate for both.
+- **The footprint rule cannot bite at growth time.** `joinable` requires every
+  lot of a window to be served on its own, so a block never forms across the
+  line. It bites when a ROAD IS TAKEN AWAY, and when a zoo's four tiles are
+  placed at once. Both are checked; neither is what the README first implied.
+- **An overlay is painted on the ground, so a zoo hides its own band.** The
+  platform's red can be photographed; the zoo's cannot, because its 2×2
+  sprite covers all four of its diamonds. True of every overlay in the game.
 - Rail bridges are still refused (no rail on water), so a station can be
   cut off by a channel the road crosses. Unchanged by this part.
 

@@ -335,13 +335,38 @@ it is that all sides have access points."*
 
 ```
 siteTiles(i)   = the tiles of the THING at i: a block's footprint (§3b), a zoo's four (§2), or [i]
-siteRoadDist(i)= min roadDist over siteTiles(i)
+siteRoadDist(i)= min roadDist over siteTiles(i)      — except a PLATFORM, below
 served(i)      ⇔ siteRoadDist(i) <= ROAD_REACH (3)
 doorSearch(i)  = a multi-source BFS out of siteTiles(i), through any tile a BARE WALL does not block
                  (§6b), stopping at the first depth that reaches road → { d, doors }
 doorsOf(i)     = every road tile at that depth, ascending — ALL SIDES ARE ACCESS POINTS
-nearestRoad(i, reach = 8) = the same search, further out; the CARD's second question, asked by no rule
+passable(j)    = ground a citizen may stand on: not water, not a bare wall, not a building, not a
+                 civic that is not a park
+asksAccess(i)  = a lot, a zoo, a station or a civic EMPLOYER — never a park, never open ground
+nearestRoad(i, reach = ROAD_REACH + 5) = the same search, further out; the CARD's second question, asked by no rule
 ```
+
+**Two questions, not one.** A lot's access is a DISTANCE: nobody walks the
+gap, the animal appears at its door, and a river or a neighbour's terrace
+between lot and road has never been an obstacle to it. A PLATFORM's access is
+a WALK: every tile of its forecourt goes into the stored path and is drawn
+under a walker. So `siteRoadDist` sends a `rail === 2` tile through the same
+search with `passable`, and `served`, `doorsOf`, the card and the overlay all
+read their answer through that one branch — the field cannot call a station
+served that the graph cannot reach. Without it the rig walked a rabbit
+through a house and across a river and called the platform a station for it.
+
+**Who is asked.** `asksAccess` — read by BOTH the access overlay's refusal
+band and the hover card's warning, so "no road" is only ever SAID where it is
+a refusal. A park never asks (a park is a place, not a service), and neither
+does open ground: on countryside "no road within 3" is not a complaint.
+
+**`ROAD_REACH` is a knob and everything moves with it.** The overlay's tints
+are indexed by distance and CLAMPED to the greens it has, so at
+`ROAD_REACH` 5 a lot five tiles out takes the deepest green rather than the
+refusal red; `nearestRoad` looks `ROAD_REACH + 5` out rather than a literal
+8. A fixed table read at 5 inverted the overlay's meaning, and every check
+passed because they all ran at 3.
 
 `served` is the only test of a road's nearness in `js/sim`; `hasAccess` is
 gone. Part M' greps for a second one (the one allowed reader of the raw

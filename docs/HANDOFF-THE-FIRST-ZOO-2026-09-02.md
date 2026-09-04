@@ -1815,3 +1815,32 @@ cheap to write and lies to everything downstream: `commuteTime`, the traffic
 count, the walker's line of travel and the "every path tile is a road" check
 all assume consecutive entries are neighbours. `nodePath` expands the
 station link so that assumption stays true — and a new check asserts it.
+
+### 24b. What a hostile review found (and what it says about how I check)
+
+The part went out at 465 checks with 18 mutants caught and no survivors, and
+an adversarial reader scored it **6/10** with eleven named defects, every one
+carrying a command and its output. All eleven are fixed in `46770c0`. Four
+were real behaviour; the rest were my prose or my checks. What is worth
+keeping is the SHAPE of each miss.
+
+| what it found | the shape of the miss |
+|---|---|
+| a forecourt walked through a neighbour's house and across a river, and `served` called the platform a station for it | **I generalised a predicate without re-reading what it now MEANS.** `doorSearch` was a reach test; the moment its tiles went into a stored path they became ground an animal stands on, and "through any tile a wall does not block" stopped being the right rule. A test's meaning changes when its OUTPUT changes use |
+| a frontage rule spelled as an N4 scan over `world.road` passed the check named "no module tests a road's nearness for itself", and dropped the fixture town 41% | **A grep polices a spelling, not a claim.** The claim is behavioural — two lots alike but for their distance must cap alike — and that is what the check asks now. Second-order: the suite had no guard on the town's SIZE at all, so a 41% collapse was a report line |
+| a park was told it had no road | **Two copies of "who is asking"**, one in the card and one in the overlay, and I wrote the second one wider than the first. One predicate now |
+| the overlay's meaning inverted at `ROAD_REACH` 5 | **A table counted out to the length of today's constant.** Every check ran at 3, so nothing saw it. Index and clamp |
+| the door a station link LANDS on was unpriced | **I tested the interesting half.** The fixture painted the forecourt and never the door, so the chain's price was pinned and the landing's was not |
+| `splitLot`'s re-plan was never exercised | **My check said `commuters.length === 0 \|\| ...` on a fixture with no citizens.** A guard that can never be false is not a check — the second one I wrote this session |
+| a tile sealed inside a wall had a door | `computeRoadDist` refuses to ENTER a barrier; the door search started INSIDE one and walked out. The agreement sweep ran on a rig with no walls in it |
+| `computeStationDoors` at the op was provably inert | **Insurance is not behaviour.** Deleting it passed. Either delete it or make it load-bearing with a check; I made it load-bearing — and the first draft of THAT check did not discriminate either, because moving a road AWAY leaves the walk stuck on a dead door and falling back to the road, which is what it does with the links rebuilt too. Move the road CLOSER |
+| the commit's own numbers were wrong in four places | I quoted a check count from before a rebase and gate hashes measured on a different parent, with the flags unrecorded. **A verification section is a claim like any other** |
+| "the rate did not move" (the landmark repair's justification) | I measured 4 seeds × 2 layouts and generalised. The reviewer's eight was a different eight, found a town mine never sampled, and the direction flips on `--markets`. **n = 8 decides nothing**; the honest sentence is that it is rare and unsettled |
+| neither headline mechanism happens in any town the mayor builds | **All the evidence was unit fixtures**, and no gate could see the feature. `--rig deep` builds a town she would not and reports both |
+
+The one that will outlive this part: **a rule whose only reachable case is a
+DEMOLITION**. The footprint rule cannot bite while a city grows, because
+`joinable` requires every lot of a window to be served on its own — a block
+never forms across the line. It bites when a road is taken away, and when a
+zoo's four tiles arrive at once. I had written it up as a growth rule in three
+places before anyone asked when it could actually happen.
