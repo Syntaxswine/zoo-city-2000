@@ -287,6 +287,14 @@ function centreWithBed(world, from) {
   return best;
 }
 
+/** The wrongful arrest still standing for this file, if there is one: same culprit, same scene, same cause, not yet put right. */
+function standingWrongful(world, f) {
+  for (const a of world.events.arrests) {
+    if (a.wrongful && !a.exonerated && a.culpritId === f.culpritId && a.tile === f.tile && a.cause === f.cause) return a;
+  }
+  return null;
+}
+
 function exonerate(world, culprit, notices) {
   const ev = world.events;
   for (const a of ev.arrests) {
@@ -313,7 +321,16 @@ function exonerate(world, culprit, notices) {
 export function arrest(world, f, c, wrongful, notices, opts = {}) {
   const ev = world.events;
   const tick = world.tick;
-  f.closed = true;
+  // A RIGHT arrest closes the file. A WRONG one does not, and until now it
+  // did: the town took an animal in, shut the case, and no detective ever
+  // looked at that street again — so exonerate(), which needs the real
+  // culprit arrested for the SAME file, could not fire at all (measured:
+  // 0.0 exonerations per 30y at four stations). BACKLOG:369-371 asked for
+  // this. The consequence is deliberate and is the joke: an open file keeps
+  // being worked, so a town that arrests the wrong animal can arrest a
+  // SECOND wrong animal for the same burglary, and the sentence the first
+  // one is serving does not pause while it does.
+  if (!wrongful) f.closed = true;
   const culprit = world.byId.get(f.culpritId);
   c.record = (c.record || 0) + 1;
   remember(world, c, KIND.ARRESTED, f.cause);
@@ -387,9 +404,18 @@ export function filesTick(world, cen, notices) {
       // and concluded, correctly, that nothing was being done. The line does
       // not start with a flashing prefix, so it lands in the reader and not
       // over the map.
-      const line = f.cause === "killing"
-        ? `COLD — the file on the ${f.cause} at ${at(world, f.tile)} closed without an arrest. ${nameOf(culprit)} is still at ${at(world, culprit.home)}.`
-        : `The file on the ${f.cause} at ${at(world, f.tile)} closed after ${KNOBS.CASE_MONTHS} months. ${nameOf(culprit)} was never charged.`;
+      // "closed without an arrest" was true only while a wrongful arrest closed
+      // the file. Now that one does not, a file can go cold with somebody
+      // already serving its sentence, and the line has to say so. Derived from
+      // the arrest record rather than flagged on the file, so it cannot go stale.
+      const wrong = standingWrongful(world, f);
+      const line = wrong
+        ? (f.cause === "killing"
+          ? `COLD — the file on the ${f.cause} at ${at(world, f.tile)} closed after ${KNOBS.CASE_MONTHS} months. ${wrong.name} is serving the sentence for it. ${nameOf(culprit)} is still at ${at(world, culprit.home)}.`
+          : `The file on the ${f.cause} at ${at(world, f.tile)} closed after ${KNOBS.CASE_MONTHS} months. ${wrong.name} is serving the sentence for it and ${nameOf(culprit)} was never charged.`)
+        : (f.cause === "killing"
+          ? `COLD — the file on the ${f.cause} at ${at(world, f.tile)} closed without an arrest. ${nameOf(culprit)} is still at ${at(world, culprit.home)}.`
+          : `The file on the ${f.cause} at ${at(world, f.tile)} closed after ${KNOBS.CASE_MONTHS} months. ${nameOf(culprit)} was never charged.`);
       ev.log.push({ t: tick, id: "cold", line, links: [culprit.id] });
       notices.push(line);
       continue;

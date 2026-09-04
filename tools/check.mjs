@@ -470,6 +470,86 @@ check("determinism: same seed + same inputs ⇒ same hash", stateHash(A.world) =
   check("and clearing it restores the hash exactly", stateHash(clean) === h0, "the shape is not reversible");
 }
 
+// ---- THE FILE STAYS OPEN: a wrongful arrest does not close the case (docs/PROPOSAL-CAMERAS.md §4d; BACKLOG:369-371) ----
+// Until this landed, taking in the wrong animal SHUT the file, so no detective
+// ever looked at that street again and exonerate() — which needs the real
+// culprit arrested for the SAME file — could not fire. Measured on the rig in
+// tools/camprobe.mjs, 4 seeds x 30y at four stations: exonerations 0.0 -> 1.3,
+// wrongful arrests 1.0 -> 2.3 (an open file can catch a SECOND wrong animal),
+// solved 54.6% -> 60.7%, and 1.0 file a run now goes cold with somebody
+// already serving its sentence.
+{
+  const JU = await import("../js/sim/justice.js");
+  const O = load(A.saved);
+  const pool = O.citizens.filter((c) => !c.dead && c.home >= 0 && !c.fixed && (!c.held || c.held <= O.tick));
+  check("THE FILE rig: two free animals to play the culprit and the wronged", pool.length >= 2, `${pool.length}`);
+  if (pool.length >= 2) {
+    const [culprit, wronged] = pool;
+    const mk = (cause = "burglary") => JU.openFile(O, { tile: wronged.home, culpritId: culprit.id, cause });
+
+    const fw = mk();
+    JU.arrest(O, fw, wronged, true, []);
+    check("a WRONGFUL arrest leaves the file open", fw.closed === false, "the wrong animal closed the case");
+
+    const fr = mk();
+    JU.arrest(O, fr, culprit, false, []);
+    check("a RIGHT arrest closes the file", fr.closed === true, "the case stayed open");
+
+    // The payoff the open file buys: the real culprit taken in for the same
+    // file exonerates the animal serving for it. This is the line BACKLOG
+    // asked for, and it was unreachable before.
+    const ex0 = O.events.justice.exonerated;
+    const fx = mk();
+    JU.arrest(O, fx, wronged, true, []);
+    const wrongedArrest = O.events.arrests[O.events.arrests.length - 1];
+    JU.arrest(O, fx, culprit, false, []);
+    check("arresting the real culprit for an open file exonerates the animal serving for it", O.events.justice.exonerated > ex0, `${ex0} -> ${O.events.justice.exonerated}`);
+    check("and the arrest record is marked put right", wrongedArrest.exonerated === true, "the record still reads unexonerated");
+
+    // A file CAN still go cold with somebody serving, and when it does the
+    // line has to say so: "closed without an arrest" was true only while a
+    // wrongful arrest closed the case.
+    const P = load(A.saved);
+    const pc = P.citizens.filter((c) => !c.dead && c.home >= 0 && !c.fixed && (!c.held || c.held <= P.tick));
+    if (pc.length >= 2) {
+      for (const cause of ["burglary", "killing"]) {
+        const fc = JU.openFile(P, { tile: pc[1].home, culpritId: pc[0].id, cause });
+        JU.arrest(P, fc, pc[1], true, []);
+        const serving = P.events.arrests[P.events.arrests.length - 1].name;
+        fc.opened = P.tick - KNOBS.CASE_MONTHS; // age it past the investigation, not past FILE_MONTHS
+        const said = [];
+        JU.filesTick(P, census(P), said);
+        const cold = said.find((l) => new RegExp(`file on the ${cause}`).test(l));
+        check(`a ${cause} file going cold with somebody serving says so`, !!cold && /is serving the sentence/.test(cold), cold || "no cold line");
+        check(`and it names the animal serving for the ${cause}`, !!cold && cold.includes(serving), cold || "no cold line");
+        check(`and the ${cause} line does not also claim nobody was arrested`, !!cold && !/closed without an arrest/.test(cold), cold || "no cold line");
+      }
+      // The other half of the same law: with NO wrongful arrest standing, the
+      // old line is still the one that prints. A DIFFERENT culprit and scene,
+      // because standingWrongful matches on culprit + scene + cause and the
+      // two files above have already put a wrongful arrest on record for
+      // pc[0] — and pc[1] no longer has a home to name, the arrest took it.
+      const quietCulprit = P.citizens.find((c) => !c.dead && c.home >= 0 && c.id !== pc[0].id && c.id !== pc[1].id);
+      check("THE FILE rig: a third animal with a home for the quiet case", !!quietCulprit, "none free");
+      const fq = JU.openFile(P, { tile: quietCulprit ? quietCulprit.home : 0, culpritId: quietCulprit ? quietCulprit.id : pc[0].id, cause: "killing" });
+      fq.opened = P.tick - KNOBS.CASE_MONTHS;
+      const quiet = [];
+      JU.filesTick(P, census(P), quiet);
+      const q = quiet.find((l) => /^COLD/.test(l));
+      check("a killing that nobody was arrested for still closes without an arrest", !!q && /closed without an arrest/.test(q) && !/is serving the sentence/.test(q), q || "no COLD line");
+    }
+  }
+  // Trespass always passes wrongful = false, so the minor path is untouched:
+  // its file closes on the spot as it always did.
+  const T = load(A.saved);
+  const tc = T.citizens.find((c) => !c.dead && c.home >= 0);
+  if (tc) {
+    const ft = JU.openFile(T, { tile: tc.home, culpritId: tc.id, cause: "trespass", crime: KNOBS.TRESPASS_CRIME, radius: 1 });
+    JU.arrest(T, ft, tc, false, [], { minor: true });
+    check("a trespass file still closes on the spot", ft.closed === true, "the minor path changed");
+  }
+}
+
 // ---- walls (docs/PROPOSAL-ZONING-RAIL-WALLS.md §1; SPEC §6b) ----------------------
 // The flood must reproduce the square before it is allowed to differ from it.
 {
