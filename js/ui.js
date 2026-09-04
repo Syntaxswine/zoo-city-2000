@@ -436,11 +436,15 @@ export function createUI(app) {
         lines.push(el("div", "warn", `road access: none — the nearest road is ${rep.nearest.d} tiles away at ${xy(rep.nearest.doors[0])}, ${rep.nearest.d - KNOBS.ROAD_REACH} too far`));
       } else if (rep.roadDist <= KNOBS.ROAD_REACH) {
         // NO DOOR, AND YET A ROAD IS RIGHT THERE, close enough that the raw
-        // field on the env line below prints it. A PLATFORM gets here because
-        // its access is a WALK and a river hides a road two tiles off; a LOT
-        // gets here behind a bare wall. Either way the card used to fall
-        // through to the horizon line and print "no road within 8 tiles in any
-        // direction" a line above "road 2", in the same card.
+        // field on the env line below prints it. ONLY A PLATFORM can be here:
+        // `computeRoadDist` and the bare-wall door search are the same BFS over
+        // the same passability, run in opposite directions, so for any other
+        // site `!served` implies `roadDist > ROAD_REACH` and this branch is
+        // unreachable. (I once "corrected" that to say a walled lot reaches it
+        // too; a sixth review brute-forced 354,843 asking sites across 4,000
+        // random maps - 2,989 platforms here, and nothing else, ever.) The card
+        // used to fall through to the horizon line and print "no road within 8
+        // tiles in any direction" a line above "road 2", in the same card.
         lines.push(el("div", "warn", `road access: none — a road is ${rep.roadDist} tile${rep.roadDist === 1 ? "" : "s"} away, but nothing can walk to it: the ground between is water, a wall or a building`));
       } else {
         // AND THE HORIZON LINE IS ABOUT WALKING TOO. `nearestRoad` carries the
@@ -515,7 +519,7 @@ export function createUI(app) {
     switch (s.reason) {
       case REASON.GROWING: case REASON.STABLE: case REASON.MERGING: return "—";
       case REASON.PART: return `part of the block at (${rep.tx},${rep.ty})`;
-      case REASON.NO_ROAD: return "no road within 3 tiles";
+      case REASON.NO_ROAD: return `no road within ${KNOBS.ROAD_REACH} tiles`; // the knob, not a 3: SPEC 6c says everything moves with it
       case REASON.SMOG: return `smog ${rep.pol} > ${KNOBS.SMOG_REFUSE}`;
       case REASON.NO_DEMAND: case REASON.EMPTY: {
         const v = s.parts.valve;

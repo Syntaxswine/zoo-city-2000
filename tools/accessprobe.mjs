@@ -288,7 +288,9 @@ for (const c of world.citizens) {
 }
 console.log("");
 console.log(`forecourts - ${riders} riders · ${crossers} commutes cross one · ${forecourtTiles} forecourt tiles walked in total`);
-if (!crossers) console.log("  none. Every platform in this town is already a door, so nothing has a forecourt to cross — try --rig deep.");
+if (!crossers) console.log(world.citizens.length
+  ? "  none. Every platform in this town is already a door, so nothing has a forecourt to cross — try --rig deep."
+  : "  none: this town has no citizens. --rig many is a COST rig and not a town; the forecourts above are real, but nobody lives here to walk them.");
 
 // ---- the town in one line -----------------------------------------------------
 console.log("");

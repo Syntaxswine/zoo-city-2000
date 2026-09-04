@@ -1643,7 +1643,7 @@ idx(world, tx, ty) → i ;  inBounds(world, tx, ty)
 // js/sim/tick.js
 tick(world) → { notices: [string], events: [eventRecord] }   // one month
 // js/sim/ops.js
-apply(world, op) → { ok, cost, reason, replaced, evicts, undoable }   // op.kind ∈ zone (with density)|road|bulldoze|tree|park|zoo|fire|police|rate|toggle|choice ; logs to world.log; deducts cash
+apply(world, op) → { ok, cost, reason, replaced, evicts, undoable }   // op.kind ∈ zone (with density)|road|rail|station|wall|bulldoze|tree|park|zoo|fire|police|centre|use|rate|toggle|choice|cheat ; logs to world.log; deducts cash
 undo(world) → { ok }
 costOf(world, op) → { cost, tiles }        // for the live strip
 // js/sim/fields.js — access, one standard (§6c)

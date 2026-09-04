@@ -8,7 +8,7 @@
 
 import { createWorld, capacityOf, jobsOf, CIVIC, ROAD, TERRAIN, ZONE } from "../js/sim/world.js";
 import { createHousehold, placeHousehold } from "../js/sim/citizens.js";
-import { commuteTime, doorOf, roadPath } from "../js/sim/fields.js";
+import { commuteTime, doorsOf, commutePath, passable, TILE, RIDE } from "../js/sim/fields.js";
 import { SPECIES_BY_ID } from "../js/sim/species.js";
 import { refreshLast } from "../js/sim/tick.js";
 import { needOf } from "../js/sim/needs.js";
@@ -152,9 +152,17 @@ function populate(world, code, built) {
       const key = `${home}:${job}`;
       let path = pathCache.get(key);
       if (path === undefined) {
-        const from = doorOf(world, home);
-        const to = doorOf(world, job);
-        path = from == null || to == null ? null : roadPath(world, from, to, SPECIES_BY_ID.rabbit.commute);
+        // THE REAL RULE, not a road walk between two lowest-numbered doors:
+        // every door of each end, the cheapest pairing, weighted by species
+        // (SPEC 6c). The old version built its own commutes with `roadPath`
+        // and then "checked" that they started at `doorOf` and were all road -
+        // both true by construction, and both the rule as it was BEFORE this
+        // part. A sixth hostile review found the fixture verifying its own
+        // constructor, with 1258 of 1258 workers passing on every rig.
+        const from = doorsOf(world, home);
+        const to = doorsOf(world, job);
+        const r = from.length && to.length ? commutePath(world, "rabbit", from, to, SPECIES_BY_ID.rabbit.commute) : null;
+        path = r ? r.path : null;
         pathCache.set(key, path);
       }
       if (path) options.push({ home, path });
@@ -218,11 +226,21 @@ export function coherentStressFacts(fixture) {
   }
   for (const citizen of world.citizens) {
     if (citizen.job < 0) continue;
-    const from = doorOf(world, citizen.home);
-    const to = doorOf(world, citizen.job);
-    if (!citizen.path || citizen.path[0] !== from || citizen.path[citizen.path.length - 1] !== to
-      || commuteTime(citizen.path) > SPECIES_BY_ID[citizen.species].commute) { badPath++; continue; }
-    for (const step of citizen.path) if (world.road[step] === ROAD.NONE) { badPath++; break; }
+    // The law as it stands (SPEC 6c): a commute leaves by ONE OF the doors of
+    // its home and arrives at ONE OF the doors of its job - not the
+    // lowest-numbered of each - and every tile it WALKS is ground a citizen
+    // may stand on, which includes a station's forecourt and does not have to
+    // be a road.
+    const from = doorsOf(world, citizen.home);
+    const to = doorsOf(world, citizen.job);
+    const p = citizen.path;
+    if (!p || !p.length || !from.includes(p[0] & TILE) || !to.includes(p[p.length - 1] & TILE)
+      || commuteTime(p) > SPECIES_BY_ID[citizen.species].commute) { badPath++; continue; }
+    for (const step of p) {
+      const t = step & TILE;
+      if (step & RIDE) continue;
+      if (world.road[t] === ROAD.NONE && world.rail[t] !== 2 && !passable(world, t)) { badPath++; break; }
+    }
   }
   return {
     population: world.last.census.P,

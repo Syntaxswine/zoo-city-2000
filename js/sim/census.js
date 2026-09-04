@@ -152,6 +152,9 @@ export function census(world) {
   let parks = 0;
   let zoos = 0;
   let zoosNoRoad = 0;
+  let fireStationsNoRoad = 0;
+  let policeStationsNoRoad = 0;
+  let centresNoRoad = 0;
   let lotsNoRoad = 0;
   let lvSum = 0;
   let polSum = 0;
@@ -198,11 +201,26 @@ export function census(world) {
     if (world.big[i] === 2) blocks2++;
     else if (world.big[i] === 3) { blocks3++; const lm = landmarkOf(world.theme[i]); if (lm) { landmarks++; landmarkCounts[lm.name] = (landmarkCounts[lm.name] || 0) + 1; } }
     if (world.dread[i] > maxDread) maxDread = world.dread[i];
+    // THE WHOLE LOOP ASKS, not just the zoo. A civic nobody can walk to
+    // employs nobody, covers nothing and takes nobody in - and these counts
+    // are what the rest of the game reads for its EFFECT: `justice` sizes the
+    // arrest force from `policeStations`, the advisor withholds its "no fire
+    // station" and "no centre" lines from `fireStations` and `centres`, and
+    // the "the centre is full" warning sizes its beds from `centres`. Gating
+    // the zoo and stopping there left a police station eight tiles from the
+    // only road solving 35 of the 38 crimes a working one solves, and a fire
+    // station nobody could reach giving exactly the protection of having none
+    // while silencing the warning that says so (SPEC 6c, 9b).
+    //
+    // UPKEEP IS NOT GATED and lives in budget.js: you pay for the building you
+    // built, reachable or not. Nor is `markets` - a meat hall nobody can walk
+    // to still smells, and its dread is proximity, not access; the licence it
+    // could earn asks `served` for itself (events.js).
     if (world.civic[i] === CIVIC.PARK) parks++;
     else if (world.civic[i] === CIVIC.ZOO) { if (served(world, i)) zoos++; else zoosNoRoad++; } // a zoo no road reaches is a fenced field: no halo, no cap, no jobs (SPEC 6c)
-    else if (world.civic[i] === CIVIC.FIRE) fireStations++;
-    else if (world.civic[i] === CIVIC.POLICE) policeStations++;
-    else if (world.civic[i] === CIVIC.CENTRE) centres++;
+    else if (world.civic[i] === CIVIC.FIRE) { if (served(world, i)) fireStations++; else fireStationsNoRoad++; }
+    else if (world.civic[i] === CIVIC.POLICE) { if (served(world, i)) policeStations++; else policeStationsNoRoad++; }
+    else if (world.civic[i] === CIVIC.CENTRE) { if (served(world, i)) centres++; else centresNoRoad++; }
     if (world.burning[i]) burning++;
     if (world.tier[i] > 0) { crimeSum += world.crime[i]; crimeN++; if (world.crime[i] > maxCrime) maxCrime = world.crime[i]; }
     if (world.zone[i] !== ZONE.NONE) {
@@ -245,7 +263,7 @@ export function census(world) {
     meatSlaughtered: (world.meatStats?.yearly?.slaughtered || 0) * KNOBS.PEN_YIELD,
     approval: P ? moodSum / P : 50,
     native: P ? native / P : 0,
-    parks, zoos, zoosNoRoad, lots, roads, walls, tunnels, usePred, usePrey, railTiles, stations, riders, commuteN, meanCommute: commuteN ? commuteSum / commuteN : 0, lotsNoRoad,
+    parks, zoos, zoosNoRoad, fireStationsNoRoad, policeStationsNoRoad, centresNoRoad, lots, roads, walls, tunnels, usePred, usePrey, railTiles, stations, riders, commuteN, meanCommute: commuteN ? commuteSum / commuteN : 0, lotsNoRoad,
     fireStations, policeStations, burning,
     blocks2, blocks3, // the 2×2 and 3×3 blocks standing (anchors; SPEC §3b)
     landmarks, landmarkCounts, // the 3×3s that rose as a species' landmark, and which by name (SPEC §3c)

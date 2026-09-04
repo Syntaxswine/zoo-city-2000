@@ -80,6 +80,21 @@ export function tick(world) {
   // `invalidatePaths` and never called it since long before this part, which
   // is what that import was reaching for and never got right.
   settleDoors(world);
+  // AND RE-PLAN NOW, UNCONDITIONALLY, because what follows READS `c.path`.
+  // `justiceTick` prices a trespass through `fields.exposure`, and `meatTick`
+  // routes carts, and both are inside this tick. A stale commute here changes
+  // who is exposed, which changes how many `rng.chance` draws justice takes,
+  // and the two cities never meet again: measured at 129 employed animals
+  // holding no commute when justice asked, 28 trespass arrests against 34, and
+  // `09222178` against `0c2a6629` eight months on. It is unconditional and not
+  // folded into the settle above because a FIRE does not have to move a door
+  // to strand a commute - `evictFromLot` rehomes the family and
+  // `placeHousehold` marks every one of them stale.
+  replanStale(world);
+  // The count is a readout (`world.last` is rebuilt every tick and never
+  // saved) and it is what makes this law checkable: justice and the carts must
+  // never read a commute that is not there.
+  const staleAtJustice = world.citizens.reduce((n, c) => n + (!c.dead && c.home >= 0 && c.job >= 0 && !c.path ? 1 : 0), 0);
   // 7b. crime and punishment: releases, the killing, burglary, the files.
   // Lots and events can change a hall or a road in this same month.
   resetMeatRoutes(world);
@@ -98,7 +113,7 @@ export function tick(world) {
   // leave a departed citizen named as the current oldest resident.
   cen.notables = notables(world);
   // 8. history, report, advisor, milestones
-  world.last = { census: cen, demand: dem, budget: bud.fig, grew: lots.grew, decayed: lots.decayed, arrived: cit.arrived, left: cit.left, births: cit.births, deaths: cit.deaths, funerals: cit.funerals, littersLost: cit.littersLost, rehomed: cit.rehomed, zonedOut: cit.zonedOut };
+  world.last = { staleAtJustice, census: cen, demand: dem, budget: bud.fig, grew: lots.grew, decayed: lots.decayed, arrived: cit.arrived, left: cit.left, births: cit.births, deaths: cit.deaths, funerals: cit.funerals, littersLost: cit.littersLost, rehomed: cit.rehomed, zonedOut: cit.zonedOut };
   world.notices = notices;
   const month = world.tick % 12;
   if (month === 0) {
@@ -168,12 +183,10 @@ function settleDoors(world) {
   if (!world.doorsMoved) return false;
   world.doorsMoved = false;
   invalidatePaths(world);
-  // NO RE-PLAN HERE. It used to be, and that was the wrong place twice over:
-  // this function only runs when the DOOR GRAPH moved, and the law is about
-  // the boundary, not about doors. The unconditional `replanStale` at the end
-  // of `tick` covers every writer of `c.stale`, and `citizensTick`'s own stale
-  // pass covers anything invalidated before it - so a re-plan here repaired
-  // nothing that was not already repaired, and a mutant deleting it lived.
+  // NO RE-PLAN HERE: this function does ONE thing, and who repairs the damage
+  // depends on where the caller stands in the tick. After `lotsTick` the
+  // citizens' own stale pass is coming; after `eventsTick` it is not, and that
+  // caller re-plans for itself, because everything below it reads `c.path`.
   return true;
 }
 
@@ -233,14 +246,14 @@ function advisor(world, cen, dem, fig) {
   if (notable.oldest) report += ` Oldest resident: ${notable.oldest.name}, age ${notable.oldest.age}, at ${lotAt(world, notable.oldest.home)}.`;
   if (notable.largest) report += ` Largest household: the ${notable.largest.surname} family, ${notable.largest.size} animals at ${lotAt(world, notable.largest.home)}, including ${notable.largest.name}.`;
   out.push(report);
-  if (cen.P === 0 && lots === 0) out.push("ADVISOR: zone R, C and I within 3 tiles of a road. Animals arrive when there are jobs.");
+  if (cen.P === 0 && lots === 0) out.push(`ADVISOR: zone R, C and I within ${KNOBS.ROAD_REACH} tiles of a road. Animals arrive when there are jobs.`);
   if (world.valves.R > 0.3 && cen.vacantR < 10) out.push("ADVISOR: the animals want more housing.");
   if (world.valves.C > 0.3 && lotsC < lotsR / 4) out.push("ADVISOR: the town wants shops.");
   if (world.valves.I > 0.3 && lotsI < lotsR / 4) out.push("ADVISOR: the town wants industry.");
-  if (cen.lotsNoRoad > 0) out.push(`ADVISOR: ${cen.lotsNoRoad} zoned lots have no road within 3 tiles.`);
+  if (cen.lotsNoRoad > 0) out.push(`ADVISOR: ${cen.lotsNoRoad} zoned lots have no road within ${KNOBS.ROAD_REACH} tiles.`);
   const maxRate = Math.max(world.rates.R, world.rates.C, world.rates.I);
   if (maxRate > dem.n + 3) out.push(`ADVISOR: taxes are well above the neutral ${dem.n.toFixed(1)}%. The animals are talking about leaving.`);
-  if (cen.P >= 800 && cen.zoos === 0) out.push(cen.zoosNoRoad ? "ADVISOR: the Zoo has no road within 3 tiles of it. Nobody can reach it, so nobody works there and no street is worth more for it." : "ADVISOR: the citizens want a Zoo.");
+  if (cen.P >= 800 && cen.zoos === 0) out.push(cen.zoosNoRoad ? `ADVISOR: the Zoo has no road within ${KNOBS.ROAD_REACH} tiles of it. Nobody can reach it, so nobody works there and no street is worth more for it.` : "ADVISOR: the citizens want a Zoo.");
   if (cen.P >= 300 && cen.fireStations === 0) out.push(`ADVISOR: no fire station — a fire burns two months, spreads at ${KNOBS.FIRE_SPREAD}, and always takes the building. A station covers six tiles (§500) and its engine saves ${Math.round(KNOBS.FIRE_SAVED * 10)} fires in ten on its own beat.`);
   // No station at all is not "less policing", it is NO investigation: filesTick
   // does not roll where there is no force, so every file goes cold. The old

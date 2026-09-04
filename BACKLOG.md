@@ -239,7 +239,7 @@ another's. Git merges those. `citizens.js`, `justice.js` and `events.js`
 are the risk: B adds one-liners at call sites; A adds one function; H
 edits two `post` sites; F edits one advisor function; D never opens them.
 
-## Road access, standardized — SHIPPED 2026-09-04 (plan §4-R; SPEC §6c, §5, §7.9, §9b, §11; handoff §24–§24g; `tools/accessprobe.mjs`; the suite went 428 → 523 across FIVE hostile reviews, 6 → 6.5 → 6.5 → 7 → 7)
+## Road access, standardized — SHIPPED 2026-09-04 (plan §4-R; SPEC §6c, §5, §7.9, §9b, §11; handoff §24–§24h; `tools/accessprobe.mjs`; the suite went 428 → 526 across SIX hostile reviews, 6 → 6.5 → 6.5 → 7 → 7 → 7)
 
 The owner: *"as long as a tile is within 1-3 tiles of the road it has road
 access"*, *"the 6x6 squares have roads around the whole perimeter, so nothing
@@ -450,6 +450,80 @@ doors itself. So the check was watching the wrong half of its own fix: deleting
 the op-time settle left it green with 317 animals walking through a police
 station. The measurement is taken before the tick now. **A line added for one
 reason can take the teeth out of a check written for another.**
+
+## The SIXTH hostile review — the loop was the class and one member got fixed (2026-09-04)
+
+A sixth adversarial reader scored `e346c10` **7/10**. 85 mutants of their own:
+68 died by a named check, 14 survived, four of those provably not equivalent.
+
+1. **A POLICE STATION NOBODY CAN REACH SOLVES 35 OF THE 38 CRIMES A WORKING
+   ONE DOES.** `justice` sizes the arrest force from `cen.policeStations`, and
+   that counter sits three lines below the `served`-gated `jobs` counter round
+   four fixed *for exactly this reason*. Measured on three identical 40-year
+   towns differing only in where the one station stands: no station — 176 cold
+   files, 0 arrests; station OUT OF REACH — 135 cold, **35 arrests**, 0 staff,
+   0 tiles covered; station served — 88 cold, 38 arrests. **The census loop was
+   the class and only the zoo got fixed.** `fireStations`, `policeStations` and
+   `centres` are gated now, with `…NoRoad` siblings beside `zoosNoRoad`.
+2. **The same counters silenced the advisor.** A fire station eight tiles from
+   the only road gives exactly the protection of having none *and* switches off
+   the line that says so; an unreachable centre suppresses "build a
+   pacification centre" and sizes the "the centre is full" warning from phantom
+   beds. Upkeep is NOT gated and stays in `budget.js` — you pay for the
+   building you built — and `markets` is not gated either, because a hall
+   nobody can reach still smells and the licence it could earn asks `served`
+   for itself.
+3. **A hole I opened myself, one commit earlier.** I had deleted
+   `settleDoors`'s `replanStale` as redundant. It is not: `justiceTick` prices
+   a trespass from `c.path` and `meatTick` routes carts on it, and both run
+   INSIDE the tick, after the 7c settle and before the boundary re-plan. 129
+   employed animals holding no commute when justice asked, 28 trespass arrests
+   against 34, `09222178` against `0c2a6629` eight months on. The re-plan is
+   back — unconditional, after `eventsTick`, because a fire does not have to
+   move a door to strand a commute — and `world.last.staleAtJustice` is a
+   readout so the law is checkable: **justice and the carts never read a
+   commute that is not there.**
+4. **The round-five "correction" was the false sentence this time.** I wrote
+   that a walled lot could reach the card's middle refusal; SPEC said only a
+   platform can. SPEC was right. `computeRoadDist` and the bare-wall door
+   search are the same BFS over the same passability run in opposite
+   directions, so for any non-platform site `!served` implies
+   `roadDist > ROAD_REACH`. The reviewer brute-forced it: 354,843 asking sites
+   across 4,000 random maps, **2,989 platforms in that state and nothing else,
+   ever.** Corrected in `js/ui.js`; SPEC untouched, because SPEC was right.
+5. **A gating check that verified its own fixture's constructor.**
+   `need-stress.mjs` built every commute with `roadPath` between the two
+   lowest-numbered doors, then "checked" that each commute started at
+   `doorOf(home)` and was all road — both true by construction, and both the
+   PRE-Part-R rule. 1258 of 1258 workers passed on every rig, every time. It
+   uses `commutePath` over `doorsOf` now and checks the law as it stands: any
+   door of each end, and every walked tile ground a citizen may stand on.
+6. **Two more survivors, both closed**: `routeToHall` builds its own door set
+   (it is the route a body takes to the hall) and the all-sides law had never
+   been asked of it — a mutant taking only the first door left the east lot
+   with no route at all; and `fields.doorOf`'s "lowest-numbered" contract was
+   asserted nowhere once `need-stress` stopped using it.
+7. **The ground-writer tripwire was narrower than the predicate it guards.**
+   `passable` reads SIX fields, not three: `terrain`, `tier` and `civic`
+   directly, plus `wall`, `road` and `rail` through `reach.isBarrier`. The
+   regex now covers all six.
+8. Smalls: five sentences hardcoded `3` where SPEC says the knob moves
+   everything (the card's refusal, three advisor lines, the Rules tab's G1);
+   `--rig many` explained its zero forecourt crossings with "every platform is
+   already a door" when the real reason is that the rig has no citizens; and
+   §16's `apply` contract listed eleven op kinds when there are seventeen —
+   missing `rail`, `station` and `wall`, the three the platform arm is built
+   on.
+
+**Known and NOT fixed** (with the reason): the deep rig's forecourts run down
+an unzoned strip, so nothing can ever be built or burnt there and the settle
+machinery fires **zero times in 360 months** of it — the reviewer instrumented
+that and is right. Zoning the strip closes every platform in the rig and riders
+drop to 0, which stops it measuring the thing it was built to measure, so the
+rig stays as it is and the settle's town-scale coverage lives in the suite
+instead: the reroute-town fixture (346 animals, a civic dropped on a forecourt)
+and the forecourt-grow fixture. The PROBE and the published GATES have no
+coverage of it, and that is now written down rather than assumed.
 
 ## The FIFTH hostile review — the fix was still the size of the example (2026-09-04)
 

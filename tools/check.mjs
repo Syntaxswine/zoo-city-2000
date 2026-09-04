@@ -117,6 +117,7 @@ check("tick cost is not catastrophic (the printed number is the instrument; this
   const B = load(A.saved);
   let worst = null;
   let staleLeft = 0;
+  let worstAtJustice = 0;
   let boundaries = 0;
   for (let t = 0; t < 15 * 12; t++) {
     tick(B);
@@ -128,6 +129,11 @@ check("tick cost is not catastrophic (the printed number is the instrument; this
       if (c.stale) staleLeft++;
     }
     if (pathless && (!worst || pathless > worst.n)) worst = { n: pathless, month: t };
+    // AND THE WINDOW INSIDE THE TICK, not only its end: `justiceTick` prices a
+    // trespass from `c.path` and `meatTick` routes carts on it, both after the
+    // settle that follows the fire. A commute missing THERE changes who is
+    // exposed and how many rolls justice takes, and the city never comes back.
+    worstAtJustice = Math.max(worstAtJustice, B.last.staleAtJustice || 0);
   }
   // AND THE CASE FORCED, because the passive walk is a canary and a canary
   // waits for weather. The reachable trigger is a FIRE ON A FULL HOME: the
@@ -151,8 +157,9 @@ check("tick cost is not catastrophic (the printed number is the instrument; this
   for (let k = 0; k < 12 && razedAt < 0; k++) { tick(BF); if (BF.tier[fattest] === 0) razedAt = k + 1; }
   const burntPathless = BF.citizens.filter((c) => !c.dead && c.home >= 0 && c.job >= 0 && !c.path).length;
   const burntStale = BF.citizens.filter((c) => !c.dead && c.stale).length;
-  check("NOTHING MAY END A TICK STALE — 180 tick boundaries of a real town with the weather on, AND the case forced: burn down the fullest house in the city and the month still ends with every employed animal carrying a commute and nobody left flagged. A fire evicts and rehomes at step 7, two steps after the pass that repairs a stale commute",
-    !worst && staleLeft === 0 && fattestN >= 5 && razedAt > 0 && burntPathless === 0 && burntStale === 0,
+  check("NOTHING MAY END A TICK STALE — 180 tick boundaries of a real town with the weather on, AND the case forced: burn down the fullest house in the city and the month still ends with every employed animal carrying a commute and nobody left flagged — and nobody is missing one at the moment JUSTICE and the CARTS read them either, which is inside the same tick",
+    !worst && staleLeft === 0 && worstAtJustice === 0 && (BF.last.staleAtJustice || 0) === 0
+      && fattestN >= 5 && razedAt > 0 && burntPathless === 0 && burntStale === 0,
     `${boundaries} boundaries · ${worst ? `WORST month ${worst.month}: ${worst.n} employed animals with no commute` : "0 pathless at every boundary"} · ${staleLeft} left flagged · the fire: ${fattestN} employed animals burnt out, razed after ${razedAt} month${razedAt === 1 ? "" : "s"}, ${burntPathless} left with no commute and ${burntStale} still flagged`);
 }
 
@@ -2814,6 +2821,13 @@ check("determinism: same seed + same inputs ⇒ same hash", stateHash(A.world) =
       return {
         E, e, cen,
         zooServed: sv(E, e(12, 17)), jobs: cen.J, zoos: cen.zoos, zoosNoRoad: cen.zoosNoRoad,
+        // THE COUNTS THE REST OF THE GAME READS FOR EFFECT, not for upkeep:
+        // `justice` sizes the arrest force from `policeStations`, and the
+        // advisor withholds "no fire station" and "no centre" from the other
+        // two. Gating the zoo and stopping there left an unreachable police
+        // station solving 35 of the 38 crimes a working one solves.
+        police1: cen.policeStations, fire1: cen.fireStations, centre1: cen.centres,
+        policeNo: cen.policeStationsNoRoad, fireNo: cen.fireStationsNoRoad, centreNo: cen.centresNoRoad,
         police: covered(E.policeCov), fire: covered(E.fireCov),
         // The van's shadow, measured the only honest way: the same tile with
         // and without the centre standing. A centre nobody can reach sends no
@@ -2831,10 +2845,14 @@ check("determinism: same seed + same inputs ⇒ same hash", stateHash(A.world) =
     };
     const off = arms(false);
     const on = arms(true);
-    check("access: what a road actually buys, arm by arm — a zoo, a pacification centre, a police and a fire station and a tier-2 meat hall, all out of reach: no jobs on the census (so no demand either), no cover on a single tile, no van shadow on the land value, and no Butchers' licence; lay the road that reaches them and every one of the five arrives",
+    check("access: what a road actually buys, arm by arm — a zoo, a pacification centre, a police and a fire station and a tier-2 meat hall, all out of reach: no jobs on the census (so no demand either), no cover on a single tile, NO STATION ON THE COUNT THE ARREST FORCE AND THE ADVISOR READ, no van shadow, and no Butchers' licence; lay the road that reaches them and every one of them arrives",
       off.jobs === 0 && off.zoos === 0 && off.zoosNoRoad === 1 && off.police === 0 && off.fire === 0 && off.vanShadow === 0 && !off.licence
-        && on.jobs > 0 && on.zoos === 1 && on.zoosNoRoad === 0 && on.police > 0 && on.fire > 0 && on.vanShadow > 0 && on.licence,
-      `out of reach: ${off.jobs} jobs · ${off.zoos}/${off.zoosNoRoad} zoos served/not · ${off.police} police tiles · ${off.fire} fire tiles · van shadow ${off.vanShadow} · licence ${off.licence}`
+        && off.police1 === 0 && off.fire1 === 0 && off.centre1 === 0
+        && off.policeNo === 1 && off.fireNo === 1 && off.centreNo === 1
+        && on.jobs > 0 && on.zoos === 1 && on.zoosNoRoad === 0 && on.police > 0 && on.fire > 0 && on.vanShadow > 0 && on.licence
+        && on.police1 === 1 && on.fire1 === 1 && on.centre1 === 1
+        && on.policeNo === 0 && on.fireNo === 0 && on.centreNo === 0,
+      `out of reach: ${off.jobs} jobs · ${off.zoos}/${off.zoosNoRoad} zoos served/not · ${off.police} police tiles · ${off.fire} fire tiles · van shadow ${off.vanShadow} · licence ${off.licence} · the census counts police/fire/centre ${off.police1}/${off.fire1}/${off.centre1} with ${off.policeNo}/${off.fireNo}/${off.centreNo} out of reach`
         + ` || in reach: ${on.jobs} jobs · ${on.zoos}/${on.zoosNoRoad} · ${on.police} · ${on.fire} · ${on.vanShadow} · ${on.licence}`);
 
     // And the CARTS: every side of a hall is a loading bay, so a cart coming
@@ -2870,6 +2888,24 @@ check("determinism: same seed + same inputs ⇒ same hash", stateHash(A.world) =
         && west.door === h4(11, 10) && east.door === h4(13, 10)
         && west.walkSteps === east.walkSteps,
       `doors ${hallDoors.map(xy).join(" ")} · from the west ${west ? xy(west.door) : "NO ROUTE"} in ${west && west.walkSteps} · from the east ${east ? xy(east.door) : "NO ROUTE"} in ${east && east.walkSteps}`);
+    // AND `routeToHall` KNOWS EVERY DOOR TOO. It is the route `justice.kill`
+    // publishes for a body, and it builds its own door set - so the all-sides
+    // law had to be asserted of it separately, and was not: a mutant taking
+    // only the hall's first door left the east lot with no route to the hall
+    // at all, and the suite green.
+    const eastRoute = ME2.routeToHall(H4, h4(18, 11), h4(12, 10));
+    const westRoute = ME2.routeToHall(H4, h4(6, 11), h4(12, 10));
+    check("access: and the route that carries a BODY to the hall knows every door as well — `routeToHall` builds its own door set for the hall, so a cart from the east arrives at the east door and one from the west at the west, for the same money",
+      !!eastRoute && !!westRoute && eastRoute.door === h4(13, 10) && westRoute.door === h4(11, 10)
+        && eastRoute.walkSteps === westRoute.walkSteps,
+      `from the east ${eastRoute ? xy(eastRoute.door) : "NO ROUTE"} in ${eastRoute && eastRoute.walkSteps} · from the west ${westRoute ? xy(westRoute.door) : "NO ROUTE"} in ${westRoute && westRoute.walkSteps}`);
+    // AND `doorOf` IS THE LOWEST-NUMBERED ONE, which is its whole contract and
+    // was asserted nowhere once `need-stress` stopped using it.
+    check("access: and `doorOf` is the LOWEST-numbered door, which is the only thing it promises — the single-tile reader the tools use has to agree with the list every rule reads",
+      FI.doorOf(H4, h4(12, 10)) === doors(H4, h4(12, 10))[0] && doors(H4, h4(12, 10)).length === 2
+        && FI.doorOf(H4, h4(12, 10)) < doors(H4, h4(12, 10))[1],
+      `doorOf ${xy(FI.doorOf(H4, h4(12, 10)))} · doorsOf ${doors(H4, h4(12, 10)).map(xy).join(" ")}`);
+
     // AND THE FREIGHT CACHE IS RESET AT THE OP, not at the next month.
     // `hallReach` memoises per tick, so a cart asked after a player op would
     // otherwise be answered from a map that no longer exists - `ops.apply`
@@ -3259,11 +3295,13 @@ check("determinism: same seed + same inputs ⇒ same hash", stateHash(A.world) =
     }
     check("access: ONE implementation — no module in js/sim outside fields.js tests a road's nearness for itself; there is one predicate and nowhere else to ask",
       offenders.length === 0, offenders.join(" · "));
-    // WHO CAN MOVE THE GROUND A FORECOURT STANDS ON. `passable` reads
-    // `terrain`, `tier` and `civic`, and every place any of the three is
+    // WHO CAN MOVE THE GROUND A FORECOURT STANDS ON. `passable` reads SIX
+    // fields, not three: `terrain`, `tier` and `civic` directly, and `wall`,
+    // `road` and `rail` through `reach.isBarrier` - the last two being how a
+    // tunnel is a way rather than a wall. Every place any of the six is
     // written has to be followed by a settle, or stored commutes walk through
-    // a building - or across a lake. There are five, and each one's settle is
-    // mutation-tested by name elsewhere in this section:
+    // a building, or across a lake. There are five modules, and each one's
+    // settle is mutation-tested by name elsewhere in this section:
     //
     //   lots.js, blocks.js   inside lotsTick        -> tick.js settles at 4b
     //   events.js            inside eventsTick      -> tick.js settles at 7c
@@ -3275,7 +3313,7 @@ check("determinism: same seed + same inputs ⇒ same hash", stateHash(A.world) =
     // checks above. It fires when a SIXTH module starts writing that ground,
     // which is the moment someone has to decide where its settle goes.
     const groundWriters = [];
-    const WRITE = /\b(?:world|w)\.(?:terrain|tier|civic)\s*\[[^\]]*\]\s*(?:=[^=]|\+\+|--|\+=|-=)/;
+    const WRITE = /\b\w+\.(?:terrain|tier|civic|wall|rail|road)\s*\[[^\]]*\]\s*(?:=[^=]|\+\+|--|\+=|-=)/;
     for (const f of readdirSync(simDir)) {
       if (!/\.js$/.test(f)) continue;
       const src = readFileSync(path.join(simDir, f), "utf8");

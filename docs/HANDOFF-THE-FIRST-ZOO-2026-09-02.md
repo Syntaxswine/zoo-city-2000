@@ -2069,3 +2069,41 @@ Too small and too seed-fragile to assert without pinning a golden number to a
 seed, so the ORDER of the three settles is checked against `tick.js`'s source
 and the number is written beside it. That is a spelling-level tripwire and it
 says so.
+
+## 24h. The sixth review: the loop was the class (session 15, 2026-09-04)
+
+**7/10.** **523 → 526 checks, 0 failures**, all six gate hashes unchanged.
+
+**The bug.** Round four gated `jobsOf` in the census by `served`. Three lines
+below it, in the same loop, `fireStations`, `policeStations` and `centres` were
+counted ungated — and `justice` sizes the ARREST FORCE from
+`cen.policeStations`. A police station eight tiles from the only road,
+employing nobody and covering nothing, did **35 of the 38 arrests** a working
+one did. The advisor's "no fire station" and "no centre" lines were silenced
+the same way, and the "centre is full" warning sized its beds from phantom
+ones.
+
+**The lesson, which is the same one for the sixth time: THE LOOP WAS THE
+CLASS.** When a fix lands inside an iteration over a set, the other members of
+that set are the first place to look, before anything cleverer.
+
+### And one I opened myself
+
+I had deleted `settleDoors`'s `replanStale` as redundant, on the argument that
+the boundary call covered it. It does not: `justiceTick` and `meatTick` read
+`c.path` INSIDE the tick, between the 7c settle and the boundary. 129 animals
+holding no commute when justice asked; `09222178` against `0c2a6629` eight
+months later. **"Redundant" is a claim about every reader, and I had only
+counted the ones at the end.** `world.last.staleAtJustice` is a readout now so
+the law can be checked rather than argued.
+
+### The traps, keyed by what you would see
+
+| what you see | what it is |
+|---|---|
+| a gate added to one line of a loop | the loop is the class. Check every other member of it in the same pass |
+| a counter used for UPKEEP and for EFFECT | they want different gates. You pay for a building you cannot reach; it does not work for you |
+| "this call is redundant now" | enumerate the readers, including the ones inside the same iteration. Ours had two (`justiceTick`, `meatTick`) between the write and the repair |
+| a fixture that builds its own answer | `need-stress` built commutes with `roadPath` and then checked they were all road. 1258 of 1258 passed, forever |
+| a rig built for a case | check it can still MAKE the case. The deep rig's forecourts sit on unzoned ground: nothing can be built or burnt there, and the settle fires 0 times in 360 months of it |
+| a correction to a previous false sentence | it can be the false one. Round five "corrected" SPEC's "only a platform" and SPEC was right — 354,843 sites say so |
