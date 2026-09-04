@@ -732,6 +732,13 @@ check("determinism: same seed + same inputs ⇒ same hash", stateHash(A.world) =
     check("the camera is a tool on key E", !!tool && tool.key === "E" && tool.op.kind === "camera", JSON.stringify(tool && { key: tool.key, kind: tool.op.kind }));
     // NOT in PLACE_TOOLS: that is the click set, and the camera is a drag.
     check("and it is a drag, not a click", !PLACE_TOOLS.includes("camera"), "camera is in PLACE_TOOLS");
+    // PLACE_TOOLS was doing two jobs: "this is a click tool" and "this tool
+    // has a ghost". The camera is the only tool that is a DRAG and still wants
+    // one, so the lists part company — and a flat drag still gets neither.
+    const { GHOST_TOOLS } = await import("../js/tools.js");
+    check("but it still shows a ghost under the cursor", GHOST_TOOLS.includes("camera"), "camera has no ghost");
+    check("every click tool keeps its ghost", PLACE_TOOLS.every((t) => GHOST_TOOLS.includes(t)), PLACE_TOOLS.filter((t) => !GHOST_TOOLS.includes(t)).join(", "));
+    check("and the flat drags still have none", !GHOST_TOOLS.includes("road") && !GHOST_TOOLS.includes("wall") && !GHOST_TOOLS.includes("rail"), GHOST_TOOLS.join(", "));
     check("every tool id is still unique", new Set(TOOLS.map((t) => t.id)).size === TOOLS.length, `${TOOLS.length}`);
   }
 

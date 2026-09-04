@@ -15,7 +15,7 @@
 import { idx } from "./sim/world.js";
 import { costOf, roadL } from "./sim/ops.js";
 import { pinTarget } from "./follow.js";
-import { TOOL_BY_ID, TOOL_BY_KEY, PLACE_TOOLS, labelForOp } from "./tools.js";
+import { TOOL_BY_ID, TOOL_BY_KEY, PLACE_TOOLS, GHOST_TOOLS, labelForOp } from "./tools.js";
 const PAN_SPEED = 700; // projection px per second
 
 export function createInput(canvas, app) {
@@ -108,6 +108,17 @@ export function createInput(canvas, app) {
     return null;
   }
 
+  /**
+   * The op a HOVER should be costed as — which is not the same question as
+   * what a click would do. A drag tool that draws a GHOST needs a plan under
+   * the cursor as well, or `ok` is false on every tile and the ghost renders
+   * refused-red even on ground that would take it. Flat drags (road, wall,
+   * rail) still get nothing, exactly as before, because they have no ghost.
+   */
+  function hoverOp(tx, ty) {
+    return clickOp(tx, ty) || (GHOST_TOOLS.includes(state.tool) ? previewOp(state.tool, tx, ty) : null);
+  }
+
   function previewOp(id, tx, ty) {
     const tool = TOOL_BY_ID[id];
     if (!tool || tool.op.kind === "inspect") return null;
@@ -141,7 +152,7 @@ export function createInput(canvas, app) {
   }
 
   function refreshCost() {
-    const op = state.drag ? dragOp() : state.hover && clickOp(state.hover[0], state.hover[1]);
+    const op = state.drag ? dragOp() : state.hover && hoverOp(state.hover[0], state.hover[1]);
     if (!op) { state.cost = null; app.ui.setCost(""); return; }
     const plan = costOf(world(), op);
     const refused = !!plan.reason || (plan.tiles.length > 0 && !affordable(plan.cost));
@@ -228,7 +239,7 @@ export function createInput(canvas, app) {
         state.drag.by = Math.max(0, Math.min(w.h - 1, state.drag.by));
       }
       refreshCost();
-    } else if (changed || PLACE_TOOLS.includes(state.tool)) refreshCost();
+    } else if (changed || GHOST_TOOLS.includes(state.tool)) refreshCost();
   }
 
   function onUp(e) {
@@ -401,11 +412,17 @@ export function createInput(canvas, app) {
     if (state.pinned != null) { h.tx = state.pinned % w.w; h.ty = (state.pinned / w.w) | 0; h.pinned = true; }
     else if (state.hover) { h.tx = state.hover[0]; h.ty = state.hover[1]; }
     if (state.drag && state.cost) h.drag = { tiles: state.cost.tiles, refused: state.cost.refused };
-    if (!state.drag && state.hover && PLACE_TOOLS.includes(state.tool) && state.mouse.inside) {
+    if (!state.drag && state.hover && GHOST_TOOLS.includes(state.tool) && state.mouse.inside) {
       const [tx, ty] = state.hover;
       const size = state.tool === "zoo" ? 2 : 1;
       const ok = !!state.cost && !state.cost.refused && state.cost.tiles.length > 0;
-      h.ghost = { tx, ty, w: size, h: size, ok, sprite: state.tool === "station" ? app.art.station("ns") : app.art.civic(state.tool) };
+      // The camera gets the ghost DIAMOND and the cost, and no translucent
+      // standing sprite: the owner looked at both and the diamond reads fine
+      // on a street, where a 5-px mast at 0.55 alpha over asphalt does not.
+      const sprite = state.tool === "camera" ? null
+        : state.tool === "station" ? app.art.station("ns")
+        : app.art.civic(state.tool);
+      h.ghost = { tx, ty, w: size, h: size, ok, sprite };
     }
     return h;
   }

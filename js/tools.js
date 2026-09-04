@@ -32,6 +32,19 @@ export const TOOLS = Object.freeze([
 export const TOOL_BY_ID = Object.freeze(Object.fromEntries(TOOLS.map((tool) => [tool.id, tool])));
 export const TOOL_BY_KEY = Object.freeze(Object.fromEntries(TOOLS.map((tool) => [tool.key.toUpperCase(), tool])));
 export const PLACE_TOOLS = Object.freeze(TOOLS.filter((tool) => ["station", "park", "zoo", "centre", "police", "fire"].includes(tool.op.kind)).map((tool) => tool.id));
+/**
+ * Tools that get a GHOST under the cursor — the ground diamond
+ * (`art.overlay("ghost")`), green where the tile will take the thing and red
+ * where it will not, plus a costed plan so the strip can price it.
+ *
+ * This is NOT PLACE_TOOLS, which was doing two unrelated jobs: "this tool is
+ * a click, not a drag" and "this tool has a ghost". The camera is the only
+ * tool that is a DRAG and still wants a ghost, so the two lists part company
+ * here. Without it `refreshCost` costs nothing on hover, `ok` is false on
+ * every tile, and the camera's diamond renders refused-red even on a street
+ * that would take it. A flat drag (road, wall, rail) still gets neither.
+ */
+export const GHOST_TOOLS = Object.freeze([...PLACE_TOOLS, "camera"]);
 
 /** Resolve a concrete op back to the registry row that names it. */
 export function toolForOp(op) {
