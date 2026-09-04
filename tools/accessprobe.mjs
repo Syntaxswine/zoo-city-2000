@@ -27,12 +27,25 @@
 //
 //   node tools/accessprobe.mjs [--seed 7] [--years 30] [--layout millbelt]
 //                              [--zoo 12] [--stations] [--save FILE] [--csv]
+//   node tools/accessprobe.mjs --rig deep [--years 20]
 //
 // --save loads a real saved city instead of building one (the owner's town,
 // once it arrives: docs/fixtures/). Everything below is read-only.
+//
+// --rig deep exists because THE SCRIPTED MAYOR CANNOT BUILD THE CASES THIS
+// PART IS ABOUT. She rings every 6x6 block with road, so no tile is ever
+// more than three from one and the footprint rule lifts nothing; and she
+// lays her line along a ring, so every platform is a door already and no
+// animal ever crosses a forecourt. Both are true of the owner's towns too,
+// which is the owner's own observation ("the 6x6 squares have roads around
+// the whole perimeter") - but a rule with no town to act in has only unit
+// fixtures behind it, and that is worth being able to SEE rather than
+// asserting. The deep rig is a town the mayor would not build: 8x8 quarters
+// roaded on two sides only, and a line set three tiles back from the road.
 
 import { readFileSync } from "node:fs";
-import { createWorld, ZONE, ZONE_NAME, CIVIC, siteTiles } from "../js/sim/world.js";
+import { createWorld, ZONE, ZONE_NAME, CIVIC, ROAD, TERRAIN, siteTiles } from "../js/sim/world.js";
+import { apply } from "../js/sim/ops.js";
 import { tick } from "../js/sim/tick.js";
 import { load, save } from "../js/sim/save.js";
 import { KNOBS } from "../js/sim/rules.js";
@@ -45,6 +58,7 @@ const argv = process.argv.slice(2);
 const arg = (k, d) => { const i = argv.indexOf(k); return i >= 0 ? argv[i + 1] : d; };
 const flag = (k) => argv.includes(k);
 const SEED = arg("--seed", "7");
+const RIG = arg("--rig", null);
 const YEARS = Number(arg("--years", 30));
 const LAYOUT = arg("--layout", "millbelt");
 const SAVE = arg("--save", null);
@@ -52,10 +66,45 @@ const ZOO = arg("--zoo", null);
 const CSV = flag("--csv");
 const REACH = KNOBS.ROAD_REACH;
 
+/** A town the mayor would not build: deep quarters and a line set back from the road. */
+function deepRig(seed, years) {
+  const w = createWorld({ seed });
+  const at = (x, y) => y * w.w + x;
+  for (let y = 2; y <= 40; y++) for (let x = 2; x <= 58; x++) {
+    const i = at(x, y);
+    w.terrain[i] = TERRAIN.GRASS; w.road[i] = ROAD.NONE; w.zone[i] = ZONE.NONE;
+    w.tier[i] = 0; w.wall[i] = 0; w.rail[i] = 0; w.civic[i] = 0; w.big[i] = 0;
+  }
+  w.cash = 900000;
+  w.events.noDisasters = true;
+  // Three avenues and one spine. The quarters between them are SEVEN deep and
+  // roaded on one side only, so their far rows sit four and five tiles out -
+  // the case the mayor's ringed 6x6 can never make.
+  const roads = [];
+  for (const y of [6, 18, 30]) for (let x = 4; x <= 56; x++) roads.push(at(x, y));
+  for (let y = 6; y <= 30; y++) roads.push(at(4, y));
+  apply(w, { kind: "road", tiles: roads });
+  apply(w, { kind: "zone", zone: ZONE.R, x0: 6, y0: 7, x1: 54, y1: 13, density: 3 });
+  apply(w, { kind: "zone", zone: ZONE.I, x0: 6, y0: 19, x1: 28, y1: 26, density: 3 });
+  apply(w, { kind: "zone", zone: ZONE.C, x0: 30, y0: 19, x1: 54, y1: 26, density: 3 });
+  // The line runs down the empty strip at y = 15: three tiles from the middle
+  // avenue, so both platforms are doors with two tiles of forecourt each.
+  const line = [];
+  for (let x = 8; x <= 52; x++) line.push(at(x, 15));
+  apply(w, { kind: "rail", tiles: line });
+  apply(w, { kind: "station", tx: 10, ty: 15 });
+  apply(w, { kind: "station", tx: 50, ty: 15 });
+  for (let t = 0; t < years * 12; t++) tick(w);
+  return w;
+}
+
 // ---- the town ---------------------------------------------------------------
 let world;
 let title;
-if (SAVE) {
+if (RIG === "deep") {
+  world = deepRig(SEED, YEARS);
+  title = `--rig deep, seed ${SEED} - ${YEARS} years, ${world.citizens.length} citizens (a town the mayor would not build)`;
+} else if (SAVE) {
   world = load(readFileSync(SAVE, "utf8"));
   title = `${SAVE} — ${world.citizens.length} citizens at month ${world.tick}`;
 } else {
@@ -168,6 +217,26 @@ for (const r of refused.slice(0, 40)) {
 }
 if (refused.length > 40) console.log(`  … and ${refused.length - 40} more`);
 if (!refused.length) console.log(`  none — every zoned lot in this town is within ${REACH} of a road. Only a hand-built town shows the other case; --save one.`);
+
+// ---- forecourts: does anybody actually cross one? ---------------------------
+let riders = 0;
+let crossers = 0;
+let forecourtTiles = 0;
+for (const c of world.citizens) {
+  if (c.dead || !c.path) continue;
+  let rode = false;
+  let crossed = 0;
+  for (let k = 0; k < c.path.length; k++) {
+    const t = c.path[k] & 0x7fff;
+    if (c.path[k] & 0x8000) { rode = true; continue; }
+    if (world.road[t] === ROAD.NONE && world.rail[t] !== 2) crossed++;
+  }
+  if (rode) riders++;
+  if (crossed) { crossers++; forecourtTiles += crossed; }
+}
+console.log("");
+console.log(`forecourts - ${riders} riders · ${crossers} commutes cross one · ${forecourtTiles} forecourt tiles walked in total`);
+if (!crossers) console.log("  none. Every platform in this town is already a door, so nothing has a forecourt to cross — try --rig deep.");
 
 // ---- the town in one line -----------------------------------------------------
 console.log("");

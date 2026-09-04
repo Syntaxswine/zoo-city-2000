@@ -9,7 +9,7 @@
 
 import { KNOBS } from "./rules.js";
 import { ZONE, anchorOf, footprintOf, capacityOf, absent } from "./world.js";
-import { WALK, dial, doorsOf, nodePath } from "./fields.js";
+import { WALK, TILE, dial, doorsOf, nodePath } from "./fields.js";
 import { DIET_OF } from "./species.js";
 import { removeCitizen } from "./citizens.js";
 import { KIND, remember } from "./life.js";
@@ -166,7 +166,7 @@ function routeResult(world, prev, door, hall, cost) {
   return Object.freeze({
     hall,
     door,
-    from: path.length ? path[0] & 0x7fff : -1, // the door the cart actually left by
+    from: path.length ? path[0] & TILE : -1, // the door the cart actually left by
     walkSteps: cost / WALK,
     physicalSteps: Math.max(0, path.length - 1),
     path,

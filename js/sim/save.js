@@ -130,12 +130,12 @@ export function rebuildDerived(world) {
   world.wallsDirty = true;
   recountRosters(world);
   // Paths first (deterministic), then fields (traffic reads paths).
-  computeFields(world); // computes roadDist so doorOf works
+  computeFields(world); // computes roadDist and the station links, so doorsOf and the commute search work
   for (const c of world.citizens) {
     if (c.job < 0 || c.home < 0) continue;
     const a = doorsOf(world, c.home);
     const b = doorsOf(world, c.job);
-    c.path = a != null && b != null ? (commutePath(world, c.species, a, b) || { path: null }).path : null; // the weighted commute (use-zoning), never the unit BFS: a loaded city must take the roads the live one took
+    c.path = a.length && b.length ? (commutePath(world, c.species, a, b) || { path: null }).path : null; // the weighted commute (use-zoning), never the unit BFS: a loaded city must take the roads the live one took
   }
   computeFields(world);
   // A loaded city reads complete at once (the play-tester saw placeholders

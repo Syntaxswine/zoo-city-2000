@@ -37,7 +37,7 @@ import { rasterize } from "./art/format.js";
 import { ZONE, CIVIC, TERRAIN, ROAD, isPart, anchorOf, sideOf } from "./sim/world.js";
 import { DECK_TOP } from "./art/roads.js";
 import { lotScore, REASON } from "./sim/lots.js";
-import { siteRoadDist } from "./sim/fields.js";
+import { siteRoadDist, asksAccess } from "./sim/fields.js";
 import { KNOBS } from "./sim/rules.js";
 import { tunnelAxis } from "./sim/reach.js";
 import { isWorker } from "./sim/census.js";
@@ -48,12 +48,18 @@ const MARGIN = 256; // projection px around the viewport kept in the static laye
 const REACH_UP = 120; // tallest sprite above its tile's north vertex
 const REACH_SIDE = 40;
 const BUSY = 40;
-// The access overlay (SPEC 6c): one entry per value siteRoadDist can take -
-// standing on the road, one, two and three tiles from it, and out of reach.
-// THREE DIFFERENT GREENS, not one green at three alphas: this paints over
+// The access overlay (SPEC 6c). THREE DIFFERENT GREENS for one, two and
+// three tiles from the road, not one green at three alphas: this paints over
 // grass, asphalt, chalk and water-side sand, and a band told apart only by
-// how strong it is stops being a band on a dark ground.
-const ACCESS_TINT = [null, "rgba(178,208,96,0.55)", "rgba(112,166,84,0.55)", "rgba(52,110,72,0.55)", "rgba(190,70,60,0.60)"];
+// how strong it is stops being a band on a dark ground. The road itself is
+// untinted, and out of reach is the zot red.
+//
+// Indexed by DISTANCE, and the index is clamped: KNOBS.ROAD_REACH is a knob,
+// and a fixed five-entry table read at ROAD_REACH 5 handed a served lot the
+// refusal red and an unserved one `undefined` - the overlay's meaning
+// inverted. The deepest green is simply the last band, however many there are.
+const ACCESS_GREEN = ["rgba(178,208,96,0.55)", "rgba(112,166,84,0.55)", "rgba(52,110,72,0.55)"];
+const ACCESS_RED = "rgba(190,70,60,0.60)";
 const BG = "#d6d1bf"; // beyond the map: the plate's ground, as in the sibling field guides
 const RED_TINT = { "=": "0", "(": "0" };
 // R chalk (terrain.js chalkKey) is drawn in grass keys because the R accent
@@ -347,8 +353,9 @@ export function createRenderer(canvas, initialWorld, art) {
           // four fifths of a young map in warning red said so at the top of
           // its voice.
           const d = siteRoadDist(world, i);
-          fill = d <= KNOBS.ROAD_REACH ? ACCESS_TINT[d]
-            : world.zone[i] !== ZONE.NONE || world.civic[i] || world.rail[i] === 2 ? ACCESS_TINT[KNOBS.ROAD_REACH + 1]
+          fill = d === 0 ? null
+            : d <= KNOBS.ROAD_REACH ? ACCESS_GREEN[Math.min(d, ACCESS_GREEN.length) - 1]
+            : asksAccess(world, i) ? ACCESS_RED
             : null;
         }
         else if (mode === "score" && world.zone[i] !== ZONE.NONE) {

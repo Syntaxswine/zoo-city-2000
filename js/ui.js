@@ -23,7 +23,7 @@ import { ZONE, CIVIC, TERRAIN, ROAD, ZONE_NAME, USE_NAME, anchorOf } from "./sim
 import { dateOf, characterLine } from "./sim/tick.js";
 import { eventTitle, TICKER_FLASH } from "./sim/events.js";
 import { lotReport, REASON } from "./sim/lots.js";
-import { exposure } from "./sim/fields.js";
+import { exposure, asksAccess, NEAR_REACH } from "./sim/fields.js";
 import { RULES, KNOBS } from "./sim/rules.js";
 import { yearlyFigures } from "./sim/budget.js";
 import { SPECIES, SPECIES_BY_ID } from "./sim/species.js";
@@ -420,8 +420,7 @@ export function createUI(app) {
     // Road access, in the words the rule uses (SPEC 6c). Shown for anything
     // the rule is ASKED about - a lot, a zoo, the centre, a station, a
     // platform - and never for plain ground, where the question is idle.
-    const asksAccess = rep.zone !== ZONE.NONE || rep.civic !== CIVIC.NONE || w.rail[i] === 2;
-    if (asksAccess) {
+    if (asksAccess(w, i)) {
       const xy = (t) => `(${t % w.w},${(t / w.w) | 0})`;
       if (rep.served) {
         const doors = rep.doors.slice(0, 4).map(xy).join(" ");
@@ -434,7 +433,7 @@ export function createUI(app) {
         // next is how far and which way.
         lines.push(el("div", "warn", `road access: none — the nearest road is ${rep.nearest.d} tiles away at ${xy(rep.nearest.doors[0])}, ${rep.nearest.d - KNOBS.ROAD_REACH} too far`));
       } else {
-        lines.push(el("div", "warn", `road access: none — no road within ${rep.nearest ? rep.nearest.d - 1 : 8} tiles in any direction`));
+        lines.push(el("div", "warn", `road access: none — no road within ${(rep.nearest ? rep.nearest.d : NEAR_REACH + 1) - 1} tiles in any direction`));
       }
     }
     const env = el("div", "dim");

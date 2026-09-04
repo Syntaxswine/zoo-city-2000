@@ -5,7 +5,7 @@
 // radius²)); 4,096 tiles is microseconds.
 
 import { KNOBS } from "./rules.js";
-import { TERRAIN, ROAD, ZONE, CIVIC, idx, inBounds, N4, isStation, absent, occAt, anchorOf, footprintOf, siteTiles } from "./world.js";
+import { TERRAIN, ROAD, ZONE, CIVIC, idx, inBounds, N4, isStation, isCivicEmployer, absent, occAt, anchorOf, footprintOf, siteTiles } from "./world.js";
 import { SPECIES_BY_ID, DIET_OF, admits } from "./species.js";
 import { forEachWithin, computeOcclusion, isBarrier } from "./reach.js";
 
@@ -53,9 +53,40 @@ export function computeRoadDist(world) {
  * the one building standing across them is at 0.
  */
 export function siteRoadDist(world, i) {
+  // A PLATFORM is asked the WALKING question, not the distance one, because
+  // its forecourt is the thing a citizen actually crosses (SPEC 6c, and
+  // `passable` above). ONE branch, here: `served`, `doorsOf`, the card and
+  // the overlay all read their answer through this, so the field, the doors
+  // the card lists and the edges the commute graph carries cannot disagree
+  // about whether a station across a river is a station.
+  if (world.rail[i] === 2) return doorSearch(world, i, doorScratch(world), { passable }).d;
   let d = KNOBS.ROAD_REACH + 1;
   for (const j of siteTiles(world, i)) if (world.roadDist[j] < d) d = world.roadDist[j];
   return d;
+}
+
+/** The search options for the thing at i - the one place that knows a platform is asked differently. */
+const accessOpts = (world, i) => (world.rail[i] === 2 ? { passable } : {});
+
+/**
+ * WALKABLE ground, for the one place the gap between a site and its road is
+ * actually CROSSED ON FOOT: a station's forecourt (computeStationDoors). A
+ * lot's reach is a distance - nobody walks it, the animal appears at the
+ * door - so a river or a neighbour's house between a lot and its road is no
+ * obstacle to it, and never was. A platform is different: the stored path
+ * carries every tile of its forecourt and a walker draws them, so a
+ * forecourt through a house or across water is a rabbit walking through a
+ * wall. Not passable: water, a bare wall (isBarrier), a building standing
+ * on a lot, and a civic building - a park is a place to walk, a police
+ * station is a wall.
+ */
+export function passable(world, j) {
+  if (isBarrier(world, j)) return false;
+  if (world.terrain[j] === TERRAIN.WATER && world.road[j] === ROAD.NONE) return false; // a bridge is a road, and roads are doors
+  if (world.tier[j] > 0 && !world.rubble[j]) return false; // a building stands here
+  const c = world.civic[j];
+  if (c && c !== CIVIC.PARK) return false;
+  return true;
 }
 
 /**
@@ -67,6 +98,21 @@ export function siteRoadDist(world, i) {
  * hall. There is no second test of a road's nearness anywhere in js/sim -
  * Part M' greps for one.
  */
+/**
+ * Does anything on this tile ASK the access question? A lot does (it will not
+ * grow), a zoo does (no keepers, no halo, no cap), a station does (nobody can
+ * board), the civic employers do (no staff, no cover). A PARK does not - SPEC
+ * 6c says a park is a place, not a service, and the owner never listed it -
+ * and neither does open ground. Both the access overlay and the hover card
+ * read this, so "no road here" is only ever SAID where it is a refusal.
+ */
+export function asksAccess(world, i) {
+  if (world.zone[i] !== ZONE.NONE) return true;
+  if (world.rail[i] === 2) return true;
+  const c = world.civic[i];
+  return c === CIVIC.ZOO || c === CIVIC.ZOO_PART || isCivicEmployer(c);
+}
+
 export const served = (world, i) => siteRoadDist(world, i) <= KNOBS.ROAD_REACH;
 
 /** Traffic: number of commuter paths through each road tile (readout only). */
@@ -432,8 +478,9 @@ const DOOR_N4 = [[0, -1], [1, 0], [0, 1], [-1, 0]]; // N E S W
  * with each tile's parent, so a caller can walk a door back to the site (the
  * station approach below).
  */
-export function doorSearch(world, i, seen, { reach = KNOBS.ROAD_REACH, prev = null } = {}) {
+export function doorSearch(world, i, seen, { reach = KNOBS.ROAD_REACH, prev = null, passable: pass = null } = {}) {
   const { w } = world;
+  const open = pass || ((wo, j) => !isBarrier(wo, j));
   seen.fill(0);
   if (prev) prev.fill(-1);
   const doors = [];
@@ -442,6 +489,11 @@ export function doorSearch(world, i, seen, { reach = KNOBS.ROAD_REACH, prev = nu
     if (seen[j]) continue;
     seen[j] = 1;
     if (world.road[j] !== ROAD.NONE) doors.push(j); // the site stands on a road
+    // A site tile sealed inside a bare wall is a way out of nothing. Without
+    // this the search STARTS inside the barrier and walks out, while
+    // computeRoadDist never gets in - and the two would report different
+    // numbers for the same tile.
+    if (isBarrier(world, j)) continue;
     frontier.push(j);
   }
   if (doors.length) { doors.sort((a, b) => a - b); return { d: 0, doors }; }
@@ -455,11 +507,12 @@ export function doorSearch(world, i, seen, { reach = KNOBS.ROAD_REACH, prev = nu
         const ny = ty + dy;
         if (!inBounds(world, nx, ny)) continue;
         const j = ny * w + nx;
-        if (seen[j] || isBarrier(world, j)) continue; // a bare wall is not a way to a road
+        if (seen[j]) continue;
         seen[j] = 1;
-        if (prev) prev[j] = cur;
-        if (world.road[j] !== ROAD.NONE) doors.push(j);
-        else next.push(j);
+        if (prev) prev[j] = cur; // a DOOR needs its parent too: the chain back to the platform is read off it
+        if (world.road[j] !== ROAD.NONE) { doors.push(j); continue; } // a road is the answer, whatever else is on it
+        if (!open(world, j)) continue; // a bare wall is not a way to a road; nor, for a forecourt, is a river or a house
+        next.push(j);
       }
     }
     if (doors.length) { doors.sort((a, b) => a - b); return { d, doors }; }
@@ -475,18 +528,19 @@ const doorScratch = (world) => {
 
 /** Every door of the site at i, ascending; empty when no road is within reach. */
 export function doorsOf(world, i) {
-  return doorSearch(world, i, doorScratch(world)).doors;
+  return doorSearch(world, i, doorScratch(world), accessOpts(world, i)).doors;
 }
 
 /** ONE door of the site at i (the lowest-numbered), or null - for the readers that want a single tile. */
 export function doorOf(world, i) {
-  const { doors } = doorSearch(world, i, doorScratch(world));
+  const { doors } = doorSearch(world, i, doorScratch(world), accessOpts(world, i));
   return doors.length ? doors[0] : null;
 }
 
-/** How far the nearest road really is, PAST ROAD_REACH, and where. The hover card asks this of a lot at 4; no rule does. */
-export function nearestRoad(world, i, reach = 8) {
-  return doorSearch(world, i, doorScratch(world), { reach });
+/** How far the nearest road really is, PAST ROAD_REACH, and where. The hover card asks this of a lot the rule refuses; no rule does. */
+export const NEAR_REACH = KNOBS.ROAD_REACH + 5; // derived, so this still looks further than the rule when the knob moves
+export function nearestRoad(world, i, reach = NEAR_REACH) {
+  return doorSearch(world, i, doorScratch(world), { reach, ...accessOpts(world, i) });
 }
 
 /**
@@ -520,7 +574,10 @@ export function computeStationDoors(world) {
   const add = (a, b, chain) => { (links[a] || (links[a] = [])).push([b, chain]); };
   for (let i = 0; i < n; i++) {
     if (world.rail[i] !== 2) continue;
-    const { d, doors } = doorSearch(world, i, seen, { prev });
+    // The SAME search `served` asks of a platform, so the field and the graph
+    // cannot disagree: a station the card calls served is one a citizen can
+    // walk to, and the tiles it walks are tiles it can stand on.
+    const { d, doors } = doorSearch(world, i, seen, { prev, passable });
     if (d < 1 || !doors.length) continue; // d === 0 cannot happen: ops.js refuses a station on a road
     for (const j of doors) {
       const chain = [];
@@ -631,8 +688,10 @@ export function dial(world, species, from, maxCost, settle, policy = {}) {
         // A station's forecourt: the platform and each of its doors, WALK per
         // tile of the gap (computeStationDoors). At d = 1 this is the step the
         // N4 loop just took, at the same cost, so nothing about a station
-        // beside a road moves. The tiles crossed are not roads and carry no
-        // use-zoning: a forecourt is nobody's lot.
+        // beside a road moves. The tiles crossed are priced one at a time with
+        // stepCost, so the player's line runs across a forecourt like anywhere
+        // else - a forecourt tile can be a zoned lot, and a rabbit must pay
+        // the trespass fields.exposure will read back off the stored path.
         const links = world._hasStationDoors ? world._stationDoors[tile] : null;
         if (links) for (const [j, chain] of links) {
           let lc = neutral ? WALK : stepCost(world, species, j);
