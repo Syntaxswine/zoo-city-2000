@@ -124,8 +124,12 @@ land value, no room on the population cap. Warehouses are no exception any
 more: the inside of an industrial block stands as tall as its edge. One
 rule, asked of a lot, a block, a hall, a platform and a zoo alike, and a
 citizen leaves home by whichever side its work is on. Press `O` to the
-**access** overlay and you can point at the tile: untinted on the road,
-three greens for one, two and three tiles out, red where nothing will grow.
+**access** overlay and you can point at the tile: untinted on the road, then
+sand, mauve and aubergine for one, two and three tiles out, and rust where
+something asked for a road and there is none. It starts OFF in every city and
+is not saved. (It was three greens for a week, and the first band rendered as
+the grass ramp's own light shade - the owner counted two road-adjacent tiles
+where the sim had three, and the sim was innocent.)
 
 **Walls.** `6` lays a wall like a road (§8 a tile). Smells, dread, the
 crime a hall casts, fire and police cover and the land value a park lends
@@ -221,8 +225,11 @@ mill-town with a fox problem").
   walked tile by tile and priced by who is crossing, and it is refused if that
   ground is a river or a house; a bare wall shuts a door and a tunnel opens it;
   the growth rule reads the road ONLY through `served` — two lots at one and
-  three tiles cap and score alike; `ROAD_REACH` is a knob and the overlay
-  survives it moving; the overlay really paints four bands, reddens only what
+  three tiles cap and score alike; the doors the card lists and the edges the
+  commute graph rides are the same list in the same order, after a build, two
+  years, a reload and an op; a building that GROWS across a forecourt closes it
+  and everyone walking it re-plans that month; `ROAD_REACH` is a knob and the
+  overlay survives it moving; the overlay really paints four bands, reddens only what
   asked, and the card says the distance in words),
   `budget.post` as the only cash mutator, relative imports, no
   `Math.random`, the sim blind to browser preferences, the title screen

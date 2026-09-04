@@ -52,14 +52,19 @@ export function computeRoadDist(world) {
  * A 6x6 estate ringed by road has an interior tile at 3 and a corner at 0;
  * the one building standing across them is at 0.
  */
-export function siteRoadDist(world, i) {
+export function siteRoadDist(world, i, seen = null) {
   // A PLATFORM is asked the WALKING question, not the distance one, because
   // its forecourt is the thing a citizen actually crosses (SPEC 6c, and
   // `passable` above). ONE branch, here: `served`, `doorsOf`, the card and
   // the overlay all read their answer through this, so the field, the doors
   // the card lists and the edges the commute graph carries cannot disagree
   // about whether a station across a river is a station.
-  if (world.rail[i] === 2) return doorSearch(world, i, doorScratch(world), { passable }).d;
+  //
+  // `seen` is used only by that branch - it is the one that searches. A lot's
+  // answer is a table lookup and needs no buffer, so a caller that does not
+  // know what it is pointing at (the access overlay, per visible tile) may
+  // hand one over regardless.
+  if (world.rail[i] === 2) return doorSearch(world, i, seen || doorScratch(world), { passable }).d;
   let d = KNOBS.ROAD_REACH + 1;
   for (const j of siteTiles(world, i)) if (world.roadDist[j] < d) d = world.roadDist[j];
   return d;
@@ -96,7 +101,18 @@ export function passable(world, j) {
 // consulted: a flood is weather, the ground is still ground, and roads carry
 // traffic straight through one - a forecourt that closed and re-opened with
 // the water would take a station's riders away and give them back for a
-// season, which is a bigger claim than this part is making.
+// season, which is a bigger claim than this part is making. PLAIN TRACK is
+// walkable: a citizen steps over a rail line the way it steps over a level
+// crossing, which the card has always described as a thing animals walk
+// across, and a forecourt that ran a tile along the track was the behaviour
+// before anyone wrote this rule down.
+//
+// The bridge clause is the one that looks dead and is not: `doorSearch`
+// answers a road before it asks this question, so nothing in the door search
+// ever hands `passable` a bridge - but `passable` is exported and read as
+// "ground a citizen may stand on", and a predicate that called a bridge water
+// would be wrong the first time anything else asked it. It is a ruling in the
+// table below for that reason, not an unreachable branch.
 
 /**
  * ACCESS, the one standard (SPEC 6c). The owner: "as long as a tile is
@@ -506,8 +522,19 @@ export function doorSearch(world, i, seen, { reach = KNOBS.ROAD_REACH, prev = nu
     if (isBarrier(world, j)) continue;
     frontier.push(j);
   }
-  if (doors.length) { doors.sort((a, b) => a - b); return { d: 0, doors }; }
-  for (let d = 1; d <= reach; d++) {
+  // ONE SORT, ONE EXIT. There were two sorts, and the d = 0 one could not be
+  // made to matter: `siteTiles` happens to come back in raster order today, so
+  // a site standing on several roads already listed them ascending, and
+  // deleting that line left the whole suite green. It is not dead - it is the
+  // guarantee that "ascending" does not quietly depend on the order world.js
+  // walks a footprint - so the search has one way out instead, where the live
+  // case (a forecourt entered from EAST and WEST, discovered east-then-west)
+  // holds it up. `d` is 0 when the site stands on a road, the depth the
+  // frontier broke at, or `reach + 1` when the loop ran out - which is exactly
+  // the "no road in range" answer, with `doors` empty. (No closure per call:
+  // this search runs once per visible platform tile per frame.)
+  let d = 0;
+  if (!doors.length) for (d = 1; d <= reach; d++) {
     const next = [];
     for (const cur of frontier) {
       const tx = cur % w;
@@ -525,10 +552,11 @@ export function doorSearch(world, i, seen, { reach = KNOBS.ROAD_REACH, prev = nu
         next.push(j);
       }
     }
-    if (doors.length) { doors.sort((a, b) => a - b); return { d, doors }; }
+    if (doors.length) break;
     frontier = next;
   }
-  return { d: reach + 1, doors };
+  doors.sort((a, b) => a - b);
+  return { d, doors };
 }
 
 const doorScratch = (world) => {
@@ -536,21 +564,41 @@ const doorScratch = (world) => {
   return world._seen && world._seen.length === n ? world._seen : (world._seen = new Uint8Array(n));
 };
 
-/** Every door of the site at i, ascending; empty when no road is within reach. */
-export function doorsOf(world, i) {
-  return doorSearch(world, i, doorScratch(world), accessOpts(world, i)).doors;
+/**
+ * Every door of the site at i, ascending; empty when no road is within reach.
+ *
+ * `seen` IS THE BOUNDARY. SPEC §14 forbids the draw and street layers a
+ * buffer on the world, and these readers are exactly who they call: the hover
+ * card, the walker picking a doorstep, the access overlay asking every visible
+ * tile. Pass your own Uint8Array(w*h) and nothing of yours touches the world;
+ * omit it and the sim's own scratch is used, which is right for the sim.
+ * `accessOpts` travels with the site either way - one implementation of "what
+ * is this thing's door", so the street cannot use the bare-wall rule where the
+ * sim uses `passable`.
+ */
+export function doorsOf(world, i, seen = null) {
+  return doorSearch(world, i, seen || doorScratch(world), accessOpts(world, i)).doors;
 }
 
-/** ONE door of the site at i (the lowest-numbered), or null - for the readers that want a single tile. */
-export function doorOf(world, i) {
-  const { doors } = doorSearch(world, i, doorScratch(world), accessOpts(world, i));
+/** ONE door of the site at i (the lowest-numbered), or null. The single-tile reader: the tools (need-stress, check) and any caller that wants a doorstep rather than a set. */
+export function doorOf(world, i, seen = null) {
+  const doors = doorsOf(world, i, seen);
   return doors.length ? doors[0] : null;
 }
 
-/** How far the nearest road really is, PAST ROAD_REACH, and where. The hover card asks this of a lot the rule refuses; no rule does. */
-export const NEAR_REACH = KNOBS.ROAD_REACH + 5; // derived, so this still looks further than the rule when the knob moves
-export function nearestRoad(world, i, reach = NEAR_REACH) {
-  return doorSearch(world, i, doorScratch(world), { reach, ...accessOpts(world, i) });
+/**
+ * How far the nearest road really is, PAST ROAD_REACH, and where. The hover
+ * card asks this of a lot the rule refuses; no rule does.
+ *
+ * A FUNCTION, not a constant: `KNOBS.ROAD_REACH` is a knob the suite moves and
+ * a module-load constant would freeze the card's horizon at whatever the knob
+ * was when the file was imported - at ROAD_REACH 9 the card would look LESS
+ * far than the rule does, while SPEC §6c claims everything moves with it. It
+ * was that sentence, asserted and never tested, that a hostile review pulled.
+ */
+export const nearReach = () => KNOBS.ROAD_REACH + 5;
+export function nearestRoad(world, i, reach = null, seen = null) {
+  return doorSearch(world, i, seen || doorScratch(world), { reach: reach ?? nearReach(), ...accessOpts(world, i) });
 }
 
 /**

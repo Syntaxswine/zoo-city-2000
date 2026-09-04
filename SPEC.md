@@ -341,10 +341,18 @@ doorSearch(i)  = a multi-source BFS out of siteTiles(i), through any tile a BARE
                  (§6b), stopping at the first depth that reaches road → { d, doors }
 doorsOf(i)     = every road tile at that depth, ascending — ALL SIDES ARE ACCESS POINTS
 passable(j)    = ground a citizen may stand on: not water, not a bare wall, not a building, not a
-                 civic that is not a park
+                 civic that is not a park. A BRIDGE and a TUNNEL are ways, not walls; trees, rubble,
+                 a flood, a park, plain track and a platform are all ground. One row per ruling in
+                 Part M', so each is a decision rather than an omission
 asksAccess(i)  = a lot, a zoo, a station or a civic EMPLOYER — never a park, never open ground
-nearestRoad(i, reach = ROAD_REACH + 5) = the same search, further out; the CARD's second question, asked by no rule
+nearestRoad(i, reach = nearReach()) = the same search, further out; the CARD's second question, asked by no rule
+nearReach()    = ROAD_REACH + 5, read at CALL time — a constant froze the card's horizon at import
 ```
+
+Every one of these takes an optional caller-owned `seen` buffer. §14 forbids
+the draw and street layers a buffer on the world, and they are exactly who
+calls them — the access overlay asks `siteRoadDist` of every visible tile, and
+a platform's answer is a search.
 
 **Two questions, not one.** A lot's access is a DISTANCE: nobody walks the
 gap, the animal appears at its door, and a river or a neighbour's terrace
@@ -362,11 +370,24 @@ a refusal. A park never asks (a park is a place, not a service), and neither
 does open ground: on countryside "no road within 3" is not a complaint.
 
 **`ROAD_REACH` is a knob and everything moves with it.** The overlay's tints
-are indexed by distance and CLAMPED to the greens it has, so at
-`ROAD_REACH` 5 a lot five tiles out takes the deepest green rather than the
-refusal red; `nearestRoad` looks `ROAD_REACH + 5` out rather than a literal
-8. A fixed table read at 5 inverted the overlay's meaning, and every check
-passed because they all ran at 3.
+are indexed by distance and CLAMPED to the band it has, so at `ROAD_REACH` 5
+a lot five tiles out takes the deepest tint rather than the refusal red;
+`nearReach()` is a FUNCTION, read when the card asks, so the card's horizon
+still looks further than the rule at 9 as it does at 3. A fixed table read at
+5 inverted the overlay's meaning, and every check passed because they all ran
+at 3. The horizon was the same mistake one layer down — a module-load
+constant, so at `ROAD_REACH` 9 the card looked LESS far than the rule while
+this paragraph claimed otherwise, and the check that was supposed to catch it
+restored the knob before reading it and evaluated `8 > 3`. Both settings are
+asked now, inside the moved window.
+
+**The field, the card and the graph are the same list.** `served`, `doorsOf`
+and the edges in `computeStationDoors` are three readings of one search, and
+a check asks every platform for all three after a build, after two years of
+ticks, after a reload and after an op — same tiles, same ORDER, no extras and
+no leftovers. The order is not cosmetic: it is the tie-break every downstream
+number is settled by, and deleting the sort moved every published gate hash
+and a scripted town by 10% while the suite stayed green.
 
 `served` is the only test of a road's nearness in `js/sim`; `hasAccess` is
 gone. Part M' greps for a second one (the one allowed reader of the raw
@@ -412,6 +433,19 @@ the moment a road, wall or rail is drawn, not at the next tick: every loaded
 city opens PAUSED, and the card used to read "no road within 3" beside a
 brand-new road until the player pressed Space. Hash-neutral — it is the same
 field the tick would have built.
+
+**The ground under a forecourt MOVES, and a move is a re-plan.** `passable`
+reads `tier` and `civic`, so a building that GROWS across a forecourt — or a
+civic dropped on one — closes a way that stored commutes are already walking,
+and neither goes through the road/wall/rail branch above.
+`computeStationDoors` keeps a signature of the whole door graph and raises
+`world.doorsMoved` when it changes; `tick.js` acts on it right after
+`lotsTick` (before the citizens run, so the stale pass re-plans in the same
+month) and `ops.apply` acts on it after every op, both with the same
+`invalidatePaths` a road edit uses. Without it a straight run kept the stale
+commutes while a reload re-planned, and the two parted company a month later
+— hidden at first, because `c.path` is not in the saved citizen and §16's
+hash could not see it for two years.
 
 **Not access.** A building's drawn door is on its south face whatever side
 the road is on (art, §12.2). `ROAD_REACH` stays 3.

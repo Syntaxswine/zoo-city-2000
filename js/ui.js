@@ -23,7 +23,7 @@ import { ZONE, CIVIC, TERRAIN, ROAD, ZONE_NAME, USE_NAME, anchorOf } from "./sim
 import { dateOf, characterLine } from "./sim/tick.js";
 import { eventTitle, TICKER_FLASH } from "./sim/events.js";
 import { lotReport, REASON } from "./sim/lots.js";
-import { exposure, asksAccess, NEAR_REACH } from "./sim/fields.js";
+import { exposure, asksAccess, nearReach } from "./sim/fields.js";
 import { RULES, KNOBS } from "./sim/rules.js";
 import { yearlyFigures } from "./sim/budget.js";
 import { SPECIES, SPECIES_BY_ID } from "./sim/species.js";
@@ -433,7 +433,7 @@ export function createUI(app) {
         // next is how far and which way.
         lines.push(el("div", "warn", `road access: none — the nearest road is ${rep.nearest.d} tiles away at ${xy(rep.nearest.doors[0])}, ${rep.nearest.d - KNOBS.ROAD_REACH} too far`));
       } else {
-        lines.push(el("div", "warn", `road access: none — no road within ${(rep.nearest ? rep.nearest.d : NEAR_REACH + 1) - 1} tiles in any direction`));
+        lines.push(el("div", "warn", `road access: none — no road within ${(rep.nearest ? rep.nearest.d : nearReach() + 1) - 1} tiles in any direction`));
       }
     }
     const env = el("div", "dim");
@@ -444,9 +444,19 @@ export function createUI(app) {
     if (w.rail[i] === 2) {
       // A platform is served like a lot: riders reach it from ANY of its doors,
       // and the forecourt between costs them a walk a tile (SPEC 6c, 7.9).
+      //
+      // THE FORECOURT IS ONE TILE SHORTER THAN THE DISTANCE. At d = 1 the door
+      // is next door and nothing is crossed; at d = 3 two tiles are. That is
+      // the chain `computeStationDoors` lays into the path and the tile count
+      // the suite reports, and the card used to print the distance instead -
+      // an off-by-one in the reader's favour that nothing pinned.
+      const court = rep.siteDist - 1;
+      // And when it is NOT served, this line says the CONSEQUENCE only: the
+      // access line above has already given the distance and the direction,
+      // and saying "no road within 3" twice in one card is a stutter.
       lines.push(el("div", rep.served ? "dim" : "warn", rep.served
-        ? `a station: riders board from ${rep.doors.length === 1 ? "the road at" : `${rep.doors.length} sides,`} ${rep.doors.slice(0, 4).map((t) => `(${t % w.w},${(t / w.w) | 0})`).join(" ")}${rep.siteDist > 1 ? `, crossing ${rep.siteDist} tiles of forecourt on foot` : ""}; a citizen's ride costs 0.3 of a walk, while a hall cart's ride is free distance; neither changes property-value distance`
-        : `a station with no road within ${KNOBS.ROAD_REACH}: nobody can reach the platform`));
+        ? `a station: riders board from ${rep.doors.length === 1 ? "the road at" : `${rep.doors.length} sides,`} ${rep.doors.slice(0, 4).map((t) => `(${t % w.w},${(t / w.w) | 0})`).join(" ")}${court > 0 ? `, crossing ${court} tile${court === 1 ? "" : "s"} of forecourt on foot` : ""}; a citizen's ride costs 0.3 of a walk, while a hall cart's ride is free distance; neither changes property-value distance`
+        : "a station nobody can board: with no door on it the line runs straight past, and no commute may use it"));
     } else if (w.rail[i]) lines.push(el("div", "dim", w.road[i] !== ROAD.NONE ? "a level crossing: the road and the line share this tile square-on — animals walk across it, anything on the line passes straight through without stopping, and the city maintains both" : "rail: citizen commutes price it at 0.3 of a walk; hall logistics count it as free travel; it never shortens property-value distance"));
     if (w.wall[i]) lines.push(el("div", "dim", w.road[i] !== ROAD.NONE ? "a tunnel: the road runs through the wall; smells, dread and cover pass along it and nowhere else" : "a wall: smells, dread, cover and land-value halos go round it, and a killer's reach stops at it; a road through it is a tunnel"));
     if (rep.dread) lines.push(el("div", "dim", `dread ${rep.dread}: herbivores −${Math.min(KNOBS.DREAD_MOOD_CAP, Math.round(KNOBS.DREAD_MOOD_HERB * rep.dread))} mood and −${Math.round(KNOBS.DREAD_HOME_HERB * rep.dread)} on the home score; LV −${Math.round(KNOBS.LV_DREAD * rep.dread)}; carnivores do not mind`));

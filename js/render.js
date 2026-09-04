@@ -340,6 +340,17 @@ export function createRenderer(canvas, initialWorld, art) {
     ctx.lineTo(sx - HALF_W, sy + HALF_H);
     ctx.closePath();
   }
+  // The access overlay asks fields.siteRoadDist of every visible tile, and for
+  // a PLATFORM that question is a search that needs a seen array. SPEC §14:
+  // this layer may not write the world, not even a scratch buffer - so it owns
+  // one. (Without it the overlay filled `world._seen`, per platform tile per
+  // frame, in the same file the walker layer is forbidden to.)
+  let _accessSeen = null;
+  const accessSeen = (w) => {
+    const n = w.w * w.h;
+    if (!_accessSeen || _accessSeen.length !== n) _accessSeen = new Uint8Array(n);
+    return _accessSeen;
+  };
   function drawOverlay(mode, range) {
     for (let ty = range.y0; ty <= range.y1; ty++) {
       for (let tx = range.x0; tx <= range.x1; tx++) {
@@ -363,7 +374,7 @@ export function createRenderer(canvas, initialWorld, art) {
           // not a complaint, it is countryside, and a first draft that washed
           // four fifths of a young map in warning red said so at the top of
           // its voice.
-          const d = siteRoadDist(world, i);
+          const d = siteRoadDist(world, i, accessSeen(world));
           fill = d === 0 ? null
             : d <= KNOBS.ROAD_REACH ? ACCESS_BAND[Math.min(d, ACCESS_BAND.length) - 1]
             : asksAccess(world, i) ? ACCESS_RED

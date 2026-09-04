@@ -40,8 +40,13 @@
 // which is the owner's own observation ("the 6x6 squares have roads around
 // the whole perimeter") - but a rule with no town to act in has only unit
 // fixtures behind it, and that is worth being able to SEE rather than
-// asserting. The deep rig is a town the mayor would not build: 8x8 quarters
-// roaded on two sides only, and a line set three tiles back from the road.
+// asserting. The deep rig is a town the mayor would not build: quarters SEVEN
+// rows deep with an avenue on one side only, so their far rows sit four and
+// five tiles out, and a line down the empty strip three tiles back from the
+// middle avenue, so both platforms have two tiles of forecourt. (The header
+// used to describe 8x8 quarters roaded on two sides - a rig this file has
+// never built. A probe that misdescribes its own town invites its numbers to
+// be read against the wrong picture.)
 
 import { readFileSync } from "node:fs";
 import { createWorld, ZONE, ZONE_NAME, CIVIC, ROAD, TERRAIN, siteTiles } from "../js/sim/world.js";

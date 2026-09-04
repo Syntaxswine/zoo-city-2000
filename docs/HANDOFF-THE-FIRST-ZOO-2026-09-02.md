@@ -1854,9 +1854,10 @@ gate; and "28 mutants, 28 caught" did not survive an independent sweep — ten
 survivors in forty-nine, three of them sitting on the lines the first round's
 fixes added.
 
-**The full list, unfixed, is in `BACKLOG.md` under "OPEN — the second hostile
-review's findings".** Do not start anything else in this area without reading
-it. The short version:
+**The full list is in `BACKLOG.md` under "The second hostile review — all
+thirteen, closed".** It was written down here BEFORE any of it was fixed, and
+§24d below is what closed it. Do not start anything else in this area without
+reading both. The short version of what was found:
 
 - **`fields.passable` reads `tier` and `civic`, and nothing invalidates paths
   when those change.** A building grown across a station's forecourt leaves
@@ -1882,3 +1883,53 @@ showed me a forecourt through a house; I made a `passable` predicate and
 pinned water, walls and houses — and did not ask what else changes `tier`, or
 who else reads the answer, or whether the graph agreed with the field. A
 review that hands you a reproduction is handing you one member of a class.
+
+## 24d. All thirteen, closed — and what the sweep taught (session 15, 2026-09-04)
+
+`bb175ad` fixed finding 1; this section is findings 2–13 and the sweep that
+checked them. **483 → 489 checks, 0 failures.** A 19-mutant sweep aimed at
+exactly these lines catches all 19.
+
+| what | how it is held |
+|---|---|
+| the graph and the field could disagree (2, 3, 6) | ONE check: `doorsOf` and `world._stationDoors` are the same list, same order, asked of every platform after a build, after two years, after a reload and after an op — plus the consequence, two identical lines with one north end behind a river, and the rabbit walks to the far one |
+| the civic clause, the "dead" bridge clause (4, 10) | the rulings table `572b5d2` added after the review was taken; two more rulings, plain track and a platform, so they are decisions |
+| the doors sort (5) | ONE sort now, at the one exit both returns pass through, held up by a platform entered from EAST and WEST; and the town canary narrowed from 250–560 to 365–405 |
+| `joinable` / `troubled` (7) | two PAIRS on `blocks.mergeWindow` directly: the far corner out of reach, then in; then the ANCHOR out of reach |
+| `NEAR_REACH` (8) | a function, `nearReach()`, read at call time; the check reads the horizon INSIDE the moved window, at 5 and at 9 |
+| the card's forecourt, the doubled refusal (9, 13) | the DOM shim hovers a real platform and reads the card's own words, against the link chain the commute carries |
+| `walkers.door()` (11) | it calls `doorsOf`, which carries `accessOpts` with it |
+| `render.js` writing `world._seen` (12) | every reader takes an optional caller-owned `seen`; the draw layer owns one, and a check stamps the world's, draws over it, and demands the stamp survive **and the frame still be a frame** |
+
+### Three traps, for whoever is next
+
+**A sweep harness must run the unmutated seed first.** A first draft copied
+`js/ tools/ docs/` into each sandbox; `check.mjs` reads `css/field.css` two
+thirds of the way through; twelve mutants came back "CAUGHT" — by an ENOENT.
+A harness that cannot run the code reports a perfect score. `msweep/run.mjs`
+now runs the seed and exits 2 if it is not green, and separates CRASHED from
+CAUGHT so a crash never reads as a caught mutant.
+
+**A line added for one reason can take the teeth out of a check written for
+another.** Finding 1's op-time half is "every commute that walked it re-plans
+in the same breath" — and the check measured that AFTER a `tick()` that had
+been inserted to dodge the same-month-save hole. The tick settles the doors
+itself, so deleting the op-time settle left the check green with 317 animals
+walking through a police station. Measure the claim where the claim is made.
+
+**A line that cannot be made to fail is not being held by anything.** The
+`d = 0` doors sort survived every mutant because `siteTiles` happens to come
+back in raster order, so a site standing on several roads already listed them
+ascending. It is not dead — it is the guarantee that "ascending" does not
+quietly depend on the order `world.js` walks a footprint — so it moved to the
+one exit both returns go through, where the live case holds it up. When a line
+cannot be made to matter, move it somewhere it can, rather than deleting it or
+leaving it unheld.
+
+### Still open, and not this part's to close
+
+A save taken in the SAME MONTH as any path-invalidating op reloads to a
+slightly different city. It is PRE-EXISTING — measured on `411d903`, a road
+edit does it too — and reachable in play, because `main.js` autosaves on
+`pagehide`. Reproduction and three possible resolutions are in `BACKLOG.md`;
+picking one is a rule call, not a bug fix.

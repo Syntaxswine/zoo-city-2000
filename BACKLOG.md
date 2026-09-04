@@ -238,7 +238,7 @@ another's. Git merges those. `citizens.js`, `justice.js` and `events.js`
 are the risk: B adds one-liners at call sites; A adds one function; H
 edits two `post` sites; F edits one advisor function; D never opens them.
 
-## Road access, standardized — SHIPPED 2026-09-04 (plan §4-R; SPEC §6c, §5, §7.9, §9b, §11; handoff §24; `tools/accessprobe.mjs`; Part M' is 49 checks, and the suite went 428 → 478; 28 of 28 mutants caught)
+## Road access, standardized — SHIPPED 2026-09-04 (plan §4-R; SPEC §6c, §5, §7.9, §9b, §11; handoff §24, §24b, §24c, §24d; `tools/accessprobe.mjs`; the suite went 428 → 489 across TWO hostile reviews, and a 19-mutant sweep aimed at these lines catches all 19)
 
 The owner: *"as long as a tile is within 1-3 tiles of the road it has road
 access"*, *"the 6x6 squares have roads around the whole perimeter, so nothing
@@ -332,89 +332,99 @@ SPEC §15. The suite's own convention is already the third - every save/load
 check ticks before it saves - so today the law is really "hash-equal from any
 TICK boundary", and §16 does not say that.
 
-## OPEN — the second hostile review's findings (2026-09-04, scored 6.5/10)
+## The second hostile review — all thirteen, closed (2026-09-04)
 
-**These are NOT fixed.** They are written down before they are fixed so that
-they survive the session. A second adversarial reader ran 49 mutants of their
-own against `ea014d5` and found ten survivors, six of them behaviourally live,
-three sitting on the very lines the FIRST review's fixes added.
+A second adversarial reader scored the access work **6.5/10** against
+`ea014d5`, ran 49 mutants of its own and found ten survivors. Every finding is
+below with what closed it. The suite went **483 → 489 checks**, and a sweep of
+20 mutants aimed at exactly these lines catches all 20 (the sweep is
+`scratchpad/msweep`; it runs the unmutated seed first and refuses to report
+until that is green — a first draft copied only `js/ tools/ docs/`, `check.mjs`
+reads `css/` two thirds of the way through, and twelve mutants came back
+"CAUGHT" by an ENOENT).
 
-1. **THE SAVE/LOAD LAW BREAKS. (worst; a determinism bug reachable by ordinary
-   play.)** `fields.passable` reads `world.tier` and `world.civic`, and NOTHING
-   invalidates paths when those change: `ops.apply` invalidates only for
-   `roads || walls || rails`, and `lotsTick` growing a building never does. So
-   a stored commute laid across a station's forecourt keeps crossing it after a
-   building or a civic stands there. Reproduced two ways — one player op (a
-   police station on the forecourt), and no op at all (zone the strip and let
-   it build) — each diverging one month after a reload: `3915a6f0` vs
-   `6ffb842b`, `34eba157` vs `e0bb2571`. A control with the same rig and the
-   police station four tiles OFF the forecourt holds for 60 months. It is the
-   forecourt, not the op. Worse, `c.path` is not in `canonicalCitizen`, so the
-   divergence hides for a while: 15 paths differed live-vs-reload with the hash
-   still equal for 24 months. **This is my own handoff §24 lesson — changing a
-   thing's SHAPE changes its derived state — wired for merges and splits and
-   not for the new shape change Part R invented: a building GROWING.**
-2. **Surviving mutant: `computeStationDoors` without its `passable` gate.** The
-   card says a river platform has no doors while the graph rides it and the
-   rabbit swims, and the suite is green. The flagship sentence of the first
-   review's fix ("the field, the doors the card lists and the edges the graph
-   carries cannot disagree", SPEC §6c) has no check behind it: the GROUND
-   fixture routes a commute that never touches the river platform.
-3. **Surviving mutant: `links.fill(undefined)`.** Stale link edges accumulate
-   one copy per tick, and a rabbit rides a doorless platform through a wall.
-4. **Surviving mutant: the civic clause of `passable`.** A police station, a
-   fire station, the centre and a zoo on a forecourt are all unpinned (the
-   rulings table added in `572b5d2` covers a police station — recheck which
-   half of this survives on HEAD).
-5. **Surviving mutant: the doors sort.** Deleting one line moves EVERY
-   published gate hash and the millbelt town by +10% (1563 → 1720 citizens),
-   and the suite reports 478/0. The town canary added for exactly this does not
-   fire — one town, one band, and the band is far too wide.
-6. **Surviving mutant: only the first door of a platform is linked.** The card
-   says "riders board from 2 sides" while the graph has one. "All sides are
-   access points" is checked for a lot and for a block and NOT for the one site
-   type where the doors are the only way in.
-7. **Surviving mutant: `joinable` no longer asks `served`.** That premise is
-   asserted in SPEC §6c, handoff §24b and this file — three times, tested zero.
-8. **A THIRD guard that cannot be false, and a false sentence in SPEC.**
-   `check.mjs` restores `KNOBS.ROAD_REACH` BEFORE the check that reads it, so
-   `NEAR_REACH > KNOBS.ROAD_REACH` is evaluated as `8 > 3`. And the claim is
-   false anyway: `NEAR_REACH` is a module-load constant, so at `ROAD_REACH` 9
-   the card looks LESS far than the rule does. SPEC §6c puts that sentence
-   under the heading "ROAD_REACH is a knob and everything moves with it".
-9. **The card overstates the forecourt by one tile** — it prints `siteDist`
-   where the forecourt is `siteDist - 1`, and the suite's own count agrees with
-   the smaller number. Unpinned in both directions.
-10. **Two dead sub-conditions in `passable`** (`&& world.road[j] === ROAD.NONE`
-    — a road is returned as a door before `passable` is ever asked; the rubble
-    clause was removed in `572b5d2`). Instrumented: 2,809 calls, 0 reaching
-    either.
-11. **`walkers.door()` asks a different question from `doorsOf` for a
-    platform** — `accessOpts` is module-private, so the street would use the
-    bare-wall rule where the sim uses `passable`. Latent, and a second copy of
-    the rule in the one place Law 6 is loudest.
-12. **`render.js` writes a world-owned buffer** — `siteRoadDist` on a platform
-    reaches `doorScratch(world)` and fills `world._seen`, per visible tile per
-    frame. SPEC §14 forbids exactly this for the walker layer, and `doorSearch`
-    takes a caller-owned `seen` for that reason.
-13. Smaller: the unserved platform's card says the refusal twice; the
-    `accessprobe` header describes a rig it does not build; `fields.doorOf` is
-    now dead under `js/`; a forecourt may cross plain rail track, which "ground
-    a citizen may stand on" does not say.
+1. **THE SAVE/LOAD LAW BROKE.** `fields.passable` reads `tier` and `civic`,
+   and nothing invalidated paths when those changed: a building GROWN across a
+   station's forecourt, or a civic dropped on one, closed a way stored
+   commutes were already walking. Reproduced two ways, each diverging a month
+   after a reload; `c.path` is not in `canonicalCitizen`, so the hash hid it
+   for 24 months first. **Fixed** in `bb175ad`: `computeStationDoors` keeps a
+   signature of the whole door graph and raises `world.doorsMoved`;
+   `tick.js`'s `settleDoors` acts on it right after `lotsTick` (before the
+   citizens run) and `ops.apply` after every op. Both reproductions are checks,
+   on a rig where riding is NECESSARY (two road systems that never touch, one
+   line across): 317 commutes crossed the forecourt, 0 left walking through a
+   police station.
+2. **`computeStationDoors` without its `passable` gate**, 3. **`links.fill(undefined)`**,
+   6. **only the first door linked** — one check now asks the flagship
+   sentence: the doors the card lists (`doorsOf`) and the edges the graph
+   rides (`world._stationDoors`) are THE SAME LIST, in the same order, asked of
+   every platform after a build, after two years of ticks, after a reload and
+   after an op on a forecourt. Plus the consequence: two identical lines, one
+   with its north end behind a river, and the rabbit crossing the city walks to
+   the far one rather than boarding the near one it cannot reach.
+4. **The civic clause of `passable`**, 10. **the "dead" bridge clause** — both
+   already pinned by the rulings table `572b5d2` added after the review was
+   taken, and both die today. The bridge clause is NOT dead and is now
+   documented as a ruling rather than a branch: `doorSearch` answers a road
+   before it asks, but `passable` is exported and read as "ground a citizen may
+   stand on", and a predicate that called a bridge open water would be wrong
+   the first time anything else asked. Two rulings the review called omissions
+   are decisions now: plain track and a platform are walkable — a citizen steps
+   over a line the way it crosses a level crossing.
+5. **The doors sort.** There were two sorts; the `d = 0` one could not be made
+   to fail, because `siteTiles` comes back in raster order today, so a site
+   standing on several roads already listed them ascending. ONE sort now, at
+   the one exit both returns go through, and a fixture whose platform is
+   entered from EAST and WEST — discovered east-then-west, so the order is
+   load-bearing. The town canary was the other half: a band of 250–560 round a
+   town of 385 could not see a 10% move. It is 365–405 now (±5%), and
+   re-baselining it is a deliberate act with a number in the commit message.
+7. **`joinable` / `troubled` no longer ask `served`.** Two PAIRS, asked of
+   `blocks.mergeWindow` directly (going through `lotScore` would watch the
+   wrong door shut): the same four tier-3 houses at the same 74% full, refused
+   when the far corner is four tiles from the only road and joined when one
+   more road tile makes it three — and refused again when it is the corner that
+   is near and the ANCHOR that is out of reach.
+8. **A guard that could not be false, and a false sentence in SPEC.**
+   `NEAR_REACH` was a module-load constant, so at `ROAD_REACH` 9 the card
+   looked LESS far than the rule while SPEC §6c claimed everything moved with
+   it; and the check restored the knob before reading it, evaluating `8 > 3`.
+   It is `nearReach()`, a function, read at call time; the check reads the
+   horizon INSIDE the moved window, at 5 and at 9.
+9. **The card overstated the forecourt by one tile** — it printed `siteDist`
+   where the forecourt is `siteDist - 1` (at `d = 1` the door is next door and
+   nothing is crossed). Fixed, and pinned by a check that reads the card's own
+   words through the DOM shim and compares them with the link chain the commute
+   actually carries.
+11. **`walkers.door()` asked a different question from `doorsOf`** for a
+    platform. It calls `doorsOf` now, which carries `accessOpts` with it — one
+    implementation, in the one place Law 6 is loudest.
+12. **`render.js` wrote a world-owned buffer.** `doorsOf`, `doorOf`,
+    `nearestRoad` and `siteRoadDist` all take an optional caller-owned `seen`;
+    the draw layer owns one (SPEC §14), and a check stamps `world._seen`, draws
+    the whole-map access pass over it, and demands the stamp survive AND the
+    frame still be a frame.
+13. Smalls: the unserved platform's card says the refusal once (the access line
+    gives the distance and the direction, the station line gives the
+    consequence); `accessprobe`'s header describes the rig it actually builds
+    (quarters seven rows deep with an avenue on one side, not 8×8 roaded on
+    two); `fields.doorOf` is documented as the single-tile reader the TOOLS
+    use, which is what it is.
 
 Found SOUND by the same reader, with evidence: cost is a non-issue (98
 stations, `computeStationDoors` 0.07 ms/tick, the whole-map overlay 0.16
-ms/frame); the save/load law holds everywhere ELSE it could be pushed (1,595
-citizens, four platforms with forecourts, 125 riders, walls, a tunnel on a
-forecourt, a bridge, use-zoning on two forecourts, blocks merging, a live op
-and an undo — 60 months); the rendered-pixel overlay checks are real; 39 of
-their 49 mutants were caught; every published number reproduces exactly.
+ms/frame); the save/load law holds everywhere ELSE it could be pushed; the
+rendered-pixel overlay checks are real; 39 of their 49 mutants were caught;
+every published number reproduces exactly.
 
-**The one change that closes the most:** make a change in PASSABILITY
-invalidate what depends on it — and add the save → load → continue law on a rig
-where a building grows across a forecourt. That gate kills 1, and 2, 3 and 4
-cannot survive it either, because none of them can keep the graph agreeing with
-the ground after the ground moves.
+**What the sweep taught that the review did not.** The check for finding 1's
+op-time half had a `tick()` between the op and the measurement — added for an
+unrelated reason (the same-month-save hole below) — and the tick settles the
+doors itself. So the check was watching the wrong half of its own fix: deleting
+the op-time settle left it green with 317 animals walking through a police
+station. The measurement is taken before the tick now. **A line added for one
+reason can take the teeth out of a check written for another.**
 
 ## Road access — the first review
 

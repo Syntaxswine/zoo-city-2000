@@ -28,7 +28,7 @@ import { ROAD, CIVIC, ZONE, TERRAIN, inBounds, anchorOf, absent } from "./sim/wo
 import { ageYears } from "./sim/census.js";
 import { SPECIES_BY_ID } from "./sim/species.js";
 import { hash01 } from "./sim/rng.js";
-import { doorSearch, edgeRoads } from "./sim/fields.js";
+import { doorsOf, edgeRoads } from "./sim/fields.js";
 import { KNOBS } from "./sim/rules.js";
 import { art } from "./art/index.js";
 import { BUBBLES_MAX, NEED_REACH, needOf, needsContext } from "./sim/needs.js";
@@ -114,18 +114,21 @@ export function createWalkers(initialWorld) {
   const roadPath = (from, to) => roadSearch(from, (j) => j === to);
 
   /**
-   * A door of the lot at i, or -1. The RULE is fields.doorSearch - one
+   * A door of the lot at i, or -1. The RULE is fields.doorsOf - one
    * implementation for the sim and the street, so a walker never sets off
-   * from a side the commute does not use. Only the scratch is ours: the
-   * boundary law above forbids this layer a buffer on the world, and
-   * doorSearch takes the seen array from its caller for exactly that reason.
-   * A commuter needs none of this; its walk starts at its stored path's first
-   * tile, which IS the door the search chose.
+   * from a side the commute does not use. It has to be doorsOf and not the
+   * raw doorSearch: a PLATFORM is asked a different question (`passable`, not
+   * the bare-wall default), and calling the search directly meant the street
+   * would have used the wrong rule the moment a walker was given one. Only
+   * the scratch is ours - the boundary law above forbids this layer a buffer
+   * on the world, and doorsOf takes the seen array from its caller for
+   * exactly that reason. A commuter needs none of this; its walk starts at
+   * its stored path's first tile, which IS the door the search chose.
    */
   function door(i) {
     if (i < 0) return -1;
     resize();
-    const { doors } = doorSearch(world, i, seen);
+    const doors = doorsOf(world, i, seen);
     return doors.length ? doors[0] : -1;
   }
 

@@ -4,3 +4,4 @@ out/
 node_modules/
 docs/play/
 docs/play-*/
+.claude/worktrees/

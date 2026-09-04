@@ -96,7 +96,14 @@ check("tick cost", ms < 30, `${ms.toFixed(1)} ms/tick`);
 // town. The band is deliberately wide — this is here to catch a collapse, not
 // to pin a number, and a legitimate change that moves it this far should say
 // so in its commit and move the band.
-check("the scripted city is still a town", world.citizens.length > 250 && world.citizens.length < 560, `${world.citizens.length} citizens after ${YEARS} years (the band is 250-560; a change that moves it this far is a finding, not a nuisance)`);
+// THE CANARY, and it has to be able to SEE. The band was 250-560 round a town
+// of 385 - three parts in eight either way - and a hostile review deleted one
+// line of fields.js, moved a scripted town by 10% and watched the suite report
+// 478 checks and no failures. A canary with a band wider than the damage is
+// not a canary. 365-405 is +/-5%: a change that moves the town further than
+// that is a FINDING, and re-baselining this line is a deliberate act with a
+// number in the commit message, not a nuisance to be widened away.
+check("the scripted city is still a town", world.citizens.length > 365 && world.citizens.length < 405, `${world.citizens.length} citizens after ${YEARS} years (the band is 365-405, \u00b15% of 385; moving it is a finding, and re-baselining is a decision)`);
 
 // ledger
 let sum = 0;
@@ -1670,9 +1677,11 @@ check("determinism: same seed + same inputs ⇒ same hash", stateHash(A.world) =
       apply(G2, { kind: "road", tiles: [g2(46, 12)] });                        say("a tunnel through it", 46, 12, true);
       G2.terrain[g2(47, 12)] = TERRAIN.WATER;                                  say("open water", 47, 12, false);
       apply(G2, { kind: "road", tiles: [g2(47, 12)] });                        say("a bridge over it", 47, 12, true);
+      apply(G2, { kind: "rail", tiles: [g2(48, 12), g2(49, 12)] });            say("plain track", 48, 12, true);
+      apply(G2, { kind: "station", tx: 48, ty: 12 });                          say("a platform", 48, 12, true);
       const wrong = rows.filter((r) => r.got !== r.want);
-      check("access: what a citizen may cross, one row per ruling — trees, rubble, a flood, a park and bare chalk yes; a building (alight or not), a civic that is not a park, and open water no; and a tunnel or a bridge is a way, not a wall",
-        wrong.length === 0 && rows.length === 12, wrong.map((r) => `${r.name}: ${r.got}, wanted ${r.want}`).join(" · ") || `${rows.length} rulings`);
+      check("access: what a citizen may cross, one row per ruling — trees, rubble, a flood, a park, bare chalk, plain track and a platform yes; a building (alight or not), a civic that is not a park, and open water no; and a tunnel or a bridge is a way, not a wall",
+        wrong.length === 0 && rows.length === 14, wrong.map((r) => `${r.name}: ${r.got}, wanted ${r.want}`).join(" · ") || `${rows.length} rulings`);
     }
     check("access: and a park is not a building — the one civic a citizen may walk across leaves the forecourt open",
       (() => {
@@ -1832,13 +1841,18 @@ check("determinism: same seed + same inputs ⇒ same hash", stateHash(A.world) =
     const A2 = load(save(town.W2));
     const a2 = town.ww;
     const rp = apply(A2, { kind: "police", tx: 30, ty: 8 });
+    // MEASURED BEFORE THE TICK, because "in the same breath" is the claim and
+    // ops.apply is who has to keep it. This line used to come after the tick
+    // below, and the tick settles the doors itself - so the check was watching
+    // the wrong half of the fix, and deleting the op-time settle left it green
+    // with 317 animals walking through a police station.
+    const stillWalking = throughWalls(A2);
     // One month, so the straight run's stale pass has re-planned before the
     // save. Saving in the SAME month as any path-invalidating op has diverged
     // since long before this part - a road edit does it too, measured on
     // 411d903 - and that hole is in the BACKLOG, not this check's business.
     tick(A2);
     const A3 = load(save(A2));
-    const stillWalking = throughWalls(A2);
     let apart = -1;
     for (let k = 0; k < 24 && apart < 0; k++) { tick(A2); tick(A3); if (stateHash(A2) !== stateHash(A3)) apart = k + 1; }
     check("access: a civic dropped on a forecourt closes it, and every commute that walked it re-plans in the same breath \u2014 nobody is left walking through a police station, and save \u2192 load \u2192 two more years holds",
@@ -1857,6 +1871,179 @@ check("determinism: same seed + same inputs ⇒ same hash", stateHash(A.world) =
     check("access: and the same when NOBODY does anything \u2014 zone the forecourt, let a house grow on it, and the commutes that used it re-plan the month the wall goes up",
       grew > 0 && stillWalking2 === 0 && apart2 === -1,
       `${grew} houses grew on the forecourt \u00b7 ${stillWalking2} commutes still walk through one \u00b7 ${apart2 < 0 ? "no divergence in 24 months" : `DIVERGED at month +${apart2}`}`);
+  }
+
+  // ---- THE GRAPH AND THE FIELD SAY THE SAME THING --------------------------
+  {
+    // SPEC 6c's flagship sentence - "the field, the doors the card lists and
+    // the edges the commute graph carries cannot disagree" - was asserted in
+    // three documents and tested nowhere. A hostile review proved it: drop
+    // `passable` from computeStationDoors, or its `links.fill(undefined)`, or
+    // link only a platform's FIRST door, and the suite stayed green while the
+    // card said one thing and the graph rode another. Every fixture that
+    // routed a commute routed it past a platform that was fine.
+    //
+    // The statement is an EQUALITY between two things computed different ways:
+    // the doors the card lists (doorsOf - a fresh search, per platform) and
+    // the edges the sim actually rides (world._stationDoors - built once for
+    // the whole map). Same tiles, same order, no extras, no leftovers. It is
+    // asked after a build, after two years of ticks, after a reload and after
+    // an op, because three of the four ways it can break only show with time.
+    const G3 = createWorld({ seed: "graph-field" });
+    const g3 = (x, y) => y * G3.w + x;
+    const gxy = (t) => `(${t % G3.w},${(t / G3.w) | 0})`;
+    for (let y = 2; y <= 34; y++) for (let x = 2; x <= 56; x++) {
+      const i = g3(x, y);
+      G3.terrain[i] = TERRAIN.GRASS; G3.road[i] = ROAD.NONE; G3.zone[i] = ZONE.NONE;
+      G3.tier[i] = 0; G3.wall[i] = 0; G3.rail[i] = 0; G3.civic[i] = 0; G3.big[i] = 0; G3.use[i] = 0;
+    }
+    G3.cash = 600000;
+    G3.events.noDisasters = true;
+    // TWO road systems that never touch, so riding is the only way across -
+    // a walk between them does not exist rather than merely costing more.
+    const groad = [];
+    for (const y of [6, 26]) for (let x = 4; x <= 54; x++) groad.push(g3(x, y));
+    // Spurs down each side of the north platform, so it has TWO doors at the
+    // same distance and they are DISCOVERED east-then-west: without the sort
+    // in doorSearch the card lists them the other way round, which is the one
+    // deleted line that moved every published gate hash and 10% of a town.
+    for (const x of [29, 31]) for (const y of [7, 8]) groad.push(g3(x, y));
+    apply(G3, { kind: "road", tiles: groad });
+    // The line that works, and the line that does not: same geometry, except
+    // the north end of the western one stands behind a river.
+    for (let x = 10; x <= 14; x++) G3.terrain[g3(x, 8)] = TERRAIN.WATER;
+    for (const x of [12, 30]) {
+      const ln = [];
+      for (let y = 9; y <= 23; y++) ln.push(g3(x, y));
+      apply(G3, { kind: "rail", tiles: ln });
+      apply(G3, { kind: "station", tx: x, ty: 9 });
+      apply(G3, { kind: "station", tx: x, ty: 23 });
+    }
+    apply(G3, { kind: "zone", zone: ZONE.R, x0: 20, y0: 4, x1: 40, y1: 5, density: 3 });
+    apply(G3, { kind: "zone", zone: ZONE.C, x0: 20, y0: 27, x1: 30, y1: 28, density: 3 });
+    apply(G3, { kind: "zone", zone: ZONE.I, x0: 32, y0: 27, x1: 42, y1: 28, density: 3 });
+    computeFields(G3);
+
+    const targets = (w, i) => (w._stationDoors && w._stationDoors[i] ? w._stationDoors[i].map(([j]) => j) : []);
+    const disagree = (w) => {
+      const out = [];
+      for (let i = 0; i < w.w * w.h; i++) {
+        if (w.rail[i] !== 2) continue;
+        const card = doors(w, i);
+        const graph = targets(w, i);
+        if (card.join(",") !== graph.join(",")) out.push(`${gxy(i)} card [${card.map(gxy).join(" ")}] graph [${graph.map(gxy).join(" ")}]`);
+      }
+      return out;
+    };
+    // ASCENDING, everywhere - the contract doorSearch's own comment states.
+    const unsorted = (w) => {
+      const out = [];
+      for (let i = 0; i < w.w * w.h; i++) {
+        if (w.rail[i] !== 2 && w.zone[i] === ZONE.NONE && !w.civic[i]) continue;
+        const d = doors(w, i);
+        for (let k = 1; k < d.length; k++) if (d[k] <= d[k - 1]) { out.push(gxy(i)); break; }
+      }
+      return out;
+    };
+
+    const northTwo = doors(G3, g3(30, 9));
+    const riverEnd = doors(G3, g3(12, 9));
+    const built = disagree(G3);
+    for (let k = 0; k < 24; k++) tick(G3);       // time: stale edges pile up here
+    const ticked = disagree(G3);
+    const G4 = load(save(G3));                    // a rebuild from nothing
+    const reloaded = disagree(G4);
+    apply(G4, { kind: "park", tx: 30, ty: 8 });   // an op ON a forecourt that does NOT move the doors: a park is ground
+    const oppedSame = disagree(G4);
+    const parkDoors = doors(G4, g3(30, 9)).length;
+    apply(G4, { kind: "bulldoze", x0: 30, y0: 8, x1: 30, y1: 8, what: "civic" });
+    apply(G4, { kind: "police", tx: 30, ty: 8 });  // a station house IS a wall - and the platform still has both doors,
+    const oppedWalled = disagree(G4);              // because it is entered from either side: all sides are access points
+    const walledDoors = doors(G4, g3(30, 9)).length;
+    for (const x of [29, 31]) apply(G4, { kind: "police", tx: x, ty: 9 }); // seal the sides too, and now there is no way in
+    const oppedGone = disagree(G4);
+    const policeDoors = doors(G4, g3(30, 9)).length;
+    const messy = unsorted(G3);
+
+    const anyBad = built[0] || ticked[0] || reloaded[0] || oppedSame[0] || oppedWalled[0] || oppedGone[0];
+    check("access: the doors the card lists and the edges the commute graph rides are THE SAME LIST — asked of every platform after a build, after two years, after a reload, after an op that leaves a forecourt open and after one that shuts it, and asked in ORDER, because the order is the tie-break every downstream number is settled by",
+      built.length === 0 && ticked.length === 0 && reloaded.length === 0 && messy.length === 0
+        && oppedSame.length === 0 && parkDoors === 2 && oppedWalled.length === 0 && walledDoors === 2
+        && oppedGone.length === 0 && policeDoors === 0
+        && northTwo.length === 2 && northTwo[0] === g3(29, 8) && northTwo[1] === g3(31, 8)
+        && riverEnd.length === 0,
+      `built ${built.length} · ticked ${ticked.length} · reloaded ${reloaded.length} · a park on the forecourt ${oppedSame.length} (${parkDoors} doors) · a police station on it ${oppedWalled.length} (${walledDoors} doors, entered from the other side) · sealed ${oppedGone.length} (${policeDoors} doors) · out of order ${messy.length} · the two-door platform lists ${northTwo.map(gxy).join(" ")} · the river one ${riverEnd.length}`
+        + (anyBad ? ` — ${anyBad}` : ""));
+
+    // And the consequence, which is the whole point of the equality: a
+    // platform the field refuses carries no edges, so nobody boards it. The
+    // two lines are the same shape; only the western one's north end stands
+    // behind water. A commute from one road system to the other has no walk
+    // available at all, so if it arrives it rode - and it can only have ridden
+    // the eastern line.
+    // 150, not the default 40: the ONLY way across is the far line, and the
+    // detour to it is most of the width of the map. A budget that refuses the
+    // journey would prove nothing - the rabbit has to be able to arrive for
+    // "which platform did it board" to be a question.
+    const trip = commutePath(G3, "rabbit", [g3(12, 6)], [g3(12, 26)], 150);
+    const walked = trip ? Array.from(trip.path).filter((e) => !(e & RIDE)).map((e) => e & TILE) : [];
+    check("access: and a platform the field refuses carries no edges — two identical lines, one with its north end behind a river, and the rabbit crossing the city walks to the far one rather than boarding the near one it cannot reach",
+      !!trip && ridesPath(trip.path) && walked.includes(g3(30, 9)) && !walked.includes(g3(12, 9))
+        && targets(G3, g3(12, 9)).length === 0 && targets(G3, g3(30, 9)).length === 2,
+      `${trip ? "arrived" : "no route"} · rode ${trip && ridesPath(trip.path)} · through the river platform ${walked.includes(g3(12, 9))} · edges: river ${targets(G3, g3(12, 9)).length}, clear ${targets(G3, g3(30, 9)).length}`);
+  }
+
+  // ---- A LOT NOBODY CAN REACH IS NOT SWALLOWED INTO A BLOCK -----------------
+  {
+    // `blocks.joinable` asks `served` of every lot it takes in, and
+    // `blocks.troubled` asks it of the lot that starts the window. Both
+    // premises are stated in SPEC 6c, in the handoff and in BACKLOG; both
+    // survived a mutant, because no fixture had ever put an unreachable lot in
+    // a merge window. Two PAIRS, so neither can pass by accident: the same
+    // four houses, the same fill, one road tile apart.
+    //
+    // `mergeWindow` is asked directly rather than through `lotScore`, which
+    // refuses an unserved lot several gates earlier - a test that went through
+    // it would be watching the wrong door shut.
+    const fourHouses = (roads) => {
+      const M = createWorld({ seed: "join-served" });
+      const m = (x, y) => y * M.w + x;
+      for (let y = 4; y <= 18; y++) for (let x = 4; x <= 18; x++) {
+        const i = m(x, y);
+        M.terrain[i] = TERRAIN.GRASS; M.road[i] = ROAD.NONE; M.zone[i] = ZONE.NONE;
+        M.tier[i] = 0; M.wall[i] = 0; M.rail[i] = 0; M.civic[i] = 0; M.big[i] = 0; M.use[i] = 0;
+      }
+      M.valves.R = 0.5;
+      M.events.noDisasters = true;
+      apply(M, { kind: "road", tiles: roads.map(([x, y]) => m(x, y)) });
+      apply(M, { kind: "zone", zone: ZONE.R, x0: 10, y0: 10, x1: 12, y1: 12, density: 3 });
+      for (let y = 10; y <= 12; y++) for (let x = 10; x <= 12; x++) M.tier[m(x, y)] = 2;
+      M.tier[m(10, 10)] = 3;
+      computeFields(M);
+      recountRosters(M);
+      const house = (lot, n) => { for (let k = 0; k < n; k += 4) placeHousehold(M, createHousehold(M, "rabbit", Math.min(4, n - k)), lot); };
+      house(m(10, 10), 20); house(m(11, 10), 8); house(m(10, 11), 8); house(m(11, 11), 4); // 40 of 54, the same 74% either way
+      computeFields(M);
+      recountRosters(M);
+      const win = BL.mergeWindow(M, m(10, 10));
+      return {
+        win, fill: win ? BL.windowFill(M, win.tiles) : null,
+        anchor: siteRoadDist(M, m(10, 10)), corner: siteRoadDist(M, m(11, 11)),
+      };
+    };
+    const WEST = [[9, 6], [9, 7], [9, 8], [9, 9]];  // the anchor is 2 out, the far corner 4
+    const EAST = [[13, 10], [13, 11], [13, 12]];    // everything within 3
+    const cornerOut = fourHouses(WEST);
+    const cornerIn = fourHouses([...WEST, [12, 13]]);          // one tile, and the corner is 3
+    const anchorOut = fourHouses([[13, 11]]);                  // now the CORNER is near and the anchor is 4
+    const anchorIn = fourHouses(EAST);
+    check("access: a house nobody can reach is not swallowed into a block, and one cannot start a block either — the same four tier-3 houses at the same 74% full, refused when the far corner is four tiles from the only road and joined when one more road tile makes it three; and refused again when it is the corner that is near and the anchor that is out of reach",
+      !cornerOut.win && cornerOut.corner === KNOBS.ROAD_REACH + 1 && cornerOut.anchor === 2
+        && !!cornerIn.win && cornerIn.win.side === 2 && cornerIn.corner === KNOBS.ROAD_REACH
+        && !anchorOut.win && anchorOut.anchor === KNOBS.ROAD_REACH + 1
+        && !!anchorIn.win && anchorIn.win.side === 2
+        && Math.abs(cornerIn.fill - anchorIn.fill) < 1e-9,
+      `corner ${cornerOut.corner} → ${cornerOut.win ? "MERGED" : "no window"} · corner ${cornerIn.corner} → ${cornerIn.win ? `${cornerIn.win.side}×${cornerIn.win.side}` : "NO WINDOW"} · anchor ${anchorOut.anchor} → ${anchorOut.win ? "MERGED" : "no window"} · anchor ${anchorIn.anchor} → ${anchorIn.win ? `${anchorIn.win.side}×${anchorIn.win.side}` : "NO WINDOW"} · fill ${cornerIn.fill && cornerIn.fill.toFixed(3)}/${anchorIn.fill && anchorIn.fill.toFixed(3)}`);
   }
 
   // ---- WAREHOUSES: the frontage rule is gone --------------------------------
@@ -2085,13 +2272,24 @@ check("determinism: same seed + same inputs ⇒ same hash", stateHash(A.world) =
     const at5 = sv(K2, k2(12, 11)) && doors(K2, k2(12, 11)).length === 1;
     const at6 = !sv(K2, k2(12, 12));
     const near = nearestRoad(K2, k2(12, 12));
+    // THE HORIZON IS READ WHILE THE KNOB IS MOVED. The claim is that the
+    // card's "how far is the nearest road, really" looks further than the
+    // rule does, whatever the rule is - and it was evaluated AFTER the restore
+    // below, so it read 8 > 3 and could not fail. It was false, too:
+    // NEAR_REACH was a module-load constant, so at ROAD_REACH 9 the card
+    // looked LESS far than the rule. Both settings are asked now, and the
+    // second is the one the old code got wrong.
+    const horizon5 = FI.nearReach();
+    KNOBS.ROAD_REACH = 9;
+    const horizon9 = FI.nearReach();
     KNOBS.ROAD_REACH = saveReach;
     K2.roadsDirty = true;
     computeFields(K2);
-    check("access: ROAD_REACH is a KNOB — at 5 a lot five tiles out is served with a door, six is not, and the card still looks further than the rule does",
-      at5 && at6 && near.d === 6 && near.doors.length === 1 && FI.NEAR_REACH > KNOBS.ROAD_REACH
+    check("access: ROAD_REACH is a KNOB — at 5 a lot five tiles out is served with a door, six is not, and the card's horizon still looks further than the rule does at 5 AND at 9",
+      at5 && at6 && near.d === 6 && near.doors.length === 1
+        && horizon5 > 5 && horizon9 > 9 && FI.nearReach() > KNOBS.ROAD_REACH
         && sv(K2, k2(12, 9)) && !sv(K2, k2(12, 10)),
-      `at 5 ${at5} · at 6 ${at6} · nearest ${near.d} · back at ${KNOBS.ROAD_REACH}`);
+      `at 5 ${at5} · at 6 ${at6} · nearest ${near.d} · horizon ${horizon5} at reach 5, ${horizon9} at 9, ${FI.nearReach()} at ${KNOBS.ROAD_REACH}`);
   }
 
   // ---- ONE implementation ---------------------------------------------------
@@ -2290,6 +2488,36 @@ check("determinism: same seed + same inputs ⇒ same hash", stateHash(A.world) =
     check("access: a PLATFORM out of reach takes the same red a refused lot takes — the overlay's red is every refusal, not the zoned ones only",
       O.rail[oat(22, 13)] === 2 && !sv(O, oat(22, 13)) && platRed >= 0 && platRed === colour(acc, loneFar),
       `platform ${platRed >= 0 ? platRed.toString(16) : "no tinted pixel"} vs a refused lot ${colour(acc, loneFar).toString(16)}`);
+    // AND THE DRAW LAYER WRITES NOTHING ON THE WORLD (SPEC 14). Asking
+    // `siteRoadDist` of a platform is a SEARCH, and a search needs a `seen`
+    // array - so the overlay was filling `world._seen`, per platform tile per
+    // frame, in the same file whose walker layer is forbidden a world buffer
+    // for exactly this reason. The world's own scratch is STAMPED and a frame
+    // is drawn over it; the stamp has to survive, and the frame has to still
+    // be a frame (the platform is still painted its refusal red), or a
+    // renderer that drew nothing would pass.
+    O._seen.fill(0xab);
+    const stamped = O._seen.reduce((a, b) => a + b, 0);
+    const acc2 = shot("access");
+    const kept = O._seen.reduce((a, b) => a + b, 0);
+    const stillRed = (() => {
+      const [sx, sy] = ts(22.5, 13.5);
+      const bx = Math.round((sx - camera.x) * camera.zoom + canvas.width / 2);
+      const by = Math.round((sy - camera.y) * camera.zoom + canvas.height / 2);
+      for (let dy = -14; dy <= 14; dy += 2) for (let dx = -26; dx <= 26; dx += 2) {
+        const px = bx + dx;
+        const py = by + dy;
+        if (px < 0 || py < 0 || px >= canvas.width || py >= canvas.height) continue;
+        const got = renderer.pick(px, py);
+        if (!got || got[0] !== 22 || got[1] !== 13) continue;
+        const o = (py * canvas.width + px) * 4;
+        if (colour(acc2, o) !== colour(off, o)) return colour(acc2, o);
+      }
+      return -1;
+    })();
+    check("access: and drawing the overlay writes NOTHING on the world — the whole-map access pass asks a search of every platform it can see, and it brings its own scratch: the world's is stamped, the frame is drawn, and the stamp is still there afterwards",
+      O._seen.length === O.w * O.h && stamped === 0xab * O._seen.length && kept === stamped && stillRed === platRed,
+      `stamp ${stamped} → ${kept} over ${O._seen.length} tiles · the platform is still painted ${stillRed >= 0 ? stillRed.toString(16) : "NOTHING"}`);
     // AND THE BANDS SURVIVE THE KNOB MOVING. A fixed five-entry tint table read
     // at ROAD_REACH 5 handed a SERVED lot at five tiles the refusal red and an
     // unserved one `undefined` — no fill at all. The overlay's meaning
@@ -4945,6 +5173,56 @@ function costOfBulldoze(w, x, y) { return (0, costOfOp)(w, { kind: "bulldoze", x
   }
   check("panel: a BUILT lot still names its tier — the lazy name is still a name",
     named.length >= 6 && nameBad.length === 0, `${named.join(" ")} · ${nameBad.join(" · ")}`);
+
+  // ---- THE STATION CARD, IN ITS OWN WORDS ----------------------------------
+  //
+  // The card is the only place the forecourt is described to a player, and it
+  // had never been READ by anything: it printed the site's DISTANCE where the
+  // forecourt is distance MINUS ONE (at d = 1 the door is next door and
+  // nothing is crossed), and an unserved platform said the refusal twice -
+  // once in the access line and again in the station line. Both are words, so
+  // both are checked as words, on a world built for it.
+  {
+    const V = createWorld({ seed: "station-card" });
+    const v = (x, y) => y * V.w + x;
+    for (let y = 2; y <= 20; y++) for (let x = 2; x <= 40; x++) {
+      const i = v(x, y);
+      V.terrain[i] = TERRAIN.GRASS; V.road[i] = ROAD.NONE; V.zone[i] = ZONE.NONE;
+      V.tier[i] = 0; V.wall[i] = 0; V.rail[i] = 0; V.civic[i] = 0; V.big[i] = 0; V.use[i] = 0;
+    }
+    V.events.noDisasters = true;
+    const vroad = [];
+    for (let x = 4; x <= 36; x++) vroad.push(v(x, 6));
+    for (const x of [19, 21]) for (const y of [7, 8]) vroad.push(v(x, y)); // spurs, so ONE platform has two doors
+    apply(V, { kind: "road", tiles: vroad });
+    for (let x = 6; x <= 12; x++) V.terrain[v(x, 8)] = TERRAIN.WATER;      // and one has none
+    const vline = [];
+    for (let x = 6; x <= 34; x++) vline.push(v(x, 9));
+    apply(V, { kind: "rail", tiles: vline });
+    apply(V, { kind: "station", tx: 8, ty: 9 });   // behind the river: unserved
+    apply(V, { kind: "station", tx: 20, ty: 9 });  // two doors, one tile of forecourt
+    apply(V, { kind: "station", tx: 30, ty: 9 });  // one door, two tiles of forecourt
+    apply(V, { kind: "road", tiles: [v(30, 7)] }); // ...brought to d = 2 by a single tile
+    computeFields(V);
+    const vui = createUI(stubApp(V));
+    const cardAt = (i) => { vui.updateHover({ tile: i, pinned: true }); return textOf(document.getElementById("card")); };
+    const FI2 = await import("../js/sim/fields.js");
+    const far = cardAt(v(30, 9));
+    const two = cardAt(v(20, 9));
+    const none = cardAt(v(8, 9));
+    const d30 = FI2.siteRoadDist(V, v(30, 9));
+    const d20 = FI2.siteRoadDist(V, v(20, 9));
+    // The number the card prints is the number the SIM lays into the path.
+    const chainOf = (i) => (V._stationDoors && V._stationDoors[i] ? V._stationDoors[i][0][1].length : -1);
+    check("panel: the station card counts the forecourt the sim actually walks — a platform two tiles from its door says ONE tile of forecourt, not two, and the link chain the commute carries has exactly that many tiles in it",
+      d30 === 2 && chainOf(v(30, 9)) === 1 && /crossing 1 tile of forecourt on foot/.test(far) && !/crossing 2 tiles/.test(far)
+        && d20 === 2 && /riders board from 2 sides/.test(two) && /crossing 1 tile of forecourt on foot/.test(two),
+      `d ${d30}, chain ${chainOf(v(30, 9))} → "${(far.match(/crossing [^;]*/) || ["(nothing)"])[0]}" · two-door: "${(two.match(/riders board from [^;]*/) || ["(nothing)"])[0]}"`);
+    check("panel: and an unserved platform refuses ONCE — the access line gives the distance and the direction, the station line gives the consequence, and neither repeats the other",
+      /road access: none/.test(none) && (none.match(/no road within|nearest road is/g) || []).length === 1
+        && /a station nobody can board/.test(none) && !/a station with no road within/.test(none),
+      `"${(none.match(/road access:[^·]*/) || ["(nothing)"])[0].trim()}" + "${(none.match(/a station[^;]*/) || ["(nothing)"])[0].trim()}"`);
+  }
 
   // And the frame loop must survive whatever the panel does. main.js is the
   // only place that decides the game keeps running; read it, because a check
