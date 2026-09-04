@@ -81,13 +81,22 @@ const accessOpts = (world, i) => (world.rail[i] === 2 ? { passable } : {});
  * station is a wall.
  */
 export function passable(world, j) {
-  if (isBarrier(world, j)) return false;
-  if (world.terrain[j] === TERRAIN.WATER && world.road[j] === ROAD.NONE) return false; // a bridge is a road, and roads are doors
-  if (world.tier[j] > 0 && !world.rubble[j]) return false; // a building stands here
+  if (isBarrier(world, j)) return false;                                            // a bare wall (a tunnel carries a way, so it is not one)
+  if (world.terrain[j] === TERRAIN.WATER && world.road[j] === ROAD.NONE) return false; // open water; a bridge is a road, and roads are doors
+  if (world.tier[j] > 0) return false;                                              // a building stands here, burning or not
   const c = world.civic[j];
-  if (c && c !== CIVIC.PARK) return false;
+  if (c && c !== CIVIC.PARK) return false;                                          // a zoo, a station house, the centre - buildings all
   return true;
 }
+// RULINGS, so they are decisions and not omissions. RUBBLE is walkable: a
+// razed lot is tier 0 (events.toRubble lowers every storey before setting it),
+// so the tier test above covers a standing building and nothing else, and no
+// separate rubble clause is needed - one that looked necessary was dead.
+// TREES are walkable; an animal goes through a wood. FLOODING is not
+// consulted: a flood is weather, the ground is still ground, and roads carry
+// traffic straight through one - a forecourt that closed and re-opened with
+// the water would take a station's riders away and give them back for a
+// season, which is a bigger claim than this part is making.
 
 /**
  * ACCESS, the one standard (SPEC 6c). The owner: "as long as a tile is

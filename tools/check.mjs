@@ -1651,6 +1651,29 @@ check("determinism: same seed + same inputs ⇒ same hash", stateHash(A.world) =
         && siteRoadDist(R2, rr(18, 9)) === 3 && sv(R2, rr(18, 9)) && doors(R2, rr(18, 9)).length === 1
         && !!trip2 && ridesPath(trip2.path) && impassable.length === 0,
       `river ${siteRoadDist(R2, rr(8, 9))}/${doors(R2, rr(8, 9)).length} · houses ${siteRoadDist(R2, rr(14, 9))}/${doors(R2, rr(14, 9)).length} · grass ${siteRoadDist(R2, rr(18, 9))}/${doors(R2, rr(18, 9)).length} · rode ${trip2 && ridesPath(trip2.path)} · impassable ${impassable.length}`);
+    // The list itself, one row per ruling, so it is a decision that can fail
+    // rather than a comment that cannot.
+    {
+      const G2 = load(save(R2));
+      const g2 = (x, y) => y * G2.w + x;
+      const rows = [];
+      const say = (name, x, y, want) => rows.push({ name, got: passable(G2, g2(x, y)), want });
+      G2.terrain[g2(40, 12)] = TERRAIN.TREE;                                   say("a tree", 40, 12, true);
+      G2.rubble[g2(41, 12)] = 6;                                               say("rubble", 41, 12, true);
+      G2.flooded[g2(42, 12)] = 1;                                              say("a flood", 42, 12, true);
+      apply(G2, { kind: "park", tx: 43, ty: 12 });                             say("a park", 43, 12, true);
+      apply(G2, { kind: "zone", zone: ZONE.R, x0: 44, y0: 12, x1: 44, y1: 12, density: 3 }); say("chalk, unbuilt", 44, 12, true);
+      G2.tier[g2(44, 12)] = 1;                                                 say("a building", 44, 12, false);
+      G2.burning[g2(44, 12)] = 2;                                              say("a building alight", 44, 12, false);
+      apply(G2, { kind: "police", tx: 45, ty: 12 });                           say("a police station", 45, 12, false);
+      apply(G2, { kind: "wall", tiles: [g2(46, 12)] });                        say("a bare wall", 46, 12, false);
+      apply(G2, { kind: "road", tiles: [g2(46, 12)] });                        say("a tunnel through it", 46, 12, true);
+      G2.terrain[g2(47, 12)] = TERRAIN.WATER;                                  say("open water", 47, 12, false);
+      apply(G2, { kind: "road", tiles: [g2(47, 12)] });                        say("a bridge over it", 47, 12, true);
+      const wrong = rows.filter((r) => r.got !== r.want);
+      check("access: what a citizen may cross, one row per ruling — trees, rubble, a flood, a park and bare chalk yes; a building (alight or not), a civic that is not a park, and open water no; and a tunnel or a bridge is a way, not a wall",
+        wrong.length === 0 && rows.length === 12, wrong.map((r) => `${r.name}: ${r.got}, wanted ${r.want}`).join(" · ") || `${rows.length} rulings`);
+    }
     check("access: and a park is not a building — the one civic a citizen may walk across leaves the forecourt open",
       (() => {
         const P3 = load(save(R2));
