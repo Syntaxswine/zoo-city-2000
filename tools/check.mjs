@@ -1519,6 +1519,28 @@ check("determinism: same seed + same inputs ⇒ same hash", stateHash(A.world) =
       L2.use[l2(8, 7)] === 1 && !!plain && !!rabbit && !!foxReal
         && foxReal.cost === plain.cost && rabbit.cost > plain.cost,
       `unpainted ${plain && plain.cost} · rabbit ${rabbit && rabbit.cost} · fox ${foxReal && foxReal.cost}`);
+    // The whole ladder, one line per distance: the plan asks for two tiles as
+    // well as three, and one is the case that must NOT move.
+    const ladderRows = [1, 2, 3, 4].map((gap) => {
+      const P2 = clone();
+      const p2 = (x, y) => y * P2.w + x;
+      const track = [];
+      for (let x = 6; x <= 32; x++) track.push(p2(x, 6 + gap));
+      apply(P2, { kind: "rail", tiles: track });
+      apply(P2, { kind: "station", tx: 8, ty: 6 + gap });
+      apply(P2, { kind: "station", tx: 30, ty: 6 + gap });
+      computeFields(P2);
+      const plat = p2(8, 6 + gap);
+      const trip = commutePath(P2, "rabbit", [p2(6, 6)], [p2(32, 6)]);
+      return { gap, d: siteRoadDist(P2, plat), doors: doors(P2, plat).length, rode: !!trip && ridesPath(trip.path), time: trip ? commuteTime(trip.path) : null };
+    });
+    check("access: the station ladder — one, two and three tiles from the road all carry the line, four does not, and each tile of forecourt costs the journey two more steps (one at each end)",
+      ladderRows.every((r) => r.d === Math.min(KNOBS.ROAD_REACH + 1, r.gap))
+        && ladderRows.slice(0, 3).every((r) => r.doors === 1 && r.rode)
+        && ladderRows[3].doors === 0 && ladderRows[3].rode === false
+        && Math.abs(ladderRows[1].time - ladderRows[0].time - 2) < 1e-9
+        && Math.abs(ladderRows[2].time - ladderRows[1].time - 2) < 1e-9,
+      ladderRows.map((r) => `${r.gap}:${r.d}/${r.doors}${r.rode ? "R" : "-"}${r.time == null ? "" : "@" + r.time.toFixed(1)}`).join(" "));
     const B2 = load(save(S));
     const b2 = (x, y) => y * B2.w + x;
     apply(B2, { kind: "wall", tiles: [b2(7, 8), b2(8, 8), b2(9, 8), b2(7, 7), b2(8, 7), b2(9, 7)] });

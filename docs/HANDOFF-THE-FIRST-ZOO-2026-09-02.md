@@ -1773,6 +1773,14 @@ that distance, ascending — because all sides are access points.
 | meat hall, centre, fire, police | `hasAccess` | `served` |
 | doors | ONE road tile, first in N-E-S-W order | every road tile at the site's distance |
 
+**R1 alone is hash-neutral, measured.** The plan asked for the op-time
+recompute to land first with every gate unchanged. It landed with the rest,
+so the claim was checked in a scratch worktree instead: the hunk applied to
+`411d903` and nothing else gives `771239e1` / `27376829` / `10a8a697` /
+`e48a4e21` on balanced / dormitory / millbelt / estate — the same four
+hashes as the untouched tree — and 428 checks, 0 failures. A claim of the
+form "this changes nothing" is cheap to make and cheap to check; check it.
+
 **Measured** (`tools/accessprobe.mjs --layout millbelt`, seed 7, 30 years):
 mean **1.42 doors a lot**, **37% of lots leavable by more than one side**,
 **11 industrial lots at tier 3 that the frontage rule capped at 2**, 0 lots

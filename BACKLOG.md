@@ -259,6 +259,13 @@ path tile by tile, so it is walked, priced and drawn as the walk it is.
 SC2000's industrial frontage rule (`roadDist <= 1` for tier 3) is deleted.
 An unserved zoo loses its jobs, its halo and its place on the cap together.
 
+R1 — recomputing the road field AT THE OP — was proved hash-neutral on its
+own, the way the plan asked, and not merely argued: applied alone to
+`411d903` in a scratch worktree, the four 30-year gates come back
+byte-identical (`771239e1` balanced, `27376829` dormitory, `10a8a697`
+millbelt, `e48a4e21` estate) and the suite passes 428/0. Everything else in
+this part moves the hash on purpose.
+
 Measured (`tools/accessprobe.mjs --layout millbelt`, seed 7, 30 years):
 **37% of zoned lots can be left by more than one side** (mean 1.42 doors),
 and **11 industrial lots stand at tier 3 that the frontage rule capped at 2**.
