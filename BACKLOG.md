@@ -304,6 +304,34 @@ Two defects the standard turned up on its way in:
   The mayor now takes the first free 2×2 a road REACHES; a rig that cannot
   build a working zoo cannot measure one.
 
+## OPEN — a save taken in the SAME MONTH as an op reloads to a different city (PRE-EXISTING, found 2026-09-04)
+
+Not Part R's, and older than it: measured on `411d903`, before any of this
+work. `invalidatePaths` nulls every commute; a reload's `rebuildDerived`
+rebuilds them all. So between an op and the next tick the two disagree, and
+the first tick after the load computes traffic from real paths where the
+straight run computes it from none - pollution, land value and everything
+downstream follow.
+
+```
+town: 200 citizens
+  save IMMEDIATELY after a road edit: DIVERGED at month +1
+  save one month after the road edit: holds for 12 months
+```
+
+Reachable in play, because the autosave is not only the 12-tick one: `main.js`
+also autosaves on `pagehide` and on `visibilitychange`, at whatever moment the
+player switches tab or closes it. Lay a road, switch tab, come back tomorrow,
+and the city is a hair different from the one you left. Small, and real.
+
+Three ways out, none of them Part R's to choose: re-plan eagerly inside
+`invalidatePaths` (costs a full commute pass per road edit, and moves WHEN a
+job is lost, which is a rule change); make `save` refuse to serialise while
+paths are stale (it would have to tick or wait); or accept it and say so in
+SPEC §15. The suite's own convention is already the third - every save/load
+check ticks before it saves - so today the law is really "hash-equal from any
+TICK boundary", and §16 does not say that.
+
 ## OPEN — the second hostile review's findings (2026-09-04, scored 6.5/10)
 
 **These are NOT fixed.** They are written down before they are fixed so that

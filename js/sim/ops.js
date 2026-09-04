@@ -454,6 +454,12 @@ export function apply(world, op, { log = true } = {}) {
   // hash-neutral — the tick recomputed exactly these before anything read them.
   if (roads || walls || rails) { world.roadsDirty = true; invalidatePaths(world); computeOcclusion(world); computeRoadDist(world); computeStationDoors(world); }
   else if (lines) invalidatePaths(world); // the stale pass re-searches under the line and releases the workers it forbids
+  // A CIVIC or a BULLDOZE changes `tier`/`civic`, which is ground a station's
+  // forecourt is measured on, and neither sets `roads`. Recompute the door
+  // graph after every op and invalidate if it moved - the same rule tick.js
+  // applies after lotsTick, for the same reason.
+  computeStationDoors(world);
+  if (world.doorsMoved) { world.doorsMoved = false; invalidatePaths(world); }
   resetMeatRoutes(world); // a hall, its door, capacity or the freight graph may have changed inside this tick
   post(world, "build", -plan.cost);
   world.undoStack = plan.evicts ? [] : [{ op, snap, cost: plan.cost, roads: roads || walls || rails, t: world.tick }];
@@ -501,6 +507,8 @@ export function undo(world) {
   }
   if (u.roads) { world.roadsDirty = true; invalidatePaths(world); computeOcclusion(world); computeRoadDist(world); computeStationDoors(world); } // live, as apply does
   else if (u.op.kind === "use") invalidatePaths(world);
+  computeStationDoors(world);
+  if (world.doorsMoved) { world.doorsMoved = false; invalidatePaths(world); }
   resetMeatRoutes(world);
   post(world, "build", u.cost);
   world.log.push({ t: world.tick, op: { kind: "undo" } });

@@ -131,6 +131,7 @@ export function rebuildDerived(world) {
   recountRosters(world);
   // Paths first (deterministic), then fields (traffic reads paths).
   computeFields(world); // computes roadDist and the station links, so doorsOf and the commute search work
+  world.doorsMoved = false; // a loaded city is about to re-plan every path anyway
   for (const c of world.citizens) {
     if (c.job < 0 || c.home < 0) continue;
     const a = doorsOf(world, c.home);

@@ -572,9 +572,10 @@ export function computeStationDoors(world) {
   const links = world._stationDoors && world._stationDoors.length === n ? world._stationDoors : (world._stationDoors = new Array(n));
   links.fill(undefined);
   world._hasStationDoors = false;
+  const sig = [];
   let any = false;
   for (let i = 0; i < n && !any; i++) if (world.rail[i] === 2) any = true;
-  if (!any) return;
+  if (!any) { markDoorsMoved(world, ""); return; }
   const prev = world._doorPrev && world._doorPrev.length === n ? world._doorPrev : (world._doorPrev = new Int32Array(n));
   const seen = doorScratch(world);
   // An edge carries only the tiles it crosses; its COST is worked out at
@@ -597,7 +598,34 @@ export function computeStationDoors(world) {
       add(j, i, chain.slice().reverse());
       world._hasStationDoors = true;
     }
+    sig.push(`${i}:${doors.join(",")}`);
   }
+  markDoorsMoved(world, sig.join("|"));
+}
+
+/**
+ * A PLATFORM'S DOORS ARE DERIVED FROM THE GROUND, AND THE GROUND MOVES.
+ * `passable` reads `tier` and `civic`: a building that GROWS across a
+ * forecourt, or a civic dropped on one, closes a way that stored commutes are
+ * already walking - and neither goes through the road/wall/rail branch of
+ * ops.apply that invalidates paths. A reload re-plans everything, the straight
+ * run keeps the stale paths, and save -> load -> continue parts company one
+ * month later. (Found by a hostile review; it is handoff 24's own lesson - a
+ * shape change invalidates what was derived from the shape - applied to merges
+ * and splits and not to the shape change this part invented.)
+ *
+ * So the signature of the whole door graph is kept, and any change to it says
+ * so. The first computation on a world sets the signature and claims nothing:
+ * a freshly loaded city has just rebuilt every path already. The FLAG is
+ * cleared by whoever acts on it (tick.js, ops.js), which is where
+ * citizens.invalidatePaths lives - fields.js may not import it without a
+ * cycle, and one implementation of "every commute is stale" is worth the
+ * indirection.
+ */
+function markDoorsMoved(world, sig) {
+  const had = world._stationDoorSig;
+  world._stationDoorSig = sig;
+  if (had !== undefined && had !== sig) world.doorsMoved = true;
 }
 
 /** Edge road tiles (on the map border). */

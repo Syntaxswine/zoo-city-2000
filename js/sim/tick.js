@@ -1,12 +1,12 @@
 // tick.js — one month, in the order SPEC §1 states. The only orchestrator.
 
 import { KNOBS } from "./rules.js";
-import { computeFields, recountRosters } from "./fields.js";
+import { computeFields, recountRosters, computeStationDoors } from "./fields.js";
 import { census, needCensus, notables } from "./census.js";
 import { updateDemand, peekDemand, neutralRate } from "./demand.js";
 import { yearlyFigures } from "./budget.js";
 import { lotsTick } from "./lots.js";
-import { citizensTick, compact } from "./citizens.js";
+import { citizensTick, compact, invalidatePaths } from "./citizens.js";
 import { budgetTick } from "./budget.js";
 import { eventsTick } from "./events.js";
 import { justiceTick } from "./justice.js";
@@ -52,6 +52,14 @@ export function tick(world) {
   // 4. lots
   const lots = lotsTick(world);
   notices.push(...lots.landmarks); // a landmark rose (SPEC §3c); lotsTick logged it under its own id
+  // 4b. lotsTick may have BUILT or RAZED across a station's forecourt, which is
+  // ground `fields.passable` reads: the platform's doors move and stored
+  // commutes are left walking through a building. Settle it HERE, in the month
+  // it happened and before the citizens run, so the stale pass re-plans this
+  // month - a month later would be worse than useless, because traffic and
+  // everything downstream of it would already have been taken from the old
+  // paths in one world and the new ones in the other.
+  settleDoors(world);
   // 5. citizens
   const cit = citizensTick(world, cen, dem);
   notices.push(...cit.zonedOutLines); // use-zoning: households that left under the player's line (SPEC §7.8)
@@ -114,8 +122,29 @@ export function tick(world) {
  * load, or after a rate change while paused) so the panel never shows
  * placeholders. Valves are not advanced; counts are current.
  */
+/**
+ * A PLATFORM'S DOORS ARE DERIVED FROM GROUND THAT MOVES. `fields.passable`
+ * reads `tier` and `civic`, so a building that grows across a forecourt - or a
+ * civic dropped on one - closes a way that stored commutes are already
+ * walking, and neither goes through the road/wall/rail branch of ops.apply
+ * that invalidates paths. `computeStationDoors` keeps a signature of the whole
+ * door graph and raises `world.doorsMoved` when it changes; this is the one
+ * place a tick acts on it, with the same `invalidatePaths` a road edit uses.
+ * (A hostile review found the hole: save -> load -> continue parted company a
+ * month after a police station was dropped on a forecourt, and `c.path` is not
+ * in the saved citizen, so the hash hid it for two years first.)
+ */
+function settleDoors(world) {
+  computeStationDoors(world);
+  if (!world.doorsMoved) return false;
+  world.doorsMoved = false;
+  invalidatePaths(world);
+  return true;
+}
+
 export function refreshLast(world) {
   computeFields(world);
+  settleDoors(world);
   recountRosters(world);
   const cen = census(world);
   Object.assign(cen, meatCensus(world));

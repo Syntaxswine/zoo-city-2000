@@ -1763,6 +1763,102 @@ check("determinism: same seed + same inputs ⇒ same hash", stateHash(A.world) =
       `${crossing} commutes cross a forecourt · ${paths} paths differ at the save · ${stateHash(T2)} vs ${stateHash(T3)}`);
   }
 
+  // ---- the ground under a forecourt MOVES ----------------------------------
+  {
+    // The second hostile review's find, and the worst of the session: a
+    // building grown across a forecourt, or a civic dropped on one, closes a
+    // way stored commutes are already walking. Neither goes through the
+    // road/wall/rail branch of ops.apply that invalidates paths, so a straight
+    // run kept the stale commutes while a reload re-planned, and the two
+    // parted company a month later - hidden at first, because `c.path` is not
+    // in the saved citizen and the hash could not see it.
+    //
+    // THE RIG MAKES RIDING NECESSARY, NOT ATTRACTIVE. Two road systems that
+    // never touch, and one line across the gap: every commute from the homes
+    // to the work must ride, and every rider crosses a forecourt. A first
+    // draft put both halves on one road and hoped riding would win - it did on
+    // ONE seed of four, which is a bet, not a rig.
+    const townOf = (seed) => {
+      const W2 = createWorld({ seed });
+      const ww = (x, y) => y * W2.w + x;
+      for (let y = 2; y <= 34; y++) for (let x = 2; x <= 56; x++) {
+        const i = ww(x, y);
+        W2.terrain[i] = TERRAIN.GRASS; W2.road[i] = ROAD.NONE; W2.zone[i] = ZONE.NONE;
+        W2.tier[i] = 0; W2.wall[i] = 0; W2.rail[i] = 0; W2.civic[i] = 0; W2.big[i] = 0;
+      }
+      W2.cash = 600000;
+      W2.events.noDisasters = true;
+      const av = [];
+      for (const y of [6, 26]) for (let x = 4; x <= 54; x++) av.push(ww(x, y));
+      apply(W2, { kind: "road", tiles: av });
+      const ln = [];
+      for (let y = 9; y <= 23; y++) ln.push(ww(30, y));
+      apply(W2, { kind: "rail", tiles: ln });
+      apply(W2, { kind: "station", tx: 30, ty: 9 });   // three tiles below the north road
+      apply(W2, { kind: "station", tx: 30, ty: 23 });  // three tiles above the south road
+      for (const [x0, x1] of [[20, 28], [32, 40]]) {
+        apply(W2, { kind: "zone", zone: ZONE.R, x0, y0: 7, x1, y1: 8, density: 3 });
+        apply(W2, { kind: "zone", zone: x0 === 20 ? ZONE.C : ZONE.I, x0, y0: 24, x1, y1: 25, density: 3 });
+      }
+      for (let k = 0; k < 15 * 12; k++) tick(W2);
+      return { W2, ww };
+    };
+    const crossers = (w) => {
+      let n = 0;
+      for (const c of w.citizens) {
+        if (c.dead || !c.path) continue;
+        for (let k = 0; k < c.path.length; k++) {
+          const t = c.path[k] & TILE;
+          if (!(c.path[k] & RIDE) && w.road[t] === ROAD.NONE && w.rail[t] !== 2) { n++; break; }
+        }
+      }
+      return n;
+    };
+    const throughWalls = (w) => {
+      let n = 0;
+      for (const c of w.citizens) {
+        if (c.dead || !c.path) continue;
+        for (let k = 0; k < c.path.length; k++) {
+          const t = c.path[k] & TILE;
+          if (!(c.path[k] & RIDE) && w.road[t] === ROAD.NONE && w.rail[t] !== 2 && !passable(w, t)) { n++; break; }
+        }
+      }
+      return n;
+    };
+    const town = townOf("forecourt-moves");
+    const before = crossers(town.W2);
+
+    // (a) AN OP: a civic dropped on the forecourt the riders cross.
+    const A2 = load(save(town.W2));
+    const a2 = town.ww;
+    const rp = apply(A2, { kind: "police", tx: 30, ty: 8 });
+    // One month, so the straight run's stale pass has re-planned before the
+    // save. Saving in the SAME month as any path-invalidating op has diverged
+    // since long before this part - a road edit does it too, measured on
+    // 411d903 - and that hole is in the BACKLOG, not this check's business.
+    tick(A2);
+    const A3 = load(save(A2));
+    const stillWalking = throughWalls(A2);
+    let apart = -1;
+    for (let k = 0; k < 24 && apart < 0; k++) { tick(A2); tick(A3); if (stateHash(A2) !== stateHash(A3)) apart = k + 1; }
+    check("access: a civic dropped on a forecourt closes it, and every commute that walked it re-plans in the same breath \u2014 nobody is left walking through a police station, and save \u2192 load \u2192 two more years holds",
+      before >= 50 && rp.ok && A2.civic[a2(30, 8)] === CIVIC.POLICE && !sv(A2, a2(30, 9)) && stillWalking === 0 && apart === -1,
+      `${before} crossed a forecourt \u00b7 ${stillWalking} still walking through the station \u00b7 ${apart < 0 ? "no divergence in 24 months" : `DIVERGED at month +${apart}`}`);
+
+    // (b) NO OP AT ALL: zone the forecourt and let the town build across it.
+    const B2 = load(save(town.W2));
+    apply(B2, { kind: "zone", zone: ZONE.R, x0: 30, y0: 7, x1: 30, y1: 8, density: 3 });
+    let grew = 0;
+    for (let k = 0; k < 10 * 12 && !grew; k++) { tick(B2); grew = (B2.tier[town.ww(30, 7)] > 0 ? 1 : 0) + (B2.tier[town.ww(30, 8)] > 0 ? 1 : 0); }
+    const B3 = load(save(B2));
+    const stillWalking2 = throughWalls(B2);
+    let apart2 = -1;
+    for (let k = 0; k < 24 && apart2 < 0; k++) { tick(B2); tick(B3); if (stateHash(B2) !== stateHash(B3)) apart2 = k + 1; }
+    check("access: and the same when NOBODY does anything \u2014 zone the forecourt, let a house grow on it, and the commutes that used it re-plan the month the wall goes up",
+      grew > 0 && stillWalking2 === 0 && apart2 === -1,
+      `${grew} houses grew on the forecourt \u00b7 ${stillWalking2} commutes still walk through one \u00b7 ${apart2 < 0 ? "no divergence in 24 months" : `DIVERGED at month +${apart2}`}`);
+  }
+
   // ---- WAREHOUSES: the frontage rule is gone --------------------------------
   {
     const I = clone();
