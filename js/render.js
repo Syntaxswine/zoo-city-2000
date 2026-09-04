@@ -48,17 +48,28 @@ const MARGIN = 256; // projection px around the viewport kept in the static laye
 const REACH_UP = 120; // tallest sprite above its tile's north vertex
 const REACH_SIDE = 40;
 const BUSY = 40;
-// The access overlay (SPEC 6c). THREE DIFFERENT GREENS for one, two and
-// three tiles from the road, not one green at three alphas: this paints over
-// grass, asphalt, chalk and water-side sand, and a band told apart only by
-// how strong it is stops being a band on a dark ground. The road itself is
-// untinted, and out of reach is the zot red.
+// The access overlay (SPEC 6c): the road untinted, then one, two and three
+// tiles from it, then the zot red for out of reach.
+//
+// NOT GREEN. The first version was three greens, and the owner reported that
+// only two tiles beside a road counted. They counted right: band 1 over grass
+// mid rendered as #96AF50 and the grass ramp's own light shade is #96A551 -
+// the nearest band was not a tint, it was grass, and the eye had no way to
+// know. A ground diamond is painted from SEVERAL shades of one ramp and its
+// untinted neighbours use the same ramp, so a tint fails the moment the colour
+// it makes over one shade lands on ANY shade of that ramp.
+//
+// Measured over every ground ramp (grass, canopy, earth, asphalt, concrete)
+// against every shade of the SAME ramp, worst case, on the weighted distance
+// Part M' uses: three greens 4.2, three violets 8.4, blue 8.9, cream-to-violet
+// 12.0. Cream to violet it is - pale sand, dusty mauve, aubergine, rust - a
+// four-step ramp that stays off the map's greens entirely.
 //
 // Indexed by DISTANCE, and the index is clamped: KNOBS.ROAD_REACH is a knob,
 // and a fixed five-entry table read at ROAD_REACH 5 handed a served lot the
 // refusal red and an unserved one `undefined` - the overlay's meaning
-// inverted. The deepest green is simply the last band, however many there are.
-const ACCESS_GREEN = ["rgba(178,208,96,0.55)", "rgba(112,166,84,0.55)", "rgba(52,110,72,0.55)"];
+// inverted. The last band is simply the last, however many there are.
+const ACCESS_BAND = ["rgba(246,232,200,0.60)", "rgba(186,130,200,0.60)", "rgba(92,56,130,0.65)"];
 const ACCESS_RED = "rgba(190,70,60,0.60)";
 const BG = "#d6d1bf"; // beyond the map: the plate's ground, as in the sibling field guides
 const RED_TINT = { "=": "0", "(": "0" };
@@ -354,7 +365,7 @@ export function createRenderer(canvas, initialWorld, art) {
           // its voice.
           const d = siteRoadDist(world, i);
           fill = d === 0 ? null
-            : d <= KNOBS.ROAD_REACH ? ACCESS_GREEN[Math.min(d, ACCESS_GREEN.length) - 1]
+            : d <= KNOBS.ROAD_REACH ? ACCESS_BAND[Math.min(d, ACCESS_BAND.length) - 1]
             : asksAccess(world, i) ? ACCESS_RED
             : null;
         }

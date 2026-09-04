@@ -2127,6 +2127,50 @@ check("determinism: same seed + same inputs ⇒ same hash", stateHash(A.world) =
         && O.roadDist[oat(14, 11)] > KNOBS.ROAD_REACH
         && colour(acc, loneFar) !== colour(acc, wildFar) && colour(acc, wildFar) === colour(off, wildFar),
       `zoned ${loneFar >= 0 ? colour(acc, loneFar).toString(16) : "?"} · open country ${wildFar >= 0 ? colour(acc, wildFar).toString(16) : "?"} (untinted ${wildFar >= 0 ? colour(off, wildFar).toString(16) : "?"})`);
+    // LEGIBILITY, measured. The check above compares ONE pixel of each band
+    // against the same pixel unpainted, and that cannot see the failure the
+    // owner found: the first shipped ramp was three greens, band 1 over grass
+    // mid rendered #96AF50, and the grass ramp's own light shade is #96A551.
+    // Unequal, and invisible. A ground diamond is painted from SEVERAL shades
+    // of one ramp and its untinted neighbours use the same ramp, so the real
+    // question is whether a tinted tile's WHOLE palette stays clear of the
+    // bare ground's whole palette - and whether the bands stay clear of each
+    // other. Weighted distance (green weighted most, as the eye does).
+    const palette = (buf, tx, ty) => {
+      const [sx, sy] = ts(tx + 0.5, ty + 0.5);
+      const bx = Math.round((sx - camera.x) * camera.zoom + canvas.width / 2);
+      const by = Math.round((sy - camera.y) * camera.zoom + canvas.height / 2);
+      const out = new Set();
+      for (let dy = -7; dy <= 7; dy++) for (let dx = -14; dx <= 14; dx++) {
+        const px = bx + dx;
+        const py = by + dy;
+        if (px < 0 || py < 0 || px >= canvas.width || py >= canvas.height) continue;
+        const got = renderer.pick(px, py);
+        if (!got || got[0] !== tx || got[1] !== ty) continue;
+        out.add(colour(buf, (py * canvas.width + px) * 4));
+      }
+      return [...out];
+    };
+    const apart = (a, b) => {
+      const dr = ((a >> 16) & 255) - ((b >> 16) & 255);
+      const dg = ((a >> 8) & 255) - ((b >> 8) & 255);
+      const db = (a & 255) - (b & 255);
+      return Math.sqrt(2 * dr * dr + 4 * dg * dg + 3 * db * db) / 3;
+    };
+    const gap = (xs, ys) => { let m = Infinity; for (const a of xs) for (const b of ys) m = Math.min(m, apart(a, b)); return m; };
+    const painted = [1, 2, 3, 4].map((d) => palette(acc, 10, 6 + d));
+    const bare = [1, 2, 3, 4].map((d) => palette(off, 10, 6 + d)).flat().concat(palette(off, 14, 11), palette(acc, 14, 11));
+    const LEGIBLE = 8;
+    let worstBare = Infinity;
+    let worstBand = Infinity;
+    for (let i = 0; i < painted.length; i++) {
+      worstBare = Math.min(worstBare, gap(painted[i], bare));
+      for (let j = i + 1; j < painted.length; j++) worstBand = Math.min(worstBand, gap(painted[i], painted[j]));
+    }
+    check("access: and the bands are LEGIBLE, not merely different — every colour a tinted tile shows stays clear of every colour the bare ground shows, and of the other bands; three greens failed this at 4 because band 1 over grass mid rendered as the grass ramp's own light shade",
+      painted.every((pp) => pp.length >= 3) && worstBare > LEGIBLE && worstBand > LEGIBLE,
+      `worst against bare ground ${worstBare.toFixed(1)} · worst between bands ${worstBand.toFixed(1)} · the gate is ${LEGIBLE}`);
+
     // A PLATFORM out of reach is a refusal too, and it is the only one of the
     // three arms that can be photographed: a zoo's own sprite covers all four
     // of its ground diamonds, so the overlay under a zoo is invisible — a real
