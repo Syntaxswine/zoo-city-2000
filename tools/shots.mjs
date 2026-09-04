@@ -201,6 +201,11 @@ function sheets(z) {
     { sprite: OVERLAYS.fire[1], label: "fire 1 (over cottage)", onTile: true, under: BUILDINGS[1][1][0], lift: 6 },
     { sprite: OVERLAYS.flood[0], label: "flood (over grass)", onTile: true },
     { sprite: RUBBLE, label: "rubble", onTile: false },
+    // On a crossroads, which is where the design says a camera belongs: the
+    // lens rides the +a end on yaw 0 and the +b side on yaw 1, and the mast
+    // is on the east corner in both because only that corner is depth-clean.
+    { sprite: OVERLAYS.camera[0], label: "camera yaw 0 (over crossroads)", onTile: true, under: ROADS[0][N | E | S | W] },
+    { sprite: OVERLAYS.camera[1], label: "camera yaw 1 (over crossroads)", onTile: true, under: ROADS[0][N | E | S | W] },
   ];
   {
     const cols = 5, cellW = 150, cellH = 110, groundY = 90;
