@@ -429,9 +429,12 @@ export function createUI(app) {
           ? `road access: on the road · ${rep.doors.length === 1 ? "its tile" : `${rep.doors.length} road tiles`} ${doors}`
           : `road access: ${rep.siteDist} tile${rep.siteDist === 1 ? "" : "s"} · ${rep.doors.length === 1 ? "door" : `${rep.doors.length} doors, every side counts:`} ${doors}${rep.doors.length > 4 ? " …" : ""}`));
       } else if (rep.nearest && rep.nearest.doors.length) {
-        lines.push(el("div", "warn", `no road within ${KNOBS.ROAD_REACH} — the nearest is ${rep.nearest.d} tiles away at ${xy(rep.nearest.doors[0])}`));
+        // Parallel to the served line above, and NOT another "no road within
+        // 3": the score line has already said that, and what the reader wants
+        // next is how far and which way.
+        lines.push(el("div", "warn", `road access: none — the nearest road is ${rep.nearest.d} tiles away at ${xy(rep.nearest.doors[0])}, ${rep.nearest.d - KNOBS.ROAD_REACH} too far`));
       } else {
-        lines.push(el("div", "warn", `no road within ${KNOBS.ROAD_REACH}, and none within ${rep.nearest ? rep.nearest.d - 1 : 8} either`));
+        lines.push(el("div", "warn", `road access: none — no road within ${rep.nearest ? rep.nearest.d - 1 : 8} tiles in any direction`));
       }
     }
     const env = el("div", "dim");

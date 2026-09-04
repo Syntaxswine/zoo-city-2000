@@ -338,7 +338,18 @@ export function createRenderer(canvas, initialWorld, art) {
           // The number the RULE reads, not the tile's own: fields.siteRoadDist
           // asks the whole footprint, so every tile of a block paints the one
           // distance that decides whether the building is served.
-          fill = ACCESS_TINT[Math.min(KNOBS.ROAD_REACH + 1, siteRoadDist(world, i))];
+          //
+          // The greens are REACH and are painted everywhere, so a player can
+          // see where a road would let them build before they zone. The red is
+          // a REFUSAL and is painted only where something is actually asking —
+          // a lot, a civic, a platform. On open country "no road within 3" is
+          // not a complaint, it is countryside, and a first draft that washed
+          // four fifths of a young map in warning red said so at the top of
+          // its voice.
+          const d = siteRoadDist(world, i);
+          fill = d <= KNOBS.ROAD_REACH ? ACCESS_TINT[d]
+            : world.zone[i] !== ZONE.NONE || world.civic[i] || world.rail[i] === 2 ? ACCESS_TINT[KNOBS.ROAD_REACH + 1]
+            : null;
         }
         else if (mode === "score" && world.zone[i] !== ZONE.NONE) {
           const s = lotScore(world, i).score;

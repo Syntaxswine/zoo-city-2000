@@ -1710,7 +1710,7 @@ check("determinism: same seed + same inputs ⇒ same hash", stateHash(A.world) =
       /road access: 1 tile · door \(12,6\)/.test(one) && /road access: 3 tiles · door \(12,6\)/.test(three),
       `${(one.match(/road access:[^\n]*/) || [""])[0]} —— ${(three.match(/road access:[^\n]*/) || [""])[0]}`);
     check("access: and on a lot the rule refuses it says how far the nearest road actually is — the question a player asks the moment they see the red",
-      /no road within 3 — the nearest is 6 tiles away at \(12,6\)/.test(none),
+      /road access: none — the nearest road is 6 tiles away at \(12,6\), 3 too far/.test(none),
       (none.match(/no road[^\n]*/) || [""])[0]);
   }
 
@@ -1723,6 +1723,11 @@ check("determinism: same seed + same inputs ⇒ same hash", stateHash(A.world) =
     const { toScreen: ts } = await import("../js/iso/iso.js");
     const O = clone();
     const oat = (x, y) => y * O.w + x;
+    // The ladder is ZONED here: the greens are reach and are painted on any
+    // ground, but the red is a refusal and is painted only where something is
+    // asking. An unzoned tile at 4 is countryside, and the check below holds
+    // that distinction as hard as it holds the bands.
+    apply(O, { kind: "zone", zone: ZONE.R, x0: 10, y0: 7, x1: 10, y1: 10, density: 3 });
     apply(O, { kind: "zone", zone: ZONE.R, x0: 22, y0: 8, x1: 24, y1: 10, density: 3 });
     for (let y = 8; y <= 10; y++) for (let x = 22; x <= 24; x++) O.tier[oat(x, y)] = 3;
     computeFields(O);
@@ -1770,6 +1775,14 @@ check("determinism: same seed + same inputs ⇒ same hash", stateHash(A.world) =
       bcorner >= 0 && loneFar >= 0 && O.roadDist[oat(24, 10)] > KNOBS.ROAD_REACH && O.roadDist[oat(10, 10)] > KNOBS.ROAD_REACH
         && colour(acc, bcorner) === colour(acc, pixelOf(22, 8)) && colour(acc, bcorner) !== colour(acc, loneFar),
       `corner ${bcorner >= 0 ? colour(acc, bcorner).toString(16) : "?"} vs the lone tile ${loneFar >= 0 ? colour(acc, loneFar).toString(16) : "?"}`);
+    // The red is a refusal, not a map of the countryside: the same distance,
+    // zoned and unzoned, and only one of them is painted.
+    const wildFar = pixelOf(14, 11);
+    check("access: the red says NO to something that asked — a zoned lot four tiles out is painted, the open country beside it at the same distance is left alone",
+      loneFar >= 0 && wildFar >= 0 && O.zone[oat(10, 10)] !== ZONE.NONE && O.zone[oat(14, 11)] === ZONE.NONE
+        && O.roadDist[oat(14, 11)] > KNOBS.ROAD_REACH
+        && colour(acc, loneFar) !== colour(acc, wildFar) && colour(acc, wildFar) === colour(off, wildFar),
+      `zoned ${loneFar >= 0 ? colour(acc, loneFar).toString(16) : "?"} · open country ${wildFar >= 0 ? colour(acc, wildFar).toString(16) : "?"} (untinted ${wildFar >= 0 ? colour(off, wildFar).toString(16) : "?"})`);
     // main.js boots the whole app on import, so the key map is read as source.
     const mainSrc = readFileSync(path.join(ROOT, "js", "main.js"), "utf8");
     check("access: the O key reaches it, and it has a word to say for itself",
