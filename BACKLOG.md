@@ -304,6 +304,92 @@ Two defects the standard turned up on its way in:
   The mayor now takes the first free 2×2 a road REACHES; a rig that cannot
   build a working zoo cannot measure one.
 
+## OPEN — the second hostile review's findings (2026-09-04, scored 6.5/10)
+
+**These are NOT fixed.** They are written down before they are fixed so that
+they survive the session. A second adversarial reader ran 49 mutants of their
+own against `ea014d5` and found ten survivors, six of them behaviourally live,
+three sitting on the very lines the FIRST review's fixes added.
+
+1. **THE SAVE/LOAD LAW BREAKS. (worst; a determinism bug reachable by ordinary
+   play.)** `fields.passable` reads `world.tier` and `world.civic`, and NOTHING
+   invalidates paths when those change: `ops.apply` invalidates only for
+   `roads || walls || rails`, and `lotsTick` growing a building never does. So
+   a stored commute laid across a station's forecourt keeps crossing it after a
+   building or a civic stands there. Reproduced two ways — one player op (a
+   police station on the forecourt), and no op at all (zone the strip and let
+   it build) — each diverging one month after a reload: `3915a6f0` vs
+   `6ffb842b`, `34eba157` vs `e0bb2571`. A control with the same rig and the
+   police station four tiles OFF the forecourt holds for 60 months. It is the
+   forecourt, not the op. Worse, `c.path` is not in `canonicalCitizen`, so the
+   divergence hides for a while: 15 paths differed live-vs-reload with the hash
+   still equal for 24 months. **This is my own handoff §24 lesson — changing a
+   thing's SHAPE changes its derived state — wired for merges and splits and
+   not for the new shape change Part R invented: a building GROWING.**
+2. **Surviving mutant: `computeStationDoors` without its `passable` gate.** The
+   card says a river platform has no doors while the graph rides it and the
+   rabbit swims, and the suite is green. The flagship sentence of the first
+   review's fix ("the field, the doors the card lists and the edges the graph
+   carries cannot disagree", SPEC §6c) has no check behind it: the GROUND
+   fixture routes a commute that never touches the river platform.
+3. **Surviving mutant: `links.fill(undefined)`.** Stale link edges accumulate
+   one copy per tick, and a rabbit rides a doorless platform through a wall.
+4. **Surviving mutant: the civic clause of `passable`.** A police station, a
+   fire station, the centre and a zoo on a forecourt are all unpinned (the
+   rulings table added in `572b5d2` covers a police station — recheck which
+   half of this survives on HEAD).
+5. **Surviving mutant: the doors sort.** Deleting one line moves EVERY
+   published gate hash and the millbelt town by +10% (1563 → 1720 citizens),
+   and the suite reports 478/0. The town canary added for exactly this does not
+   fire — one town, one band, and the band is far too wide.
+6. **Surviving mutant: only the first door of a platform is linked.** The card
+   says "riders board from 2 sides" while the graph has one. "All sides are
+   access points" is checked for a lot and for a block and NOT for the one site
+   type where the doors are the only way in.
+7. **Surviving mutant: `joinable` no longer asks `served`.** That premise is
+   asserted in SPEC §6c, handoff §24b and this file — three times, tested zero.
+8. **A THIRD guard that cannot be false, and a false sentence in SPEC.**
+   `check.mjs` restores `KNOBS.ROAD_REACH` BEFORE the check that reads it, so
+   `NEAR_REACH > KNOBS.ROAD_REACH` is evaluated as `8 > 3`. And the claim is
+   false anyway: `NEAR_REACH` is a module-load constant, so at `ROAD_REACH` 9
+   the card looks LESS far than the rule does. SPEC §6c puts that sentence
+   under the heading "ROAD_REACH is a knob and everything moves with it".
+9. **The card overstates the forecourt by one tile** — it prints `siteDist`
+   where the forecourt is `siteDist - 1`, and the suite's own count agrees with
+   the smaller number. Unpinned in both directions.
+10. **Two dead sub-conditions in `passable`** (`&& world.road[j] === ROAD.NONE`
+    — a road is returned as a door before `passable` is ever asked; the rubble
+    clause was removed in `572b5d2`). Instrumented: 2,809 calls, 0 reaching
+    either.
+11. **`walkers.door()` asks a different question from `doorsOf` for a
+    platform** — `accessOpts` is module-private, so the street would use the
+    bare-wall rule where the sim uses `passable`. Latent, and a second copy of
+    the rule in the one place Law 6 is loudest.
+12. **`render.js` writes a world-owned buffer** — `siteRoadDist` on a platform
+    reaches `doorScratch(world)` and fills `world._seen`, per visible tile per
+    frame. SPEC §14 forbids exactly this for the walker layer, and `doorSearch`
+    takes a caller-owned `seen` for that reason.
+13. Smaller: the unserved platform's card says the refusal twice; the
+    `accessprobe` header describes a rig it does not build; `fields.doorOf` is
+    now dead under `js/`; a forecourt may cross plain rail track, which "ground
+    a citizen may stand on" does not say.
+
+Found SOUND by the same reader, with evidence: cost is a non-issue (98
+stations, `computeStationDoors` 0.07 ms/tick, the whole-map overlay 0.16
+ms/frame); the save/load law holds everywhere ELSE it could be pushed (1,595
+citizens, four platforms with forecourts, 125 riders, walls, a tunnel on a
+forecourt, a bridge, use-zoning on two forecourts, blocks merging, a live op
+and an undo — 60 months); the rendered-pixel overlay checks are real; 39 of
+their 49 mutants were caught; every published number reproduces exactly.
+
+**The one change that closes the most:** make a change in PASSABILITY
+invalidate what depends on it — and add the save → load → continue law on a rig
+where a building grows across a forecourt. That gate kills 1, and 2, 3 and 4
+cannot survive it either, because none of them can keep the graph agreeing with
+the ground after the ground moves.
+
+## Road access — the first review
+
 A HOSTILE REVIEW scored the first draft 6/10 and named eleven things; all of
 them are in `46770c0`, and the review's own reproductions are fixtures now.
 The four worst were real behaviour: a forecourt that walked through houses and

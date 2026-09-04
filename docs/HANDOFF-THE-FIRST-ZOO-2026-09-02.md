@@ -1844,3 +1844,41 @@ DEMOLITION**. The footprint rule cannot bite while a city grows, because
 never forms across the line. It bites when a road is taken away, and when a
 zoo's four tiles arrive at once. I had written it up as a growth rule in three
 places before anyone asked when it could actually happen.
+
+### 24c. The second review — READ THIS BEFORE TOUCHING ACCESS
+
+Scored **6.5/10**, and the score barely moved from the first review's 6 for
+three stated reasons: the headline bug of round one is still reproducible on
+unmutated HEAD by a different trigger; the change breaks the repo's strongest
+gate; and "28 mutants, 28 caught" did not survive an independent sweep — ten
+survivors in forty-nine, three of them sitting on the lines the first round's
+fixes added.
+
+**The full list, unfixed, is in `BACKLOG.md` under "OPEN — the second hostile
+review's findings".** Do not start anything else in this area without reading
+it. The short version:
+
+- **`fields.passable` reads `tier` and `civic`, and nothing invalidates paths
+  when those change.** A building grown across a station's forecourt leaves
+  stored commutes walking through it, and save → load → continue diverges one
+  month later. This is handoff §24's own lesson — a shape change invalidates
+  what was derived from the shape — applied to merges and splits and not to
+  the new shape change this part invented, which is a building GROWING.
+- Six surviving mutants on the new code, each with a live reproduction.
+- A third guard that cannot be false, and a sentence in SPEC §6c that is
+  simply untrue (`NEAR_REACH` does not track `ROAD_REACH`).
+
+**The shape of THIS round's misses**, which is different from round one's:
+
+| round one | round two |
+|---|---|
+| I reused a predicate whose meaning had changed | I made a NEW predicate and did not ask what invalidates it |
+| my checks tested the interesting half | my checks tested the *first* half — the one fixture I wrote for a case, routed so it never reached the second |
+| a grep policed a spelling | a behavioural check policed ONE tier and ONE call site |
+| the canary was missing | the canary exists and is too wide to fire on a 10% swing |
+
+The pattern under all four: **I fix the instance I was shown.** Round one
+showed me a forecourt through a house; I made a `passable` predicate and
+pinned water, walls and houses — and did not ask what else changes `tier`, or
+who else reads the answer, or whether the graph agreed with the field. A
+review that hands you a reproduction is handing you one member of a class.
