@@ -346,6 +346,7 @@ passable(j)    = ground a citizen may stand on: not water, not a bare wall, not 
                  Part M', so each is a decision rather than an omission
 asksAccess(i)  = a lot, a zoo, a station or a civic EMPLOYER — never a park, never open ground
 nearestRoad(i, reach = nearReach()) = the same search, further out; the CARD's second question, asked by no rule
+                 — it carries the site's own rule, so a platform is asked the WALKING question here too
 nearReach()    = ROAD_REACH + 5, read at CALL time — a constant froze the card's horizon at import
 ```
 
@@ -441,14 +442,36 @@ field the tick would have built.
 reads `tier` and `civic`, so a building that GROWS across a forecourt — or a
 civic dropped on one — closes a way that stored commutes are already walking,
 and neither goes through the road/wall/rail branch above.
-`computeStationDoors` keeps a signature of the whole door graph and raises
-`world.doorsMoved` when it changes; `tick.js` acts on it right after
-`lotsTick` (before the citizens run, so the stale pass re-plans in the same
-month) and `ops.apply` acts on it after every op, both with the same
-`invalidatePaths` a road edit uses. Without it a straight run kept the stale
-commutes while a reload re-planned, and the two parted company a month later
-— hidden at first, because `c.path` is not in the saved citizen and §16's
-hash could not see it for two years.
+`computeStationDoors` keeps a signature of the door graph and raises
+`world.doorsMoved` when it changes. **The signature is `platform > door :
+chain`, per edge — the tiles BETWEEN, not only the door.** A door set is not
+the graph: the chain is what `nodePath` lays into every stored path, what
+`computeTraffic` counts, what `commuteTime` prices, what `exposure` reads the
+player's line on, and what a walker is drawn standing on. A civic dropped on
+the tile both of a platform's doors were reached through leaves BOTH doors
+standing — it is entered from either side — and moves every chain; a signature
+over door lists sees nothing, and 99 animals keep walking through a police
+station.
+
+The flag is acted on in three places, all with the same `invalidatePaths` a
+road edit uses: `ops.apply` after every op (and `ops.undo` after every undo),
+`tick.js` right after `lotsTick` (before the citizens run, so the stale pass
+re-plans in the same month), and `tick.js` again after `eventsTick`, because a
+fire, a flood or the bulldozer razes buildings at step 7 — three steps after
+the first settle, and everything below that line plans over the door graph.
+Without any of this a straight run keeps the stale commutes while a reload
+re-plans, and the two part company a month later — hidden at first, because
+`c.path` is not in the saved citizen and §16's hash could not see it for two
+years.
+
+**What the card may say.** Three refusals, and each is true of a different
+thing. A road within the horizon that a citizen could reach: *"the nearest
+road is 6 tiles away at (5,6), 3 too far"*. A road the RAW field can see but
+nothing can walk to — only a platform can be in this state, because its access
+is a walk: *"a road is 2 tiles away, but nothing can walk to it"*. And nothing
+at all within `nearReach()`: *"no road within 8 tiles in any direction"*. The
+middle one exists because the card printed the third beside `road 2` on the
+env line of the same card — a false sentence, contradicted two lines down.
 
 **Not access.** A building's drawn door is on its south face whatever side
 the road is on (art, §12.2). `ROAD_REACH` stays 3.

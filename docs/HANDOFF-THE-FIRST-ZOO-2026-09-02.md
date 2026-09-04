@@ -1933,3 +1933,51 @@ slightly different city. It is PRE-EXISTING — measured on `411d903`, a road
 edit does it too — and reachable in play, because `main.js` autosaves on
 `pagehide`. Reproduction and three possible resolutions are in `BACKLOG.md`;
 picking one is a rule call, not a bug fix.
+
+## 24e. The third review: the same bug one level down (session 15, 2026-09-04)
+
+A third hostile reader scored `46e16e5` **6.5/10**, and the headline of the two
+commits before it was still false. **483 → 503 checks, 0 failures.**
+
+**The bug.** `markDoorsMoved` hashed the door SET. The forecourt CHAIN — the
+tiles between a platform and its door — was not in it, and the chain is what
+`nodePath` lays into every stored path, what `computeTraffic` counts, what
+`commuteTime` prices, what `exposure` reads the player's line on, and what a
+walker is drawn standing on. So a civic dropped on the tile both of a
+platform's doors were reached through left **both doors standing** — the
+platform is entered from either side — moved every chain, and raised nothing.
+99 commutes kept walking through a police station; §16 broke a month after a
+tick-boundary save. The signature is `platform > door : chain` per edge now.
+
+**And the check written for exactly that claim performed the counterexample
+and asserted past it.** It applied the police station, asserted the doors were
+still two (they were), and never looked at the chains. That is the third
+distinct way this part's checks have been one step short of their own claim.
+
+### The traps, keyed by what you would see
+
+| what you see | what it is |
+|---|---|
+| a "shape changed" flag that never fires | the signature covers the NAME of the derived thing and not its CONTENT. Ask what a reader of this actually consumes — here, the tiles, not the door |
+| a check that applies the counterexample and passes | it asserts the part that did not move. Assert the part the bug moves |
+| card and graph disagree for exactly one month | something razed or built AFTER the settle in the tick order. `eventsTick` is step 7; the settle was at 4b |
+| "no road within 8 tiles" beside "road 2" in one card | a search LIMIT printed as a measurement. A platform's access is a WALK, so the raw field and the walking answer are different questions and both are true |
+| a check name with a number in it | the number is untested by construction unless the assertion is an exact list. "six modules" was five |
+| a published figure that will not reproduce | it names no rig. `accessprobe --cost` prints the town it timed |
+| a check that lists which modules IMPORT a predicate | a spelling. A mutant can keep the import and shadow it — `justice.js`'s `served` was unheld that way, and a centre no road reached still took prisoners. Pair every list with one PAIR OF RUNS |
+
+### Still open, and not this part's to close
+
+A save taken in the SAME MONTH as any path-invalidating op reloads to a
+slightly different city. PRE-EXISTING — measured on `411d903`, a road edit does
+it too — and reachable in play because `main.js` autosaves on `pagehide`.
+Reproduction and three resolutions are in `BACKLOG.md`; picking one is a rule
+call, not a bug fix.
+
+### The lesson, a third time
+
+Round one showed me a forecourt through a house; I pinned water, walls and
+houses. Round two showed me a forecourt that CLOSED; I hashed the door list.
+Round three showed me a forecourt that MOVED. **Each fix was exactly the size
+of the example I was shown**, and the general question was available every
+time: *what else is derived from this, and who reads it?*

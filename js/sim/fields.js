@@ -645,10 +645,18 @@ export function computeStationDoors(world) {
       chain.reverse(); // platform-first
       add(i, j, chain);
       add(j, i, chain.slice().reverse());
-      // Endpoint identity is not enough: a new building can make the same
-      // equally near door reroute across different forecourt tiles. Those
-      // tiles are stored in citizen paths, so their exact stable chain is
-      // part of the derived graph's identity and must invalidate the paths.
+      // THE SIGNATURE CARRIES THE CHAIN, NOT JUST THE DOOR. Endpoint identity
+      // is not enough: a door set is not the graph, and the tiles BETWEEN a
+      // platform and its door are what `nodePath` lays into every stored
+      // path, what `computeTraffic` counts, what `commuteTime` prices, what
+      // `exposure` reads the player's line on, and what a walker is drawn
+      // standing on. A building or a civic that reroutes a forecourt WITHOUT
+      // taking the door away moves all of that and leaves the door list
+      // alone: a hostile review found the door-set version blind to exactly
+      // that, on this part's own flagship fixture, with 99 animals walking
+      // through a police station and save -> load -> continue parting company
+      // a month later. (Two agents fixed this in the same hour, separately
+      // and equivalently; X2's shape string is the one that landed.)
       shape.push(`${j}>${chain.join(",")}`);
       world._hasStationDoors = true;
     }

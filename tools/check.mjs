@@ -271,6 +271,60 @@ function auditIds(w) {
   for (const [i, n] of beds) if (F.civic[i] !== CIVIC.CENTRE || n > KNOBS.CENTRE_BEDS) bedsOver++;
   check("held citizens hold no job; beds point at a centre and never exceed it", heldN > 0 && heldBad === 0 && bedsOver === 0, `held ${heldN} · with a job ${heldBad} · bad beds ${bedsOver}`);
   check("the sold are gone (dangling-id law)", auditIds(F) === 0, `${auditIds(F)}`);
+
+  // A CENTRE NOBODY CAN REACH TAKES NO PRISONERS. `justice.centreWithBed`
+  // asks `served`, and nothing held it to that: a mutation sweep replaced
+  // justice's `served` with `() => true` and 502 checks stayed green. Part M'
+  // has a check that every sim module still IMPORTS `served` — which is a
+  // spelling, and this is the behaviour. The sentence table's own else-branch
+  // is the tell: with no reachable centre the animal goes to the CELLS, and
+  // the ticker says "No centre in town".
+  {
+    const cx = ci % F.w;
+    const cy = (ci / F.w) | 0;
+    const forceRounds = (U, rounds) => {
+      const kp = KNOBS.KILL_P;
+      const ab = KNOBS.ARREST_BASE;
+      const wp = KNOBS.WRONGFUL_P;
+      for (let k = 0; k < rounds; k++) {
+        KNOBS.KILL_P = 1 / Math.max(1e-9, killTotal(U));
+        tick(U);
+        KNOBS.KILL_P = kp;
+        KNOBS.ARREST_BASE = 1;
+        KNOBS.WRONGFUL_P = 1;
+        tick(U);
+        KNOBS.ARREST_BASE = ab;
+        KNOBS.WRONGFUL_P = wp;
+      }
+    };
+    // The same city, its one centre razed and a new one put where no road
+    // comes within three; then the same centre with one road tile laid beside
+    // it. Everything else about the two runs is identical.
+    const stranded = (withRoad) => {
+      const U = load(save(F));
+      apply(U, { kind: "bulldoze", x0: cx, y0: cy, x1: cx, y1: cy, what: "civic" });
+      let far = -1;
+      for (let i = 0; i < U.w * U.h && far < 0; i++) {
+        const x = i % U.w;
+        const y = (i / U.w) | 0;
+        if (x < 4 || y < 4 || x > U.w - 6 || y > U.h - 6) continue;
+        if (U.roadDist[i] <= KNOBS.ROAD_REACH) continue;
+        if (apply(U, { kind: "centre", tx: x, ty: y }).ok) far = i;
+      }
+      if (far >= 0 && withRoad) apply(U, { kind: "road", tiles: [far + 2, far + 3] }); // two tiles east: `served` is a distance, not a connection
+      const before = { takenIn: U.events.justice.takenIn, cells: U.events.justice.cells };
+      forceRounds(U, 6);
+      const after = { takenIn: U.events.justice.takenIn, cells: U.events.justice.cells };
+      const noCentre = U.events.log.filter((e) => e.id === "arrest" && /No centre in town/.test(e.line)).length;
+      return { far, servedNow: far >= 0 && served(U, far), takenIn: after.takenIn - before.takenIn, cells: after.cells - before.cells, noCentre, centres: U.civic.reduce((a, v) => a + (v === CIVIC.CENTRE ? 1 : 0), 0) };
+    };
+    const out = stranded(false);
+    const inn = stranded(true);
+    check("a pacification centre no road reaches takes nobody in — the convicted go to the cells and the ticker says there is no centre in town; lay two road tiles beside the same building and the same sentences land in it",
+      out.far >= 0 && out.centres === 1 && !out.servedNow && out.takenIn === 0 && out.cells > 0 && out.noCentre > 0
+        && inn.far === out.far && inn.centres === 1 && inn.servedNow && inn.takenIn > 0,
+      `out of reach: ${out.takenIn} taken in, ${out.cells} to the cells, ${out.noCentre} "no centre" lines · with a road: ${inn.takenIn} taken in, ${inn.cells} to the cells`);
+  }
   // Reload with a held animal, continue 24 ticks (the centre releases fixed on the way): hash-equal.
   const G = load(save(F));
   // A FIXED animal is counted over the window, not at the end of it: the
@@ -1937,9 +1991,9 @@ check("determinism: same seed + same inputs ⇒ same hash", stateHash(A.world) =
     const A3 = load(save(A2));
     let apart = -1;
     for (let k = 0; k < 24 && apart < 0; k++) { tick(A2); tick(A3); if (stateHash(A2) !== stateHash(A3)) apart = k + 1; }
-    check("access: a civic dropped on a forecourt closes it, and every commute that walked it re-plans in the same breath \u2014 nobody is left walking through a police station, and save \u2192 load \u2192 two more years holds",
+    check("access: a civic dropped on a forecourt closes it, and every commute that walked it re-plans in the same breath — nobody is left walking through a police station, and save → load → two more years holds",
       before >= 50 && rp.ok && A2.civic[a2(30, 8)] === CIVIC.POLICE && !sv(A2, a2(30, 9)) && stillWalking === 0 && apart === -1,
-      `${before} crossed a forecourt \u00b7 ${stillWalking} still walking through the station \u00b7 ${apart < 0 ? "no divergence in 24 months" : `DIVERGED at month +${apart}`}`);
+      `${before} crossed a forecourt · ${stillWalking} still walking through the station · ${apart < 0 ? "no divergence in 24 months" : `DIVERGED at month +${apart}`}`);
 
     // (b) NO OP AT ALL: zone the forecourt and let the town build across it.
     const B2 = load(save(town.W2));
@@ -1950,9 +2004,183 @@ check("determinism: same seed + same inputs ⇒ same hash", stateHash(A.world) =
     const stillWalking2 = throughWalls(B2);
     let apart2 = -1;
     for (let k = 0; k < 24 && apart2 < 0; k++) { tick(B2); tick(B3); if (stateHash(B2) !== stateHash(B3)) apart2 = k + 1; }
-    check("access: and the same when NOBODY does anything \u2014 zone the forecourt, let a house grow on it, and the commutes that used it re-plan the month the wall goes up",
+    check("access: and the same when NOBODY does anything — zone the forecourt, let a house grow on it, and the commutes that used it re-plan the month the wall goes up",
       grew > 0 && stillWalking2 === 0 && apart2 === -1,
-      `${grew} houses grew on the forecourt \u00b7 ${stillWalking2} commutes still walk through one \u00b7 ${apart2 < 0 ? "no divergence in 24 months" : `DIVERGED at month +${apart2}`}`);
+      `${grew} houses grew on the forecourt · ${stillWalking2} commutes still walk through one · ${apart2 < 0 ? "no divergence in 24 months" : `DIVERGED at month +${apart2}`}`);
+  }
+
+  // ---- THE SIGNATURE, ONE TRANSITION PER ROW -------------------------------
+  {
+    // `markDoorsMoved` is the whole of "a move is a re-plan": every stale
+    // commute in the game depends on it noticing. Its first version hashed the
+    // door SET, and a third hostile review found the hole under it — a
+    // building that REROUTES a forecourt without taking a door away moved
+    // every tile a citizen walks and raised nothing. 99 animals kept walking
+    // through a police station on this part's own flagship fixture.
+    //
+    // So the transitions are a table, one row each, and the LAST row is the
+    // one that makes the rest mean anything: nothing changed, and it says so.
+    const S3 = createWorld({ seed: "signature" });
+    const s3 = (x, y) => y * S3.w + x;
+    for (let y = 2; y <= 20; y++) for (let x = 2; x <= 30; x++) {
+      const i = s3(x, y);
+      S3.terrain[i] = TERRAIN.GRASS; S3.road[i] = ROAD.NONE; S3.zone[i] = ZONE.NONE;
+      S3.tier[i] = 0; S3.wall[i] = 0; S3.rail[i] = 0; S3.civic[i] = 0; S3.big[i] = 0; S3.use[i] = 0;
+    }
+    S3.events.noDisasters = true;
+    // A road that ENDS in a corner, so the platform's one door is diagonal to
+    // it and reachable two ways round — the geometry the review named: "the
+    // platform's nearest road tile is not axis-aligned with it".
+    const sroad = [];
+    for (let y = 2; y <= 4; y++) sroad.push(s3(12, y));
+    for (let x = 11; x <= 12; x++) sroad.push(s3(x, 4));
+    apply(S3, { kind: "road", tiles: sroad });
+    const srail = [];
+    for (let x = 4; x <= 20; x++) srail.push(s3(x, 5));
+    apply(S3, { kind: "rail", tiles: srail });
+    apply(S3, { kind: "station", tx: 10, ty: 5 });
+    computeFields(S3);
+    const plat = s3(10, 5);
+    const chainOf = (w, i) => {
+      const l = w._stationDoors && w._stationDoors[i];
+      return l ? l.map(([j, c]) => `${j}<${c.join(".")}`).join(" ") : "";
+    };
+    const rows = [];
+    const say = (name, change, want) => {
+      const doorsBefore = doors(S3, plat).join(",");
+      const chainBefore = chainOf(S3, plat);
+      S3.doorsMoved = false;
+      change();
+      computeStationDoors(S3);
+      rows.push({
+        name, want, got: !!S3.doorsMoved,
+        doorsSame: doors(S3, plat).join(",") === doorsBefore,
+        chainSame: chainOf(S3, plat) === chainBefore,
+      });
+    };
+    // THE TIE-BREAK IS THE ORDER, and the order decides which tiles an animal
+    // walks. Two routes of two tiles reach this door - north-then-east round
+    // (10,4), or east-then-north round (11,5). `DOOR_N4` is N E S W, so the
+    // north one is discovered first and is the forecourt the commute carries.
+    // Reordering those four pairs changes what is drawn under a walker and
+    // nothing else could see it - so the order is pinned PAIR BY PAIR below,
+    // because one pin (north before east) left a mutant that swapped east and
+    // south alive.
+    const firstChain = chainOf(S3, plat);
+    say("nothing changes", () => {}, false);
+    // The one the door set cannot see: the door stays, the way to it moves.
+    say("a house grows on the forecourt", () => { S3.zone[s3(10, 4)] = ZONE.R; S3.tier[s3(10, 4)] = 1; }, true);
+    const reroute = rows[rows.length - 1];
+    say("and nothing changes again", () => {}, false);
+    say("the door itself is taken", () => { S3.road[s3(11, 4)] = ROAD.NONE; S3.roadsDirty = true; computeRoadDist(S3); }, true);
+    say("a new door is opened", () => { S3.road[s3(11, 4)] = ROAD.ROAD; S3.roadsDirty = true; computeRoadDist(S3); }, true);
+    say("the last station goes", () => { S3.rail[plat] = 1; }, true);
+    say("and with no station at all, nothing changes", () => {}, false);
+    say("a station appears again", () => { S3.rail[plat] = 2; }, true);
+    const wrong = rows.filter((r) => r.got !== r.want);
+    check("access: the door-graph signature, one transition per row — a door taken, a door opened, the last station gone, the first station back, and A FORECOURT REROUTED UNDER AN UNCHANGED DOOR all say the graph moved; nothing changing says nothing, three times, or the flag would mean nothing",
+      wrong.length === 0 && rows.length === 8 && reroute.doorsSame && !reroute.chainSame
+        && firstChain === `${s3(11, 4)}<${s3(10, 4)}`,
+      wrong.length ? wrong.map((r) => `${r.name}: ${r.got}, wanted ${r.want}`).join(" · ")
+        : `${rows.length} transitions · the reroute kept its door list (${reroute.doorsSame}) and changed its chain (${!reroute.chainSame}) · the tie-break went north first (${firstChain === `${s3(11, 4)}<${s3(10, 4)}`})`);
+  }
+
+  // ---- N, E, S, W: THE ORDER, PAIR BY PAIR ---------------------------------
+  {
+    // `DOOR_N4` is a cyclic order, and every adjacent pair of it decides a
+    // real tie. Three platforms, each with ONE door reachable two ways in the
+    // same number of steps, and each pinning the pair that settles it:
+    //
+    //   north before east  door NE of the platform -> the chain goes N then E
+    //   east  before south door SE of the platform -> the chain goes E then S
+    //   south before west  door SW of the platform -> the chain goes S then W
+    //
+    // Nothing else in the game can see this: the doors come back sorted, the
+    // distances are equal, and only the TILES A WALKER IS DRAWN ON change.
+    const O4 = createWorld({ seed: "door-order" });
+    const o4 = (x, y) => y * O4.w + x;
+    for (let y = 2; y <= 26; y++) for (let x = 2; x <= 40; x++) {
+      const i = o4(x, y);
+      O4.terrain[i] = TERRAIN.GRASS; O4.road[i] = ROAD.NONE; O4.zone[i] = ZONE.NONE;
+      O4.tier[i] = 0; O4.wall[i] = 0; O4.rail[i] = 0; O4.civic[i] = 0; O4.big[i] = 0; O4.use[i] = 0;
+    }
+    O4.events.noDisasters = true;
+    // Three platforms on one line, far enough apart not to share a door.
+    const oline = [];
+    for (let x = 4; x <= 36; x++) oline.push(o4(x, 12));
+    apply(O4, { kind: "rail", tiles: oline });
+    // One road tile each, DIAGONAL to its platform, so two routes of two steps
+    // reach it and the discovery order picks between them.
+    apply(O4, { kind: "road", tiles: [o4(9, 11), o4(17, 13), o4(23, 13)] });
+    apply(O4, { kind: "station", tx: 8, ty: 12 });   // its door is NE  -> N wins over E
+    apply(O4, { kind: "station", tx: 16, ty: 12 });  // its door is SE  -> E wins over S
+    apply(O4, { kind: "station", tx: 24, ty: 12 });  // its door is SW  -> S wins over W
+    computeFields(O4);
+    const chain1 = (i) => {
+      const l = O4._stationDoors && O4._stationDoors[i];
+      return l && l.length === 1 ? l[0][1].map((t) => `${t % O4.w},${(t / O4.w) | 0}`).join(" ") : `(${l ? l.length : 0} links)`;
+    };
+    const ne = chain1(o4(8, 12));
+    const se = chain1(o4(16, 12));
+    const sw = chain1(o4(24, 12));
+    check("access: the door search's N, E, S, W is a decision, pinned pair by pair — where two forecourts of the same length reach the same door, north beats east, east beats south and south beats west, and the tiles a walker is drawn on are the ones that change",
+      ne === "8,11" && se === "17,12" && sw === "24,13",
+      `NE door → [${ne}] (want 8,11) · SE door → [${se}] (want 17,12) · SW door → [${sw}] (want 24,13)`);
+  }
+
+  // ---- A FORECOURT REROUTED, IN A TOWN -------------------------------------
+  {
+    // The review's own reproduction, on the rig the flagship check already
+    // uses: a police station dropped on the tile BOTH doors were reached
+    // through. The doors survive — the platform is entered from either side —
+    // and every chain moves. Before the signature carried the chain: 99
+    // commutes still walking through the station, and save → load → continue
+    // parting company one month later.
+    const R4 = createWorld({ seed: "reroute-town" });
+    const r4 = (x, y) => y * R4.w + x;
+    for (let y = 2; y <= 34; y++) for (let x = 2; x <= 56; x++) {
+      const i = r4(x, y);
+      R4.terrain[i] = TERRAIN.GRASS; R4.road[i] = ROAD.NONE; R4.zone[i] = ZONE.NONE;
+      R4.tier[i] = 0; R4.wall[i] = 0; R4.rail[i] = 0; R4.civic[i] = 0; R4.big[i] = 0; R4.use[i] = 0;
+    }
+    R4.cash = 600000;
+    R4.events.noDisasters = true;
+    const rroads = [];
+    for (const y of [6, 26]) for (let x = 4; x <= 54; x++) rroads.push(r4(x, y));
+    for (const x of [29, 31]) for (const y of [7, 8]) rroads.push(r4(x, y));
+    apply(R4, { kind: "road", tiles: rroads });
+    const rline = [];
+    for (let y = 9; y <= 23; y++) rline.push(r4(30, y));
+    apply(R4, { kind: "rail", tiles: rline });
+    apply(R4, { kind: "station", tx: 30, ty: 9 });
+    apply(R4, { kind: "station", tx: 30, ty: 23 });
+    for (const [x0, x1] of [[20, 28], [32, 40]]) {
+      apply(R4, { kind: "zone", zone: ZONE.R, x0, y0: 4, x1, y1: 5, density: 3 });
+      apply(R4, { kind: "zone", zone: x0 === 20 ? ZONE.C : ZONE.I, x0, y0: 27, x1, y1: 28, density: 3 });
+    }
+    for (let k = 0; k < 15 * 12; k++) tick(R4);
+    const throughChain = (w, t) => {
+      let n = 0;
+      for (const c of w.citizens) {
+        if (c.dead || !c.path) continue;
+        for (let k = 0; k < c.path.length; k++) if (!(c.path[k] & RIDE) && (c.path[k] & TILE) === t) { n++; break; }
+      }
+      return n;
+    };
+    const before = throughChain(R4, r4(30, 8));
+    const doorsBefore = doors(R4, r4(30, 9)).slice();
+    const P2 = load(save(R4));
+    const rp = apply(P2, { kind: "police", tx: 30, ty: 8 });
+    const stillOnIt = throughChain(P2, r4(30, 8));
+    const doorsAfter = doors(P2, r4(30, 9)).slice();
+    tick(P2);
+    const P3 = load(save(P2));
+    let apart = -1;
+    for (let k = 0; k < 24 && apart < 0; k++) { tick(P2); tick(P3); if (stateHash(P2) !== stateHash(P3)) apart = k + 1; }
+    check("access: a forecourt REROUTED under an unchanged door — a police station on the tile both of a platform's doors were reached through leaves both doors standing and moves every chain, and every commute that walked the old way re-plans at the op; nobody is left walking through the station, and save → load → two more years holds",
+      before >= 50 && rp.ok && doorsBefore.length === 2 && doorsAfter.length === 2
+        && doorsBefore.join(",") === doorsAfter.join(",") && stillOnIt === 0 && apart === -1,
+      `${before} walked the old chain · doors ${doorsBefore.length} → ${doorsAfter.length} (same list ${doorsBefore.join(",") === doorsAfter.join(",")}) · ${stillOnIt} still on the police station · ${apart < 0 ? "no divergence in 24 months" : `DIVERGED at month +${apart}`}`);
   }
 
   // ---- THE GRAPH AND THE FIELD SAY THE SAME THING --------------------------
@@ -2073,6 +2301,200 @@ check("determinism: same seed + same inputs ⇒ same hash", stateHash(A.world) =
       !!trip && ridesPath(trip.path) && walked.includes(g3(30, 9)) && !walked.includes(g3(12, 9))
         && targets(G3, g3(12, 9)).length === 0 && targets(G3, g3(30, 9)).length === 2,
       `${trip ? "arrived" : "no route"} · rode ${trip && ridesPath(trip.path)} · through the river platform ${walked.includes(g3(12, 9))} · edges: river ${targets(G3, g3(12, 9)).length}, clear ${targets(G3, g3(30, 9)).length}`);
+  }
+
+  // ---- THE COUNT, AND WHO RE-PLANS -----------------------------------------
+  {
+    // (a) The census reports what the rule refuses. `lotsNoRoad` is printed in
+    // the Census tab and nothing asserted it, so a mutant deleting the line
+    // survived: the tab would have said every lot in a stranded quarter was
+    // fine.
+    const C4 = createWorld({ seed: "census-noroad" });
+    const c4 = (x, y) => y * C4.w + x;
+    for (let y = 2; y <= 20; y++) for (let x = 2; x <= 30; x++) {
+      const i = c4(x, y);
+      C4.terrain[i] = TERRAIN.GRASS; C4.road[i] = ROAD.NONE; C4.zone[i] = ZONE.NONE;
+      C4.tier[i] = 0; C4.wall[i] = 0; C4.rail[i] = 0; C4.civic[i] = 0; C4.big[i] = 0; C4.use[i] = 0;
+    }
+    C4.events.noDisasters = true;
+    const crow = [];
+    for (let x = 6; x <= 24; x++) crow.push(c4(x, 6));
+    apply(C4, { kind: "road", tiles: crow });
+    apply(C4, { kind: "zone", zone: ZONE.R, x0: 8, y0: 7, x1: 12, y1: 9, density: 3 });   // 15 lots, all within 3
+    apply(C4, { kind: "zone", zone: ZONE.R, x0: 16, y0: 11, x1: 20, y1: 13, density: 3 }); // 15 lots, all 5 or more out
+    for (let y = 7; y <= 9; y++) for (let x = 8; x <= 12; x++) C4.tier[c4(x, y)] = 1;
+    for (let y = 11; y <= 13; y++) for (let x = 16; x <= 20; x++) C4.tier[c4(x, y)] = 1;
+    computeFields(C4);
+    let refused = 0;
+    for (let i = 0; i < C4.w * C4.h; i++) if (C4.zone[i] !== ZONE.NONE && !sv(C4, i)) refused++;
+    const cen4 = census(C4);
+    check("access: the census counts what the rule refuses — thirty lots, fifteen of them five tiles from the only road, and the Census tab says fifteen; the number the tab prints is the number 'served' gives, lot for lot",
+      cen4.lots === 30 && refused === 15 && cen4.lotsNoRoad === refused,
+      `${cen4.lots} lots · the tab says ${cen4.lotsNoRoad} with no road · the rule itself refuses ${refused}`);
+
+    // (b) A MERGE RE-PLANS THE PEOPLE WHO WORK THERE, not only the people who
+    // live there. `blocks.replanOn` reads both `c.home` and `c.job`, and the
+    // job half was untested: a mutant dropping it survived, and a worker whose
+    // WORKPLACE changed shape kept a path to a door that no longer exists.
+    const M4 = createWorld({ seed: "replan-jobs" });
+    const m4 = (x, y) => y * M4.w + x;
+    for (let y = 4; y <= 18; y++) for (let x = 4; x <= 18; x++) {
+      const i = m4(x, y);
+      M4.terrain[i] = TERRAIN.GRASS; M4.road[i] = ROAD.NONE; M4.zone[i] = ZONE.NONE;
+      M4.tier[i] = 0; M4.wall[i] = 0; M4.rail[i] = 0; M4.civic[i] = 0; M4.big[i] = 0; M4.use[i] = 0;
+    }
+    M4.valves.R = 0.5;
+    M4.events.noDisasters = true;
+    apply(M4, { kind: "road", tiles: [6, 7, 8, 9, 10, 11, 12, 13].map((x) => m4(x, 9)) });
+    apply(M4, { kind: "zone", zone: ZONE.C, x0: 10, y0: 10, x1: 11, y1: 11, density: 3 });
+    apply(M4, { kind: "zone", zone: ZONE.R, x0: 6, y0: 10, x1: 7, y1: 11, density: 3 });
+    for (let y = 10; y <= 11; y++) for (let x = 10; x <= 11; x++) { M4.tier[m4(x, y)] = 2; M4.maxTier[m4(x, y)] = 3; }
+    M4.tier[m4(10, 10)] = 3;
+    for (let y = 10; y <= 11; y++) for (let x = 6; x <= 7; x++) M4.tier[m4(x, y)] = 2;
+    computeFields(M4);
+    recountRosters(M4);
+    for (let k = 0; k < 4; k++) placeHousehold(M4, createHousehold(M4, "rabbit", 4), m4(6, 10));
+    // Employ them in the shop block, and give each a real path, as a tick would.
+    // HALF AT THE ANCHOR, half in a corner - and the two are cleared by
+    // DIFFERENT code. A worker in a corner is MOVED to the anchor by
+    // mergeLots' own job loop, which nulls the path on its way past; a worker
+    // already AT the anchor is not moving, so only `replanOn` can notice that
+    // the building it works in has grown new doors. A fixture that employed
+    // everyone in a corner tested the first loop and left the second's job
+    // half free: a mutant dropping `set.has(c.job)` survived it.
+    const workers = M4.citizens.filter((c) => !c.dead).slice(0, 8);
+    workers.forEach((c, k) => {
+      c.job = k % 2 ? m4(11, 11) : m4(10, 10); // a corner, and the anchor itself
+      c.path = commutePath(M4, c.species, doors(M4, c.home), doors(M4, c.job), 40)?.path || null;
+      c.stale = false;
+    });
+    const atAnchor = workers.filter((c) => c.job === m4(10, 10)).length;
+    const withPaths = workers.filter((c) => !!c.path).length;
+    const win4 = BL.mergeWindow(M4, m4(10, 10));
+    if (win4) BL.mergeLots(M4, win4);
+    const stillHolding = workers.filter((c) => c.path && !c.stale).length;
+    check("access: a merge re-plans the people who WORK there, not only the people who live there — households employed half in the anchor of a shop block and half in a corner, and when the four shops become one 2×2 every one of those commutes is thrown away — the corner staff because they MOVE, the anchor staff because the building they were already in has new doors",
+      withPaths >= 6 && atAnchor >= 3 && !!win4 && win4.side === 2 && stillHolding === 0,
+      `${withPaths} of ${workers.length} had a path (${atAnchor} of them at the anchor) · the window is ${win4 ? `${win4.side}×${win4.side}` : "MISSING"} · ${stillHolding} kept a stale path`);
+  }
+
+  // ---- THE OTHER WAYS THE GROUND MOVES, AND THE OTHER SIDES ----------------
+  {
+    // A compact rig: two road systems that never touch, one line across, and a
+    // platform with a door on EITHER side of it. Used by three checks below.
+    const twoDoors = () => {
+      const T = createWorld({ seed: "two-doors" });
+      const t = (x, y) => y * T.w + x;
+      for (let y = 2; y <= 30; y++) for (let x = 2; x <= 40; x++) {
+        const i = t(x, y);
+        T.terrain[i] = TERRAIN.GRASS; T.road[i] = ROAD.NONE; T.zone[i] = ZONE.NONE;
+        T.tier[i] = 0; T.wall[i] = 0; T.rail[i] = 0; T.civic[i] = 0; T.big[i] = 0; T.use[i] = 0;
+      }
+      T.cash = 400000;
+      T.events.noDisasters = true;
+      const rr = [];
+      for (const y of [6, 24]) for (let x = 6; x <= 34; x++) rr.push(t(x, y));
+      for (const x of [19, 21]) for (const y of [7, 8]) rr.push(t(x, y));
+      for (const x of [19, 21]) for (const y of [22, 23]) rr.push(t(x, y)); // the FAR platform gets two doors as well
+      apply(T, { kind: "road", tiles: rr });
+      const ln = [];
+      for (let y = 9; y <= 21; y++) ln.push(t(20, y));
+      apply(T, { kind: "rail", tiles: ln });
+      apply(T, { kind: "station", tx: 20, ty: 9 });
+      apply(T, { kind: "station", tx: 20, ty: 21 });
+      computeFields(T);
+      return { T, t };
+    };
+
+    // (a) BOTH DOORS ARE EDGES, not just the lowest-numbered one. THE ARRIVAL
+    // is where this bites: `dial` relaxes a platform's link LIST in one place,
+    // when the platform's walk node settles, and on the way IN that only leads
+    // back out to the doors. On the way OUT it is the whole choice. So the far
+    // platform's west door - the lower-numbered one, the only one a "first
+    // link" graph would offer - is painted predator-only, and the rabbit gets
+    // off on the east side for the price the fox pays. `doorsOf` listing two
+    // is not the same claim as the graph carrying two, and this is the half
+    // that says the second edge WORKS.
+    const { T: TA, t: ta } = twoDoors();
+    const plainR = commutePath(TA, "rabbit", [ta(20, 6)], [ta(20, 24)], 90);
+    apply(TA, { kind: "use", use: 1, x0: 19, y0: 23, x1: 19, y1: 23 }); // the ARRIVAL platform's west door
+    computeFields(TA);
+    const paintedR = commutePath(TA, "rabbit", [ta(20, 6)], [ta(20, 24)], 90);
+    const paintedF = commutePath(TA, "fox", [ta(20, 6)], [ta(20, 24)], 90);
+    const westDoor = ta(19, 23);
+    const rabbitWalked = paintedR ? Array.from(paintedR.path).filter((e) => !(e & RIDE)).map((e) => e & TILE) : [];
+    check("access: every side of a PLATFORM is an edge in the graph, not only the lowest-numbered one — paint the FAR platform's west door predator-only and the rabbit gets off on the east side for the price the fox pays, which it could not do if the graph carried one way out",
+      !!plainR && !!paintedR && !!paintedF && ridesPath(paintedR.path)
+        && doors(TA, ta(20, 9)).length === 2 && doors(TA, ta(20, 21)).length === 2
+        && paintedR.cost === plainR.cost && paintedR.cost === paintedF.cost
+        && !rabbitWalked.includes(westDoor),
+      `plain ${plainR && plainR.cost} · rabbit ${paintedR && paintedR.cost} · fox ${paintedF && paintedF.cost} · the rabbit used the painted door ${rabbitWalked.includes(westDoor)}`);
+
+    // (b) AN UNDO IS AN OP TOO. `ops.undo` puts a razed forecourt back, and
+    // the graph has to come back with it.
+    const { T: TB, t: tb } = twoDoors();
+    const linksOf = (w, i) => (w._stationDoors && w._stationDoors[i] ? w._stationDoors[i].map(([j, c]) => `${j}<${c.join(".")}`).join(" ") : "");
+    const clean = linksOf(TB, tb(20, 9));
+    apply(TB, { kind: "police", tx: 20, ty: 8 });
+    const walled = linksOf(TB, tb(20, 9));
+    const un = undo(TB);
+    const restored = linksOf(TB, tb(20, 9));
+    const fresh = (() => { computeStationDoors(TB); return linksOf(TB, tb(20, 9)); })();
+    check("access: an UNDO puts the forecourt back, and the graph with it — a civic on a forecourt reroutes both chains, undoing it restores them at the op rather than at the next tick, and what the graph holds is what a fresh computation gives",
+      !!clean && walled !== clean && un.ok && restored === clean && fresh === clean,
+      `clean [${clean}] · walled [${walled}] · undone [${restored}] · recomputed [${fresh}]`);
+
+    // (c) A FIRE RAZES AT STEP 7, three steps after the settle at 4b. Nothing
+    // settled after it, so the card and the graph disagreed for a whole month
+    // after every fire - and `events.js` has imported `invalidatePaths` and
+    // never called it since long before this part.
+    const { T: TC, t: tc } = twoDoors();
+    TC.zone[tc(20, 8)] = ZONE.R; TC.maxTier[tc(20, 8)] = 3; TC.tier[tc(20, 8)] = 2;
+    TC.zone[tc(20, 7)] = ZONE.R; TC.maxTier[tc(20, 7)] = 3; TC.tier[tc(20, 7)] = 2;
+    computeFields(TC);
+    computeStationDoors(TC);
+    const builtOver = linksOf(TC, tc(20, 9));
+    BL.ignite(TC, tc(20, 8), 1);
+    BL.ignite(TC, tc(20, 7), 1);
+    let razedAt = -1;
+    for (let k = 0; k < 12 && razedAt < 0; k++) { tick(TC); if (TC.tier[tc(20, 7)] === 0 && TC.tier[tc(20, 8)] === 0) razedAt = k + 1; }
+    const afterFire = linksOf(TC, tc(20, 9));
+    const freshAfterFire = (() => { const K = load(save(TC)); return linksOf(K, tc(20, 9)); })();
+    check("access: a FIRE razes at step 7, and the doors settle in the same month — eventsTick clears ground three steps after the settle that follows lotsTick, so a burnt-out forecourt used to leave the card and the graph disagreeing until the next month turned",
+      razedAt > 0 && builtOver !== afterFire && afterFire === freshAfterFire && afterFire.length > 0,
+      `razed after ${razedAt} month${razedAt === 1 ? "" : "s"} · while built over [${builtOver}] · after the fire [${afterFire}] · a reload gives [${freshAfterFire}]`);
+
+    // (d) THE BRANCH THAT SAYS `d === 0 cannot happen` IS A CLAIM ABOUT ops,
+    // so ops is what proves it. A mutant deleting the guard survives, and
+    // should: the case is unreachable. This is the construction that makes it
+    // so, tested where it is decided rather than left as a comment.
+    const { T: TD, t: td } = twoDoors();
+    const roadOnPlatform = apply(TD, { kind: "road", tiles: [td(20, 9)] });
+    const stationOnRoad = apply(TD, { kind: "station", tx: 20, ty: 6 });
+    const cross = [];
+    for (let y = 4; y <= 10; y++) cross.push(td(26, y)); // a straight N-S run across the E-W road: a level crossing (SPEC 12.4c)
+    const railOnRoad = apply(TD, { kind: "rail", tiles: cross });
+    check("access: a platform can never stand on a road, which is why `computeStationDoors` may say d === 0 cannot happen — ops refuses a road on a platform and a station on a road, and a level crossing is plain track and a road, never a station and a road",
+      !roadOnPlatform.ok && !stationOnRoad.ok && railOnRoad.ok
+        && TD.rail[td(20, 9)] === 2 && TD.road[td(20, 9)] === ROAD.NONE
+        && TD.rail[td(26, 6)] === 1 && TD.road[td(26, 6)] !== ROAD.NONE,
+      `road on a platform ${roadOnPlatform.ok ? "ALLOWED" : roadOnPlatform.reason} · station on a road ${stationOnRoad.ok ? "ALLOWED" : stationOnRoad.reason} · a level crossing is allowed (${railOnRoad.ok}) and is track + road, never platform + road`);
+
+    // (e) THE BOUNDARY LAW, for the readers as well as the overlay. SPEC 14
+    // forbids the draw and street layers a buffer on the world; `doorsOf` and
+    // `nearestRoad` take one for that reason, and nothing held them to it -
+    // the overlay's check pins `siteRoadDist` alone.
+    const { T: TE, t: te } = twoDoors();
+    const mine = new Uint8Array(TE.w * TE.h);
+    TE._seen.fill(0xcd);
+    const stamp = TE._seen.reduce((a, b) => a + b, 0);
+    const gotDoors = doors(TE, te(20, 9), mine).length;
+    const gotNear = nearestRoad(TE, te(20, 9), null, mine).doors.length;
+    const kept = TE._seen.reduce((a, b) => a + b, 0);
+    const usedMine = mine.reduce((a, b) => a + b, 0) > 0;
+    check("access: and the door READERS take the caller's scratch too — `doorsOf` and `nearestRoad` fill the buffer they are handed and leave the world's alone, which is the law the walker layer lives under and the overlay's check does not reach",
+      gotDoors === 2 && gotNear === 2 && kept === stamp && usedMine,
+      `${gotDoors} doors · ${gotNear} from nearestRoad · the world's stamp ${stamp} → ${kept} · the caller's buffer was written ${usedMine}`);
   }
 
   // ---- A LOT NOBODY CAN REACH IS NOT SWALLOWED INTO A BLOCK -----------------
@@ -2431,11 +2853,11 @@ check("determinism: same seed + same inputs ⇒ same hash", stateHash(A.world) =
     // nothing with it. Any other read is a rule growing a second copy.
     const ALLOWED = /roadDist: world\.roadDist\[i\], \/\/ this TILE's distance/;
     const offenders = [];
-    let sawServed = 0;
+    const served5 = [];
     for (const f of readdirSync(simDir)) {
       if (!/\.js$/.test(f)) continue;
       const src = readFileSync(path.join(simDir, f), "utf8");
-      if (f !== "fields.js" && /import \{[^}]*\bserved\b[^}]*\} from "\.\/fields\.js"/.test(src)) sawServed++;
+      if (f !== "fields.js" && /import \{[^}]*\bserved\b[^}]*\} from "\.\/fields\.js"/.test(src)) served5.push(f);
       if (f === "fields.js") continue;
       src.split("\n").forEach((lineTxt, k) => {
         if (!/roadDist\s*\[/.test(lineTxt)) return;
@@ -2445,11 +2867,41 @@ check("determinism: same seed + same inputs ⇒ same hash", stateHash(A.world) =
     }
     check("access: ONE implementation — no module in js/sim outside fields.js tests a road's nearness for itself; there is one predicate and nowhere else to ask",
       offenders.length === 0, offenders.join(" · "));
+    // WHO CAN MOVE THE GROUND A FORECOURT STANDS ON. `passable` reads
+    // `terrain`, `tier` and `civic`, and every place any of the three is
+    // written has to be followed by a settle, or stored commutes walk through
+    // a building - or across a lake. There are five, and each one's settle is
+    // mutation-tested by name elsewhere in this section:
+    //
+    //   lots.js, blocks.js   inside lotsTick        -> tick.js settles at 4b
+    //   events.js            inside eventsTick      -> tick.js settles at 7c
+    //                        (it razes buildings AND it can open new WATER)
+    //   ops.js               a player op or an undo -> ops settles at the op
+    //   world.js             worldgen, before a tick has ever run
+    //
+    // This is a TRIPWIRE, not the proof - the proofs are the behavioural
+    // checks above. It fires when a SIXTH module starts writing that ground,
+    // which is the moment someone has to decide where its settle goes.
+    const groundWriters = [];
+    const WRITE = /\b(?:world|w)\.(?:terrain|tier|civic)\s*\[[^\]]*\]\s*(?:=[^=]|\+\+|--|\+=|-=)/;
+    for (const f of readdirSync(simDir)) {
+      if (!/\.js$/.test(f)) continue;
+      const src = readFileSync(path.join(simDir, f), "utf8");
+      if (src.split("\n").some((l) => WRITE.test(l) && !/^\s*(\/\/|\*)/.test(l))) groundWriters.push(f);
+    }
+    check("access: exactly five modules move the ground a forecourt stands on — lots and blocks inside lotsTick, events inside eventsTick (it razes buildings AND it can open new water), ops at the op, and worldgen before any of it — and the tick settles the door graph after each of the three windows; a sixth writer means a fourth settle to decide on",
+      groundWriters.join(" ") === "blocks.js events.js lots.js ops.js world.js",
+      `${groundWriters.length} write terrain, tier or civic: ${groundWriters.join(" ")}`);
     const anyHasAccess = readdirSync(path.join(ROOT, "js"), { recursive: true })
       .filter((f) => typeof f === "string" && /\.js$/.test(f))
       .some((f) => /hasAccess/.test(readFileSync(path.join(ROOT, "js", f), "utf8")));
-    check("access: and the OLD predicate is gone, not merely unused — `hasAccess` is nowhere under js/, and six sim modules import `served` in its place",
-      !anyHasAccess && sawServed >= 5, `${sawServed} sim modules import served`);
+    // FIVE, and the five are NAMED. The name used to say six and the
+    // assertion said ">= 5", so the number in the sentence was untested by
+    // construction - and it was wrong. An exact list fails in both directions:
+    // a module that stops asking, and a module that starts.
+    check("access: and the OLD predicate is gone, not merely unused — `hasAccess` is nowhere under js/, and exactly five sim modules import `served` in its place: blocks, census, events, justice and lots",
+      !anyHasAccess && served5.join(" ") === "blocks.js census.js events.js justice.js lots.js",
+      `${served5.length} sim modules import served: ${served5.join(" ")}`);
   }
 
   // ---- the card says it ------------------------------------------------------
@@ -2996,8 +3448,18 @@ check("no Math.random under js/", mathRandom.length === 0, mathRandom.join(", ")
 
   const W = createWalkers(A.world);
   const hashBefore = stateHash(A.world);
+  // SPEC 14 forbids this layer a buffer ON THE WORLD, and the hash cannot see
+  // one: `world._seen` is derived scratch and is not in `canonicalWorld`. So
+  // the world's buffer is STAMPED, and the stamp has to survive a walk. The
+  // layer asks `fields.doorsOf` for a doorstep and hands it its own array;
+  // dropping that argument is invisible to every other check there is.
+  const seenBefore = A.world._seen ? A.world._seen.slice() : null;
+  if (A.world._seen) A.world._seen.fill(0xe1);
+  const walkStamp = A.world._seen ? A.world._seen.reduce((a, b) => a + b, 0) : 0;
   W.notify();
   for (let k = 0; k < 80; k++) W.update(0.1, { x0: 0, y0: 0, x1: A.world.w, y1: A.world.h });
+  const walkKept = A.world._seen ? A.world._seen.reduce((a, b) => a + b, 0) : 0;
+  if (seenBefore) A.world._seen.set(seenBefore);
   const first = W.list().find((x) => x.citizen != null);
   W.setCursor(first ? [Math.floor(first.tx), Math.floor(first.ty)] : null);
   const voiced = W.list().filter((x) => x.need);
@@ -3012,8 +3474,10 @@ check("no Math.random under js/", mathRandom.length === 0, mathRandom.join(", ")
   check("needs: a linked citizen pin keeps its in-world pop-out when the pointer is over the card",
     !!first && linkedPin.length === 1 && linkedPin[0].citizen === first.citizen);
   W.setCursor(null);
-  check("needs: leaving Inspect clears every bubble and the walker layer never writes the sim",
-    W.list().every((x) => x.need == null) && stateHash(A.world) === hashBefore);
+  check("needs: leaving Inspect clears every bubble and the walker layer never writes the sim — not the saved state, and not the door search's scratch buffer either, which no hash can see",
+    W.list().every((x) => x.need == null) && stateHash(A.world) === hashBefore
+      && !!seenBefore && walkKept === walkStamp,
+    `${W.list().length} walkers · the world's door scratch ${walkStamp} → ${walkKept}`);
 
   // The input regression is event-driven: pan under a stationary pointer,
   // change tools, and prove the citizen-id pin survives walker teardown while
@@ -5334,6 +5798,24 @@ function costOfBulldoze(w, x, y) { return (0, costOfOp)(w, { kind: "bulldoze", x
     apply(V, { kind: "station", tx: 20, ty: 9 });  // two doors, one tile of forecourt
     apply(V, { kind: "station", tx: 30, ty: 9 });  // one door, two tiles of forecourt
     apply(V, { kind: "road", tiles: [v(30, 7)] }); // ...brought to d = 2 by a single tile
+    // A LOT WITH A ROAD ON TWO SIDES, so the card has a list to get wrong.
+    apply(V, { kind: "road", tiles: [v(27, 7)] });
+    apply(V, { kind: "zone", zone: ZONE.R, x0: 26, y0: 7, x1: 26, y1: 7, density: 3 });
+    V.tier[v(26, 7)] = 2;
+    // AND A PLATFORM WITH A ROAD TWO TILES AWAY THAT NOTHING CAN WALK TO:
+    // a river right across the map, so there is no way round at any
+    // distance. The raw field still reads 2 - `computeRoadDist` goes
+    // through water, because a lot on the far bank is served by the bridge
+    // it will get - and the card used to print "no road within 8 tiles in
+    // any direction" one line above "road 2", in the same card.
+    const vroad2 = [];
+    for (let x = 14; x <= 36; x++) vroad2.push(v(x, 12)); // starts east of the river platform, so nothing above changes
+    apply(V, { kind: "road", tiles: vroad2 });
+    for (let x = 2; x <= 40; x++) V.terrain[v(x, 13)] = TERRAIN.WATER;
+    const vline2 = [];
+    for (let x = 16; x <= 32; x++) vline2.push(v(x, 14));
+    apply(V, { kind: "rail", tiles: vline2 });
+    apply(V, { kind: "station", tx: 24, ty: 14 });
     computeFields(V);
     const vui = createUI(stubApp(V));
     const cardAt = (i) => { vui.updateHover({ tile: i, pinned: true }); return textOf(document.getElementById("card")); };
@@ -5353,6 +5835,19 @@ function costOfBulldoze(w, x, y) { return (0, costOfOp)(w, { kind: "bulldoze", x
       /road access: none/.test(none) && (none.match(/no road within|nearest road is/g) || []).length === 1
         && /a station nobody can board/.test(none) && !/a station with no road within/.test(none),
       `"${(none.match(/road access:[^·]*/) || ["(nothing)"])[0].trim()}" + "${(none.match(/a station[^;]*/) || ["(nothing)"])[0].trim()}"`);
+    const stranded = cardAt(v(24, 14));
+    check("panel: and when a road is RIGHT THERE and nothing can walk to it, the card says so — a platform two tiles from a road across a river it cannot cross used to print \"no road within 8 tiles in any direction\" one line above \"road 2\", in the same card",
+      V.roadDist[v(24, 14)] === 2 && !FI2.served(V, v(24, 14)) && FI2.doorsOf(V, v(24, 14)).length === 0
+        && /a road is 2 tiles away, but nothing can walk to it/.test(stranded)
+        && !/no road within/.test(stranded) && !/nearest road is/.test(stranded)
+        && /road 2/.test(stranded),
+      `raw ${V.roadDist[v(24, 14)]} · "${(stranded.match(/road access:[^·]*/) || ["(nothing)"])[0].trim()}"`);
+    const twoSided = cardAt(v(26, 7));
+    check("panel: and a lot entered from two sides SAYS both — the card lists every door, because \"all sides are access points\" is a promise to the player and not only to the pathfinder",
+      FI2.doorsOf(V, v(26, 7)).length === 2
+        && /2 doors, every side counts:/.test(twoSided)
+        && /\(26,6\)/.test(twoSided) && /\(27,7\)/.test(twoSided),
+      `${FI2.doorsOf(V, v(26, 7)).length} doors · "${(twoSided.match(/road access:[^·]*/) || ["(nothing)"])[0].trim()}"`);
   }
 
   // And the frame loop must survive whatever the panel does. main.js is the

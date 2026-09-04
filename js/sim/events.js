@@ -10,7 +10,7 @@
 import { KNOBS } from "./rules.js";
 import { ZONE, CIVIC, TERRAIN, ROAD, idx, inBounds, capacityOf } from "./world.js";
 import { post } from "./budget.js";
-import { removeHousehold, evictFromLot, fireFromLot, invalidatePaths } from "./citizens.js";
+import { removeHousehold, evictFromLot, fireFromLot } from "./citizens.js";
 import { neutralRate } from "./demand.js";
 import { ageYears } from "./census.js";
 import { SPECIES_BY_ID, SPECIES } from "./species.js";

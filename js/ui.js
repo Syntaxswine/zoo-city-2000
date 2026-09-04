@@ -434,6 +434,16 @@ export function createUI(app) {
         // 3": the score line has already said that, and what the reader wants
         // next is how far and which way.
         lines.push(el("div", "warn", `road access: none — the nearest road is ${rep.nearest.d} tiles away at ${xy(rep.nearest.doors[0])}, ${rep.nearest.d - KNOBS.ROAD_REACH} too far`));
+      } else if (rep.roadDist <= KNOBS.ROAD_REACH) {
+        // NO DOOR, AND YET A ROAD IS RIGHT THERE. Only a PLATFORM can reach
+        // this: its access is a WALK, so a river or a terrace between the line
+        // and the road hides a road two tiles away, while the raw field on the
+        // env line below still reads 2. (A lot cannot: if its own tile were
+        // within reach the site would be served and this branch unreachable.)
+        // The card used to fall through to the horizon line and print "no road
+        // within 8 tiles in any direction" one line above "road 2" - a false
+        // sentence, contradicted by the same card, found by a hostile review.
+        lines.push(el("div", "warn", `road access: none — a road is ${rep.roadDist} tile${rep.roadDist === 1 ? "" : "s"} away, but nothing can walk to it: the ground between is water, a wall or a building`));
       } else {
         lines.push(el("div", "warn", `road access: none — no road within ${(rep.nearest ? rep.nearest.d : nearReach() + 1) - 1} tiles in any direction`));
       }

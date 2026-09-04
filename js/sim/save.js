@@ -131,7 +131,10 @@ export function rebuildDerived(world) {
   recountRosters(world);
   // Paths first (deterministic), then fields (traffic reads paths).
   computeFields(world); // computes roadDist and the station links, so doorsOf and the commute search work
-  world.doorsMoved = false; // a loaded city is about to re-plan every path anyway
+  // (No `doorsMoved` reset here: this runs on a world createWorld has just
+  // made, so fields.markDoorsMoved has no previous signature to compare and
+  // claims nothing by design. A line resetting the flag looked prudent and
+  // could never fire - a mutant deleting it survived every check there is.)
   for (const c of world.citizens) {
     if (c.job < 0 || c.home < 0) continue;
     const a = doorsOf(world, c.home);

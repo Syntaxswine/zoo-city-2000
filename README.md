@@ -249,9 +249,13 @@ mill-town with a fox problem").
   build (quarters seven deep roaded on one side, a line set three tiles back),
   because she rings every 6×6 and lays her line along a ring, so in her towns
   the footprint rule lifts nothing and no animal ever crosses a forecourt.
-  In the deep rig: 418 zoned lots the rule refuses with the real distance on
-  each, 2 of 2 platforms that are doors only under the standard, and 12
-  commutes crossing 48 tiles of forecourt.
+  In the deep rig at its default thirty years: 418 zoned lots the rule
+  refuses with the real distance on each, 2 of 2 platforms that are doors only
+  under the standard, and 20 commutes crossing 80 tiles of forecourt. (Those
+  last two move with `--years`: at 20 it is 12 crossing 48. A number quoted
+  beside a command has to be the number that command gives.) `--cost` times
+  the two hot paths and prints the town it timed them on; `--rig many` is a
+  cost worst case rather than a town.
 - `tools/accessprobe.mjs --layout millbelt` — what road access reaches and
   what it refuses: zoned lots by the distance the RULE reads beside the
   distance their own tile reads, how many sides each lot is entered from,

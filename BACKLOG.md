@@ -239,7 +239,7 @@ another's. Git merges those. `citizens.js`, `justice.js` and `events.js`
 are the risk: B adds one-liners at call sites; A adds one function; H
 edits two `post` sites; F edits one advisor function; D never opens them.
 
-## Road access, standardized — SHIPPED 2026-09-04 (plan §4-R; SPEC §6c, §5, §7.9, §9b, §11; handoff §24, §24b, §24c, §24d; `tools/accessprobe.mjs`; the suite went 428 → 489 across TWO hostile reviews, and a 19-mutant sweep aimed at these lines catches all 19)
+## Road access, standardized — SHIPPED 2026-09-04 (plan §4-R; SPEC §6c, §5, §7.9, §9b, §11; handoff §24, §24b, §24c, §24d, §24e; `tools/accessprobe.mjs`; the suite went 428 → 503 across THREE hostile reviews)
 
 The owner: *"as long as a tile is within 1-3 tiles of the road it has road
 access"*, *"the 6x6 squares have roads around the whole perimeter, so nothing
@@ -413,11 +413,26 @@ reads `css/` two thirds of the way through, and twelve mutants came back
     two); `fields.doorOf` is documented as the single-tile reader the TOOLS
     use, which is what it is.
 
-Found SOUND by the same reader, with evidence: cost is a non-issue (98
-stations, `computeStationDoors` 0.07 ms/tick, the whole-map overlay 0.16
-ms/frame); the save/load law holds everywhere ELSE it could be pushed; the
-rendered-pixel overlay checks are real; 39 of their 49 mutants were caught;
-every published number reproduces exactly.
+Found SOUND by the same reader, with evidence: the save/load law holds
+everywhere ELSE it could be pushed; the rendered-pixel overlay checks are
+real; 39 of their 49 mutants were caught; every published number reproduces
+exactly.
+
+Cost was found sound too, but the figures were quoted from an unnamed rig and
+a THIRD reviewer measured 2–4× them on their own. **A number names its rig**,
+so the measurement lives in the repo now — `tools/accessprobe.mjs --cost`
+times the two hot paths and prints the town it timed them on:
+
+| rig (`node tools/accessprobe.mjs …`) | platforms | `computeStationDoors` | `siteRoadDist` over all 4,096 tiles |
+|---|---|---|---|
+| `--layout millbelt --seed 7 --years 30 --cost` | 0 | 0.018 ms | 0.222 ms |
+| `--rig deep --cost` | 2 | 0.039 ms | 0.180 ms |
+| `--rig many --cost` (a worst case, not a town) | 56 | 0.098 ms | 0.132 ms |
+
+The second column is per tick and per op; the third is an upper bound on the
+access overlay's per-frame work minus the drawing (it asks every tile on the
+map; the renderer asks only the visible ones). 0.1 ms against a 16 ms frame.
+Cost is a non-issue — but it is a non-issue with a rig beside it now.
 
 **What the sweep taught that the review did not.** The check for finding 1's
 op-time half had a `tick()` between the op and the measurement — added for an
@@ -426,6 +441,114 @@ doors itself. So the check was watching the wrong half of its own fix: deleting
 the op-time settle left it green with 317 animals walking through a police
 station. The measurement is taken before the tick now. **A line added for one
 reason can take the teeth out of a check written for another.**
+
+## The THIRD hostile review — the same bug one level down (2026-09-04)
+
+A third adversarial reader scored `46e16e5` **6.5/10** and was right to. The
+headline of the previous two commits — *"the ground under a forecourt MOVES,
+and a move is a re-plan"* — was **still false**, one level below where it was
+patched.
+
+1. **The signature hashed the door SET, not the forecourt CHAIN.** A civic or
+   a building that REROUTES a forecourt without taking a door away moves every
+   tile a citizen walks and raised nothing. Reproduced on this part's own
+   flagship fixture with this part's own op — a police station on the tile both
+   of a platform's doors were reached through, both doors surviving because the
+   platform is entered from either side — **99 commutes left walking through
+   it**, and §16 broken a month after a tick-boundary save (`86db0002` vs
+   `375be68d`) with no op at all. **The check written for exactly this claim
+   performed the counterexample and asserted past it**: it compared door lists
+   and never looked at the chains. Fixed: the signature is `platform > door :
+   chain` per edge, and there is now a transition table (a door taken, a door
+   opened, the last station gone, the first station back, a forecourt rerouted
+   under an unchanged door — and three rows where nothing changes and it says
+   so).
+2. **A fire razes at step 7, three steps after the settle at 4b.** The card and
+   the graph disagreed for a whole month after every fire, and everything below
+   that line (meat carts, a killer's walk) planned over a stale graph.
+   `tick.js` settles after `eventsTick` too now. (`events.js` had imported
+   `invalidatePaths` and never called it since long before this part; the
+   import is gone.)
+3. **The game printed a false sentence to the player, contradicted by the same
+   card.** A platform with a road two tiles away across an uncrossable river
+   read *"no road within 8 tiles in any direction"* one line above *"road 2"* —
+   because `nearestRoad` asks a platform the WALKING question and the fall
+   through printed a search LIMIT as a measurement. There are three refusals
+   now, each true of a different thing (SPEC §6c), and the middle one is
+   checked through the DOM shim on a river that cannot be walked round. The
+   old fixture's river had a way round at exactly 8, so the false branch was
+   never entered: the easy case cannot test.
+4. **A false number in a check's own name.** *"six sim modules import
+   `served`"*, asserted as `>= 5`. It is five, and they are named now
+   (blocks, census, events, justice, lots) — an exact list fails in both
+   directions.
+5. **A README number quoted beside a command that does not give it.** `--rig
+   deep` defaults to 30 years; the published 12 commutes / 48 tiles was
+   measured at 20. It is 20 / 80 at the default, and both are stated.
+6. **Cost figures with no rig.** See the table above — `--cost` and `--rig
+   many` are in `accessprobe` now, so the number and the town it was measured
+   on travel together.
+7. **Dead lines.** `save.js`'s `doorsMoved` reset could never fire (a loaded
+   world has no previous signature by design); `events.js`'s unused import;
+   and `computeStationDoors`'s `d === 0` guard, which is unreachable *because
+   ops refuses a road on a platform and a station on a road* — a claim about
+   ops, now tested in ops.
+8. **§14 was held for the overlay and not for the readers.** `doorsOf` and
+   `nearestRoad` take a caller-owned scratch and nothing made them use it.
+9. **Nine more surviving mutants**, each now with a check: both of a
+   platform's doors are EDGES and not merely listed (paint one predator-only
+   and the rabbit boards from the other for the fox's price); an undo restores
+   the graph at the op; a merge re-plans the people who WORK there; the card
+   lists every door of a two-sided lot; the census counts what the rule
+   refuses; the N,E,S,W tie-break decides which forecourt tiles are walked.
+
+**Found SOUND by the third reader, with evidence** — do not re-verify: all 20
+of the second review's mutants die by a NAMED check; every published gate hash
+reproduces byte-for-byte (`8707f655` balanced · `f86913c3` dormitory ·
+`a20db622` millbelt · `df5631eb` estate · `aaac75f4` balanced --stations --zoo
+12 · `418c5b2c` estate --zoo 12); every `accessprobe --layout millbelt` number
+reproduces exactly; Law 6 holds behaviourally, not only by grep (one raw
+`roadDist` read outside `fields.js`, the allowed one); §16 holds on the deep
+rig across four seeds, 20 years then save → load → 36 months; §14 holds for
+`render.js`; the rulings table is real at 14 rows; the town canary is genuinely
+narrow.
+
+**And one the third reviewer did NOT find, which my own sweep did.**
+`justice.centreWithBed` asks `served` — a pacification centre no road reaches
+takes nobody in — and nothing held it: replacing justice's `served` with
+`() => true` left 502 checks green. The Part M' check that every sim module
+still IMPORTS `served` pins a SPELLING, not a behaviour, and the mutant kept
+the import and shadowed it. The behaviour is a check now, and the sentence
+table's own else-branch is what makes it visible: with no reachable centre the
+convicted go to the CELLS and the ticker says *"No centre in town"*. Lay two
+road tiles beside the same building and the same sentences land in it. **A
+list of importers is a spelling; a pair of runs is the rule.**
+
+**Three mutants survive ON PURPOSE, and here is why.** An honest mutation
+report names its equivalent mutants rather than quietly dropping them.
+
+- `computeStationDoors`'s `d === 0` guard. Unreachable: `ops.crossable`
+  refuses a road on a platform and `ops` refuses a station on a road, so a
+  platform can never stand on its own door. That construction is a check now
+  (a level crossing is track + road, never platform + road), which is where
+  the claim actually lives.
+- `computeRoadDist` exploring one ring further. Equivalent: the post-loop
+  clamp erases it.
+- `lotReport` computing `nearest` even when the lot is served. Equivalent: the
+  card reads `rep.nearest` only in the unserved branch. It is a wasted search
+  per hovered served tile, not a behaviour.
+
+**The lesson, which is the same lesson a third time.** Round one showed me a
+forecourt through a house and I pinned water, walls and houses. Round two
+showed me a forecourt that CLOSED and I hashed the door list. Round three
+showed me a forecourt that MOVED. Each time the fix was exactly the size of
+the example. The general shape was available every time: *what else is derived
+from this, and who reads it?* The tripwire that came out of asking it properly
+is in Part M': **exactly four modules write `tier` or `civic`** — lots and
+blocks inside `lotsTick`, events inside `eventsTick`, ops at the op — and the
+tick settles the door graph after each of the three windows. A fifth writer
+fails that check, which is the moment someone has to decide where its settle
+goes.
 
 ## Road access — the first review
 

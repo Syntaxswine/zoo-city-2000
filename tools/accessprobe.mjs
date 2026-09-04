@@ -28,6 +28,10 @@
 //   node tools/accessprobe.mjs [--seed 7] [--years 30] [--layout millbelt]
 //                              [--zoo 12] [--stations] [--save FILE] [--csv]
 //   node tools/accessprobe.mjs --rig deep [--years 20]
+//   node tools/accessprobe.mjs [--rig deep|many] --cost   — what the two hot
+//              paths cost on the town it just built, printed with the town.
+//              `--rig many` is a cost worst case and not a town: as many
+//              platforms as the map holds, each three tiles off its road
 //
 // --save loads a real saved city instead of building one (the owner's town,
 // once it arrives: docs/fixtures/). Everything below is read-only.
@@ -54,7 +58,7 @@ import { apply } from "../js/sim/ops.js";
 import { tick } from "../js/sim/tick.js";
 import { load, save } from "../js/sim/save.js";
 import { KNOBS } from "../js/sim/rules.js";
-import { served, siteRoadDist, doorsOf, nearestRoad, computeFields } from "../js/sim/fields.js";
+import { served, siteRoadDist, doorsOf, nearestRoad, computeFields, computeStationDoors } from "../js/sim/fields.js";
 import { lotScore } from "../js/sim/lots.js";
 import { census } from "../js/sim/census.js";
 import { createMayor } from "./mayor.mjs";
@@ -62,6 +66,7 @@ import { createMayor } from "./mayor.mjs";
 const argv = process.argv.slice(2);
 const arg = (k, d) => { const i = argv.indexOf(k); return i >= 0 ? argv[i + 1] : d; };
 const flag = (k) => argv.includes(k);
+const COST = argv.includes("--cost"); // time the two hot paths on THIS town, and say which town
 const SEED = arg("--seed", "7");
 const RIG = arg("--rig", null);
 const YEARS = Number(arg("--years", 30));
@@ -103,10 +108,43 @@ function deepRig(seed, years) {
   return w;
 }
 
+/**
+ * A WORST CASE FOR COST, and nothing else: as many platforms as the map will
+ * hold, each three tiles off a road so each one's doors are a real search.
+ * The scripted mayor builds two; a town nobody would play might build fifty.
+ * Cost scales with platforms - every one is a bounded BFS with two O(tiles)
+ * fills - so a figure quoted from a two-platform town says nothing about a
+ * fifty-platform one, and a figure with no town named says nothing at all.
+ */
+function manyRig(seed) {
+  const w = createWorld({ seed });
+  const at = (x, y) => y * w.w + x;
+  for (let y = 2; y <= 60; y++) for (let x = 2; x <= 60; x++) {
+    const i = at(x, y);
+    w.terrain[i] = TERRAIN.GRASS; w.road[i] = ROAD.NONE; w.zone[i] = ZONE.NONE;
+    w.tier[i] = 0; w.wall[i] = 0; w.rail[i] = 0; w.civic[i] = 0; w.big[i] = 0;
+  }
+  w.cash = 9000000;
+  w.events.noDisasters = true;
+  const roads = [];
+  for (let y = 4; y <= 56; y += 8) for (let x = 4; x <= 58; x++) roads.push(at(x, y));
+  apply(w, { kind: "road", tiles: roads });
+  for (let y = 7; y <= 56; y += 8) {
+    const line = [];
+    for (let x = 6; x <= 56; x++) line.push(at(x, y));
+    apply(w, { kind: "rail", tiles: line });
+    for (let x = 8; x <= 54; x += 6) apply(w, { kind: "station", tx: x, ty: y });
+  }
+  return w;
+}
+
 // ---- the town ---------------------------------------------------------------
 let world;
 let title;
-if (RIG === "deep") {
+if (RIG === "many") {
+  world = manyRig(SEED);
+  title = `--rig many, seed ${SEED} - a cost worst case, not a town`;
+} else if (RIG === "deep") {
   world = deepRig(SEED, YEARS);
   title = `--rig deep, seed ${SEED} - ${YEARS} years, ${world.citizens.length} citizens (a town the mayor would not build)`;
 } else if (SAVE) {
@@ -246,6 +284,32 @@ if (!crossers) console.log("  none. Every platform in this town is already a doo
 // ---- the town in one line -----------------------------------------------------
 console.log("");
 console.log(`town: P ${cen.P} · lots ${cen.lots} · lots with no road ${cen.lotsNoRoad} · roads ${cen.roads} · stations ${cen.stations} · riders ${cen.riders} · mean commute ${cen.meanCommute.toFixed(2)}`);
+
+// ---- what it costs, ON THIS TOWN ---------------------------------------------
+//
+// A NUMBER NAMES ITS RIG. Published cost figures for this part were measured
+// on an unstated map and did not reproduce (2-4x out) when a reviewer built
+// their own - so the measurement lives here, printed with the town it was
+// taken on, and anyone quoting it can quote the command too.
+//
+// The second line is the work the ACCESS OVERLAY does per frame minus the
+// drawing: `siteRoadDist` of every tile on the map, which for a platform is a
+// search. The renderer only asks it of visible tiles, so this is an upper
+// bound on a full-screen pass, not the frame time.
+if (COST) {
+  const n = world.w * world.h;
+  const time = (label, f, reps) => {
+    for (let k = 0; k < Math.max(2, reps >> 2); k++) f(); // warm
+    const t0 = process.hrtime.bigint();
+    for (let k = 0; k < reps; k++) f();
+    const ms = Number(process.hrtime.bigint() - t0) / 1e6 / reps;
+    console.log(`  ${label.padEnd(46)} ${ms.toFixed(3)} ms`);
+  };
+  console.log("");
+  console.log(`cost, on THIS town (${world.w}x${world.h} = ${n} tiles, ${cen.stations} platforms, ${cen.roads} roads):`);
+  time("computeStationDoors, once (a tick, an op)", () => computeStationDoors(world), 200);
+  time("siteRoadDist over every tile (the overlay)", () => { let s = 0; for (let i = 0; i < n; i++) s += siteRoadDist(world, i); return s; }, 60);
+}
 
 if (CSV) {
   console.log("");

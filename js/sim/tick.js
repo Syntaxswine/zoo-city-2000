@@ -69,6 +69,17 @@ export function tick(world) {
   // 7. events
   const evNotices = eventsTick(world, cen, dem);
   notices.push(...evNotices);
+  // 7c. AND AGAIN, because eventsTick moves the ground too: a fire razes
+  // buildings and a sinkhole opens new WATER, both of them things
+  // `fields.passable` reads, at step 7, three steps after the settle above. Everything below this line plans over the door
+  // graph (meat carts, a killer's walk), and next month's fields, census and
+  // demand read the paths it leaves; without this the card and the graph
+  // disagreed for a whole month after every fire, which SPEC 6c says they
+  // cannot. It belongs HERE, where the tick's own order is visible, rather
+  // than inside the events that raze: `events.js` had imported
+  // `invalidatePaths` and never called it since long before this part, which
+  // is what that import was reaching for and never got right.
+  settleDoors(world);
   // 7b. crime and punishment: releases, the killing, burglary, the files.
   // Lots and events can change a hall or a road in this same month.
   resetMeatRoutes(world);
