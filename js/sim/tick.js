@@ -168,15 +168,12 @@ function settleDoors(world) {
   if (!world.doorsMoved) return false;
   world.doorsMoved = false;
   invalidatePaths(world);
-  // AND RE-PLAN THEM NOW, not at the next citizens pass. One of the three
-  // callers runs AFTER `citizensTick`, so a stale pass is not coming: the
-  // month would end with every commute null, and next month's traffic, riders
-  // and mean commute would be taken from nothing in the straight run and from
-  // everything in a reload (`save.rebuildDerived` re-plans unconditionally).
-  // The hash at the boundary is equal either way - `c.path` is not in
-  // `canonicalCitizen` - so the two cities part a month later. Nothing may end
-  // a tick stale.
-  replanStale(world);
+  // NO RE-PLAN HERE. It used to be, and that was the wrong place twice over:
+  // this function only runs when the DOOR GRAPH moved, and the law is about
+  // the boundary, not about doors. The unconditional `replanStale` at the end
+  // of `tick` covers every writer of `c.stale`, and `citizensTick`'s own stale
+  // pass covers anything invalidated before it - so a re-plan here repaired
+  // nothing that was not already repaired, and a mutant deleting it lived.
   return true;
 }
 

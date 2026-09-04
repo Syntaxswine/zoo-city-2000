@@ -517,6 +517,18 @@ check, 16 survived, seven of those provably not equivalent.
    admits the overlay iterates its bounding box rather than the visible tiles,
    and that `js/ui.js` is a second reader of the raw field that DECIDES with it.
 
+**The sweep after all of that**: 44 mutants aimed at these lines — **41 caught
+by a NAMED check**, and the only three survivors are the documented equivalents
+(the unreachable `d === 0` guard, `computeRoadDist`'s extra ring, `lotReport`'s
+eager `nearest`). Two more fell out of it and are fixed here rather than left:
+the card's HORIZON NUMBER had no check (a mutant printing 9 instead of 8 lived,
+so the third refusal now asserts `nearReach()` by name), and **`settleDoors`'s
+own `replanStale` was redundant once the boundary call existed** —
+`citizensTick`'s stale pass already covers anything invalidated before it, and
+the end-of-tick call covers everything after, so the line repaired nothing and
+a mutant deleting it lived. It is gone. One implementation of "when a stale
+commute is rebuilt": the citizens' own pass, and the boundary.
+
 **Found SOUND by the fifth reader** — do not re-verify: both path laws hold on
 every stored commute in four layouts with disasters on (0 non-adjacent steps, 0
 unwalkable tiles, out of 1120 / 573 / 1014 / 17 paths); input-log replay is

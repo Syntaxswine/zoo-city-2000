@@ -6236,6 +6236,18 @@ function costOfBulldoze(w, x, y) { return (0, costOfOp)(w, { kind: "bulldoze", x
         && !/no road within/.test(stranded) && !/nearest road is/.test(stranded)
         && /road 2/.test(stranded),
       `raw ${V.roadDist[v(24, 14)]} · "${(stranded.match(/road access:[^·]*/) || ["(nothing)"])[0].trim()}"`);
+    // AND THE THIRD REFUSAL, with its number. A lot far from everything gets
+    // the horizon line, and the number in it is `nearReach()` - the distance
+    // the card actually searched - not the search's own limit one past it. The
+    // off-by-one there was untested and a mutant lived on it.
+    apply(V, { kind: "zone", zone: ZONE.R, x0: 6, y0: 20, x1: 6, y1: 20, density: 3 });
+    computeFields(V);
+    const nowhere = cardAt(v(6, 20));
+    check("panel: and a lot with nothing anywhere near it gets the third refusal, with the number the card really searched — no road within nearReach() tiles that anything could walk to, and nearReach() is what the sentence says",
+      FI2.nearestRoad(V, v(6, 20)).doors.length === 0
+        && new RegExp(`no road within ${FI2.nearReach()} tiles that anything could walk to`).test(nowhere)
+        && !/nearest road is/.test(nowhere) && !/a road is \d+ tiles? away/.test(nowhere),
+      `nearReach ${FI2.nearReach()} · "${(nowhere.match(/road access:[^·]*/) || ["(nothing)"])[0].trim()}"`);
     const twoSided = cardAt(v(26, 7));
     check("panel: and a lot entered from two sides SAYS both, IN ORDER — the card lists every door and lists them the way the rule gives them, because \"all sides are access points\" is a promise to the player and not only to the pathfinder",
       FI2.doorsOf(V, v(26, 7)).length === 2
