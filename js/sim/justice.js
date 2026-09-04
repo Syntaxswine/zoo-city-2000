@@ -287,6 +287,24 @@ function centreWithBed(world, from) {
   return best;
 }
 
+/** The camera nearest this scene, or -1: the one the IDENTIFIED line names. Deterministic, no draw — the first at the smallest Chebyshev distance. */
+function nearestCamera(world, tile) {
+  const reach = KNOBS.CAM_REACH + KNOBS.ROAD_REACH;
+  const tx = tile % world.w;
+  const ty = (tile / world.w) | 0;
+  for (let r = 0; r <= reach; r++) {
+    for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) {
+      if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
+      const xx = tx + dx;
+      const yy = ty + dy;
+      if (!inBounds(world, xx, yy)) continue;
+      const j = yy * world.w + xx;
+      if (world.cam[j]) return j;
+    }
+  }
+  return -1;
+}
+
 /** The wrongful arrest still standing for this file, if there is one: same culprit, same scene, same cause, not yet put right. */
 function standingWrongful(world, f) {
   for (const a of world.events.arrests) {
@@ -429,14 +447,33 @@ export function filesTick(world, cen, notices) {
     // police are not (97.4% of scenes dark at one station, 44.8% at four).
     const force = Math.min(1, cen.policeStations / KNOBS.ARREST_FORCE_N);
     if (force <= 0) continue;
-    const p = KNOBS.ARREST_BASE + KNOBS.ARREST_FORCE * force + KNOBS.ARREST_COVER * world.policeCov[f.tile] / KNOBS.POLICE_EFFECT + KNOBS.ARREST_PRIOR * (culprit.record || 0);
+    // THE CAMERA'S WHOLE EFFECT IS THIS ONE TERM, and it is here and nowhere
+    // else. It is not in computeCrime, in land value, in the burglary rate, in
+    // the killing weight or in a hall's dread — a camera SOLVES and never
+    // deters, which is the owner's ruling and, as it happens, what the
+    // evidence on real ALPR says. The `force` gate above is untouched: with no
+    // station there is no roll at all, so a network without a police force
+    // does exactly nothing, however much of the town it covers.
+    const cov = world.camCov[f.tile] / KNOBS.CAM_EFFECT;
+    const p = KNOBS.ARREST_BASE + KNOBS.ARREST_FORCE * force + KNOBS.ARREST_COVER * world.policeCov[f.tile] / KNOBS.POLICE_EFFECT + KNOBS.CAM_ARREST * cov + KNOBS.ARREST_PRIOR * (culprit.record || 0);
     if (!world.rng.chance(Math.min(0.95, p))) continue;
-    let wrongful = world.rng.chance(KNOBS.WRONGFUL_P);
+    // The same single draw it always was — the knob moves the threshold, not
+    // the number of times the die is thrown.
+    let wrongful = world.rng.chance(KNOBS.WRONGFUL_P + KNOBS.CAM_WRONGFUL * cov);
     let target = culprit;
     if (wrongful) {
       const t = pickWrongful(world, f, culprit);
       if (t) target = t;
       else wrongful = false;
+    }
+    if (cov > 0) {
+      const eye = nearestCamera(world, f.tile);
+      const months = tick - f.opened;
+      // It does not say "closed": a wrongful arrest leaves the file open, and
+      // the town does not know which kind it has just made.
+      const line = `IDENTIFIED — the camera${eye >= 0 ? ` at ${at(world, eye)}` : ""} puts ${nameOf(target)} at the ${f.cause} at ${at(world, f.tile)}, ${months} month${months === 1 ? "" : "s"} after it happened.`;
+      ev.log.push({ t: tick, id: "identified", line, links: [target.id] });
+      notices.push(line);
     }
     arrest(world, f, target, wrongful, notices);
   }

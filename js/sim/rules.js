@@ -88,6 +88,8 @@ export const KNOBS = {
   CAM_REACH: 2,             // road-steps the sight-line runs. 4 plus the ROAD_REACH-3 halo is an effective Chebyshev 7 — more ground than a §500 station's 6, for §100
   CAM_NEAR: 1,              // full effect within one road-step, half beyond; at CAM_REACH 2 this is what makes the field graded at all
   CAM_EFFECT: 60,           // the same scale as POLICE_EFFECT, so the card can print both and a player can compare them
+  CAM_ARREST: 0.30,         // added to the ARREST roll at a covered scene, and to NOTHING else. Larger than ARREST_COVER 0.18 because it is bought one tile at a time: a covered scene clears at 88.2% over the five rolled months against 21.8% dark
+  CAM_WRONGFUL: 0.10,       // … and names the wrong animal 15% of the time against the standing 5%. The picture is not a witness
   CRIME_BASE: 40,           // crime = 40 − 0.5·LV + 0.4·density3 + 40·(U/W) − police, 0..100 (Micropolis: 128 − LV + density − police)
   CRIME_LV: 0.5,
   CRIME_DENSITY: 0.4,

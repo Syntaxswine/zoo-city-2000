@@ -745,6 +745,156 @@ check("determinism: same seed + same inputs ⇒ same hash", stateHash(A.world) =
   }
 }
 
+// ---- CLEARANCE: the camera solves, and never deters (docs/PROPOSAL-CAMERAS.md §4c-4d) ----
+// Measured on tools/camprobe.mjs, 4 seeds x 30y at ONE station. Solved% by
+// camera count: 0 → 20.5, 1 → 34.2, 2 → 41.5, 4 → 49.2, 8 → 67.3, 10 → 85.3,
+// 20 → 90.4, 40 → 90.5. Mean crime over the same sweep: 39.34, —, —, —, —,
+// 39.36, 39.88, 39.23. The town clears four times as many files and its crime
+// number does not move; that is the whole design and these checks pin it.
+{
+  const JU = await import("../js/sim/justice.js");
+  const { TICKER_FLASH } = await import("../js/sim/events.js");
+  const fieldsSrc = readFileSync(path.join(ROOT, "js", "sim", "fields.js"), "utf8");
+
+  // THE ANTI-CLAIM, enforced on the source. A camera term anywhere in the
+  // crime field or in land value would make cameras DETER, which is the one
+  // thing the design forbids. The old grep guard allow-listed fields.js
+  // wholesale — and computeCrime and computeLandValue both live in it.
+  const bodyOf = (name) => {
+    const from = fieldsSrc.indexOf(`export function ${name}(`);
+    if (from < 0) return null;
+    let depth = 0;
+    for (let i = fieldsSrc.indexOf("{", from); i < fieldsSrc.length; i++) {
+      if (fieldsSrc[i] === "{") depth++;
+      else if (fieldsSrc[i] === "}" && --depth === 0) return fieldsSrc.slice(from, i + 1);
+    }
+    return null;
+  };
+  for (const fn of ["computeCrime", "computeLandValue", "computeDread"]) {
+    const body = bodyOf(fn);
+    check(`CLEARANCE rig: ${fn} was found in fields.js to read`, !!body && body.length > 200, `${body && body.length}`);
+    check(`${fn} has no camera term — a camera SOLVES and never deters`, !!body && !/\bcam\b|camCov|CAM_/.test(body), (body || "").split("\n").filter((l) => /cam/i.test(l)).join(" / ") || "not found");
+  }
+  const justiceSrc = readFileSync(path.join(ROOT, "js", "sim", "justice.js"), "utf8");
+  check("the camera reaches the sim through exactly one arrest term", (justiceSrc.match(/KNOBS\.CAM_ARREST/g) || []).length === 1, `${(justiceSrc.match(/KNOBS\.CAM_ARREST/g) || []).length} uses`);
+  check("and one wrongful term", (justiceSrc.match(/KNOBS\.CAM_WRONGFUL/g) || []).length === 1, `${(justiceSrc.match(/KNOBS\.CAM_WRONGFUL/g) || []).length} uses`);
+
+  // ---- what the term is worth, run through the real filesTick -------------
+  // Not a re-derivation of the formula: 120 real files in one world, half at
+  // covered scenes and half dark, rolled by the shipped code.
+  const trial = (cover, stations) => {
+    const W = load(A.saved);
+    const pool = W.citizens.filter((c) => !c.dead && c.home >= 0 && !c.fixed && (!c.held || c.held <= W.tick));
+    const lots = [];
+    for (let i = 0; i < W.w * W.h && lots.length < 60; i++) if (W.tier[i] > 0 && !W.rubble[i]) lots.push(i);
+    const files = [];
+    for (let k = 0; k < Math.min(60, pool.length, lots.length); k++) {
+      const f = JU.openFile(W, { tile: lots[k], culpritId: pool[k].id, cause: "burglary" });
+      f.opened = W.tick - 1; // past the opening month, so filesTick rolls it
+      files.push(f);
+      W.camCov[lots[k]] = cover;
+      W.policeCov[lots[k]] = 0;
+    }
+    const cen = census(W);
+    cen.policeStations = stations;
+    JU.filesTick(W, cen, []);
+    return { n: files.length, closed: files.filter((f) => f.closed).length, arrests: W.events.arrests.length };
+  };
+  const dark = trial(0, 1);
+  const lit = trial(KNOBS.CAM_EFFECT, 1);
+  check("CLEARANCE rig: the same number of real files at built lots in both arms", dark.n === lit.n && dark.n >= 30, `${dark.n} vs ${lit.n}`);
+  check("a covered scene clears far more often than a dark one", lit.closed > dark.closed * 3 && dark.closed >= 0, `dark ${dark.closed}/${dark.n} · covered ${lit.closed}/${lit.n}`);
+
+  // THE GATE THE OWNER ASKED FOR: no station, no roll, however much of the
+  // town is watched. A network without a police force does exactly nothing.
+  const unpoliced = trial(KNOBS.CAM_EFFECT, 0);
+  check("with NO police station a blanket of cameras solves nothing at all", unpoliced.closed === 0 && unpoliced.arrests === 0, `${unpoliced.closed} closed, ${unpoliced.arrests} arrests`);
+
+  // ---- the wrongful term ---------------------------------------------------
+  {
+    // The same single draw, at a higher threshold: WRONGFUL_P 0.05 alone
+    // against 0.05 + CAM_WRONGFUL 0.10 at full cover. Read off the shipped
+    // path rather than recomputed, by forcing every arrest and counting.
+    // ROUNDS, because one month of one town is forty draws and the term moves
+    // the threshold by ten points: forty draws cannot tell 5% from 15% (the
+    // first draft measured 3 against 3 and would have called that a pass).
+    // Ten rounds is ~400 arrests, where the two arms cannot overlap by luck.
+    const ROUNDS = 10;
+    const run = (cover) => {
+      const W = load(A.saved);
+      const lots = [];
+      for (let i = 0; i < W.w * W.h && lots.length < 60; i++) if (W.tier[i] > 0 && !W.rubble[i]) lots.push(i);
+      const saveBase = KNOBS.ARREST_BASE;
+      const saveHeld = KNOBS.HOLD_MONTHS;
+      KNOBS.ARREST_BASE = 1; // every file is worked, so the only thing varying is the wrongful roll
+      let arrests = 0;
+      for (let round = 0; round < ROUNDS; round++) {
+        // Fresh culprits each round: an animal taken last round is in custody
+        // and adultsWithin skips it, so reusing the pool would thin the arms
+        // unevenly.
+        const pool = W.citizens.filter((c) => !c.dead && c.home >= 0 && !c.fixed && (!c.held || c.held <= W.tick));
+        for (let k = 0; k < Math.min(lots.length, pool.length); k++) {
+          const f = JU.openFile(W, { tile: lots[k], culpritId: pool[k].id, cause: "burglary" });
+          f.opened = W.tick - 1;
+          W.camCov[lots[k]] = cover;
+        }
+        const cen = census(W);
+        cen.policeStations = 1;
+        const before = W.events.arrests.length;
+        JU.filesTick(W, cen, []);
+        arrests += W.events.arrests.length - before;
+        W.tick++;
+      }
+      KNOBS.ARREST_BASE = saveBase;
+      KNOBS.HOLD_MONTHS = saveHeld;
+      return { wrongful: W.events.justice.wrongful, arrests };
+    };
+    const plain = run(0);
+    const watched = run(KNOBS.CAM_EFFECT);
+    check("CLEARANCE rig: both wrongful arms made enough arrests to tell 5% from 15%", plain.arrests >= 150 && watched.arrests >= 150, `dark ${plain.arrests} · watched ${watched.arrests}`);
+    check("a camera-carried arrest names the wrong animal more often", watched.wrongful > plain.wrongful * 1.5, `${plain.wrongful}/${plain.arrests} dark · ${watched.wrongful}/${watched.arrests} watched`);
+  }
+
+  // ---- the line ------------------------------------------------------------
+  {
+    const W = load(A.saved);
+    const pool = W.citizens.filter((c) => !c.dead && c.home >= 0 && !c.fixed && (!c.held || c.held <= W.tick));
+    let lot = -1;
+    for (let i = 0; i < W.w * W.h && lot < 0; i++) if (W.tier[i] > 0 && !W.rubble[i]) lot = i;
+    let road = -1;
+    for (let i = 0; i < W.w * W.h && road < 0; i++) if (W.road[i] === ROAD.ROAD && !W.rail[i] && !W.wall[i]) road = i;
+    W.cash = 100000;
+    apply(W, { kind: "camera", tiles: [road] });
+    const f = JU.openFile(W, { tile: lot, culpritId: pool[0].id, cause: "burglary" });
+    f.opened = W.tick - 3;
+    W.camCov[lot] = KNOBS.CAM_EFFECT;
+    const saveBase = KNOBS.ARREST_BASE;
+    KNOBS.ARREST_BASE = 1;
+    const said = [];
+    const cen = census(W);
+    cen.policeStations = 1;
+    JU.filesTick(W, cen, said);
+    KNOBS.ARREST_BASE = saveBase;
+    const id = said.find((l) => /^IDENTIFIED/.test(l));
+    check("a camera-carried arrest prints IDENTIFIED", !!id, said.join(" | ").slice(0, 160) || "nothing said");
+    check("and it names the camera's own tile", !!id && new RegExp(`the camera at \\(${road % W.w},${(road / W.w) | 0}\\)`).test(id), id || "no line");
+    check("and says how long the file had been open, never that it is closed", !!id && /3 months after it happened\.$/.test(id), id || "no line");
+    check("IDENTIFIED flashes over the map", TICKER_FLASH.test(id || ""), id || "no line");
+    // A DARK scene must print nothing: the line is the camera's, not the arrest's.
+    const D = load(A.saved);
+    const dpool = D.citizens.filter((c) => !c.dead && c.home >= 0 && !c.fixed && (!c.held || c.held <= D.tick));
+    const df = JU.openFile(D, { tile: lot, culpritId: dpool[0].id, cause: "burglary" });
+    df.opened = D.tick - 3;
+    KNOBS.ARREST_BASE = 1;
+    const quiet = [];
+    const dcen = census(D);
+    dcen.policeStations = 1;
+    JU.filesTick(D, dcen, quiet);
+    KNOBS.ARREST_BASE = saveBase;
+    check("an arrest with no camera on it prints no IDENTIFIED", !quiet.some((l) => /^IDENTIFIED/.test(l)) && quiet.length > 0, quiet.join(" | ").slice(0, 160) || "nothing said at all");
+  }
+}
+
 // ---- walls (docs/PROPOSAL-ZONING-RAIL-WALLS.md §1; SPEC §6b) ----------------------
 // The flood must reproduce the square before it is allowed to differ from it.
 {
