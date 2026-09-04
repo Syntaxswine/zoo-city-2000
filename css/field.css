@@ -1,7 +1,7 @@
 /* field.css — the field-guide chrome. Parchment, ink, one monospace, 1 px
    borders, uppercase letter-spaced headings, no glow, no big buttons, no
    animation in the chrome. The map canvas fills the window; a 300 px panel
-   on the right; the tool strip along the top; demand bars top-left. */
+   on the right; the build remote on the left; demand bars top-left. */
 
 :root {
   --bg: #edeade;
@@ -28,22 +28,18 @@ body {
 
 /* ---- strip ---- */
 #strip {
-  display: flex; align-items: center; gap: 10px;
-  padding: 5px 12px;
+  display: flex; align-items: center; gap: 6px;
+  padding: 5px 8px;
   border-bottom: 1px solid var(--border);
   background: var(--panel);
   flex: none;
-  flex-wrap: wrap;
-  row-gap: 3px;
+  flex-wrap: nowrap;
   white-space: nowrap;
 }
-h1 { font-size: 13px; margin: 0 6px 0 0; letter-spacing: 3px; font-weight: 600; }
+h1 { font-size: 13px; margin: 0 6px 0 0; letter-spacing: 3px; font-weight: 600; flex: none; }
 h2 { font-size: 11px; margin: 10px 0 6px; font-weight: 600; letter-spacing: 2px; text-transform: uppercase; color: var(--dim); }
 h3 { font-size: 11px; margin: 8px 0 4px; font-weight: 600; letter-spacing: 2px; text-transform: uppercase; color: var(--dim); }
-/* The row wraps: at 1280 px the 22 buttons are 1,600 px wide, and an
-   unwrapped row made the DOCUMENT scroll sideways the moment anything in
-   it was focused (measured: scrollX 331 with the title's menu button). */
-#tools { display: flex; align-items: center; gap: 3px; flex-wrap: wrap; row-gap: 3px; }
+#tools { display: flex; align-items: center; gap: 2px; flex: none; }
 #tools .sep { color: var(--dim); padding: 0 3px; }
 button {
   font: inherit; color: var(--ink);
@@ -56,12 +52,30 @@ button.primary { background: var(--accent); color: #fffdf6; border-color: var(--
 button.tool .key { color: var(--dim); }
 button.tool.on { background: var(--ink); color: #fffdf6; border-color: var(--ink); }
 button.tool.on .key { color: #c8c2ae; }
-#cost { margin-left: 6px; min-width: 120px; color: var(--ink); }
+#cost { margin-left: 3px; min-width: 0; flex: 1; color: var(--ink); overflow: hidden; text-overflow: ellipsis; }
 #cost.refused { color: var(--bad); }
-#clock { margin-left: auto; color: var(--dim); }
+#clock { margin-left: auto; flex: none; color: var(--dim); }
 
 /* ---- layout ---- */
 main { flex: 1; display: flex; min-height: 0; }
+#palette {
+  width: 240px; flex: none; min-height: 0; overflow-y: auto;
+  padding: 7px; border-right: 1px solid var(--border); background: var(--panel);
+}
+#palette h2 { margin: 0 0 6px; padding-left: 2px; }
+.palette-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px; }
+button.palette-tool {
+  height: 48px; min-width: 0; padding: 3px 4px; display: flex; align-items: center; gap: 4px;
+  text-align: left; overflow: hidden; font-size: 10px;
+}
+button.palette-tool.on { color: #fffdf6; background: var(--ink); border-color: var(--ink); }
+button.palette-tool:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.palette-icon { width: 36px; height: 30px; flex: none; display: flex; align-items: center; justify-content: center; }
+.tool-sprite { display: block; image-rendering: pixelated; }
+.palette-copy { min-width: 0; display: flex; flex-direction: column; line-height: 1.15; }
+.palette-label { overflow: hidden; text-overflow: ellipsis; }
+.palette-key { color: var(--dim); font-size: 10px; }
+button.palette-tool.on .palette-key { color: #c8c2ae; }
 #stage { flex: 1; position: relative; min-width: 0; background: var(--map); }
 #map { display: block; width: 100%; height: 100%; image-rendering: pixelated; outline: none; cursor: crosshair; }
 #panel {
@@ -71,6 +85,23 @@ main { flex: 1; display: flex; min-height: 0; }
 }
 #panel section { padding: 8px 10px; border-bottom: 1px solid var(--border); }
 #panel footer { padding: 6px 10px; color: var(--dim); font-size: 10px; line-height: 1.4; border-top: 1px solid var(--border); }
+
+@media (max-height: 719px) {
+  #palette { width: 456px; }
+  .palette-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+
+@media (max-width: 1350px) {
+  button.tool > span:not(.key) { display: none; }
+}
+
+@media (max-width: 980px) {
+  #panel { width: 260px; }
+  #strip { gap: 3px; }
+  #tools { gap: 1px; }
+  button.tool { padding-left: 3px; padding-right: 3px; }
+  button.tool > span:not(.key) { display: none; }
+}
 
 /* ---- stats ---- */
 #stats { display: flex; flex-wrap: wrap; gap: 4px 12px; padding: 8px 10px; border-bottom: 1px solid var(--border); }

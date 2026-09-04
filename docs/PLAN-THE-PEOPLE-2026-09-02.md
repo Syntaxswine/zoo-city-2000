@@ -932,6 +932,12 @@ keeps its return address until maturity or an explicit hall release.
 
 ### P. The palette — *"a remote control on the left side of the screen"*
 
+**Status: SHIPPED 2026-09-03.** One registry drives the 2×8/4×4 sprite
+remote, keyboard selection, operations and generated help. WASD is movement
+only; focus/modal collision checks cover buttons, edited save names and news.
+All sixteen sprites and post-layout resize/picking are exercised by the 410
+check canonical suite.
+
 **Goal.** The sixteen build tools as a two-column panel on the left of the
 map, in the owner's order, each with a picture of the thing it builds.
 The top strip keeps everything that is not a build tool.
@@ -989,10 +995,10 @@ The top strip keeps everything that is not a build tool.
   the round tree, the park, the zoo, the centre, the police station, the
   fire station, the cursor glyph, rubble), the label, the key in dim, the
   cost on hover from `costOf` (the same call the cost strip makes). The
-  active tool is highlighted; clicking calls `ui.setTool` — the one
-  function that already owns tool state. 2 × 8 at ~44 px; under 720 px of
+  active tool is highlighted; clicking calls `input.setTool` — the one
+  function that owns tool state and synchronizes the UI. 2 × 8 at ~44 px; under 720 px of
   height it reflows to 4 × 4.
-- The top strip's tool buttons go; density, pause, slower/faster, undo,
+- The top strip's tool buttons go; density, Use, pause, slower/faster, undo,
   save, load, overlay, news, zoom, new city and menu stay. The strip no
   longer wraps at 1,600 px (handoff §11's trap) because it is half as
   long.

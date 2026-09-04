@@ -58,15 +58,11 @@ const RED_TINT = { "=": "0", "(": "0" };
 // tint table doing what it is for until then.
 const R_CHALK_TINT = { m: "q" };
 
-/**
- * Paint a 16×16 art portrait at an integer nearest-neighbour scale. This is
- * intentionally the only canvas bridge the person-card UI needs: palette
- * lookup remains in the art/render boundary and never leaks into ui.js.
- */
-export function paintPortrait(canvas, sprite, scale = 1) {
-  if (!canvas || typeof canvas.getContext !== "function") throw new Error("paintPortrait: canvas required");
-  if (!sprite || sprite.w !== 16 || sprite.h !== 16) throw new Error("paintPortrait: expected a 16x16 portrait sprite");
-  if (!Number.isInteger(scale) || scale < 1) throw new Error("paintPortrait: scale must be a positive integer");
+/** Paint any text-row sprite at an integer nearest-neighbour scale. */
+export function paintSprite(canvas, sprite, scale = 1) {
+  if (!canvas || typeof canvas.getContext !== "function") throw new Error("paintSprite: canvas required");
+  if (!sprite || !Array.isArray(sprite.rows) || !sprite.rows.length) throw new Error("paintSprite: sprite required");
+  if (!Number.isInteger(scale) || scale < 1) throw new Error("paintSprite: scale must be a positive integer");
   const raw = rasterize(sprite.rows);
   canvas.width = raw.w * scale;
   canvas.height = raw.h * scale;
@@ -83,6 +79,12 @@ export function paintPortrait(canvas, sprite, scale = 1) {
   }
   ctx.putImageData(img, 0, 0);
   return canvas;
+}
+
+/** Paint a 16×16 citizen portrait through the shared sprite canvas bridge. */
+export function paintPortrait(canvas, sprite, scale = 1) {
+  if (!sprite || sprite.w !== 16 || sprite.h !== 16) throw new Error("paintPortrait: expected a 16x16 portrait sprite");
+  return paintSprite(canvas, sprite, scale);
 }
 
 export function createRenderer(canvas, initialWorld, art) {

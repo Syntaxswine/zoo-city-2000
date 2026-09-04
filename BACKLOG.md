@@ -4,7 +4,18 @@ Open work, ranked. The design record is `SPEC.md`; the numbers are in
 `js/sim/rules.js` (KNOBS). Later layers were labelled at design time so v1
 could ship whole.
 
-## The People — IN PROGRESS 2026-09-03 (`docs/PLAN-THE-PEOPLE-2026-09-02.md`); Parts K, A, C, D, H and S shipped
+## The People — IN PROGRESS 2026-09-03 (`docs/PLAN-THE-PEOPLE-2026-09-02.md`); Parts K, A, C, D, H, P and S shipped
+
+**Part P SHIPPED 2026-09-03:** the sixteen build tools now live in one
+DOM-free registry and one 2×8 sprite palette left of the map (4×4 below 720
+px high); the top strip keeps modifiers and commands. The number row follows
+the owner's order, WASD is movement only, density is H, undo is
+Backspace/Ctrl+Z and save-as is Ctrl+S. Palette clicks, shortcuts, live costs,
+active/ARIA state and generated footer help all consume the same registry.
+Focused controls and the news reader own their keys, preventing double actions
+or stacked save/news screens. Renderer resize/pick, all sixteen nonblank
+thumbnails, input conflicts and hash neutrality are covered by 410 canonical
+checks. SPEC §11.
 
 **Part C SHIPPED 2026-09-03:** Inspect now pins a permanent citizen id rather
 than a walker. The card survives the end of a walk, reports home/custody/bear

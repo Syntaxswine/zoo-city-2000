@@ -34,7 +34,7 @@ No dependencies, no build. Everything under `js/sim/`, `js/art/` and
 The game opens on a painting: NEW GAME, CONTINUE (the newest named slot of
 the last city), LOAD, SAVE, OPTIONS. LOAD and SAVE enter one named-saves
 panel: save as many copies as you want, load, overwrite or delete one,
-export any slot, and import city JSON. `S` focuses the save name and `L`
+export any slot, and import city JSON. `Ctrl+S` focuses the save name and `L`
 focuses the list; the automatic save remains one overwritten row per city.
 If browser storage fills up, the refused save's JSON is left in the export
 box so the city can still be copied somewhere safe. `Esc` brings the title
@@ -45,6 +45,16 @@ written to the city's input log like any other op, so the Budget tab
 always says how much of the treasury came that way. The switch is a
 preference of the browser; the city only carries the ops. The same panel
 toggles disasters for the current city.
+
+## Controls
+
+The build remote on the left is the key: `1` Residential, `2` Commercial,
+`3` Industrial, `4` Meat, `5` Road, `6` Wall, `7` Rail, `8` Station, `9`
+Tree, `0` Park, `Z` Zoo, `V` Pacification, `P` Police, `F` Fire, `I` Inspect
+and `B` Bulldoze. `H` changes density and `U` cycles use-zoning. WASD and the
+arrows only pan. `Backspace` or `Ctrl+Z` undoes; `Ctrl+S` opens save-as and
+`L` opens the saves list. The generated help line in the game carries the
+remaining pause, speed, overlay, news, zoom, new-city and menu keys.
 
 ## The rules are the game
 
@@ -102,7 +112,7 @@ unemployment): high crime drags land value and mood, keeps shops from
 growing, and lets a named fox, raccoon or cat rob a store. The `O` overlay
 shows crime in red and police cover in blue.
 
-**Walls.** `B` lays a wall like a road (§8 a tile). Smells, dread, the
+**Walls.** `6` lays a wall like a road (§8 a tile). Smells, dread, the
 crime a hall casts, fire and police cover and the land value a park lends
 all go *round* a wall instead of through it, and so does a killer's reach —
 a walled prey compound is safe from the wolf next door. Lay a road across
@@ -121,7 +131,7 @@ and the third offence meets the sentence table. Rail (coming) is neutral
 travel; only where you step off counts. The `O` overlay shows the line in
 rust and teal.
 
-**Rail.** `T` lays track and `G` makes a station of a rail tile beside a
+**Rail.** `7` lays track and `8` makes a station of a rail tile beside a
 road. A commute is the cheapest walk-and-ride: a ride costs 0.3 of a walk,
 makes no road traffic, and is neutral ground for the player's line — a
 wolf may ride through prey-only streets, and is only stopped where it
@@ -163,7 +173,7 @@ mill-town with a fox problem").
 
 - `tools/playtest.mjs --layout balanced|dormitory|millbelt --schedule 15:13,22:7`
   — a scripted mayor on the real map; the SPEC's acceptance targets.
-- `tools/check.mjs` — 377 checks: ledger conservation to the §, valves
+- `tools/check.mjs` — 410 checks: ledger conservation to the §, valves
   bounded, no NaN, the dangling-id law, rosters and capacities, commutes on
   roads, determinism, save → load → continue hash-equal, input-log replay,
   the crime-and-punishment invariants, the walls (the flood reproduces the

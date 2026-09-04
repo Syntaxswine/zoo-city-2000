@@ -479,9 +479,9 @@ overlay's `use` mode tints predator-only rust and prey-only teal.
 
 The owner: *"rail … shortens commute times, lightens traffic, and allows
 neutral travel (as long as predators don't exit the train in a prey only
-zone)."* Tool `T` lays rail like a road (an L-drag, §20 a tile, §3 a year;
+zone)."* Tool `7` lays rail like a road (an L-drag, §20 a tile, §3 a year;
 grass or trees, across a wall — a tunnel; square-on across a road — a
-**level crossing**, below; **not on water**: no rail bridges — BACKLOG); `G` makes a **station**
+**level crossing**, below; **not on water**: no rail bridges — BACKLOG); `8` makes a **station**
 of a rail tile (§300, §100 a year). A station is a **door only when a road
 tile touches it** (the card says so). **The commute graph has two layers:**
 walk nodes on road tiles and station tiles (a step `WALK` 10, ×6 onto a
@@ -848,17 +848,26 @@ prints the exposure and the monthly chance.
 
 ---
 
-## 11. Zoning UX (`js/input.js`, `js/ui.js`)
+## 11. Zoning UX (`js/tools.js`, `js/palette.js`, `js/input.js`, `js/ui.js`)
 
-Tool strip (field-guide chrome: one monospace row, no icons above 16 px):
-`1 R · 2 C · 3 I · M Meat · 4 Road · B Wall · T Rail · G Station · U Use · 5 Tree · 6 Park · 7 Zoo · F Fire station · P Police · V Pacify ·
-8 Bulldoze · 9 Inspect · D density Low/High · Space pause · , . speed · Z undo · S save · L load · Esc menu`.
-The `O` overlay cycle is off → LV → pollution → crime (an open file is a ring) → dread → use (rust predator-only, teal prey-only) → score.
+The build remote stands left of the map, two columns by eight rows (four by
+four below 720 px high). Its sixteen buttons, thumbnails, order, operations,
+keys and generated footer help all read the one DOM-free `TOOLS` registry:
+`1 R · 2 C · 3 I · 4 Meat · 5 Road · 6 Wall · 7 Rail · 8 Station · 9 Tree ·
+0 Park · Z Zoo · V Pacify · P Police · F Fire station · I Inspect · B Bulldoze`.
+The top strip keeps only modifiers and commands: `H` density, `U` Use,
+`Space` pause, `, .` speed, `Backspace` or `Ctrl+Z` undo, `Ctrl+S` save-as,
+`L` load, `O` overlay, `R` news, `+ −` zoom, `N` new city and `Esc` menu.
+WASD and the arrows only pan the map; the news reader steps on arrows, never
+WASD. A focused form control owns its editing keys, so Space cannot both
+activate a button and pause the city. The `O` overlay cycle is off → LV →
+pollution → crime (an open file is a ring) → dread → use (rust predator-only,
+teal prey-only) → score.
 
 - **Zones, trees, bulldoze:** rectangle drag; live cost in the strip
   ("R ×36 = §180"); an unaffordable drag draws the refused hatch and does
   nothing on release; water, roads and civics skipped; trees inside a zone
-  drag are felled at §4 each (LV warning in the card). **One undo step** (`Z`) restores the last op's tiles and
+  drag are felled at §4 each (LV warning in the card). **One undo step** (`Backspace` or `Ctrl+Z`) restores the last op's tiles and
   refunds it — tiles, never people: a bulldoze that turned animals out is
   not undoable (the strip warns before you release), and a road laid over
   empty chalk says how many lots it replaced.
@@ -867,7 +876,7 @@ The `O` overlay cycle is off → LV → pollution → crime (an open file is a r
   busy variant when traffic > 40.
 - **Park 1×1 §150, Zoo 2×2 §2,500:** click-place with a ghost; red ghost when
   blocked.
-- **Density `D`:** toggles the brush; painting R/C/I with Low sets
+- **Density `H`:** toggles the brush; painting R/C/I/M with Low sets
   `maxTier = 1`; the chalk shows an inner diamond for High.
 - **Hover card** (always live; click pins):
   ```
@@ -891,7 +900,7 @@ The `O` overlay cycle is off → LV → pollution → crime (an open file is a r
   LOAD · SAVE · OPTIONS) and one card for the panels, which are the
   new-city dialog's own builders (`foundForm`, `savesPanel` in `ui.js`) so
   `N` and the title never drift apart. LOAD and SAVE are two entries to the
-  same panel (`L` focuses the slot list; `S` focuses the save-as name). It
+  same panel (`L` focuses the slot list; `Ctrl+S` focuses the save-as name). It
   stands at boot over whatever boot resumed — CONTINUE names the slot, and the "paused; Space
   resumes" flash fires when the map is actually seen — and returns on `Esc`
   (a drag or a pinned card is cleared first) or the strip's `menu`. Under
@@ -902,9 +911,10 @@ The `O` overlay cycle is off → LV → pollution → crime (an open file is a r
   stay off and no autosave of an untouched map can shadow a real city.
   OPTIONS: the cheat switch (§8) and the per-city no-disasters toggle (the
   same `toggle` op the found form uses).
-- **Screen layout:** the map viewport fills the window; a 300 px field-guide
-  panel on the right; the tool strip along the top; bars top-left over the
-  map. Integer zoom ×1 / ×2. Minimap is L1.
+- **Screen layout:** the map viewport fills the remaining window between the
+  build remote on the left and the 300 px field-guide panel on the right;
+  command strip above; bars top-left over the map. `renderer.resize()` reads
+  the canvas's actual post-layout box. Integer zoom ×1 / ×2. Minimap is L1.
 
 ---
 

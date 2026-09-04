@@ -1,7 +1,7 @@
 // input.js — mouse and keyboard → ops. SPEC §11.
 //
-//   1 R · 2 C · 3 I · 4 Road · B Wall · T Rail · G Station · U Use · 5 Tree · 6 Park · 7 Zoo · 8 Bulldoze · 9 Inspect
-//   D density · Space pause · , . speed · Z undo · S save · L load · O overlays
+//   1..0 the first ten palette positions · Z Zoo · V Pacify · P Police · F Fire · I Inspect · B Bulldoze
+//   H density · U Use · Space pause · , . speed · Backspace/Ctrl+Z undo · Ctrl+S save · L load · O overlays
 //   +/- zoom · WASD / arrows / drag-pan (middle or right button, or left with Inspect)
 //   Esc: clears a drag or a pinned card; on a clean map, the title menu (title.js)
 //
@@ -12,32 +12,10 @@
 // release. Every mutation goes through `app.doOp(op)`, which is the one
 // place that calls apply() + renderer.invalidate() + walkers.notify().
 
-import { ZONE, idx } from "./sim/world.js";
+import { idx } from "./sim/world.js";
 import { costOf, roadL } from "./sim/ops.js";
 import { pinTarget } from "./follow.js";
-
-export const TOOLS = [
-  { id: "R", key: "1", label: "R", hint: "zone residential (drag)" },
-  { id: "C", key: "2", label: "C", hint: "zone commercial (drag)" },
-  { id: "I", key: "3", label: "I", hint: "zone industrial (drag)" },
-  { id: "M", key: "M", label: "Meat", hint: "zone meat market (drag) §12 — grey, off the books; carnivores staff it, herbivores smell it four tiles off" },
-  { id: "road", key: "4", label: "Road", hint: "L-drag; Shift = straight; over water = bridge §40; square-on across a line = a level crossing" },
-  { id: "wall", key: "B", label: "Wall", hint: "L-drag §8; Shift = straight; across a road = a tunnel; smells, dread, cover and a killer's reach go round a wall" },
-  { id: "rail", key: "T", label: "Rail", hint: "L-drag §20 a tile, §3 a year; across a wall = a tunnel; square-on across a road = a level crossing; a ride costs 0.3 of a walk and makes no traffic; not on water yet" },
-  { id: "station", key: "G", label: "Station", hint: "click a rail tile §300, §100 a year — a door only beside a road; riders board and alight here" },
-  { id: "use", key: "U", label: "Use", hint: "the player's line: paint lots and roads mixed / predator-only / prey-only (drag) §1 a tile — press U again to cycle; the O overlay shows it" },
-  { id: "tree", key: "5", label: "Tree", hint: "plant trees (drag) §4" },
-  { id: "park", key: "6", label: "Park", hint: "1×1, §150 — click" },
-  { id: "zoo", key: "7", label: "Zoo", hint: "2×2, §2,500 — click" },
-  { id: "fire", key: "F", label: "Fire stn", hint: "1×1, §500 — click; within 6 tiles a fire burns one month and barely spreads" },
-  { id: "police", key: "P", label: "Police", hint: "1×1, §500 — click; takes 60 off crime within 3 tiles, 30 within 6" },
-  { id: "centre", key: "V", label: "Pacify", hint: "1×1, §1,500, §900/yr, 4 jobs, 6 beds — click; a convicted predator comes home fixed in six months" },
-  { id: "bulldoze", key: "8", label: "Bulldoze", hint: "clear (drag) §2, trees §4" },
-  { id: "inspect", key: "9", label: "Inspect", hint: "pin a card; left-drag pans" },
-];
-const TOOL_BY_KEY = Object.fromEntries(TOOLS.map((t) => [t.key, t.id]));
-const PLACE_TOOLS = new Set(["park", "zoo", "fire", "police", "centre", "station"]);
-const ZONE_OF = { R: ZONE.R, C: ZONE.C, I: ZONE.I, M: ZONE.M };
+import { TOOL_BY_ID, TOOL_BY_KEY, PLACE_TOOLS, labelForOp } from "./tools.js";
 const PAN_SPEED = 700; // projection px per second
 
 export function createInput(canvas, app) {
@@ -46,6 +24,7 @@ export function createInput(canvas, app) {
     density: 3, // 3 High, 1 Low
     use: 0, // the Use brush: 0 mixed · 1 predator-only · 2 prey-only
     hover: null, // [tx, ty] | null
+    lastHover: null, // last map tile, retained only for palette cost previews
     pinned: null, // tile index | null
     pinnedCitizen: null, // stable citizen id; never a short-lived walker object
     drag: null, // { ax, ay, bx, by, shift }
@@ -66,6 +45,7 @@ export function createInput(canvas, app) {
     const tile = state.mouse.inside ? app.renderer.pick(state.mouse.x, state.mouse.y, app.camera) : null;
     const changed = !tile !== !state.hover || (tile && state.hover && (tile[0] !== state.hover[0] || tile[1] !== state.hover[1]));
     state.hover = tile;
+    if (tile) state.lastHover = tile;
     syncThoughts();
     if (changed && state.tool !== "inspect") refreshCost();
   }
@@ -76,12 +56,18 @@ export function createInput(canvas, app) {
   }
   function setTool(id) {
     if (id === "use" && state.tool === "use") { state.use = (state.use + 1) % 3; app.ui.flash(`Use brush: ${USE_LABEL[state.use]}.`); }
+    if (id !== "use" && !TOOL_BY_ID[id]) throw new Error(`input: unknown tool '${id}'`);
     state.tool = id;
     state.drag = null;
     state.cost = null;
     app.ui.setTool(id, state.density);
     app.ui.setCost("");
     syncThoughts(id === "inspect" && state.mouse.inside ? state.hover : null);
+    if (state.mouse.inside && state.hover && id !== "inspect") refreshCost();
+    else if (id !== "use") {
+      const preview = previewTool(id);
+      if (preview.text) app.ui.setCost(preview.text, preview.refused);
+    }
   }
 
   function screenXY(e) {
@@ -94,9 +80,10 @@ export function createInput(canvas, app) {
     const d = state.drag;
     if (!d) return null;
     const w = world();
-    switch (state.tool) {
-      case "R": case "C": case "I": case "M":
-        return { kind: "zone", zone: ZONE_OF[state.tool], x0: d.ax, y0: d.ay, x1: d.bx, y1: d.by, density: state.density };
+    const spec = TOOL_BY_ID[state.tool]?.op;
+    switch (spec?.kind || state.tool) {
+      case "zone":
+        return { kind: "zone", zone: spec.zone, x0: d.ax, y0: d.ay, x1: d.bx, y1: d.by, density: state.density };
       case "tree":
         return { kind: "tree", x0: d.ax, y0: d.ay, x1: d.bx, y1: d.by };
       case "bulldoze":
@@ -115,8 +102,18 @@ export function createInput(canvas, app) {
   }
 
   function clickOp(tx, ty) {
-    if (PLACE_TOOLS.has(state.tool)) return { kind: state.tool, tx, ty };
+    if (PLACE_TOOLS.includes(state.tool)) return { kind: TOOL_BY_ID[state.tool].op.kind, tx, ty };
     return null;
+  }
+
+  function previewOp(id, tx, ty) {
+    const tool = TOOL_BY_ID[id];
+    if (!tool || tool.op.kind === "inspect") return null;
+    const kind = tool.op.kind;
+    if (PLACE_TOOLS.includes(id)) return { kind, tx, ty };
+    if (kind === "zone") return { kind, zone: tool.op.zone, x0: tx, y0: ty, x1: tx, y1: ty, density: state.density };
+    if (kind === "road" || kind === "wall" || kind === "rail") return { kind, tiles: [idx(world(), tx, ty)] };
+    return { kind, x0: tx, y0: ty, x1: tx, y1: ty };
   }
 
   function affordable(cost) {
@@ -127,7 +124,7 @@ export function createInput(canvas, app) {
 
   function costLabel(op, plan) {
     const n = plan.tiles.length;
-    const name = op.kind === "use" ? `Use ${["mixed", "predator-only", "prey-only"][op.use]}` : { zone: op.zone === ZONE.R ? "R" : op.zone === ZONE.C ? "C" : op.zone === ZONE.M ? "Meat" : "I", road: "Road", wall: "Wall", rail: "Rail", station: "Station", tree: "Tree", bulldoze: "Bulldoze", park: "Park", zoo: "Zoo", fire: "Fire station", police: "Police station", centre: "Pacification centre" }[op.kind];
+    const name = op.kind === "use" ? `Use ${["mixed", "predator-only", "prey-only"][op.use]}` : labelForOp(op);
     if (plan.reason) return `${name}: ${plan.reason}`; // the old reasons ARE the word "blocked"; a rule with something to say (the level crossing, SPEC §7.9) says it here
     if (!n) return `${name}: nothing to do`;
     const bridges = plan.tiles.filter((t) => t.what === "bridge").length;
@@ -151,6 +148,20 @@ export function createInput(canvas, app) {
     app.ui.setCost(refused && !plan.reason ? `${label} — ${world().flags.receivership ? "receivership" : "cannot afford"}` : label, refused);
   }
 
+  function previewTool(id) {
+    const tool = TOOL_BY_ID[id];
+    if (!tool) return { text: "", refused: false };
+    if (tool.op.kind === "inspect") return { text: `${tool.label}: ${tool.hint}`, refused: false };
+    const tile = state.hover || state.lastHover;
+    if (!tile) return { text: `${tool.label}: point at the map for its cost`, refused: false };
+    const op = previewOp(id, tile[0], tile[1]);
+    const plan = costOf(world(), op);
+    const refused = !!plan.reason || (plan.tiles.length > 0 && !affordable(plan.cost));
+    const label = costLabel(op, plan);
+    const text = refused && !plan.reason ? `${label} — ${world().flags.receivership ? "receivership" : "cannot afford"}` : label;
+    return { text, refused };
+  }
+
   // ---- pointer -------------------------------------------------------------------------------
   function onDown(e) {
     canvas.focus();
@@ -158,6 +169,7 @@ export function createInput(canvas, app) {
     state.mouse = { x: sx, y: sy, inside: true };
     const tile = app.renderer.pick(sx, sy, app.camera);
     state.hover = tile;
+    if (tile) state.lastHover = tile;
     syncThoughts(tile); // touch can begin here without a preceding pointermove
     const panButton = e.button === 1 || e.button === 2 || (e.button === 0 && state.tool === "inspect");
     if (panButton) {
@@ -202,6 +214,7 @@ export function createInput(canvas, app) {
     const tile = app.renderer.pick(sx, sy, app.camera);
     const changed = !tile !== !state.hover || (tile && state.hover && (tile[0] !== state.hover[0] || tile[1] !== state.hover[1]));
     state.hover = tile;
+    if (tile) state.lastHover = tile;
     syncThoughts(tile);
     if (state.drag) {
       state.drag.shift = e.shiftKey;
@@ -213,7 +226,7 @@ export function createInput(canvas, app) {
         state.drag.by = Math.max(0, Math.min(w.h - 1, state.drag.by));
       }
       refreshCost();
-    } else if (changed || PLACE_TOOLS.has(state.tool)) refreshCost();
+    } else if (changed || PLACE_TOOLS.includes(state.tool)) refreshCost();
   }
 
   function onUp(e) {
@@ -264,30 +277,27 @@ export function createInput(canvas, app) {
   }
 
   // ---- keyboard -------------------------------------------------------------------------------
-  const typing = (e) => {
+  const editing = (e) => {
     const t = e.target;
-    return t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.tagName === "SELECT" || t.isContentEditable);
+    return t && (["INPUT", "TEXTAREA", "SELECT"].includes(t.tagName) || t.isContentEditable);
   };
+  const activating = (e) => e.target && ["BUTTON", "A"].includes(e.target.tagName);
   const PAN_KEYS = { KeyW: [0, -1], KeyA: [-1, 0], KeyS: [0, 1], KeyD: [1, 0], ArrowUp: [0, -1], ArrowLeft: [-1, 0], ArrowDown: [0, 1], ArrowRight: [1, 0] };
-  // S and D are both a pan key and a command (save, density): a TAP is the
-  // command, a HOLD (> 220 ms, or with another pan key down) is the pan.
-  const TAP_MS = 220;
-  const downAt = new Map();
-
   function command(k, e) {
-    const toolKey = TOOL_BY_KEY[k] || TOOL_BY_KEY[String(k).toUpperCase()];
-    if (toolKey) { setTool(toolKey); return; }
+    const tool = TOOL_BY_KEY[String(k).toUpperCase()];
+    if (tool) { setTool(tool.id); return; }
     switch (k) {
-      case "d": case "D":
+      case "h": case "H":
         state.density = state.density === 3 ? 1 : 3;
         app.ui.setTool(state.tool, state.density);
         app.ui.flash(`Density: ${state.density === 3 ? "High (tiers to 3)" : "Low (cottages only)"}`);
+        refreshCost(); // an in-flight zone drag now has a different operation
         break;
       case " ": app.togglePause(); break;
       case ",": app.setSpeed(-1); break;
       case ".": app.setSpeed(1); break;
-      case "z": case "Z": app.undo(); break;
-      case "s": case "S": app.save(); break;
+      case "Backspace": app.undo(); break;
+      case "u": case "U": setTool("use"); break;
       case "l": case "L": app.load(); break;
       case "o": case "O": app.cycleOverlay(); break;
       case "r": case "R": app.news.toggle(); break;
@@ -312,51 +322,63 @@ export function createInput(canvas, app) {
       if (app.news && app.news.isOpen()) { app.news.close(); e.preventDefault(); return; }
       if (app.ui.modalOpen()) { app.ui.closeModals(); e.preventDefault(); return; }
     }
-    if (typing(e)) return;
-    if (e.ctrlKey || e.metaKey || e.altKey) return;
-    // The reader owns the keyboard while it is up — ← → step a dispatch — and
-    // it takes WASD too, because panning a map you cannot see is not a thing
-    // anyone meant to do. Anything it does not take is swallowed, not passed on.
-    if (app.news && app.news.isOpen()) {
-      held.clear(); // a pan key held when the reader opened must not run on behind it
-      if (app.news.key(e)) e.preventDefault();
-      return;
-    }
-    if (app.ui.modalOpen()) return;
     // Space by its code too: a synthetic KeyboardEvent can carry key "" with code "Space".
     const key = e.code === "Space" ? " " : e.key;
-    if (key === " " || e.code.startsWith("Arrow") || /^[nN+=\-_]$/.test(key)) e.preventDefault();
+    if (editing(e)) {
+      // Ctrl+S inside the save-name field must neither open the browser's Save
+      // Page dialog nor rebuild the panel and erase the name being edited.
+      if ((e.ctrlKey || e.metaKey) && e.code === "KeyS") e.preventDefault();
+      return;
+    }
+    // A reader owns its keyboard. In particular Ctrl+S cannot stack a second
+    // title/save modal over it. A button inside the reader keeps native
+    // Space/Enter activation; a top-strip button left focused behind the
+    // reader does not get a phantom click on keyup.
+    if (app.news && app.news.isOpen()) {
+      const readerControl = activating(e) && e.target.closest?.("#news");
+      if (readerControl && (key === " " || key === "Enter")) return;
+      held.clear();
+      if (app.news.key(e) || activating(e) || key === "Backspace" || e.ctrlKey || e.metaKey) e.preventDefault();
+      return;
+    }
+    // Space/Enter natively activate a focused button or link. Backspace has
+    // no native job there and must not navigate. Every other shortcut,
+    // especially WASD and palette keys, remains global after a palette click.
+    if (activating(e) && (key === " " || key === "Enter" || key === "Backspace")) {
+      if (key === "Backspace") e.preventDefault();
+      return;
+    }
+    if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && e.code === "KeyS") {
+      e.preventDefault();
+      if (!e.repeat && (!app.ui.modalOpen() || (app.title && app.title.isOpen()))) app.save();
+      return;
+    }
+    if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && e.code === "KeyZ") {
+      e.preventDefault();
+      if (!e.repeat && !app.ui.modalOpen()) app.undo();
+      return;
+    }
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    if (app.ui.modalOpen()) { if (key === "Backspace") e.preventDefault(); return; }
+    if (key === " " || key === "Backspace" || PAN_KEYS[e.code] || /^[nN+=\-_]$/.test(key)) e.preventDefault();
     if (PAN_KEYS[e.code]) {
-      if (e.repeat) { held.add(e.code); return; }
-      if (e.code === "KeyS" || e.code === "KeyD") {
-        downAt.set(e.code, performance.now());
-        if (held.size) held.add(e.code); // already panning: this one joins
-        return;
-      }
       held.add(e.code);
       return;
     }
+    if (e.repeat) return;
     command(key, e);
   }
   function onKeyUp(e) {
-    if (typing(e)) return;
-    if ((e.code === "KeyS" || e.code === "KeyD") && downAt.has(e.code)) {
-      const t0 = downAt.get(e.code);
-      downAt.delete(e.code);
-      const wasPan = held.has(e.code);
-      held.delete(e.code);
-      if (!wasPan && performance.now() - t0 < TAP_MS && !app.ui.modalOpen()) command(e.code === "KeyS" ? "s" : "d", e);
-      return;
-    }
     held.delete(e.code);
-  }
-  function promoteHolds() {
-    const now = performance.now();
-    for (const [code, t0] of downAt) if (now - t0 >= TAP_MS) held.add(code);
   }
   // Arrow keys must not scroll the page; WASD pan while held.
   function update(dt) {
-    promoteHolds();
+    // A modal can open from a mouse click while a pan key is already held, so
+    // keydown never gets a chance to clear it. Never move the hidden map.
+    if ((app.news && app.news.isOpen()) || app.ui.modalOpen() || (app.title && app.title.isOpen())) {
+      held.clear();
+      return;
+    }
     let dx = 0, dy = 0;
     for (const code of held) {
       const v = PAN_KEYS[code];
@@ -377,7 +399,7 @@ export function createInput(canvas, app) {
     if (state.pinned != null) { h.tx = state.pinned % w.w; h.ty = (state.pinned / w.w) | 0; h.pinned = true; }
     else if (state.hover) { h.tx = state.hover[0]; h.ty = state.hover[1]; }
     if (state.drag && state.cost) h.drag = { tiles: state.cost.tiles, refused: state.cost.refused };
-    if (!state.drag && state.hover && PLACE_TOOLS.has(state.tool) && state.mouse.inside) {
+    if (!state.drag && state.hover && PLACE_TOOLS.includes(state.tool) && state.mouse.inside) {
       const [tx, ty] = state.hover;
       const size = state.tool === "zoo" ? 2 : 1;
       const ok = !!state.cost && !state.cost.refused && state.cost.tiles.length > 0;
@@ -425,6 +447,8 @@ export function createInput(canvas, app) {
     hover: hoverForRenderer,
     hoverInfo,
     refreshCost,
+    previewTool,
+    toggleDensity() { command("H", { preventDefault() {} }); },
     pinCitizen(id) {
       const target = pinTarget(world(), app.walkers.list(), id);
       if (!target) return false;

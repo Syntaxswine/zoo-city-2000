@@ -285,10 +285,10 @@ export function createNews(app) {
   /** The reader owns the keyboard while it is up. Returns true if it took the key. */
   function key(e) {
     switch (e.code) {
-      case "ArrowRight": case "Space": case "Enter": case "KeyD": step(1); return true;
-      case "ArrowLeft": case "KeyA": step(-1); return true;
-      case "ArrowDown": case "KeyS": step(1); return true;
-      case "ArrowUp": case "KeyW": step(-1); return true;
+      case "ArrowRight": case "Space": case "Enter": step(1); return true;
+      case "ArrowLeft": step(-1); return true;
+      case "ArrowDown": step(1); return true;
+      case "ArrowUp": step(-1); return true;
       case "PageDown": step(10); return true;
       case "PageUp": step(-10); return true;
       case "Home": cursor = 0; markThrough(); paint(); return true;

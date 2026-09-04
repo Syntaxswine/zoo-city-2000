@@ -10,10 +10,11 @@
 <header id="strip">
   <h1>ZOO CITY 2000</h1>
   <div id="tools"></div>
-  <span id="cost"></span>
+  <span id="cost" role="status" aria-live="polite"></span>
   <span id="clock">—</span>
 </header>
 <main>
+  <nav id="palette" aria-label="Build tools"></nav>
   <div id="stage">
     <canvas id="map" tabindex="0"></canvas>
     <div id="bars" title="demand: V_R · V_C · V_I, −1..+1; the dash is the tax term, the tick on R is the cap"></div>
@@ -25,9 +26,7 @@
     <section id="card"></section>
     <nav id="tabs"></nav>
     <section id="tabBody"></section>
-    <footer>
-      1 R · 2 C · 3 I · M Meat · 4 Road · B Wall · T Rail · G Station · U Use · 5 Tree · 6 Park · 7 Zoo · F fire station · P police · V pacify · 8 Bulldoze · 9 Inspect · R news · D density · Space pause · , . speed · Z undo · S save · L load · O overlays · +/− zoom · arrows / WASD / right-drag pan · N new city · Esc menu
-    </footer>
+    <footer id="help"></footer>
   </aside>
 </main>
 <div id="choice" class="modal" hidden></div>

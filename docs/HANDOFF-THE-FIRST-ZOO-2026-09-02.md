@@ -71,17 +71,15 @@ measurement and SPEC gets edited — never the reverse.
   is named `<seed>-import`. `TICK_SECONDS 1.5`, `SPEEDS [1, 3, 10]`,
   `MAX_CATCHUP 3` ticks per frame, walker time scaled by `min(speed, 3)`;
   any open modal pauses; a choice card forces pause.
-- **Keys** (the strip is the truth — `TOOLS` in `js/input.js`, then the
-  `mk(...)` buttons in `ui.js`): `1 R · 2 C · 3 I · M Meat · 4 Road ·
-  B Wall · T Rail · G Station · U Use · 5 Tree · 6 Park · 7 Zoo ·
-  F Fire stn · P Police · V Pacify · 8 Bulldoze · 9 Inspect · D density ·
-  Space pause · , . speed · Z undo · S save · L load · O overlays ·
-  R news · +/− zoom · arrows / WASD / right-drag pan · N new city ·
-  Esc menu`. `S` and `D` are tap = command, hold > 220 ms = pan. `U`
-  pressed while the Use tool is already up cycles mixed/pred/prey. Shift on
-  a road drag = straight. Undo is one step, this month only, and any op
-  with `evicts` empties it. (This line was stale for three sessions — it
-  still listed the session-1 tools only. If you add a tool, edit it here.)
+- **Keys:** `TOOLS` in `js/tools.js` is the truth for the palette, input and
+  generated footer: `1 R · 2 C · 3 I · 4 Meat · 5 Road · 6 Wall · 7 Rail ·
+  8 Station · 9 Tree · 0 Park · Z Zoo · V Pacify · P Police · F Fire stn ·
+  I Inspect · B Bulldoze`. The strip adds `H` density, `U` Use, `Space`
+  pause, `, .` speed, `Backspace/Ctrl+Z` undo, `Ctrl+S` save, `L` load, `O`
+  overlays, `R` news, `+/−` zoom, `N` new city and `Esc` menu. WASD and
+  arrows are movement only; `U` pressed while Use is already up cycles
+  mixed/pred/prey. Shift on a road drag = straight. Undo is one step, this
+  month only, and any op with `evicts` empties it.
 
 ## 1. The shape of the thing
 
@@ -729,7 +727,7 @@ sentence, and only one of the two is true.
 unread count, ink-filled while any stands. `R` opens the reader: the feed
 oldest first (the last 400 dispatches — the log is capped there, so a long
 city's founding years are gone, not hidden), a cursor stepped with ← → (and
-↑ ↓ / WASD, which step one; PgUp/PgDn step ten — nothing scrolls, and the
+↑ ↓, which step one; PgUp/PgDn step ten — WASD remains map movement only, and the
 reader's own legend claimed otherwise until the review panel read it), four chips
 (all · headlines · trouble · good), `mark all read`, opening on the FIRST
 UNREAD, the clock stopped under it. The Log tab became the News tab reading

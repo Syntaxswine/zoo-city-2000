@@ -1640,6 +1640,9 @@ check("no Math.random under js/", mathRandom.length === 0, mathRandom.join(", ")
   };
   const cursorCalls = [];
   let costRefreshes = 0;
+  let lastCost = { text: "", refused: false };
+  let undos = 0, saves = 0, loads = 0, pauses = 0, newsOpen = false, inputModal = false;
+  const newsKeys = [];
   const pinnedWalker = { citizen: A.world.citizens[0].id };
   let walkerAlive = true;
   const inputApp = {
@@ -1652,13 +1655,13 @@ check("no Math.random under js/", mathRandom.length === 0, mathRandom.join(", ")
       list: () => walkerAlive ? [pinnedWalker] : [],
       setCursor: (tile, pin) => cursorCalls.push({ tile: tile ? [...tile] : null, pin }),
     },
-    ui: { setTool() {}, setCost() { costRefreshes++; }, flash() {}, modalOpen: () => false, closeModals() {}, openNewCity() {} },
+    ui: { setTool() {}, setCost(text, refused) { costRefreshes++; lastCost = { text, refused: !!refused }; }, flash() {}, modalOpen: () => inputModal, closeModals() {}, openNewCity() {} },
     title: { isOpen: () => false, open() {}, back() {} },
-    news: { isOpen: () => false, toggle() {}, key: () => false },
+    news: { isOpen: () => newsOpen, toggle() { newsOpen = !newsOpen; }, key: (e) => { newsKeys.push(e.code); return false; } },
     art: { civic: () => null, station: () => null },
-    doOp() {}, undo() {}, save() {}, load() {}, cycleOverlay() {},
+    doOp() {}, undo() { undos++; }, save() { saves++; }, load() { loads++; }, cycleOverlay() {},
     zoomAt(dir) { inputApp.camera.zoom = dir > 0 ? 2 : 1; inputApp.camera.x += dir > 0 ? 7 : -7; },
-    togglePause() {}, setSpeed() {},
+    togglePause() { pauses++; }, setSpeed() {},
   };
   const { createInput } = await import("../js/input.js");
   const input = createInput(inputCanvas, inputApp);
@@ -1701,6 +1704,105 @@ check("no Math.random under js/", mathRandom.length === 0, mathRandom.join(", ")
   const betweenWalks = input.hoverInfo();
   const citizenPinKept = betweenWalks?.citizen === pinnedWalker.citizen
     && betweenWalks.target?.state === "home" && cursorCalls.at(-1)?.pin === pinnedWalker.citizen;
+  const keyHash = stateHash(A.world);
+  const keyEvent = (key, code, extra = {}) => ({
+    key, code, repeat: false, ctrlKey: false, metaKey: false, altKey: false, shiftKey: false,
+    target: null, prevented: false, preventDefault() { this.prevented = true; }, ...extra,
+  });
+  const expectedToolKeys = [
+    ["1", "Digit1", "R"], ["2", "Digit2", "C"], ["3", "Digit3", "I"], ["4", "Digit4", "M"],
+    ["5", "Digit5", "road"], ["6", "Digit6", "wall"], ["7", "Digit7", "rail"], ["8", "Digit8", "station"],
+    ["9", "Digit9", "tree"], ["0", "Digit0", "park"], ["z", "KeyZ", "zoo"], ["v", "KeyV", "centre"],
+    ["p", "KeyP", "police"], ["f", "KeyF", "fire"], ["i", "KeyI", "inspect"], ["b", "KeyB", "bulldoze"],
+  ];
+  let keyParity = true;
+  for (const [key, code, id] of expectedToolKeys) {
+    windowEvents.keydown(keyEvent(key, code));
+    keyParity &&= input.tool === id;
+  }
+  const previewParity = expectedToolKeys.every(([, , id]) => {
+    const p = input.previewTool(id);
+    return typeof p.text === "string" && p.text.length > 0 && typeof p.refused === "boolean";
+  });
+  const density0 = input.density, save0 = saves, camera0 = { ...inputApp.camera };
+  let movedEach = true;
+  for (const [key, code] of [["w", "KeyW"], ["a", "KeyA"], ["s", "KeyS"], ["d", "KeyD"]]) {
+    const before = { ...inputApp.camera };
+    windowEvents.keydown(keyEvent(key, code));
+    input.update(0.05);
+    windowEvents.keyup(keyEvent(key, code));
+    movedEach &&= inputApp.camera.x !== before.x || inputApp.camera.y !== before.y;
+  }
+  const wasdOnlyMoved = input.density === density0 && saves === save0 && movedEach
+    && inputApp.camera.x === camera0.x && inputApp.camera.y === camera0.y;
+  const backspace = keyEvent("Backspace", "Backspace");
+  windowEvents.keydown(backspace);
+  windowEvents.keydown(keyEvent("z", "KeyZ", { ctrlKey: true }));
+  windowEvents.keydown(keyEvent("s", "KeyS", { ctrlKey: true }));
+  windowEvents.keydown(keyEvent("l", "KeyL"));
+  const densityBeforeH = input.density;
+  windowEvents.keydown(keyEvent("h", "KeyH"));
+  windowEvents.keydown(keyEvent("u", "KeyU"));
+  const commandsMoved = undos === 2 && saves === save0 + 1 && loads === 1 && backspace.prevented
+    && input.density !== densityBeforeH && input.tool === "use";
+  const focusedButton = { tagName: "BUTTON" };
+  const focusedCamera = { ...inputApp.camera };
+  const buttonW = keyEvent("w", "KeyW", { target: focusedButton });
+  windowEvents.keydown(buttonW);
+  input.update(0.05);
+  windowEvents.keyup(buttonW);
+  const focusedWasd = inputApp.camera.y !== focusedCamera.y;
+  windowEvents.keydown(keyEvent("5", "Digit5", { target: focusedButton }));
+  const focusedTool = input.tool === "road";
+  const focusedSave = keyEvent("s", "KeyS", { ctrlKey: true, target: focusedButton });
+  windowEvents.keydown(focusedSave);
+  const repeatUndo = keyEvent("z", "KeyZ", { ctrlKey: true, repeat: true, target: focusedButton });
+  const repeatSave = keyEvent("s", "KeyS", { ctrlKey: true, repeat: true, target: focusedButton });
+  windowEvents.keydown(repeatUndo);
+  windowEvents.keydown(repeatSave);
+  const buttonSpace = keyEvent(" ", "Space", { target: { tagName: "BUTTON" } });
+  const buttonBack = keyEvent("Backspace", "Backspace", { target: { tagName: "BUTTON" } });
+  const textUndo = keyEvent("z", "KeyZ", { ctrlKey: true, target: { tagName: "INPUT" } });
+  const textSave = keyEvent("s", "KeyS", { ctrlKey: true, target: { tagName: "INPUT" } });
+  windowEvents.keydown(buttonSpace);
+  windowEvents.keydown(buttonBack);
+  windowEvents.keydown(textUndo);
+  windowEvents.keydown(textSave);
+  const focusedControlsSafe = focusedWasd && focusedTool && focusedSave.prevented && pauses === 0 && undos === 2
+    && repeatUndo.prevented && repeatSave.prevented && !buttonSpace.prevented && buttonBack.prevented
+    && !textUndo.prevented && textSave.prevented && saves === save0 + 2;
+  const repeatTool = input.tool;
+  windowEvents.keydown(keyEvent("z", "KeyZ", { repeat: true }));
+  const repeatIgnored = input.tool === repeatTool;
+  const mouseReaderCamera = { ...inputApp.camera };
+  windowEvents.keydown(keyEvent("w", "KeyW"));
+  newsOpen = true;
+  input.update(0.1); // the reader was mouse-opened after W's keydown
+  const mouseOpenedReaderStopsPan = inputApp.camera.x === mouseReaderCamera.x && inputApp.camera.y === mouseReaderCamera.y;
+  windowEvents.keyup(keyEvent("w", "KeyW"));
+  const hiddenCamera = { ...inputApp.camera };
+  for (const [key, code] of [["w", "KeyW"], ["a", "KeyA"], ["s", "KeyS"], ["d", "KeyD"]]) windowEvents.keydown(keyEvent(key, code));
+  const behindNewsSpace = keyEvent(" ", "Space", { target: { tagName: "BUTTON", closest: () => null } });
+  const readerButtonSpace = keyEvent(" ", "Space", { target: { tagName: "BUTTON", closest: (selector) => selector === "#news" ? {} : null } });
+  windowEvents.keydown(behindNewsSpace);
+  windowEvents.keydown(readerButtonSpace);
+  const newsBack = keyEvent("Backspace", "Backspace");
+  const newsSave = keyEvent("s", "KeyS", { ctrlKey: true });
+  windowEvents.keydown(newsBack);
+  windowEvents.keydown(newsSave);
+  input.update(0.1);
+  newsOpen = false;
+  const newsWasdIdle = inputApp.camera.x === hiddenCamera.x && inputApp.camera.y === hiddenCamera.y
+    && newsKeys.join(",") === "KeyW,KeyA,KeyS,KeyD,Space,Backspace,KeyS"
+    && mouseOpenedReaderStopsPan && behindNewsSpace.prevented && !readerButtonSpace.prevented && newsBack.prevented && newsSave.prevented
+    && saves === save0 + 2;
+  inputModal = true;
+  const modalBack = keyEvent("Backspace", "Backspace");
+  windowEvents.keydown(modalBack);
+  inputModal = false;
+  const modalBackSafe = modalBack.prevented;
+  const keyNeutral = stateHash(A.world) === keyHash;
+  input.setTool("inspect");
   const pinnedRecord = A.world.byId.get(pinnedWalker.citizen);
   removeCitizen(A.world, pinnedRecord, "left");
   const afterDeparture = input.hoverInfo();
@@ -1710,10 +1812,59 @@ check("no Math.random under js/", mathRandom.length === 0, mathRandom.join(", ")
   const linkRepinned = input.pinCitizen(linkedId) && input.hoverInfo()?.citizen === linkedId;
   input.unpin();
   const explicitUnpinCleared = cursorCalls.at(-1)?.pin == null;
+  // Every registry operation travels through the same pointer machinery the
+  // browser uses. The app stub records, but deliberately does not apply, so
+  // all tools see the same clean target and cannot mask each other.
+  const opWorld = createWorld({ seed: "palette-pointer-ops", w: 24, h: 24 });
+  inputApp.world = opWorld;
+  inputApp.camera.x = 10; inputApp.camera.y = 10;
+  const madeOps = [];
+  inputApp.doOp = (op) => madeOps.push(op);
+  const at = 10 * opWorld.w + 10;
+  canvasEvents.pointermove(pe(10, 10));
+  windowEvents.keydown(keyEvent("0", "Digit0"));
+  const stationaryGhostReady = input.state.cost && !input.state.cost.refused
+    && input.hover().ghost?.ok === true && /Park/.test(lastCost.text) && !lastCost.refused;
+  // Density is part of the operation, including while the mouse is already
+  // down. Start over an already-High lot so the first plan is empty; H must
+  // immediately turn it into a Low repaint before pointerup commits it.
+  if (input.density !== 3) windowEvents.keydown(keyEvent("h", "KeyH"));
+  opWorld.zone[at] = ZONE.R;
+  opWorld.maxTier[at] = 3;
+  input.setTool("R");
+  canvasEvents.pointerdown(pe(10, 10));
+  const highDragEmpty = input.state.cost?.tiles.length === 0 && /nothing to do/.test(lastCost.text);
+  windowEvents.keydown(keyEvent("h", "KeyH"));
+  const lowDragReady = input.density === 1 && input.state.cost?.tiles.includes(at)
+    && /^Residential /.test(lastCost.text) && !lastCost.refused;
+  canvasEvents.pointerup(pe(10, 10));
+  const densityOp = madeOps.at(-1);
+  const densityDragRefresh = highDragEmpty && lowDragReady && densityOp?.kind === "zone"
+    && densityOp.zone === ZONE.R && densityOp.density === 1;
+  madeOps.length = 0;
+  opWorld.zone[at] = ZONE.NONE;
+  opWorld.maxTier[at] = 0;
+  const pointerTools = ["R", "C", "I", "M", "road", "wall", "rail", "station", "tree", "park", "zoo", "centre", "police", "fire", "bulldoze"];
+  for (const id of pointerTools) {
+    opWorld.rail[at] = id === "station" ? 1 : 0;
+    opWorld.terrain[at] = id === "bulldoze" ? 2 : 0; // TREE=2: something real to clear
+    input.setTool(id);
+    canvasEvents.pointerdown(pe(10, 10));
+    canvasEvents.pointerup(pe(10, 10));
+  }
+  const pointerKinds = madeOps.map((op) => op.kind);
+  const pointerOpsExact = JSON.stringify(pointerKinds) === JSON.stringify(["zone", "zone", "zone", "zone", "road", "wall", "rail", "station", "tree", "park", "zoo", "centre", "police", "fire", "bulldoze"])
+    && JSON.stringify(madeOps.slice(0, 4).map((op) => op.zone)) === JSON.stringify([ZONE.R, ZONE.C, ZONE.I, ZONE.M]);
   globalThis.window = oldWindow;
   check("needs: camera repicks Inspect; a citizen pin survives its walker; explicit unpin synchronizes bubbles",
     pinAttached && panelBubbleKept && escapeCleared && dragRepicked && keyRepicked && zoomRepicked && clampRepicked && costRepicked && roadCleared && citizenPinKept && epitaphKept && linkRepinned && explicitUnpinCleared,
     JSON.stringify({ pinAttached, panelBubbleKept, escapeCleared, dragRepicked, keyRepicked, zoomRepicked, clampRepicked, costRepicked, roadCleared, citizenPinKept, epitaphKept, linkRepinned, explicitUnpinCleared }));
+  check("palette input: all sixteen keys match their tools; WASD only pans; new command bindings are unambiguous",
+    keyParity && previewParity && wasdOnlyMoved && commandsMoved && focusedControlsSafe && repeatIgnored && newsWasdIdle && modalBackSafe && keyNeutral,
+    JSON.stringify({ keyParity, previewParity, wasdOnlyMoved, commandsMoved, focusedControlsSafe, repeatIgnored, newsWasdIdle, mouseOpenedReaderStopsPan, modalBackSafe, keyNeutral, undos, saves, loads, pauses, newsKeys }));
+  check("palette input: every build family emits its exact registry op through real pointer events",
+    pointerOpsExact && stationaryGhostReady && densityDragRefresh,
+    JSON.stringify({ stationaryGhostReady, densityDragRefresh, lastCost, ops: madeOps.map((op) => ({ kind: op.kind, zone: op.zone })) }));
 
   const b1 = art.bubble(90, 15), b2 = art.bubble(90, 15);
   check("needs: bubble art is cached, palette-keyed, and includes its three-pixel tail",
@@ -1914,7 +2065,7 @@ check("no Math.random under js/", mathRandom.length === 0, mathRandom.join(", ")
   const uiSrc = readFileSync(path.join(ROOT, "js", "ui.js"), "utf8");
   const html2 = readFileSync(path.join(ROOT, "index.html"), "utf8");
   check("news: js/news.js exports newsRows and createNews", /export function newsRows\b/.test(newsSrc) && /export function createNews\b/.test(newsSrc));
-  check("news: index.html mounts #news and the footer names the key", /id="news"/.test(html2) && /R news/.test(html2));
+  check("news: index.html mounts #news and generated help names the key", /id="news"/.test(html2) && /R news/.test(uiSrc));
   check("news: the strip carries the button", /btnNews/.test(uiSrc) && /app\.news\.toggle\(\)/.test(uiSrc));
   check("news: the panel keeps no second copy of the feed", !/logLines/.test(uiSrc) && /newsRows\(/.test(uiSrc));
   // The bug that made the reader necessary: onTick used to call flash() once
@@ -1930,6 +2081,190 @@ check("no Math.random under js/", mathRandom.length === 0, mathRandom.join(", ")
   check("news: a save carries no read mark",
     !saveText.includes('"news"') && !saveKeys.some((k) => /^(news|read)/i.test(k)),
     saveKeys.filter((k) => /^(news|read)/i.test(k)).join(", "));
+}
+
+// ---- Part P: one tool registry, left palette and collision-free keys -------------------------
+{
+  const paletteHash = stateHash(A.world);
+  const { TOOLS, TOOL_BY_ID, TOOL_BY_KEY, PLACE_TOOLS, labelForOp, spriteForTool, toolHelp } = await import("../js/tools.js");
+  const { art } = await import("../js/art/index.js");
+  const { paintSprite } = await import("../js/render.js");
+  const HC = await import("./headless-canvas.mjs");
+  HC.installCanvas();
+
+  const ids = ["R", "C", "I", "M", "road", "wall", "rail", "station", "tree", "park", "zoo", "centre", "police", "fire", "inspect", "bulldoze"];
+  const keys = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "Z", "V", "P", "F", "I", "B"];
+  const orders = Array.from({ length: 16 }, (_, i) => i + 1);
+  check("palette: the canonical registry has the owner's exact sixteen tools, order and unique keys",
+    JSON.stringify(TOOLS.map((t) => t.id)) === JSON.stringify(ids)
+      && JSON.stringify(TOOLS.map((t) => t.key)) === JSON.stringify(keys)
+      && JSON.stringify(TOOLS.map((t) => t.order)) === JSON.stringify(orders)
+      && new Set(TOOLS.map((t) => t.key.toUpperCase())).size === 16
+      && TOOLS.every((t) => TOOL_BY_ID[t.id] === t && TOOL_BY_KEY[t.key.toUpperCase()] === t));
+  const expectedKinds = ["zone", "zone", "zone", "zone", "road", "wall", "rail", "station", "tree", "park", "zoo", "centre", "police", "fire", "inspect", "bulldoze"];
+  check("palette: every ordered row carries its exact operation and the four zones keep R/C/I/M identity",
+    JSON.stringify(TOOLS.map((t) => t.op.kind)) === JSON.stringify(expectedKinds)
+      && JSON.stringify(TOOLS.slice(0, 4).map((t) => t.op.zone)) === JSON.stringify([ZONE.R, ZONE.C, ZONE.I, ZONE.M])
+      && TOOLS.every((t) => labelForOp(t.op) === t.label));
+  check("palette: no build binding is WASD and place-tool classification is derived from the registry",
+    TOOLS.every((t) => !["W", "A", "S", "D"].includes(t.key.toUpperCase()))
+      && JSON.stringify(PLACE_TOOLS) === JSON.stringify(["station", "park", "zoo", "centre", "police", "fire"]));
+
+  const opsSrc = readFileSync(path.join(ROOT, "js", "sim", "ops.js"), "utf8");
+  const costBody = opsSrc.slice(opsSrc.indexOf("export function costOf"), opsSrc.indexOf("function snapshot"));
+  const costKinds = new Set([...costBody.matchAll(/case "([a-z]+)"/g)].map((m) => m[1]));
+  const surfacedKinds = new Set([...TOOLS.map((t) => t.op.kind).filter((x) => x !== "inspect"), "use"]);
+  const missingKinds = [...costKinds].filter((kind) => !surfacedKinds.has(kind));
+  const extraKinds = [...surfacedKinds].filter((kind) => !costKinds.has(kind));
+  check("palette: every tile op accepted by costOf is surfaced once by a build tool or top-strip Use",
+    missingKinds.length === 0 && extraKinds.length === 0, `missing ${missingKinds.join(",")} · extra ${extraKinds.join(",")}`);
+  check("palette: non-tile rate/toggle/choice/cheat ops are the explicit non-build allow-list",
+    ["rate", "toggle", "choice", "cheat"].every((kind) => new RegExp(`op\\.kind === "${kind}"`).test(opsSrc))
+      && TOOLS.every((t) => !["rate", "toggle", "choice", "cheat", "use"].includes(t.op.kind)));
+
+  const iconRows = [];
+  let spriteFailures = 0;
+  for (const tool of TOOLS) {
+    try {
+      const sprite = spriteForTool(art, tool);
+      const canvas = HC.createCanvas(1, 1);
+      paintSprite(canvas, sprite, 1);
+      const visible = canvas._data.some((v, i) => i % 4 === 3 && v > 0);
+      if (!visible || canvas.width !== sprite.w || canvas.height !== sprite.h) spriteFailures++;
+      iconRows.push(`${tool.id}:${sprite.name}`);
+    } catch (e) { spriteFailures++; iconRows.push(`${tool.id}:ERROR ${e.message}`); }
+  }
+  const expectedSprites = ["R1-cottage-0", "C1-shop-0", "I1-shed-0", "M1-stall-0", "road-5", "wall-5", "rail-5", "station-ns", "tree-round", "park", "zoo", "pacification-centre", "police-station", "fire-station", "cursor", "rubble"];
+  const scaled = HC.createCanvas(1, 1);
+  const scaledSprite = spriteForTool(art, "R");
+  paintSprite(scaled, scaledSprite, 2);
+  let nearest = scaled.width === scaledSprite.w * 2 && scaled.height === scaledSprite.h * 2;
+  for (let y = 0; nearest && y < scaled.height; y += 2) for (let x = 0; nearest && x < scaled.width; x += 2) {
+    const p = (y * scaled.width + x) * 4;
+    for (const [dx, dy] of [[1, 0], [0, 1], [1, 1]]) {
+      const q = ((y + dy) * scaled.width + x + dx) * 4;
+      for (let c = 0; c < 4; c++) if (scaled._data[p + c] !== scaled._data[q + c]) nearest = false;
+    }
+  }
+  check("palette: all sixteen representative sprites resolve, paint nonblank once, and scale nearest-neighbour",
+    spriteFailures === 0 && nearest && JSON.stringify(iconRows.map((row) => row.slice(row.indexOf(":") + 1))) === JSON.stringify(expectedSprites), iconRows.join(" · "));
+
+  // A deliberately small DOM proves creation, click/focus parity and ARIA
+  // without a second implementation of layout or of the sprites.
+  const priorDocument = globalThis.document;
+  const made = [];
+  function decorate(node, tag) {
+    node.tagName = tag.toUpperCase(); node.children = []; node.style ||= {}; node.dataset ||= {}; node.attributes = {}; node.events = {};
+    node.append = (...children) => { node.children.push(...children); };
+    node.addEventListener = (type, fn) => { node.events[type] = fn; };
+    node.setAttribute = (name, value) => { node.attributes[name] = String(value); };
+    const classes = new Set();
+    node.classList = { toggle(name, on) { if (on) classes.add(name); else classes.delete(name); }, contains: (name) => classes.has(name) };
+    Object.defineProperty(node, "innerHTML", { get: () => "", set: () => { node.children = []; }, configurable: true });
+    made.push(node);
+    return node;
+  }
+  const host = decorate({}, "nav");
+  globalThis.document = {
+    getElementById: (id) => id === "palette" ? host : null,
+    createElement: (tag) => decorate(tag === "canvas" ? HC.createCanvas(1, 1) : {}, tag),
+  };
+  const selected = [], costs = [];
+  let paletteRef = null;
+  const fakeInput = {
+    tool: "R",
+    setTool(id) { selected.push(id); this.tool = id; if (paletteRef) paletteRef.setTool(id); },
+    previewTool: (id) => ({ text: `cost:${id}`, refused: id === "bulldoze" }),
+    refreshCost() { costs.push("restore"); },
+  };
+  const { createPalette } = await import("../js/palette.js");
+  const palette = createPalette({ input: fakeInput, ui: { setCost: (text, refused) => costs.push(`${text}:${refused}`) }, art });
+  paletteRef = palette;
+  let clickParity = palette.buttons.size === 16;
+  for (const tool of TOOLS) {
+    const button = palette.buttons.get(tool.id);
+    button.events.pointerenter();
+    button.events.click();
+    clickParity &&= costs.at(-1) === `cost:${tool.id}:${tool.id === "bulldoze"}`;
+    button.events.pointerleave();
+    clickParity &&= selected.at(-1) === tool.id && button.attributes["aria-label"].includes(tool.key)
+      && button.attributes["aria-describedby"] === "cost" && button.attributes["aria-pressed"] === "true"
+      && [...palette.buttons].filter(([, b]) => b.attributes["aria-pressed"] === "true").length === 1;
+  }
+  const interleave = palette.buttons.get("road");
+  const restores0 = costs.filter((x) => x === "restore").length;
+  interleave.events.focus();
+  interleave.events.pointerenter();
+  interleave.events.pointerleave();
+  const focusHeldPreview = costs.filter((x) => x === "restore").length === restores0;
+  interleave.events.blur();
+  const focusReleased = costs.filter((x) => x === "restore").length === restores0 + 1;
+  interleave.events.pointerenter();
+  interleave.events.focus();
+  interleave.events.blur();
+  const hoverHeldPreview = costs.filter((x) => x === "restore").length === restores0 + 1;
+  interleave.events.pointerleave();
+  const hoverReleased = costs.filter((x) => x === "restore").length === restores0 + 2;
+  const focusHoverStable = focusHeldPreview && focusReleased && hoverHeldPreview && hoverReleased;
+  palette.setTool("bulldoze");
+  const semanticActive = palette.buttons.get("bulldoze").attributes["aria-pressed"] === "true"
+    && palette.buttons.get("bulldoze").classList.contains("on")
+    && [...palette.buttons].filter(([, b]) => b.attributes["aria-pressed"] === "true").length === 1;
+  globalThis.document = priorDocument;
+  check("palette: sixteen accessible buttons paint once; pointer, click, cost preview and active state stay synchronized",
+    clickParity && semanticActive && focusHoverStable && made.filter((e) => e.tagName === "CANVAS").length === 16
+      && costs.some((x) => x === "cost:bulldoze:true") && costs.filter((x) => x === "restore").length === 18,
+    JSON.stringify({ buttons: palette.buttons.size, canvases: made.filter((e) => e.tagName === "CANVAS").length, selected, costs: costs.length, semanticActive, focusHoverStable }));
+
+  const html = readFileSync(path.join(ROOT, "index.html"), "utf8");
+  const css = readFileSync(path.join(ROOT, "css", "field.css"), "utf8");
+  const uiSrc = readFileSync(path.join(ROOT, "js", "ui.js"), "utf8");
+  const inputSrc = readFileSync(path.join(ROOT, "js", "input.js"), "utf8");
+  const newsSrc = readFileSync(path.join(ROOT, "js", "news.js"), "utf8");
+  check("palette: markup and CSS put a scroll-safe 2×8 remote before the map and reflow it 4×4 below 720px",
+    html.indexOf('id="palette"') < html.indexOf('id="stage"')
+      && /grid-template-columns:\s*repeat\(2/.test(css) && /max-height:\s*719px/.test(css)
+      && /grid-template-columns:\s*repeat\(4/.test(css) && /overflow-y:\s*auto/.test(css));
+  // Conservative declared-width budget at 12 px monospace. The breakpoint
+  // hides every command label (ARIA/title retain it), so even the longest
+  // possible clock leaves a real cost gutter instead of clipping the clock.
+  const worstClock = "Sep 999999 · paused (×0.25) · overlay: pollution · ×2";
+  const visibleKeys = ["H", "U", "␣", ",", ".", "⌫", "Ctrl+S", "L", "O", "R", "+", "N", "Esc"].join("");
+  const titleWidth = 145, chromeWidth = 16 + 18, costGutter = 70;
+  const toolBoxesAndGaps = 13 * 14 + visibleKeys.length * 7.5 + 3 * 14 + 15 * 2;
+  const stripBudget1280 = titleWidth + chromeWidth + costGutter + toolBoxesAndGaps + worstClock.length * 7.5;
+  check("palette: the unwrapped 1280px strip has a declared width budget and keeps the clock visible",
+    stripBudget1280 < 1280 && /@media \(max-width:\s*1350px\)/.test(css)
+      && /button\.tool\s*>\s*span:not\(\.key\)\s*\{\s*display:\s*none/.test(css)
+      && /#clock\s*\{[^}]*flex:\s*none/.test(css) && /#cost\s*\{[^}]*flex:\s*1/.test(css), `${stripBudget1280}px upper bound`);
+  const { createRenderer } = await import("../js/render.js");
+  const { toScreen, HALF_H } = await import("../js/iso/iso.js");
+  let boxW = 640, boxH = 400;
+  const resizeCanvas = HC.createCanvas(10, 10);
+  Object.defineProperty(resizeCanvas, "clientWidth", { get: () => boxW });
+  Object.defineProperty(resizeCanvas, "clientHeight", { get: () => boxH });
+  const resizeWorld = createWorld({ seed: "palette-resize", w: 32, h: 32 });
+  const resizeRenderer = createRenderer(resizeCanvas, resizeWorld, art);
+  const [centreX, centreY] = toScreen(12, 14);
+  const resizeCamera = { x: centreX, y: centreY + HALF_H, zoom: 1 };
+  const pickedWide = resizeRenderer.pick(resizeCanvas.width / 2, resizeCanvas.height / 2, resizeCamera);
+  boxW = 412; boxH = 276;
+  resizeRenderer.resize();
+  const pickedNarrow = resizeRenderer.pick(resizeCanvas.width / 2, resizeCanvas.height / 2, resizeCamera);
+  check("palette: renderer resize consumes the canvas's post-layout CSS box and preserves exact tile picking",
+    resizeCanvas.width === boxW && resizeCanvas.height === boxH
+      && pickedWide?.[0] === 12 && pickedWide?.[1] === 14 && pickedNarrow?.[0] === 12 && pickedNarrow?.[1] === 14,
+    JSON.stringify({ canvas: [resizeCanvas.width, resizeCanvas.height], pickedWide, pickedNarrow }));
+  check("palette: input, palette and generated footer all read the one registry; build buttons are gone from the strip",
+    /from "\.\/tools\.js"/.test(inputSrc) && /labelForOp\(op\)/.test(inputSrc)
+      && /toolHelp\(\)/.test(uiSrc) && !/for \(const t of TOOLS\)/.test(uiSrc)
+      && /id="help"/.test(html) && toolHelp().split(" · ").length === 16);
+  check("palette: WASD has no command or news binding; S/D tap timing is gone; undo/save use their modifiers",
+    !/case "Key[WASD]"/.test(newsSrc) && /case "ArrowRight"/.test(newsSrc)
+      && !/TAP_MS|downAt|promoteHolds/.test(inputSrc) && /case "Backspace"/.test(inputSrc)
+      && /e\.code === "KeyS"/.test(inputSrc) && /e\.code === "KeyZ"/.test(inputSrc));
+  check("palette: creating/painting/selecting the entire remote is simulation- and save-neutral",
+    stateHash(A.world) === paletteHash && stateHash(A.world) === stateHash(load(save(A.world))));
 }
 
 // ---- Part C: the art (if present) ------------------------------------------------

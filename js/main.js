@@ -27,6 +27,7 @@ import { createRenderer } from "./render.js";
 import { createWalkers } from "./walkers.js";
 import { createInput } from "./input.js";
 import { createUI } from "./ui.js";
+import { createPalette } from "./palette.js";
 import { createTitle } from "./title.js";
 import { createNews } from "./news.js";
 import { KNOBS } from "./sim/rules.js";
@@ -136,11 +137,11 @@ app.doOp = (op) => {
     app.walkers.notify();
     app.ui.refresh();
     // ops.js reports what a tile op did to people and chalk: a road over
-    // empty zoned lots unzones them (no refund; Z undoes), and a bulldoze
+    // empty zoned lots unzones them (no refund; Backspace undoes), and a bulldoze
     // that turns animals out is not undoable (undo restores tiles, never people).
     const n = (k, one, many) => `${k} ${k === 1 ? one : many}`;
     if (res.evicts) app.ui.flash(`Bulldozed ${n(res.evicts, "lot", "lots")} with animals in ${res.evicts === 1 ? "it" : "them"} — they must move or find work again; this cannot be undone.`);
-    else if (res.replaced) app.ui.flash(`Road laid over ${n(res.replaced, "zoned lot", "zoned lots")} — the zoning is gone, no refund (Z undoes).`);
+    else if (res.replaced) app.ui.flash(`Road laid over ${n(res.replaced, "zoned lot", "zoned lots")} — the zoning is gone, no refund (Backspace undoes).`);
   } else if (res.reason && res.reason !== "nothing to do") {
     app.ui.flash(res.reason === "insufficient funds" ? `§${res.cost.toLocaleString()} — cannot afford` : res.reason);
   }
@@ -359,6 +360,8 @@ function boot() {
   app.ui = createUI(app);
   app.news = createNews(app); // after the UI: its close() refreshes the badge on the strip
   app.input = createInput(canvas, app);
+  app.palette = createPalette(app);
+  app.renderer.resize(); // the canvas measures its real box after the left remote is populated
   app.title = createTitle(app);
   if (resumed) {
     const meta = (() => { try { return JSON.parse(store.get(META(name)) || "null"); } catch { return null; } })();

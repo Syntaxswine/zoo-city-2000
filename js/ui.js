@@ -29,7 +29,7 @@ import { yearlyFigures } from "./sim/budget.js";
 import { SPECIES, SPECIES_BY_ID } from "./sim/species.js";
 import { pluralSpecies } from "./sim/landmarks.js";
 import { ageYears, isWorker } from "./sim/census.js";
-import { TOOLS } from "./input.js";
+import { toolHelp } from "./tools.js";
 import { newsRows } from "./news.js";
 import { hallStock, hallYear } from "./sim/meat.js";
 import { needOf } from "./sim/needs.js";
@@ -69,6 +69,7 @@ export function createUI(app) {
     choice: $("#choice"),
     newcity: $("#newcity"),
     panel: $("#panel"),
+    help: $("#help"),
   };
   let tab = "rules";
   let flashTimer = 0;
@@ -119,25 +120,25 @@ export function createUI(app) {
   // ---- the tool strip -----------------------------------------------------------------------
   function buildStrip() {
     dom.tools.innerHTML = "";
-    for (const t of TOOLS) {
-      const b = el("button", "tool", "");
-      b.dataset.tool = t.id;
-      b.title = t.hint;
-      b.append(el("span", "key", t.key), " ", el("span", "", t.label));
-      b.addEventListener("click", () => app.input.setTool(t.id));
-      dom.tools.append(b);
-    }
     const dens = el("button", "tool", "");
     dens.id = "density";
-    dens.title = "density brush: Low caps a lot at one storey (bears want cottages; mice want towers)";
-    dens.addEventListener("click", () => { app.input.state.density = app.input.state.density === 3 ? 1 : 3; setTool(app.input.tool, app.input.state.density); });
+    dens.title = "H: density brush; Low caps a lot at one storey";
+    dens.setAttribute("aria-label", "Density, key H. Toggle High or Low zoning density");
+    dens.addEventListener("click", () => app.input.toggleDensity());
     dom.tools.append(dens);
+    const use = el("button", "tool", "");
+    use.id = "btnUse";
+    use.title = "U: paint lots and roads mixed / predator-only / prey-only; press again to cycle";
+    use.setAttribute("aria-label", "Use zoning, key U. Cycle mixed, predator-only or prey-only");
+    use.addEventListener("click", () => app.input.setTool("use"));
+    dom.tools.append(use);
     const sep = () => dom.tools.append(el("span", "sep", "·"));
     sep();
     const mk = (id, key, label, title, fn) => {
       const b = el("button", "tool", "");
       b.id = id;
       b.title = title;
+      b.setAttribute("aria-label", `${label}. ${title}`);
       b.append(el("span", "key", key), " ", el("span", "", label));
       b.addEventListener("click", fn);
       dom.tools.append(b);
@@ -147,8 +148,8 @@ export function createUI(app) {
     mk("btnSlower", ",", "slower", ", slower", () => app.setSpeed(-1));
     mk("btnFaster", ".", "faster", ". faster", () => app.setSpeed(1));
     sep();
-    mk("btnUndo", "Z", "undo", "Z: undo the last op (this month only)", () => app.undo());
-    mk("btnSave", "S", "save", "S: open named saves with the save-as name focused", () => app.save());
+    mk("btnUndo", "⌫", "undo", "Backspace or Ctrl+Z: undo the last op (this month only)", () => app.undo());
+    mk("btnSave", "Ctrl+S", "save", "Ctrl+S: open named saves with the save-as name focused", () => app.save());
     mk("btnLoad", "L", "load", "L: open named saves on the slot list", () => app.load());
     mk("btnOverlay", "O", "overlay", "O: cycle land value / pollution / crime / lot score overlays", () => app.cycleOverlay());
     mk("btnNews", "R", "news", "R: the news — every dispatch this city ever made, oldest first; ← → step one at a time", () => app.news.toggle());
@@ -156,14 +157,25 @@ export function createUI(app) {
     sep();
     mk("btnNew", "N", "new city", "N: found a new city / load a saved one", () => openNewCity());
     mk("btnMenu", "Esc", "menu", "Esc: the title screen — new game, continue, load, save, options", () => app.title.open());
+    dom.help.textContent = `${toolHelp()} · H density · U use · Space pause · , . speed · Backspace/Ctrl+Z undo · Ctrl+S save · L load · O overlays · R news · +/− zoom · arrows/WASD/right-drag pan · N new city · Esc menu`;
   }
 
   function setTool(id, density) {
-    for (const b of dom.tools.querySelectorAll("button[data-tool]")) b.classList.toggle("on", b.dataset.tool === id);
+    if (app.palette) app.palette.setTool(id);
     const d = $("#density");
-    if (d) { d.innerHTML = ""; d.append(el("span", "key", "D"), " ", el("span", "", density === 3 ? "High" : "Low")); d.classList.toggle("on", density === 1); }
-    const ub = dom.tools.querySelector('button[data-tool="use"]');
-    if (ub && app.input) ub.lastElementChild.textContent = `Use: ${["mixed", "pred", "prey"][app.input.state.use]}`;
+    if (d) {
+      d.innerHTML = "";
+      d.append(el("span", "key", "H"), " ", el("span", "", density === 3 ? "High" : "Low"));
+      d.classList.toggle("on", density === 1);
+      d.setAttribute("aria-pressed", String(density === 1));
+    }
+    const ub = $("#btnUse");
+    if (ub) {
+      ub.innerHTML = "";
+      ub.append(el("span", "key", "U"), " ", el("span", "", `Use: ${app.input ? ["mixed", "pred", "prey"][app.input.state.use] : "mixed"}`));
+      ub.classList.toggle("on", id === "use");
+      ub.setAttribute("aria-pressed", String(id === "use"));
+    }
   }
 
   function setCost(text, refused = false) {

@@ -149,7 +149,7 @@ export function installDom(ids = []) {
   const root = new El("body");
   const byId = new Map();
   const make = (id) => { const e = new El("div"); e.id = id; byId.set(id, e); root.append(e); return e; };
-  for (const id of ["strip", "tools", "cost", "clock", "flash", "bars", "stats", "banner", "card", "tabs", "tabBody", "choice", "newcity", "panel", "map", "reader", "readerBody", "portBox", "savesList", ...ids]) make(id);
+  for (const id of ["strip", "tools", "cost", "clock", "flash", "bars", "stats", "banner", "card", "tabs", "tabBody", "help", "choice", "newcity", "panel", "map", "reader", "readerBody", "portBox", "savesList", ...ids]) make(id);
   const doc = {
     __shim: true,
     body: root,
