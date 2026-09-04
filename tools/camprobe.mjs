@@ -42,6 +42,12 @@ const WARM = Number(arg("--warm", 8));
 const CAMS = String(arg("--cams", "0,10,20,40")).split(",").map(Number);
 const POLICE = Number(arg("--police", 1));
 const CSV = argv.includes("--csv");
+// --cap N overrides KNOBS.CAM_CAP for the whole sweep, so the brake can be
+// A/B'd ON against OFF at the SAME camera count on the same rig. Two earlier
+// drafts of this brake measured as no-ops and were only caught this way;
+// docs/PROPOSAL-CAMERAS.md §11 pre-registers it as the first balance risk.
+const CAP = arg("--cap", null);
+if (CAP !== null) KNOBS.CAM_CAP = Number(CAP);
 
 const BLOCK = 7;
 const CYCLE = [ZONE.R, ZONE.I, ZONE.C, ZONE.R, ZONE.C, ZONE.I];
@@ -136,7 +142,7 @@ function run(seed, cams) {
   const seenArrest = new Set();
   const c = {
     opened: 0, arrests: 0, cold: 0, coldServing: 0, burglaries: 0, identified: 0,
-    crimeSum: 0, crimeN: 0, hotSum: 0, hotN: 0, sceneDark: 0, valveSum: 0,
+    crimeSum: 0, crimeN: 0, hotSum: 0, hotN: 0, sceneDark: 0, valveSum: 0, watchSum: 0,
   };
   const j0 = w.events.justice;
   const base = { wrongful: j0.wrongful || 0, exonerated: j0.exonerated || 0, cold: j0.cold || 0 };
@@ -171,6 +177,7 @@ function run(seed, cams) {
     }
     if (lots) { c.hotSum += hot / lots; c.hotN++; }
     c.valveSum += w.valves.R;
+    c.watchSum += w.last?.census?.watchedShare || 0;
   }
   const j = w.events.justice;
   const cen = census(w);
@@ -188,10 +195,11 @@ function run(seed, cams) {
     crime: c.crimeN ? c.crimeSum / c.crimeN : 0,
     hot: c.hotN ? (100 * c.hotSum) / c.hotN : 0,
     valveR: c.valveSum / (YEARS * 12),
+    watched: c.watchSum / (YEARS * 12),
   };
 }
 
-const FIELDS = ["P", "opened", "arrests", "wrongful", "exonerated", "cold", "coldServing", "identified", "burglaries", "solved", "sceneDark", "crime", "hot", "valveR"];
+const FIELDS = ["P", "opened", "arrests", "wrongful", "exonerated", "cold", "coldServing", "identified", "burglaries", "solved", "sceneDark", "crime", "hot", "valveR", "watched"];
 const rows = [];
 for (const seed of SEEDS) for (const n of CAMS) rows.push(run(seed, n));
 
@@ -204,7 +212,7 @@ if (CSV) {
   console.log(["cams", "seed", "placed", ...FIELDS].join(","));
   for (const r of rows) console.log([r.cams, r.seed, r.placed, ...FIELDS.map((f) => (typeof r[f] === "number" ? r2(r[f]) : r[f]))].join(","));
 } else {
-  console.log(`camprobe — ${SEEDS.length} seeds x ${YEARS}y, ${POLICE} police station${POLICE === 1 ? "" : "s"}, warm ${WARM}y. Per seed.`);
+  console.log(`camprobe — ${SEEDS.length} seeds x ${YEARS}y, ${POLICE} police station${POLICE === 1 ? "" : "s"}, warm ${WARM}y, CAM_CAP ${KNOBS.CAM_CAP}. Per seed.`);
   const wanted = CAMS.find((n) => n > 0);
   if (wanted !== undefined && placedAt(wanted) === 0) console.log("NOTE: no camera was placed — this tree has no camera op. The 0-camera row is still a valid baseline.");
   console.log("");
@@ -214,9 +222,9 @@ if (CSV) {
   for (const n of CAMS) console.log(`| ${n} | ${r1(placedAt(n))} | ${Math.round(mean(n, "P"))} | ${r1(mean(n, "opened"))} | ${r1(mean(n, "arrests"))} | ${r1(mean(n, "solved"))}% | ${r1(mean(n, "cold"))} | ${r1(mean(n, "wrongful"))} | ${r1(mean(n, "exonerated"))} | ${r1(mean(n, "coldServing"))} |`);
   console.log("");
   console.log("DETERRENCE — the anti-claim: these columns must BARELY move (§3).");
-  console.log("| cams | mean crime | lots hot | burglaries | scenes dark | R valve | pop |");
-  console.log("|---|---|---|---|---|---|---|");
-  for (const n of CAMS) console.log(`| ${n} | ${r2(mean(n, "crime"))} | ${r1(mean(n, "hot"))}% | ${r1(mean(n, "burglaries"))} | ${r1(mean(n, "sceneDark"))}% | ${r2(mean(n, "valveR"))} | ${Math.round(mean(n, "P"))} |`);
+  console.log("| cams | mean crime | lots hot | burglaries | scenes dark | R valve | homes watched | pop |");
+  console.log("|---|---|---|---|---|---|---|---|");
+  for (const n of CAMS) console.log(`| ${n} | ${r2(mean(n, "crime"))} | ${r1(mean(n, "hot"))}% | ${r1(mean(n, "burglaries"))} | ${r1(mean(n, "sceneDark"))}% | ${r2(mean(n, "valveR"))} | ${r1(100 * mean(n, "watched"))}% | ${Math.round(mean(n, "P"))} |`);
   console.log("");
   console.log("A camera that lowers mean crime is off-thesis; one that does not raise arrests is cosmetic.");
 }

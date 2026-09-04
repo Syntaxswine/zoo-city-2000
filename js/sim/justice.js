@@ -239,9 +239,15 @@ export function burglaryTick(world, cen, notices) {
  * LIFE_MAX) — a burglary at thirty is evicted by an ordinary life and the
  * victim would quietly stop being one.
  *
- * Scope is the ADDRESS, not the block. Measured over 4 seeds x 30y: marking
- * every adult on the burgled block reaches 44-53% of the town's living adults,
- * which is most of it; the lot alone reaches 5.3-6.5%. Nobody is skipped for
+ * Scope is the ADDRESS, not the block. Marking every adult on the burgled
+ * BLOCK reaches 44-53% of the town's living adults, which is most of it. This
+ * rule — everyone living at the lot that was broken into — reaches
+ * 9.5-12.5% (measured on THIS rule, 3 seeds x 30y with stations: 135/1364,
+ * 158/1261, 125/1322). The proposal quoted 5.3-6.5%, but that was a different
+ * rule: ONE household per burglary, picked from the block by (tick + lot) % n.
+ * A tier-3 lot holds several households and all of them had their door forced,
+ * so picking one of them by arithmetic is a fiction; the address is the fact.
+ * Nobody is skipped for
  * being in the cells — a house is burgled whether or not its animals are home.
  * A shop, works or hall has nobody living there and marks nobody, so this asks
  * who lives here rather than checking the zone.

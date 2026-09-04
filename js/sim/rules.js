@@ -90,6 +90,8 @@ export const KNOBS = {
   CAM_EFFECT: 60,           // the same scale as POLICE_EFFECT, so the card can print both and a player can compare them
   CAM_ARREST: 0.30,         // added to the ARREST roll at a covered scene, and to NOTHING else. Larger than ARREST_COVER 0.18 because it is bought one tile at a time: a covered scene clears at 88.2% over the five rolled months against 21.8% dark
   CAM_WRONGFUL: 0.10,       // … and names the wrong animal 15% of the time against the standing 5%. The picture is not a witness
+  CAM_MOOD: 12,             // what a watched street costs an animal that lives on it — against CRIME's mean −5.14, a killing's fear −15 and the dread cap 25. Waived for anyone already burgled: the owner's ruling
+  CAM_CAP: 400,             // THE BRAKE, and the only one. Taken off the capacity law in proportion to the watched share of homes — ABSOLUTE, not comparative, so a blanket is the case it bites hardest in. Between CAP_PARK 150 and CAP_ZOO 500: a fully watched town gives back nearly three parks of desirability
   CRIME_BASE: 40,           // crime = 40 − 0.5·LV + 0.4·density3 + 40·(U/W) − police, 0..100 (Micropolis: 128 − LV + density − police)
   CRIME_LV: 0.5,
   CRIME_DENSITY: 0.4,
@@ -431,8 +433,8 @@ export const RULES = Object.freeze([
   },
   {
     id: "S4", title: "The camera network",
-    formula: "a camera walks CAM_REACH 2 connected road tiles and paints each one and every tile within ROAD_REACH 3 of it — the lots that street serves — at CAM_EFFECT 60 within CAM_NEAR 1 road-step, half beyond ; a wall across the street breaks the sight-line ; it NEVER enters the crime field, only the arrest roll, and only where there is a police force to make one ; §100 a camera, §2,000 a year for the whole network however many there are",
-    live: (w) => `${w.last.budget.cams || 0} cameras · ${w.last.budget.cams ? `§${KNOBS.UPKEEP_CAM_NET} a year` : "no network fee"} · ${w.last.census.policeStations ? "a force to work the pictures" : "NO POLICE STATION — the pictures go nowhere"}`,
+    formula: "a camera walks CAM_REACH 2 connected road tiles and paints each one and every tile within ROAD_REACH 3 of it — the lots that street serves — at CAM_EFFECT 60 within CAM_NEAR 1 road-step, half beyond ; a wall across the street breaks the sight-line ; it NEVER enters the crime field, only the ARREST roll (+0.30·cover), and only where there is a police force to make one ; it names the wrong animal 15% of the time against 5% ; every watched home costs its animals 12 mood unless they have been burgled themselves, and the town's capacity falls by CAM_CAP 400 × the watched share — fewer animals want to live in a watched town ; §100 a camera, §2,000 a year for the whole network however many there are",
+    live: (w) => `${w.last.budget.cams || 0} cameras · ${Math.round(100 * (w.last.census.watchedShare || 0))}% of homes watched · capacity −${Math.round(KNOBS.CAM_CAP * (w.last.census.watchedShare || 0))} · ${w.last.census.policeStations ? "a force to work the pictures" : "NO POLICE STATION — the pictures go nowhere"}`,
   },
   {
     id: "S3", title: "Fire cover",

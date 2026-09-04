@@ -15,7 +15,7 @@ export const NEED_LOT_PTS = 6;
 export const NEED_REACH = 6;
 export const BUBBLES_MAX = 8;
 
-const ACTIONABLE_MOOD = new Set(["NO_JOB", "SMOKE", "FLIGHT", "DREAD", "CRIME", "VAN"]);
+const ACTIONABLE_MOOD = new Set(["NO_JOB", "SMOKE", "FLIGHT", "DREAD", "CRIME", "VAN", "WATCHED"]);
 const LOT_NEED = new Map([
   [REASON.NO_ROAD, "NO_ROAD"],
   [REASON.CAPPED, "CAPPED"],

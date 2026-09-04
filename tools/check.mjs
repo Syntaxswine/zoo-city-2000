@@ -895,6 +895,98 @@ check("determinism: same seed + same inputs ⇒ same hash", stateHash(A.world) =
   }
 }
 
+// ---- WATCHED: the brake, the mood, the waiver (docs/PROPOSAL-CAMERAS.md §4e) ----
+// The brake is ONE TERM IN THE CAPACITY LAW and it is the only one. Two earlier
+// drafts put it in mood, in the home score and in a rehome, and all three
+// measured as no-ops under a blanket — mood has no sim consumer while V_R > 0,
+// bestHome is a pure argmax so a uniform penalty cancels, and a rehome wanting
+// somewhere less watched finds nowhere when everywhere is watched. A global
+// nuisance needs an ABSOLUTE brake.
+//
+// A/B'd on tools/camprobe.mjs (4 seeds x 30y, one station, --cap 0 against 400):
+//   10 cameras  pop 1204 → 1053 · R valve 0.30 → 0.24 · 93.4% of homes watched
+//   40 cameras  pop 1325 → 1047 · R valve 0.28 → 0.18 · 98.7% watched
+{
+  const { capacityLaw } = await import("../js/sim/demand.js");
+  const { moodTerms } = await import("../js/sim/citizens.js");
+
+  // ---- the brake is absolute -----------------------------------------------
+  {
+    const W = load(A.saved);
+    const base = census(W);
+    const cap0 = capacityLaw(W, { ...base, watchedShare: 0 });
+    const capHalf = capacityLaw(W, { ...base, watchedShare: 0.5 });
+    const capAll = capacityLaw(W, { ...base, watchedShare: 1 });
+    check("CAM_CAP takes capacity off in proportion to the watched share", cap0 > capHalf && capHalf > capAll, `${cap0.toFixed(0)} / ${capHalf.toFixed(0)} / ${capAll.toFixed(0)}`);
+    // ABSOLUTE, not comparative: the whole point. A fully watched town loses
+    // CAM_CAP scaled by the same H gain every other term gets.
+    const want = KNOBS.CAM_CAP * (1 + KNOBS.CAP_H_GAIN * base.H);
+    check("a fully watched town loses exactly CAM_CAP of capacity", Math.abs((cap0 - capAll) - want) < 1e-6, `${(cap0 - capAll).toFixed(3)} vs ${want.toFixed(3)}`);
+    check("CAM_CAP sits between a park and a zoo, so the loss is legible against them", KNOBS.CAP_PARK < KNOBS.CAM_CAP && KNOBS.CAM_CAP < KNOBS.CAP_ZOO, `${KNOBS.CAP_PARK} < ${KNOBS.CAM_CAP} < ${KNOBS.CAP_ZOO}`);
+    // With the knob at 0 the law is exactly what it was before the network.
+    const saved = KNOBS.CAM_CAP;
+    KNOBS.CAM_CAP = 0;
+    check("at CAM_CAP 0 the capacity law is the one that shipped before cameras", capacityLaw(W, { ...base, watchedShare: 1 }) === cap0, "the brake leaks when switched off");
+    KNOBS.CAM_CAP = saved;
+  }
+
+  // ---- what the share counts -----------------------------------------------
+  {
+    // OCCUPIED HOMES, not tiles: a camera pointed at a field costs nothing.
+    const W = load(A.saved);
+    const before = census(W).watchedShare;
+    check("an unwatched town has a watched share of zero", before === 0, `${before}`);
+    let empties = 0;
+    for (let i = 0; i < W.w * W.h; i++) if (!W.occupants[i]) { W.camCov[i] = KNOBS.CAM_EFFECT; empties++; }
+    check("WATCHED rig: there are empty tiles to watch", empties > 100, `${empties}`);
+    check("watching every EMPTY tile in the town costs nothing", census(W).watchedShare === 0, `${census(W).watchedShare}`);
+    let homes = 0;
+    for (let i = 0; i < W.w * W.h; i++) if (W.occupants[i]) { W.camCov[i] = KNOBS.CAM_EFFECT; homes++; }
+    check("WATCHED rig: there are occupied homes to watch", homes >= 10, `${homes}`);
+    check("watching every home makes the share one", Math.abs(census(W).watchedShare - 1) < 1e-9, `${census(W).watchedShare}`);
+    // Half cover still counts — CAM_EFFECT/2 is the threshold, so a street's
+    // far frontages are watched too.
+    for (let i = 0; i < W.w * W.h; i++) if (W.occupants[i]) W.camCov[i] = KNOBS.CAM_EFFECT / 2;
+    check("half cover is still watched", Math.abs(census(W).watchedShare - 1) < 1e-9, `${census(W).watchedShare}`);
+    for (let i = 0; i < W.w * W.h; i++) if (W.occupants[i]) W.camCov[i] = KNOBS.CAM_EFFECT / 2 - 1;
+    check("and a hair under it is not", census(W).watchedShare === 0, `${census(W).watchedShare}`);
+  }
+
+  // ---- the mood term and the owner's waiver --------------------------------
+  {
+    const W = load(A.saved);
+    const c = W.citizens.find((x) => !x.dead && x.home >= 0 && !x.burgled);
+    check("WATCHED rig: an un-burgled animal with a home", !!c, "none found");
+    if (c) {
+      const termOf = (w, cit) => (moodTerms(w, cit).find((t) => t.code === "WATCHED") || { value: 0 }).value;
+      check("an unwatched street costs no mood", termOf(W, c) === 0, `${termOf(W, c)}`);
+      W.camCov[c.home] = KNOBS.CAM_EFFECT;
+      const full = termOf(W, c);
+      check("a watched street costs CAM_MOOD", Math.abs(full + KNOBS.CAM_MOOD) < 1e-9, `${full}`);
+      W.camCov[c.home] = KNOBS.CAM_EFFECT / 2;
+      check("and half cover costs half of it", Math.abs(termOf(W, c) + KNOBS.CAM_MOOD / 2) < 1e-9, `${termOf(W, c)}`);
+      // THE OWNER'S RULING: "folks who have been robbed before do not feel
+      // that negative feeling."
+      W.camCov[c.home] = KNOBS.CAM_EFFECT;
+      c.burgled = true;
+      check("an animal whose own door has been forced does not mind the camera", termOf(W, c) === 0, `${termOf(W, c)}`);
+      c.burgled = false;
+      check("and its unburgled neighbours still do", termOf(W, c) !== 0, `${termOf(W, c)}`);
+    }
+  }
+
+  // ---- the animal can SAY it -----------------------------------------------
+  {
+    // Without a needs code the mood term is invisible to the player and might
+    // as well not exist. needTruthResults proves WATCHED WINS on a watched
+    // street; this checks the remedy names the thing to bulldoze.
+    const { ACT, line } = await import("../js/sim/voice.js");
+    check("WATCHED has a remedy a player can act on", typeof ACT.WATCHED === "string" && /camera/.test(ACT.WATCHED), ACT.WATCHED);
+    const said = line(null, { id: 1, species: "tortoise" }, { code: "WATCHED" });
+    check("and a voice line, inside the 30-character rule", typeof said === "string" && said.length > 0 && said.length <= 30, `${said} (${said && said.length})`);
+  }
+}
+
 // ---- walls (docs/PROPOSAL-ZONING-RAIL-WALLS.md §1; SPEC §6b) ----------------------
 // The flood must reproduce the square before it is allowed to differ from it.
 {
@@ -2910,7 +3002,7 @@ check("no Math.random under js/", mathRandom.length === 0, mathRandom.join(", ")
   const { refreshLast } = await import("../js/sim/tick.js");
   const { createWalkers } = await import("../js/walkers.js");
   const { art } = await import("../js/art/index.js");
-  const { needFixture, needTruthResults } = await import("./need-fixtures.mjs");
+  const { needFixture, needTruthResults, TRUTH_CODES } = await import("./need-fixtures.mjs");
   const { COHERENT_STRESS_CODES, coherentStressFacts, coherentStressFixture } = await import("./need-stress.mjs");
 
   const lineCodes = Object.keys(LINES).sort();
@@ -2932,6 +3024,15 @@ check("no Math.random under js/", mathRandom.length === 0, mathRandom.join(", ")
   }
   check("needs: signed visual hashes still resolve every species/code voice", unresolvedVoices === 0, `${unresolvedVoices}`);
 
+  // The check below iterates the fixture TABLE, so a code with no fixture is
+  // not tested — it is skipped, and the check's name ("every need code") is
+  // false without this line. WATCHED was added to the voice table and to
+  // ACTIONABLE_MOOD and the suite stayed green with nothing exercising it.
+  {
+    const { ACT } = await import("../js/sim/voice.js");
+    const uncovered = Object.keys(ACT).filter((code) => !TRUTH_CODES.includes(code));
+    check("needs: every code the voice table can act on HAS a truth fixture", uncovered.length === 0, uncovered.join(", "));
+  }
   const truthResults = needTruthResults();
   const wrongCases = truthResults.filter((r) => r.expected !== r.actual);
   check("needs: every need code wins a focused truth fixture", wrongCases.length === 0,
