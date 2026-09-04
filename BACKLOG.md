@@ -513,6 +513,16 @@ found that **the settle added for the third review's finding 2 was itself a
    hold); and the README's deep-rig numbers are re-measured at HEAD — they had
    moved with the rail knobs in `341baf8` underneath.
 
+**The sweep after all of that**: 36 mutants aimed at exactly these lines, run
+at six lanes on the fixed timing gates — **33 caught by a NAMED check**, and
+the only three survivors are the documented equivalents below (the unreachable
+`d === 0` guard, `computeRoadDist`'s extra ring, `lotReport`'s eager
+`nearest`). Two of the 33 needed their checks sharpened after the sweep: the
+freight-cache one had razed a HALL, which resets the cache through
+`meat.closeHall` and so watched the wrong reset (it takes the road under a
+door now), and `served` had gained a caller-owned buffer with nothing asking
+it for one.
+
 **Found SOUND by the fourth reader** — do not re-verify: all six gate hashes
 reproduce byte-for-byte; the whole `--cost` table reproduces on an idle
 machine; `accessprobe --layout millbelt` reproduces exactly; Law 6 holds

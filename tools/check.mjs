@@ -2590,11 +2590,12 @@ check("determinism: same seed + same inputs ⇒ same hash", stateHash(A.world) =
     const stamp = TE._seen.reduce((a, b) => a + b, 0);
     const gotDoors = doors(TE, te(20, 9), mine).length;
     const gotNear = nearestRoad(TE, te(20, 9), null, mine).doors.length;
+    const gotServed = sv(TE, te(20, 9), mine); // `served` too: `lotScore` reaches it from the SCORE overlay
     const kept = TE._seen.reduce((a, b) => a + b, 0);
     const usedMine = mine.reduce((a, b) => a + b, 0) > 0;
     check("access: and the door READERS take the caller's scratch too — `doorsOf` and `nearestRoad` fill the buffer they are handed and leave the world's alone, which is the law the walker layer lives under and the overlay's check does not reach",
-      gotDoors === 2 && gotNear === 2 && kept === stamp && usedMine,
-      `${gotDoors} doors · ${gotNear} from nearestRoad · the world's stamp ${stamp} → ${kept} · the caller's buffer was written ${usedMine}`);
+      gotDoors === 2 && gotNear === 2 && gotServed === true && kept === stamp && usedMine,
+      `${gotDoors} doors · ${gotNear} from nearestRoad · served ${gotServed} · the world's stamp ${stamp} → ${kept} · the caller's buffer was written ${usedMine}`);
   }
 
   // ---- WHAT A ROAD ACTUALLY BUYS, ARM BY ARM -------------------------------
@@ -2697,11 +2698,18 @@ check("determinism: same seed + same inputs ⇒ same hash", stateHash(A.world) =
     // otherwise be answered from a map that no longer exists - `ops.apply`
     // calls `resetMeatRoutes` for that reason and nothing held it.
     const staleRoute = ME2.hallReach(H4, h4(18, 11));       // fills the cache
-    apply(H4, { kind: "bulldoze", x0: 12, y0: 10, x1: 12, y1: 10, what: "building" });
+    // A ROAD, not the hall: razing a hall goes through `meat.closeHall`, which
+    // resets the cache itself, so a check that razed one would be watching the
+    // wrong reset. Taking the road under the east door leaves the hall
+    // standing and the east lot with nowhere to go, and only `ops.apply`'s own
+    // `resetMeatRoutes` can notice inside the same month.
+    apply(H4, { kind: "bulldoze", x0: 13, y0: 10, x1: 13, y1: 10, what: "road" });
     const afterRaze = ME2.hallReach(H4, h4(18, 11));
-    check("access: a cart asked after a player op is answered from the city as it is NOW — raze the only meat hall and the very next route request says there is nowhere to take the meat, because ops resets the freight cache at the op rather than at the next month",
-      !!staleRoute && staleRoute.hall === h4(12, 10) && H4.tier[h4(12, 10)] === 0 && afterRaze === null,
-      `before, the hall at ${staleRoute ? xy(staleRoute.hall) : "none"} · after razing it, ${afterRaze ? xy(afterRaze.hall) : "no route"}`);
+    const westStill = ME2.hallReach(H4, h4(6, 11));
+    check("access: a cart asked after a player op is answered from the city as it is NOW — take the road under a hall's east door and the very next request from the east says there is nowhere to take the meat, while the west still arrives; ops resets the freight cache at the op, not at the next month",
+      !!staleRoute && staleRoute.door === h4(13, 10) && H4.road[h4(13, 10)] === ROAD.NONE
+        && afterRaze === null && !!westStill && westStill.door === h4(11, 10),
+      `before, in by ${staleRoute ? xy(staleRoute.door) : "none"} · after the road went, from the east ${afterRaze ? xy(afterRaze.door) : "no route"} and from the west ${westStill ? xy(westStill.door) : "no route"}`);
   }
 
   // ---- A LOT NOBODY CAN REACH IS NOT SWALLOWED INTO A BLOCK -----------------
