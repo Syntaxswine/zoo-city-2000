@@ -151,7 +151,7 @@ export function createUI(app) {
     mk("btnUndo", "⌫", "undo", "Backspace or Ctrl+Z: undo the last op (this month only)", () => app.undo());
     mk("btnSave", "Ctrl+S", "save", "Ctrl+S: open named saves with the save-as name focused", () => app.save());
     mk("btnLoad", "L", "load", "L: open named saves on the slot list", () => app.load());
-    mk("btnOverlay", "O", "overlay", "O: cycle land value / pollution / crime / lot score overlays", () => app.cycleOverlay());
+    mk("btnOverlay", "O", "overlay", "O: cycle land value / pollution / crime / dread / use / road access / lot score overlays", () => app.cycleOverlay());
     mk("btnNews", "R", "news", "R: the news — every dispatch this city ever made, oldest first; ← → step one at a time", () => app.news.toggle());
     mk("btnZoom", "+", "zoom", "+ / −: zoom ×1 / ×2", () => app.zoomAt(app.camera.zoom === 1 ? 1 : -1));
     sep();
@@ -417,15 +417,34 @@ export function createUI(app) {
       if (s.window && s.reason !== REASON.MERGING) lines.push(el("div", "dim", `a ${s.window.side}×${s.window.side} block forms here when its ${s.window.side * s.window.side} lots are ${Math.round(KNOBS.FILL_TO_GROW * 100)}% full together — now ${Math.round(s.window.fill * 100)}%${s.score > KNOBS.GROW_THRESH ? "" : " — and demand is positive"}`));
       else if (s.merge) lines.push(el("div", "dim", `joining ${s.merge.side * s.merge.side} lots into one ${s.merge.side}×${s.merge.side} building holding ×${KNOBS.BIG_BONUS} what they hold`));
     }
+    // Road access, in the words the rule uses (SPEC 6c). Shown for anything
+    // the rule is ASKED about - a lot, a zoo, the centre, a station, a
+    // platform - and never for plain ground, where the question is idle.
+    const asksAccess = rep.zone !== ZONE.NONE || rep.civic !== CIVIC.NONE || w.rail[i] === 2;
+    if (asksAccess) {
+      const xy = (t) => `(${t % w.w},${(t / w.w) | 0})`;
+      if (rep.served) {
+        const doors = rep.doors.slice(0, 4).map(xy).join(" ");
+        lines.push(el("div", "", rep.siteDist === 0
+          ? `road access: on the road · ${rep.doors.length === 1 ? "its tile" : `${rep.doors.length} road tiles`} ${doors}`
+          : `road access: ${rep.siteDist} tile${rep.siteDist === 1 ? "" : "s"} · ${rep.doors.length === 1 ? "door" : `${rep.doors.length} doors, every side counts:`} ${doors}${rep.doors.length > 4 ? " …" : ""}`));
+      } else if (rep.nearest && rep.nearest.doors.length) {
+        lines.push(el("div", "warn", `no road within ${KNOBS.ROAD_REACH} — the nearest is ${rep.nearest.d} tiles away at ${xy(rep.nearest.doors[0])}`));
+      } else {
+        lines.push(el("div", "warn", `no road within ${KNOBS.ROAD_REACH}, and none within ${rep.nearest ? rep.nearest.d - 1 : 8} either`));
+      }
+    }
     const env = el("div", "dim");
     env.textContent = `LV ${rep.lv}  Pol ${rep.pol}  crime ${rep.crime}  road ${rep.roadDist > KNOBS.ROAD_REACH ? "—" : rep.roadDist}` + (w.road[i] ? `  traffic ${rep.traffic}` : "")
       + (rep.dread ? `  dread ${rep.dread}` : "") + (rep.fireCov ? "  · fire cover" : "") + (rep.policeCov ? `  · police cover −${rep.policeCov}` : "");
     lines.push(env);
     if (w.use[i] && (rep.zone !== ZONE.NONE || w.road[i] !== ROAD.NONE)) lines.push(el("div", "warn", `use: ${USE_NAME[w.use[i]]}-only — ${w.use[i] === 1 ? "the hunters (fox, owl, wolf, cat, hawk) may live, work and walk here; nobody else" : "everyone but a hunter may live, work and walk here"}; the rest are stopped under police cover`));
     if (w.rail[i] === 2) {
-      let door = -1;
-      for (const [dx, dy] of [[0, -1], [1, 0], [0, 1], [-1, 0]]) { const xx = tx + dx, yy = ty + dy; if (xx >= 0 && yy >= 0 && xx < w.w && yy < w.h && w.road[yy * w.w + xx] !== ROAD.NONE) { door = yy * w.w + xx; break; } }
-      lines.push(el("div", door >= 0 ? "dim" : "warn", door >= 0 ? `a station: riders board from the road at (${door % w.w},${(door / w.w) | 0}); a citizen's ride costs 0.3 of a walk, while a hall cart's ride is free distance; neither changes property-value distance` : "a station with no road beside it: nobody can reach the platform"));
+      // A platform is served like a lot: riders reach it from ANY of its doors,
+      // and the forecourt between costs them a walk a tile (SPEC 6c, 7.9).
+      lines.push(el("div", rep.served ? "dim" : "warn", rep.served
+        ? `a station: riders board from ${rep.doors.length === 1 ? "the road at" : `${rep.doors.length} sides,`} ${rep.doors.slice(0, 4).map((t) => `(${t % w.w},${(t / w.w) | 0})`).join(" ")}${rep.siteDist > 1 ? `, crossing ${rep.siteDist} tiles of forecourt on foot` : ""}; a citizen's ride costs 0.3 of a walk, while a hall cart's ride is free distance; neither changes property-value distance`
+        : `a station with no road within ${KNOBS.ROAD_REACH}: nobody can reach the platform`));
     } else if (w.rail[i]) lines.push(el("div", "dim", w.road[i] !== ROAD.NONE ? "a level crossing: the road and the line share this tile square-on — animals walk across it, anything on the line passes straight through without stopping, and the city maintains both" : "rail: citizen commutes price it at 0.3 of a walk; hall logistics count it as free travel; it never shortens property-value distance"));
     if (w.wall[i]) lines.push(el("div", "dim", w.road[i] !== ROAD.NONE ? "a tunnel: the road runs through the wall; smells, dread and cover pass along it and nowhere else" : "a wall: smells, dread, cover and land-value halos go round it, and a killer's reach stops at it; a road through it is a tunnel"));
     if (rep.dread) lines.push(el("div", "dim", `dread ${rep.dread}: herbivores −${Math.min(KNOBS.DREAD_MOOD_CAP, Math.round(KNOBS.DREAD_MOOD_HERB * rep.dread))} mood and −${Math.round(KNOBS.DREAD_HOME_HERB * rep.dread)} on the home score; LV −${Math.round(KNOBS.LV_DREAD * rep.dread)}; carnivores do not mind`));

@@ -15,7 +15,7 @@ import { neutralRate } from "./demand.js";
 import { ageYears } from "./census.js";
 import { SPECIES_BY_ID, SPECIES } from "./species.js";
 import { thiefPool, openFile } from "./justice.js";
-import { hasAccess, builtLots, fireExposure } from "./fields.js";
+import { served, builtLots, fireExposure } from "./fields.js";
 import { dissolve, ignite as igniteTile } from "./blocks.js"; // `ignite` is eventsTick's list of tiles the fire spreads to
 import { KIND, remember } from "./life.js";
 
@@ -516,7 +516,7 @@ export function eventsTick(world, cen, dem) {
   // reaches tier 2 (a weight-2 roster card would arrive once per 15–40 years).
   if (!ev.licence && !ev.choice && world.tick - (ev.lastLicenceOffer ?? -100000) >= 120) {
     let hall2 = false;
-    for (let i = 0; i < n && !hall2; i++) if (world.zone[i] === ZONE.M && world.tier[i] >= 2 && hasAccess(world, i)) hall2 = true;
+    for (let i = 0; i < n && !hall2; i++) if (world.zone[i] === ZONE.M && world.tier[i] >= 2 && served(world, i)) hall2 = true;
     if (hall2) {
       ev.lastLicenceOffer = world.tick;
       ev.choice = { id: "licence", title: "The Butchers' Licence", text: `The Butchers' Guild has a licence on your desk: an inspector in every meat hall, §${KNOBS.LICENCE_COST} and §${KNOBS.UPKEEP_LICENCE} a year each. The till pays tax at the C rate; crime around the halls halves; the halls buy half as eagerly.`, cost: KNOBS.LICENCE_COST, accept: `Pay §${KNOBS.LICENCE_COST}`, decline: "Decline" };

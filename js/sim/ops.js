@@ -7,12 +7,13 @@
 // a lump posted under its own ledger key, logged, replayed, never undone.
 
 import { KNOBS } from "./rules.js";
-import { TERRAIN, ROAD, ZONE, CIVIC, idx, inBounds, anchorOf, footprintOf } from "./world.js";
+import { TERRAIN, ROAD, ZONE, CIVIC, idx, inBounds, anchorOf, footprintOf, zooAnchorOf, zooTiles } from "./world.js";
 import { post, canSpend, exitReceivership } from "./budget.js";
 import { clearLot, invalidatePaths, releaseJob } from "./citizens.js";
 import { resolveChoice } from "./events.js";
 import { refreshLast } from "./tick.js";
 import { computeOcclusion } from "./reach.js";
+import { computeRoadDist, computeStationDoors } from "./fields.js";
 import { closeHall, hallStock, resetMeatRoutes } from "./meat.js";
 
 const C = KNOBS.COST;
@@ -446,7 +447,12 @@ export function apply(world, op, { log = true } = {}) {
     }
   }
   // A wall changes what a road can reach (doors, road distance) as much as a road does; a road across a wall makes a tunnel.
-  if (roads || walls || rails) { world.roadsDirty = true; invalidatePaths(world); computeOcclusion(world); } // occlusion now, so wallCount reads live; roadDist at the tick
+  // Both derived road fields are rebuilt HERE, not at the next tick: a loaded
+  // city opens paused, so a road laid before Space would leave every lot beside
+  // it reading "no road within 3" on the card and in the access overlay until
+  // the month turned. Two O(tiles) passes, well under a millisecond, and
+  // hash-neutral — the tick recomputed exactly these before anything read them.
+  if (roads || walls || rails) { world.roadsDirty = true; invalidatePaths(world); computeOcclusion(world); computeRoadDist(world); computeStationDoors(world); }
   else if (lines) invalidatePaths(world); // the stale pass re-searches under the line and releases the workers it forbids
   resetMeatRoutes(world); // a hall, its door, capacity or the freight graph may have changed inside this tick
   post(world, "build", -plan.cost);
@@ -466,20 +472,12 @@ function removeCivic(world, i) {
     world.civic[i] = CIVIC.NONE;
     return;
   }
-  // Zoo: find the anchor and clear all four.
-  const { w } = world;
-  const tx = i % w;
-  const ty = (i / w) | 0;
-  for (let dy = -1; dy <= 0; dy++) for (let dx = -1; dx <= 0; dx++) {
-    const ax = tx + dx;
-    const ay = ty + dy;
-    if (!inBounds(world, ax, ay) || world.civic[idx(world, ax, ay)] !== CIVIC.ZOO) continue;
-    const a = idx(world, ax, ay);
-    // Fire the zoo's workers.
-    for (const cz of world.citizens) if (cz.job === a) releaseJob(world, cz);
-    for (let yy = 0; yy < 2; yy++) for (let xx = 0; xx < 2; xx++) {
-      if (inBounds(world, ax + xx, ay + yy)) world.civic[idx(world, ax + xx, ay + yy)] = CIVIC.NONE;
-    }
+  // Zoo: find the corner it shares and clear all four. world.zooAnchorOf is
+  // the one place that knows how a zoo is laid out; access asks it too.
+  const a = zooAnchorOf(world, i);
+  if (a >= 0) {
+    for (const cz of world.citizens) if (cz.job === a) releaseJob(world, cz); // fire the zoo's workers
+    for (const j of zooTiles(world, a)) world.civic[j] = CIVIC.NONE;
     return;
   }
   world.civic[i] = CIVIC.NONE;
@@ -501,7 +499,7 @@ export function undo(world) {
     world.terrain[s.i] = s.terrain; world.road[s.i] = s.road; world.zone[s.i] = s.zone; world.maxTier[s.i] = s.maxTier;
     world.tier[s.i] = s.tier; world.civic[s.i] = s.civic; world.rubble[s.i] = s.rubble; world.wall[s.i] = s.wall; world.use[s.i] = s.use; world.rail[s.i] = s.rail; world.big[s.i] = s.big; world.theme[s.i] = s.theme;
   }
-  if (u.roads) { world.roadsDirty = true; invalidatePaths(world); computeOcclusion(world); }
+  if (u.roads) { world.roadsDirty = true; invalidatePaths(world); computeOcclusion(world); computeRoadDist(world); computeStationDoors(world); } // live, as apply does
   else if (u.op.kind === "use") invalidatePaths(world);
   resetMeatRoutes(world);
   post(world, "build", u.cost);

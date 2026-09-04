@@ -4,7 +4,7 @@
 import { KNOBS } from "./rules.js";
 import { SPECIES, SPECIES_BY_ID, isPredPrey, isPredatorOf, DIET_OF } from "./species.js";
 import { ZONE, CIVIC, ROAD, jobsOf, jobZone, absent, capacityOf, isPart } from "./world.js";
-import { hasAccess, edgeRoads , commuteTime, rides, fireExposure } from "./fields.js";
+import { served, edgeRoads , commuteTime, rides, fireExposure } from "./fields.js";
 import { landmarkOf } from "./landmarks.js";
 import { needOf, needsContext } from "./needs.js";
 
@@ -151,6 +151,7 @@ export function census(world) {
   let maxDread = 0;
   let parks = 0;
   let zoos = 0;
+  let zoosNoRoad = 0;
   let lotsNoRoad = 0;
   let lvSum = 0;
   let polSum = 0;
@@ -191,7 +192,7 @@ export function census(world) {
     else if (world.big[i] === 3) { blocks3++; const lm = landmarkOf(world.theme[i]); if (lm) { landmarks++; landmarkCounts[lm.name] = (landmarkCounts[lm.name] || 0) + 1; } }
     if (world.dread[i] > maxDread) maxDread = world.dread[i];
     if (world.civic[i] === CIVIC.PARK) parks++;
-    else if (world.civic[i] === CIVIC.ZOO) zoos++;
+    else if (world.civic[i] === CIVIC.ZOO) { if (served(world, i)) zoos++; else zoosNoRoad++; } // a zoo no road reaches is a fenced field: no halo, no cap, no jobs (SPEC 6c)
     else if (world.civic[i] === CIVIC.FIRE) fireStations++;
     else if (world.civic[i] === CIVIC.POLICE) policeStations++;
     else if (world.civic[i] === CIVIC.CENTRE) centres++;
@@ -199,7 +200,7 @@ export function census(world) {
     if (world.tier[i] > 0) { crimeSum += world.crime[i]; crimeN++; if (world.crime[i] > maxCrime) maxCrime = world.crime[i]; }
     if (world.zone[i] !== ZONE.NONE) {
       lots++;
-      if (!hasAccess(world, i)) lotsNoRoad++;
+      if (!served(world, i)) lotsNoRoad++;
       if (world.zone[i] === ZONE.R) rCap += capacityOf(world, i); // a block's anchor holds ×1.25 its lots; its parts hold nobody
     }
     if (world.road[i] !== ROAD.NONE) roads++;
@@ -237,7 +238,7 @@ export function census(world) {
     meatSlaughtered: (world.meatStats?.yearly?.slaughtered || 0) * KNOBS.PEN_YIELD,
     approval: P ? moodSum / P : 50,
     native: P ? native / P : 0,
-    parks, zoos, lots, roads, walls, tunnels, usePred, usePrey, railTiles, stations, riders, commuteN, meanCommute: commuteN ? commuteSum / commuteN : 0, lotsNoRoad,
+    parks, zoos, zoosNoRoad, lots, roads, walls, tunnels, usePred, usePrey, railTiles, stations, riders, commuteN, meanCommute: commuteN ? commuteSum / commuteN : 0, lotsNoRoad,
     fireStations, policeStations, burning,
     blocks2, blocks3, // the 2×2 and 3×3 blocks standing (anchors; SPEC §3b)
     landmarks, landmarkCounts, // the 3×3s that rose as a species' landmark, and which by name (SPEC §3c)

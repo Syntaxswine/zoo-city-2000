@@ -9,7 +9,7 @@
 import { KNOBS } from "./rules.js";
 import { SPECIES, SPECIES_BY_ID, NAME_PARTS, affinity, ARRIVING, PREY_OF, DIET_OF, isPredatorOf, admits } from "./species.js";
 import { ZONE, CIVIC, TERRAIN, ROAD, idx, inBounds, capacityOf, jobsOf, jobZone, absent, USE_NAME } from "./world.js";
-import { doorOf, edgeRoads, hasAccess, commutePath, dial, WALK, nodePath, commuteTime } from "./fields.js";
+import { doorsOf, edgeRoads, commutePath, dial, WALK, nodePath, commuteTime } from "./fields.js";
 import { ageYears, ageMonths, isWorker } from "./census.js";
 import { DEATHS_MAX, KIND, remember } from "./life.js";
 import { archiveCitizen } from "./legacy.js";
@@ -346,16 +346,16 @@ function detachPresent(world, hh) {
   return moving;
 }
 
-/** Lots whose door is within `maxRoad` road tiles of `fromLot`'s door. */
+/** Lots with a door within `maxRoad` road tiles of ANY of `fromLot`'s doors. */
 function lotsWithinRoad(world, fromLot, maxRoad) {
-  const door = doorOf(world, fromLot);
+  const from = doorsOf(world, fromLot);
   const set = new Set();
-  if (door == null) return set;
+  if (!from.length) return set;
   const { w, h } = world;
   const dist = new Int16Array(w * h).fill(-1);
-  const q = [door];
-  dist[door] = 0;
-  const roads = new Set([door]);
+  const q = from.slice();
+  for (const d of from) dist[d] = 0;
+  const roads = new Set(from);
   while (q.length) {
     const i = q.shift();
     const d = dist[i];
@@ -377,8 +377,7 @@ function lotsWithinRoad(world, fromLot, maxRoad) {
   const n = w * h;
   for (let i = 0; i < n; i++) {
     if (world.zone[i] !== ZONE.R || world.tier[i] === 0) continue;
-    const dr = doorOf(world, i);
-    if (dr != null && roads.has(dr)) set.add(i);
+    for (const dr of doorsOf(world, i)) if (roads.has(dr)) { set.add(i); break; }
   }
   return set;
 }
@@ -1026,18 +1025,24 @@ function jobSearch(world, out) {
   const cs = world.citizens;
   const N = cs.length;
   if (!N) return;
-  // Open jobs by door tile.
+  // Open jobs by door tile - EVERY door, because all sides of a workplace are
+  // access points (SPEC 6c). A lot with roads north and south is listed twice;
+  // searchJob scores it once, at whichever side the searcher reaches first.
+  // Having a door at all IS access, so no separate test of it.
   const n = world.w * world.h;
   const openByDoor = new Map();
+  const doorsByLot = new Map();
   for (let i = 0; i < n; i++) {
     const jobs = jobsOf(world, i);
     if (!jobs || world.staff[i] >= jobs || world.rubble[i] || world.burning[i]) continue;
-    if (!hasAccess(world, i)) continue;
-    const door = doorOf(world, i);
-    if (door == null) continue;
-    let l = openByDoor.get(door);
-    if (!l) openByDoor.set(door, (l = []));
-    l.push(i);
+    const doors = doorsOf(world, i);
+    if (!doors.length) continue;
+    doorsByLot.set(i, doors);
+    for (const door of doors) {
+      let l = openByDoor.get(door);
+      if (!l) openByDoor.set(door, (l = []));
+      l.push(i);
+    }
   }
   const start = world._jobCursor || 0;
   let searches = 0;
@@ -1049,9 +1054,9 @@ function jobSearch(world, out) {
     if (c.job < 0 || c.home < 0) continue;
     // The player's line: a lot repainted against its workers releases them (they search again under the gate).
     if (!admits(world.use[c.job], c.species)) { releaseJob(world, c); continue; }
-    const a = doorOf(world, c.home);
-    const b = doorOf(world, c.job);
-    const r = a != null && b != null ? commutePath(world, c.species, a, b) : null;
+    const a = doorsOf(world, c.home);
+    const b = doorsOf(world, c.job);
+    const r = a.length && b.length ? commutePath(world, c.species, a, b) : null;
     const path = r ? r.path : null;
     if (path) c.path = path;
     else releaseJob(world, c);
@@ -1061,11 +1066,12 @@ function jobSearch(world, out) {
     looked = k + 1;
     if (c.dead || c.home < 0 || c.job >= 0 || !isWorker(world, c)) continue;
     searches++;
-    const door = doorOf(world, c.home);
-    if (door == null) { c.jobless++; continue; }
+    const doors = doorsOf(world, c.home);
+    if (!doors.length) { c.jobless++; continue; }
     const sp = SPECIES_BY_ID[c.species];
-    // BFS over roads from the door, up to COMMUTE_MAX, scoring open jobs as we reach them.
-    const best = searchJob(world, door, sp, openByDoor, world.rng);
+    // Dial from EVERY door of the home, up to COMMUTE_MAX, scoring open jobs as
+    // we reach them: the animal leaves by whichever side its work is on.
+    const best = searchJob(world, doors, sp, openByDoor, world.rng);
     if (best) {
       c.job = best.lot;
       c.hired = world.tick;
@@ -1074,8 +1080,13 @@ function jobSearch(world, out) {
       world.staff[best.lot]++;
       remember(world, c, KIND.HIRED, best.lot);
       if (world.staff[best.lot] >= jobsOf(world, best.lot)) {
-        const l = openByDoor.get(best.door);
-        if (l) { const k2 = l.indexOf(best.lot); if (k2 >= 0) l.splice(k2, 1); if (!l.length) openByDoor.delete(best.door); }
+        for (const dd of doorsByLot.get(best.lot) || [best.door]) {
+          const l = openByDoor.get(dd);
+          if (!l) continue;
+          const k2 = l.indexOf(best.lot);
+          if (k2 >= 0) l.splice(k2, 1);
+          if (!l.length) openByDoor.delete(dd);
+        }
       }
     } else {
       c.jobless++;
@@ -1084,7 +1095,7 @@ function jobSearch(world, out) {
   world._jobCursor = (start + looked) % N;
 }
 
-function searchJob(world, door, sp, openByDoor, rng) {
+function searchJob(world, doors, sp, openByDoor, rng) {
   // Dial's buckets from the door (fields.js): a legal step 10, a step onto a
   // road the player's line forbids 60 — so a citizen takes a detour up to
   // six times longer before it trespasses, and trespasses when that is the
@@ -1092,11 +1103,18 @@ function searchJob(world, door, sp, openByDoor, rng) {
   // for node (the suite holds every commuter's path to roadPath's).
   let best = null;
   let bestS = -Infinity;
-  const { prev } = dial(world, sp.id, door, KNOBS.COMMUTE_MAX * WALK, (i, c) => {
+  // A workplace with two doors is listed under both. Dial settles in cost
+  // order, so the first door to reach it is its nearest one; score it there
+  // and never again, or the second door would draw a second random weight and
+  // could win with the longer walk.
+  const scored = new Set();
+  const { prev } = dial(world, sp.id, doors, KNOBS.COMMUTE_MAX * WALK, (i, c) => {
     const lots = openByDoor.get(i);
     if (!lots) return false;
     const d = c / WALK;
     for (const lot of lots) {
+      if (scored.has(lot)) continue;
+      scored.add(lot);
       if (!admits(world.use[lot], sp.id)) continue; // the player's line: not open to this species
       // A meat hall hires by diet (carnivores 0.9, omnivores 0.5, herbivores 0.1 — a weight: a rabbit takes the job when nothing else is open).
       const pref = world.zone[lot] === ZONE.M ? KNOBS.JOB_M[DIET_OF[sp.id]] : jobZone(world, lot) === ZONE.C ? sp.jobC : sp.jobI;

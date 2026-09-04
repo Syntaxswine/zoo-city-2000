@@ -32,7 +32,7 @@ import { apply, replay, undo, costOf as costOfOp } from "../js/sim/ops.js";
 import { save, load, stateHash, stateHashNoNews, toPlain } from "../js/sim/save.js";
 import { KNOBS } from "../js/sim/rules.js";
 import { post } from "../js/sim/budget.js";
-import { doorOf, hasAccess, computeFields, commuteTime } from "../js/sim/fields.js";
+import { doorOf, doorsOf, served, computeFields, commuteTime } from "../js/sim/fields.js";
 import { census } from "../js/sim/census.js";
 import { CIVIC } from "../js/sim/world.js";
 import { listSlots, listAllSlots, writeSlot, readSlot, deleteSlot, bytesUsed, migrate } from "../js/slots.js";
@@ -76,7 +76,7 @@ function buildCity(seed, years, { withSave = null } = {}) {
     if (t === 120) apply(world, { kind: "bulldoze", x0: sx + 1, y0: sy + 3, x1: sx + 1, y1: sy + 3 });
     const before = Uint8Array.from(world.tier);
     tick(world);
-    for (let i = 0; i < world.w * world.h; i++) if (world.tier[i] > before[i] && !hasAccess(world, i)) grewWithAccess.ok = false;
+    for (let i = 0; i < world.w * world.h; i++) if (world.tier[i] > before[i] && !served(world, i)) grewWithAccess.ok = false;
     if (withSave != null && t === withSave) saved = save(world);
   }
   return { world, saved, grewWithAccess: grewWithAccess.ok, mZoned: grewWithAccess.mZoned };
@@ -158,7 +158,7 @@ for (const c of world.citizens) {
   // A walking entry lies on a road (or a platform); a riding entry (bit 15) on rail; the door is the last tile; the time is within the commute.
   for (const p of c.path) { const i = p & 0x7fff; if (p & 0x8000 ? !world.rail[i] : world.road[i] === ROAD.NONE && world.rail[i] !== 2) pathBad++; }
   const end = c.path[c.path.length - 1] & 0x7fff;
-  if (c.job >= 0 && doorOf(world, c.job) !== end) pathBad++;
+  if (c.job >= 0 && !doorsOf(world, c.job).includes(end)) pathBad++;
   if (commuteTime(c.path) > KNOBS.COMMUTE_MAX + 1e-9) pathBad++;
 }
 check("every commute walks on roads, rides on rail, and ends at the job's door", pathBad === 0, `${pathBad}`);
@@ -258,10 +258,19 @@ function auditIds(w) {
   check("the sold are gone (dangling-id law)", auditIds(F) === 0, `${auditIds(F)}`);
   // Reload with a held animal, continue 24 ticks (the centre releases fixed on the way): hash-equal.
   const G = load(save(F));
-  for (let t = 0; t < 24; t++) { tick(F); tick(G); }
+  // A FIXED animal is counted over the window, not at the end of it: the
+  // released are old, and one that is fixed in month 3 and dies in month 20
+  // leaves `pacified` standing and no flag to find. The snapshot passed on the
+  // trajectory this fixture used to take and not on the one it takes now.
+  let fixedSeen = 0;
+  for (let t = 0; t < 24; t++) {
+    tick(F);
+    tick(G);
+    const live = F.citizens.filter((c) => c.fixed).length;
+    if (live > fixedSeen) fixedSeen = live;
+  }
   check("save → load → 24 ticks with a held and a fixed animal hash-equals", stateHash(F) === stateHash(G), `${stateHash(F)} vs ${stateHash(G)}`);
-  const fixedN = F.citizens.filter((c) => c.fixed).length;
-  check("the centre fixes", fixedN > 0 && F.events.justice.pacified > 0, `fixed ${fixedN} · pacified ${F.events.justice.pacified}`);
+  check("the centre fixes", fixedSeen > 0 && F.events.justice.pacified > 0, `fixed (most at once) ${fixedSeen} · pacified ${F.events.justice.pacified}`);
   // No cub to a household with fewer than two unfixed fertile adults — run a year and audit every birth.
   const { SPECIES_BY_ID } = await import("../js/sim/species.js");
   const { ageYears } = await import("../js/sim/census.js");
@@ -810,7 +819,7 @@ check("determinism: same seed + same inputs ⇒ same hash", stateHash(A.world) =
   check("crossing: commuteTime charges a path's ridden entries a ride and its walked entries a walk, crossing or not",
     Math.abs(commuteTime(twice) - (2 * KNOBS.RAIL_COST / WALK + 2)) < 1e-9, `${commuteTime(twice)}`);
   check("crossing: it is a road for access — a crossing seeds the road-distance flood like any other road tile",
-    F.roadDist[X] === 0 && hasAccess(F, X) && hasAccess(F, at(px + 5, py + 3)), `roadDist ${F.roadDist[X]} · neighbour ${F.roadDist[at(px + 5, py + 3)]}`);
+    F.roadDist[X] === 0 && served(F, X) && served(F, at(px + 5, py + 3)), `roadDist ${F.roadDist[X]} · neighbour ${F.roadDist[at(px + 5, py + 3)]}`);
 
   // ---- the ledger and the air: a crossing is BOTH, and pays for both -------
   const figBefore = yearlyFigures(F);
@@ -1289,6 +1298,484 @@ check("determinism: same seed + same inputs ⇒ same hash", stateHash(A.world) =
   check("rubble: the hover card counts the months down from the tile itself",
     /\$\{w\.rubble\[i\]\}/.test(uiRubble) && /clears itself/.test(uiRubble) && !/\b6 months\b/.test(uiRubble),
     uiRubble.trim().slice(0, 90));
+}
+
+// ---- Part M': road access, one standard (SPEC §6c; plan §4-R) ---------------
+//
+// The owner: "as long as a tile is within 1-3 tiles of the road it has road
+// access"; "the 6x6 squares have roads around the whole perimeter, so nothing
+// is more than 3 tiles away"; "i want that rule standardized, including rail
+// and warehouses, and zoos"; "the other way to think about it is that all
+// sides have access points."
+//
+// Four things are pinned here. THE STANDARD: one predicate, `fields.served`,
+// asking the whole FOOTPRINT — so a lot, a block, a zoo, a hall and a
+// platform are asked the same question, and nothing in js/sim asks a
+// different one. ALL SIDES: `doorSearch` returns every road tile at the
+// site's distance, and a citizen leaves by whichever of them its work is on.
+// THE PLATFORM: a station is served like a lot, and the forecourt between it
+// and its door is laid into the path tile by tile, so it costs a walk and
+// reads as one. AND THE FIELD IS SEEN: the access overlay paints the number
+// the rule reads (not the tile's own), and the card says it in words.
+{
+  const { TERRAIN, siteTiles, zooAnchorOf } = await import("../js/sim/world.js");
+  const FI = await import("../js/sim/fields.js");
+  const { served: sv, siteRoadDist, doorsOf: doors, doorSearch, nearestRoad, commutePath, computeRoadDist, WALK, RIDE, TILE, rides: ridesPath } = FI;
+  const { lotScore, lotReport } = await import("../js/sim/lots.js");
+  const BL = await import("../js/sim/blocks.js");
+  const { createHousehold, placeHousehold, recountRosters: _rr } = await import("../js/sim/citizens.js");
+  const { recountRosters } = FI;
+
+  // ---- the rig: a cleared field with ONE road across the top ---------------
+  const F = createWorld({ seed: "access" });
+  const at = (x, y) => y * F.w + x;
+  const xy = (t) => `(${t % F.w},${(t / F.w) | 0})`;
+  for (let y = 2; y <= 26; y++) for (let x = 2; x <= 40; x++) {
+    const i = at(x, y);
+    F.terrain[i] = TERRAIN.GRASS; F.road[i] = ROAD.NONE; F.zone[i] = ZONE.NONE;
+    F.tier[i] = 0; F.wall[i] = 0; F.rail[i] = 0; F.civic[i] = 0; F.big[i] = 0; F.use[i] = 0;
+  }
+  F.events.noDisasters = true;
+  const north = [];
+  for (let x = 4; x <= 34; x++) north.push(at(x, 6));
+  apply(F, { kind: "road", tiles: north });
+  computeFields(F);
+  const clone = () => load(save(F));
+
+  // ---- the ladder: 1, 2, 3 and out of reach --------------------------------
+  const ladder = [1, 2, 3, 4].map((d) => at(10, 6 + d));
+  check("access: the distance is the plain one the owner said — one, two and three tiles from the road are served, four is not",
+    ladder.every((i, k) => F.roadDist[i] === Math.min(KNOBS.ROAD_REACH + 1, k + 1)) && sv(F, ladder[0]) && sv(F, ladder[1]) && sv(F, ladder[2]) && !sv(F, ladder[3]),
+    ladder.map((i, k) => `${k + 1}:${F.roadDist[i]}${sv(F, i) ? "y" : "n"}`).join(" "));
+  check("access: the field and the search are ONE number — the depth the door search stops at equals the site's road distance, and having a door at all IS being served, on every tile of the rig",
+    (() => {
+      const scratch = new Uint8Array(F.w * F.h);
+      let bad = 0;
+      for (let i = 0; i < F.w * F.h; i++) {
+        const s = doorSearch(F, i, scratch);
+        if (Math.min(KNOBS.ROAD_REACH + 1, s.d) !== siteRoadDist(F, i)) bad++;
+        if ((s.doors.length > 0) !== sv(F, i)) bad++;
+      }
+      return bad === 0;
+    })(), "the two derivations disagree somewhere");
+  const far = ladder[3];
+  const nr = nearestRoad(F, far);
+  check("access: a lot out of reach is told how far the road really IS — the reader's next question, asked by the card and by no rule",
+    !sv(F, far) && nr.d === 4 && nr.doors.length === 1 && nr.doors[0] === at(10, 6) && nearestRoad(F, at(10, 20)).d === 9,
+    `${nr.d} at ${nr.doors.map(xy).join(" ")}`);
+  check("access: and every door is a door — one road above the ladder gives one, and a lot with nothing in reach has none",
+    doors(F, ladder[0]).length === 1 && doors(F, ladder[0])[0] === at(10, 6) && doors(F, far).length === 0);
+
+  // ---- ALL SIDES -----------------------------------------------------------
+  {
+    const T = clone();
+    const tat = (x, y) => y * T.w + x;
+    const south = [];
+    for (let x = 4; x <= 34; x++) south.push(tat(x, 10));
+    apply(T, { kind: "road", tiles: south });
+    computeFields(T);
+    const between = tat(16, 8);
+    check("access: all sides are access points — a lot with a road two tiles north and two tiles south has BOTH as doors, ascending",
+      doors(T, between).length === 2 && doors(T, between)[0] === tat(16, 6) && doors(T, between)[1] === tat(16, 10),
+      doors(T, between).map(xy).join(" "));
+    const wall = [];
+    for (let x = 14; x <= 18; x++) wall.push(tat(x, 7));
+    apply(T, { kind: "wall", tiles: wall });
+    computeFields(T);
+    const shut = doors(T, between).length === 1 && doors(T, between)[0] === tat(16, 10);
+    apply(T, { kind: "road", tiles: [tat(16, 7)] });
+    computeFields(T);
+    const tunnel = doors(T, between).length === 1 && doors(T, between)[0] === tat(16, 7) && T.wall[tat(16, 7)] === 1 && siteRoadDist(T, between) === 1;
+    check("access: a bare wall is not a way to a road — walling the gap takes the north door away; a road THROUGH the wall is a tunnel, and the tunnel itself becomes the door",
+      shut && tunnel, `shut ${shut} · tunnel ${tunnel} · ${doors(T, between).map(xy).join(" ")}`);
+  }
+
+  // ---- THE FOOTPRINT: a block is asked once, about the whole of it ----------
+  {
+    const G = clone();
+    const gat = (x, y) => y * G.w + x;
+    apply(G, { kind: "zone", zone: ZONE.R, x0: 22, y0: 8, x1: 24, y1: 10, density: 3 });
+    for (let y = 8; y <= 10; y++) for (let x = 22; x <= 24; x++) G.tier[gat(x, y)] = 3;
+    computeFields(G);
+    const anchor = gat(22, 8);
+    const corner = gat(24, 10);
+    const lone = [G.roadDist[anchor], G.roadDist[corner], sv(G, corner)];
+    const tiles = [];
+    for (let dy = 0; dy < 3; dy++) for (let dx = 0; dx < 3; dx++) tiles.push(anchor + dx + dy * G.w);
+    BL.mergeLots(G, { side: 3, anchor, tiles });
+    check("access: a BLOCK is one building, asked once — every tile of a 3×3 reads the distance of its nearest corner, so a tile the ladder refuses is served because the building is",
+      lone[0] === 2 && lone[1] === KNOBS.ROAD_REACH + 1 && lone[2] === false
+        && siteTiles(G, corner).length === 9 && siteRoadDist(G, corner) === 2 && siteRoadDist(G, anchor) === 2 && sv(G, corner),
+      `alone ${lone[0]}/${lone[1]} · as a block ${siteRoadDist(G, corner)} · its own tile still ${G.roadDist[corner]}`);
+    check("access: and the doors are the block's — a 3×3 under a road is entered by three ways in, one per tile of the side it touches",
+      doors(G, corner).length === 3 && doors(G, corner).every((t) => G.road[t] !== ROAD.NONE && ((t / G.w) | 0) === 6),
+      doors(G, corner).map(xy).join(" "));
+    BL.splitLot(G, anchor, { evict: false });
+    check("access: when the block comes apart the far lot is refused again — nothing about access is remembered; it is derived from the shape that is there",
+      siteTiles(G, corner).length === 1 && !sv(G, corner) && sv(G, anchor),
+      `${siteRoadDist(G, corner)}`);
+  }
+
+  // ---- the citizen leaves by the side its work is on ------------------------
+  {
+    const C = clone();
+    const cat = (x, y) => y * C.w + x;
+    const south = [];
+    for (let x = 4; x <= 34; x++) south.push(cat(x, 10));
+    const link = [];
+    for (let y = 6; y <= 10; y++) link.push(cat(8, y)); // the two roads meet HERE and nowhere else, west of the home: the long way round is 14 steps, inside COMMUTE_MAX and half again the short one
+    apply(C, { kind: "road", tiles: south });
+    apply(C, { kind: "road", tiles: link }); // the two roads meet only far to the east
+    apply(C, { kind: "zone", zone: ZONE.R, x0: 16, y0: 8, x1: 16, y1: 8, density: 3 });
+    apply(C, { kind: "zone", zone: ZONE.C, x0: 6, y0: 5, x1: 6, y1: 5, density: 3 });
+    apply(C, { kind: "zone", zone: ZONE.C, x0: 6, y0: 11, x1: 6, y1: 11, density: 3 });
+    computeFields(C);
+    const home = cat(16, 8);
+    const toN = commutePath(C, "rabbit", doors(C, home), doors(C, cat(6, 5)));
+    const toS = commutePath(C, "rabbit", doors(C, home), doors(C, cat(6, 11)));
+    check("access: a citizen leaves by whichever side its work is on — one home with two doors, two jobs, two different first tiles, each the near one",
+      doors(C, home).length === 2 && !!toN && !!toS
+        && (toN.path[0] & TILE) === cat(16, 6) && (toS.path[0] & TILE) === cat(16, 10) && toN.cost === toS.cost,
+      `north starts ${toN ? xy(toN.path[0] & TILE) : "—"} · south starts ${toS ? xy(toS.path[0] & TILE) : "—"}`);
+    apply(C, { kind: "bulldoze", x0: 12, y0: 10, x1: 19, y1: 10, what: "road" }); // the south road under the home, and only that
+    computeFields(C);
+    const after = commutePath(C, "rabbit", doors(C, home), doors(C, cat(6, 11)));
+    check("access: take that side's road away and the same journey leaves by the other door, the long way round — a door is where a road IS, never a fact about the lot",
+      doors(C, home).length === 1 && doors(C, home)[0] === cat(16, 6) && !!after && (after.path[0] & TILE) === cat(16, 6) && after.cost > toS.cost,
+      `${after ? `${xy(after.path[0] & TILE)} at ${after.cost}` : "no way"} vs ${toS.cost}`);
+  }
+
+  // ---- THE PLATFORM ---------------------------------------------------------
+  {
+    const S = clone();
+    const sat = (x, y) => y * S.w + x;
+    const line = [];
+    for (let x = 6; x <= 32; x++) line.push(sat(x, 9)); // three tiles south of the road
+    const rl = apply(S, { kind: "rail", tiles: line });
+    const p1 = apply(S, { kind: "station", tx: 8, ty: 9 });
+    const p2 = apply(S, { kind: "station", tx: 30, ty: 9 });
+    computeFields(S);
+    const plat = sat(8, 9);
+    check("access: a PLATFORM is served like a lot — three tiles from the road is a door, and it is the road tile straight above it",
+      rl.ok && p1.ok && p2.ok && siteRoadDist(S, plat) === 3 && doors(S, plat).length === 1 && doors(S, plat)[0] === sat(8, 6),
+      `${siteRoadDist(S, plat)} · ${doors(S, plat).map(xy).join(" ")}`);
+    const ride = commutePath(S, "rabbit", [sat(6, 6)], [sat(32, 6)]);
+    const walkOnly = 26 * WALK;
+    check("access: and the ride is taken — until now the walk layer stepped onto a platform only from a tile ORTHOGONALLY beside it, so a line three tiles off the road carried nobody",
+      !!ride && ridesPath(ride.path) && ride.cost < walkOnly, `cost ${ride && ride.cost} vs the walk ${walkOnly}`);
+    const tiles = ride ? Array.from(ride.path, (p) => p & TILE) : [];
+    let jumps = 0;
+    for (let k = 1; k < tiles.length; k++) {
+      const dx = Math.abs((tiles[k] % S.w) - (tiles[k - 1] % S.w));
+      const dy = Math.abs(((tiles[k] / S.w) | 0) - ((tiles[k - 1] / S.w) | 0));
+      if (dx + dy !== 1) jumps++;
+    }
+    const forecourt = tiles.filter((t) => S.road[t] === ROAD.NONE && S.rail[t] === 0);
+    check("access: the forecourt is WALKED — the gap is laid into the path tile by tile, so no two entries of any commute are further apart than one step, and the four grass tiles crossed are in it",
+      !!ride && jumps === 0 && forecourt.length === 4 && forecourt.every((t) => S.zone[t] === ZONE.NONE),
+      `${jumps} jumps · forecourt ${forecourt.map(xy).join(" ")}`);
+    // Priced DIFFERENTIALLY: the same line one tile from the road instead of
+    // three. Two tiles of forecourt at each end disappear, and the journey has
+    // to get exactly four walk steps shorter - which is the only way to show
+    // the gap is charged per tile rather than as one free hop.
+    const S1 = clone();
+    const s1at = (x, y) => y * S1.w + x;
+    const near = [];
+    for (let x = 6; x <= 32; x++) near.push(s1at(x, 7));
+    apply(S1, { kind: "rail", tiles: near });
+    apply(S1, { kind: "station", tx: 8, ty: 7 });
+    apply(S1, { kind: "station", tx: 30, ty: 7 });
+    computeFields(S1);
+    const ride1 = commutePath(S1, "rabbit", [s1at(6, 6)], [s1at(32, 6)]);
+    check("access: and it is priced as a walk — move the line from three tiles off the road to one and the same journey loses exactly four steps, two at each end",
+      !!ride && !!ride1 && Math.abs(commuteTime(ride.path) - commuteTime(ride1.path) - 4) < 1e-9
+        && Math.abs(commuteTime(ride.path) - (10 + 22 * KNOBS.RAIL_COST / WALK)) < 1e-9,
+      `three tiles off ${ride && commuteTime(ride.path)} · one tile off ${ride1 && commuteTime(ride1.path)}`);
+    const D = load(save(S));
+    const dat = (x, y) => y * D.w + x;
+    apply(D, { kind: "bulldoze", x0: 4, y0: 6, x1: 34, y1: 6, what: "road" });
+    const moved = [];
+    for (let x = 4; x <= 34; x++) moved.push(dat(x, 5)); // now four tiles from the line
+    apply(D, { kind: "road", tiles: moved });
+    computeFields(D);
+    const noRide = commutePath(D, "rabbit", [dat(6, 5)], [dat(32, 5)]);
+    check("access: a platform four tiles from the road is not a door — the number that refuses a lot refuses a station, and the line falls silent",
+      siteRoadDist(D, dat(8, 9)) === KNOBS.ROAD_REACH + 1 && doors(D, dat(8, 9)).length === 0 && !!noRide && !ridesPath(noRide.path),
+      `${siteRoadDist(D, dat(8, 9))}`);
+    // The player's line ACROSS a forecourt. Those tiles are not roads, so the
+    // link could easily have been priced as one flat walk a tile; then a
+    // rabbit would route straight over predator-only ground for free and be
+    // arrested for it, because fields.exposure reads the stored path and DOES
+    // count them. The edge is priced with stepCost, per tile, per species.
+    const L2 = load(save(S));
+    const l2 = (x, y) => y * L2.w + x;
+    apply(L2, { kind: "zone", zone: ZONE.R, x0: 8, y0: 7, x1: 8, y1: 8, density: 3 });
+    const plain = commutePath(L2, "rabbit", [l2(6, 6)], [l2(32, 6)]);
+    apply(L2, { kind: "use", use: 1, x0: 8, y0: 7, x1: 8, y1: 8 }); // predator-only
+    computeFields(L2);
+    const rabbit = commutePath(L2, "rabbit", [l2(6, 6)], [l2(32, 6)]);
+    const foxReal = commutePath(L2, "fox", [l2(6, 6)], [l2(32, 6)]);
+    check("access: the player's line runs across a forecourt too — the gap is priced a tile at a time and by WHO is crossing, so a rabbit pays the trespass to reach that platform and a fox does not",
+      L2.use[l2(8, 7)] === 1 && !!plain && !!rabbit && !!foxReal
+        && foxReal.cost === plain.cost && rabbit.cost > plain.cost,
+      `unpainted ${plain && plain.cost} · rabbit ${rabbit && rabbit.cost} · fox ${foxReal && foxReal.cost}`);
+    const B2 = load(save(S));
+    const b2 = (x, y) => y * B2.w + x;
+    apply(B2, { kind: "wall", tiles: [b2(7, 8), b2(8, 8), b2(9, 8), b2(7, 7), b2(8, 7), b2(9, 7)] });
+    computeFields(B2);
+    check("access: a wall across the forecourt shuts that platform and only that one — reach goes ROUND a wall, and here there is no way round",
+      doors(B2, b2(8, 9)).length === 0 && doors(B2, b2(30, 9)).length === 1,
+      `${doors(B2, b2(8, 9)).length} doors at the walled one`);
+  }
+
+  // ---- WAREHOUSES: the frontage rule is gone --------------------------------
+  {
+    const I = clone();
+    const iat = (x, y) => y * I.w + x;
+    apply(I, { kind: "zone", zone: ZONE.I, x0: 26, y0: 7, x1: 26, y1: 9, density: 3 });
+    computeFields(I);
+    for (let d = 1; d <= 3; d++) { I.tier[iat(26, 6 + d)] = 2; I.lv[iat(26, 6 + d)] = 100; }
+    const caps = [1, 2, 3].map((d) => lotScore(I, iat(26, 6 + d)).maxTier);
+    check("access: a works three tiles from the road may reach tier 3 — SC2000's frontage rule held anything past ONE tile at tier 2, so the inside of an industrial block could never stand as tall as its edge",
+      caps.every((m) => m === 3) && I.roadDist[iat(26, 9)] === 3 && I.roadDist[iat(26, 7)] === 1,
+      `maxTier at 1/2/3 tiles: ${caps.join(" ")}`);
+  }
+
+  // ---- THE ZOO: jobs, halo and cap gated the same way -----------------------
+  {
+    const Z = clone();
+    const zat = (x, y) => y * Z.w + x;
+    apply(Z, { kind: "bulldoze", x0: 4, y0: 6, x1: 34, y1: 6, what: "road" });
+    const below = [];
+    for (let x = 4; x <= 34; x++) below.push(zat(x, 13));
+    apply(Z, { kind: "road", tiles: below });
+    const rz = apply(Z, { kind: "zoo", tx: 28, ty: 9 }); // (28,9) is 4 from the road; (28,10) is 3
+    computeFields(Z);
+    const anchor = zat(28, 9);
+    check("access: a zoo is four tiles, asked once — its own anchor is out of reach and the zoo is served, because the corner behind it is not",
+      rz.ok && zooAnchorOf(Z, zat(29, 10)) === anchor && siteTiles(Z, anchor).length === 4
+        && Z.roadDist[anchor] === KNOBS.ROAD_REACH + 1 && siteRoadDist(Z, anchor) === 3 && sv(Z, anchor),
+      `anchor tile ${Z.roadDist[anchor]} · site ${siteRoadDist(Z, anchor)}`);
+    const on = census(Z);
+    const lvOn = Z.lv[zat(28, 7)];
+    apply(Z, { kind: "bulldoze", x0: 4, y0: 13, x1: 34, y1: 13, what: "road" });
+    computeFields(Z);
+    const offC = census(Z);
+    const lvOff = Z.lv[zat(28, 7)];
+    check("access: an unserved zoo is a fenced field — the halo, the census that feeds the cap and the doors that offer its jobs all stop together, on the one predicate",
+      on.zoos === 1 && on.zoosNoRoad === 0 && offC.zoos === 0 && offC.zoosNoRoad === 1 && lvOn > lvOff && doors(Z, anchor).length === 0,
+      `zoos ${on.zoos}→${offC.zoos} · LV two tiles off ${lvOn}→${lvOff}`);
+    // TWO zoos, corner to corner. `zooAnchorOf` looks north and west for an
+    // anchor, so a part could in principle find the WRONG zoo's corner - but
+    // only if two zoos overlapped, and ops.js refuses a zoo whose four tiles
+    // are not all clear of civic. That refusal is what makes the search
+    // unambiguous, so it is checked here beside the thing that relies on it.
+    const N2 = load(save(F));
+    const n2 = (x, y) => y * N2.w + x;
+    const z1 = apply(N2, { kind: "zoo", tx: 26, ty: 14 });
+    const z2 = apply(N2, { kind: "zoo", tx: 28, ty: 14 });
+    const overlap = apply(N2, { kind: "zoo", tx: 27, ty: 13 });
+    check("access: two zoos side by side keep their own four tiles, and an overlapping one is refused - which is why looking north and west for the corner can only find one",
+      z1.ok && z2.ok && overlap.ok === false
+        && zooAnchorOf(N2, n2(27, 15)) === n2(26, 14) && zooAnchorOf(N2, n2(29, 15)) === n2(28, 14)
+        && siteTiles(N2, n2(27, 15)).length === 4 && siteTiles(N2, n2(29, 14)).length === 4,
+      `${overlap.reason || "the overlap was allowed"}`);
+    const K = load(save(Z));
+    apply(K, { kind: "bulldoze", x0: 29, y0: 10, x1: 29, y1: 10, what: "civic" });
+    check("access: and the bulldozer finds the same four tiles from any one of them — zooAnchorOf is the only thing in the game that knows how a zoo is laid out",
+      siteTiles(K, zat(28, 9)).length === 1 && [zat(28, 9), zat(29, 9), zat(28, 10), zat(29, 10)].every((j) => K.civic[j] === CIVIC.NONE));
+  }
+
+  // ---- a real hiring, gated by the same predicate ---------------------------
+  {
+    const H = clone();
+    const hat = (x, y) => y * H.w + x;
+    apply(H, { kind: "zone", zone: ZONE.R, x0: 12, y0: 8, x1: 13, y1: 8, density: 3 });
+    const rz = apply(H, { kind: "zoo", tx: 20, ty: 8 });
+    for (const j of [hat(12, 8), hat(13, 8)]) H.tier[j] = 3;
+    computeFields(H);
+    recountRosters(H);
+    for (let k = 0; k < 3; k++) placeHousehold(H, createHousehold(H, "cat", 4), hat(12, 8));
+    let hired = 0;
+    for (let t = 0; t < 8 && !hired; t++) { tick(H); hired = H.citizens.filter((c) => c.job === hat(20, 8)).length; }
+    const keepers = H.citizens.filter((c) => c.job === hat(20, 8));
+    check("access: the zoo two tiles off the road HIRES — the open-job index is built out of doors, so having a door IS having access, and there is no second test of it anywhere",
+      rz.ok && sv(H, hat(20, 8)) && hired > 0 && keepers.every((c) => doors(H, hat(20, 8)).includes(c.path[c.path.length - 1] & TILE)),
+      `${hired} keepers`);
+    apply(H, { kind: "bulldoze", x0: 4, y0: 6, x1: 34, y1: 6, what: "road" });
+    computeFields(H);
+    for (let t = 0; t < 3; t++) tick(H);
+    check("access: and lets them go when the road goes — the stale pass finds no door to walk to and releases the job, exactly as a razed road does",
+      !sv(H, hat(20, 8)) && H.citizens.filter((c) => c.job === hat(20, 8)).length === 0,
+      `${H.citizens.filter((c) => c.job === hat(20, 8)).length} still on the books`);
+  }
+
+  // ---- the whole scripted city, held to the standard ------------------------
+  {
+    // Every employed animal's stored path must be the CHEAPEST way from any of
+    // its home's doors to any of its job's. This is what "all sides" means at
+    // the scale of a town, and it is the invariant that fails the moment the
+    // open-job index forgets one of a workplace's doors: the search would
+    // still hire, by the long way round.
+    let checked = 0;
+    let dearer = 0;
+    let offDoor = 0;
+    for (const c of world.citizens) {
+      if (c.dead || c.job < 0 || c.home < 0 || !c.path) continue;
+      const hd = doors(world, c.home);
+      const jd = doors(world, c.job);
+      if (!hd.length || !jd.length) continue;
+      checked++;
+      if (!hd.includes(c.path[0] & TILE) || !jd.includes(c.path[c.path.length - 1] & TILE)) offDoor++;
+      const best = commutePath(world, c.species, hd, jd);
+      if (!best || commuteTime(c.path) > commuteTime(best.path) + 1e-9) dearer++;
+    }
+    check("access: in the whole scripted town every commute starts at one of its home's doors, ends at one of its work's, and is the cheapest pairing of the two — nobody walks round a block to a side that is not the near one",
+      checked > 50 && offDoor === 0 && dearer === 0,
+      `${checked} commutes · ${offDoor} off a door · ${dearer} dearer than the best pairing`);
+  }
+
+  // ---- the field is live at the OP, not at the next month -------------------
+  {
+    const P = createWorld({ seed: "access-op" });
+    const pat = (x, y) => y * P.w + x;
+    for (let y = 2; y <= 20; y++) for (let x = 2; x <= 20; x++) { const i = pat(x, y); P.terrain[i] = TERRAIN.GRASS; P.road[i] = ROAD.NONE; P.zone[i] = ZONE.NONE; P.tier[i] = 0; P.wall[i] = 0; P.rail[i] = 0; P.civic[i] = 0; }
+    P.roadsDirty = true;
+    computeFields(P);
+    apply(P, { kind: "zone", zone: ZONE.R, x0: 10, y0: 10, x1: 10, y1: 10, density: 3 });
+    const before = sv(P, pat(10, 10));
+    const road = [];
+    for (let x = 6; x <= 16; x++) road.push(pat(x, 8));
+    apply(P, { kind: "road", tiles: road });
+    // NOT ticked. Every loaded city opens PAUSED, so the card and the overlay
+    // have to be right the instant the road is drawn or the player is told a
+    // lie for as long as they leave it paused.
+    const live = sv(P, pat(10, 10)) && P.roadsDirty === false && lotReport(P, pat(10, 10)).siteDist === 2 && lotReport(P, pat(10, 10)).doors.length === 1;
+    const fieldAtOp = Array.from(P.roadDist);
+    P.roadsDirty = true;
+    computeRoadDist(P);
+    check("access: a road is in the field the moment it is drawn — and it is the same field the tick would have built, so nothing about the hash moves",
+      !before && live && fieldAtOp.every((v, i) => v === P.roadDist[i]),
+      `before ${before} · after the op ${sv(P, pat(10, 10))} · dirty ${P.roadsDirty}`);
+    const u = undo(P);
+    check("access: and undo takes the field back with the road",
+      u.ok && !sv(P, pat(10, 10)) && P.roadDist[pat(10, 10)] === KNOBS.ROAD_REACH + 1 && P.roadsDirty === false);
+  }
+
+  // ---- ONE implementation ---------------------------------------------------
+  {
+    const simDir = path.join(ROOT, "js", "sim");
+    // The one line allowed to read the raw field outside fields.js: the hover
+    // card prints the TILE's own distance beside the site's, and decides
+    // nothing with it. Any other read is a rule growing a second copy.
+    const ALLOWED = /roadDist: world\.roadDist\[i\], \/\/ this TILE's distance/;
+    const offenders = [];
+    let sawServed = 0;
+    for (const f of readdirSync(simDir)) {
+      if (!/\.js$/.test(f)) continue;
+      const src = readFileSync(path.join(simDir, f), "utf8");
+      if (f !== "fields.js" && /import \{[^}]*\bserved\b[^}]*\} from "\.\/fields\.js"/.test(src)) sawServed++;
+      if (f === "fields.js") continue;
+      src.split("\n").forEach((lineTxt, k) => {
+        if (!/roadDist\s*\[/.test(lineTxt)) return;
+        if (/^\s*(\/\/|\*)/.test(lineTxt) || ALLOWED.test(lineTxt)) return;
+        offenders.push(`${f}:${k + 1} ${lineTxt.trim().slice(0, 60)}`);
+      });
+    }
+    check("access: ONE implementation — no module in js/sim outside fields.js tests a road's nearness for itself; there is one predicate and nowhere else to ask",
+      offenders.length === 0, offenders.join(" · "));
+    const anyHasAccess = readdirSync(path.join(ROOT, "js"), { recursive: true })
+      .filter((f) => typeof f === "string" && /\.js$/.test(f))
+      .some((f) => /hasAccess/.test(readFileSync(path.join(ROOT, "js", f), "utf8")));
+    check("access: and the OLD predicate is gone, not merely unused — `hasAccess` is nowhere under js/, and six sim modules import `served` in its place",
+      !anyHasAccess && sawServed >= 5, `${sawServed} sim modules import served`);
+  }
+
+  // ---- the card says it ------------------------------------------------------
+  {
+    const { installDom, stubApp, textOf } = await import("./dom-shim.mjs");
+    installDom();
+    const { createUI } = await import("../js/ui.js");
+    const U = clone();
+    const uat = (x, y) => y * U.w + x;
+    apply(U, { kind: "zone", zone: ZONE.R, x0: 12, y0: 7, x1: 12, y1: 9, density: 3 });
+    apply(U, { kind: "zone", zone: ZONE.R, x0: 12, y0: 12, x1: 12, y1: 12, density: 3 });
+    computeFields(U);
+    const ui = createUI(stubApp(U));
+    const card = (i) => { ui.updateHover({ tile: i, pinned: true }); return textOf(document.getElementById("card")); };
+    const one = card(uat(12, 7));
+    const three = card(uat(12, 9));
+    const none = card(uat(12, 12));
+    check("access: the card says the distance and the door, in the words the rule uses",
+      /road access: 1 tile · door \(12,6\)/.test(one) && /road access: 3 tiles · door \(12,6\)/.test(three),
+      `${(one.match(/road access:[^\n]*/) || [""])[0]} —— ${(three.match(/road access:[^\n]*/) || [""])[0]}`);
+    check("access: and on a lot the rule refuses it says how far the nearest road actually is — the question a player asks the moment they see the red",
+      /no road within 3 — the nearest is 6 tiles away at \(12,6\)/.test(none),
+      (none.match(/no road[^\n]*/) || [""])[0]);
+  }
+
+  // ---- the overlay paints the number the rule reads --------------------------
+  {
+    const HC = await import("./headless-canvas.mjs");
+    HC.installCanvas();
+    const { createRenderer } = await import("../js/render.js");
+    const { art: artR } = await import("../js/art/index.js");
+    const { toScreen: ts } = await import("../js/iso/iso.js");
+    const O = clone();
+    const oat = (x, y) => y * O.w + x;
+    apply(O, { kind: "zone", zone: ZONE.R, x0: 22, y0: 8, x1: 24, y1: 10, density: 3 });
+    for (let y = 8; y <= 10; y++) for (let x = 22; x <= 24; x++) O.tier[oat(x, y)] = 3;
+    computeFields(O);
+    const anchor = oat(22, 8);
+    const btiles = [];
+    for (let dy = 0; dy < 3; dy++) for (let dx = 0; dx < 3; dx++) btiles.push(anchor + dx + dy * O.w);
+    BL.mergeLots(O, { side: 3, anchor, tiles: btiles });
+    // Every overlay in this game is painted on the ground and then built over,
+    // so a building hides its own tile's tint. To PHOTOGRAPH the band under
+    // the block the storeys come down first (`big` is the footprint, `tier`
+    // the storeys, and siteRoadDist reads only the footprint) - the tiles keep
+    // being one 3x3 site, which is the whole claim.
+    for (const j of btiles) O.tier[j] = 0;
+    const canvas = HC.createCanvas(700, 460);
+    const renderer = createRenderer(canvas, O, artR);
+    const [ax, ay] = ts(17.5, 9.5);
+    const camera = { x: ax, y: ay, zoom: 1 };
+    const shot = (mode) => { renderer.invalidate(); renderer.draw(camera, null, { list: () => [] }, mode, 0); return Buffer.from(canvas._data); };
+    // A pixel of a tile, found the renderer's OWN way: the projection point of
+    // the tile's centre, then pick() asked what is under it. If pick disagrees
+    // the probe returns −1 and the check fails rather than reading a stray
+    // pixel and passing for the wrong reason.
+    const pixelOf = (tx, ty) => {
+      const [sx, sy] = ts(tx + 0.5, ty + 0.5);
+      const px = Math.round((sx - camera.x) * camera.zoom + canvas.width / 2);
+      const py = Math.round((sy - camera.y) * camera.zoom + canvas.height / 2);
+      if (px < 0 || py < 0 || px >= canvas.width || py >= canvas.height) return -1;
+      const got = renderer.pick(px, py);
+      return got && got[0] === tx && got[1] === ty ? (py * canvas.width + px) * 4 : -1;
+    };
+    const off = shot("off");
+    const acc = shot("access");
+    const colour = (buf, o) => (buf[o] << 16) | (buf[o + 1] << 8) | buf[o + 2];
+    const bands = [1, 2, 3, 4].map((d) => pixelOf(10, 6 + d));
+    const onRoad = pixelOf(10, 6);
+    check("access: the overlay is REAL — the renderer paints four different bands for one, two, three tiles and out of reach, and leaves the road itself untinted",
+      bands.every((o) => o >= 0) && onRoad >= 0
+        && new Set(bands.map((o) => colour(acc, o))).size === 4
+        && bands.every((o) => colour(acc, o) !== colour(off, o))
+        && colour(acc, onRoad) === colour(off, onRoad),
+      bands.map((o) => (o < 0 ? "no pixel" : colour(acc, o).toString(16))).join(" "));
+    const bcorner = pixelOf(24, 10);
+    const loneFar = pixelOf(10, 10);
+    check("access: and it paints the number the RULE reads — the far corner of a served block takes the block's band, not the red its own tile would take",
+      bcorner >= 0 && loneFar >= 0 && O.roadDist[oat(24, 10)] > KNOBS.ROAD_REACH && O.roadDist[oat(10, 10)] > KNOBS.ROAD_REACH
+        && colour(acc, bcorner) === colour(acc, pixelOf(22, 8)) && colour(acc, bcorner) !== colour(acc, loneFar),
+      `corner ${bcorner >= 0 ? colour(acc, bcorner).toString(16) : "?"} vs the lone tile ${loneFar >= 0 ? colour(acc, loneFar).toString(16) : "?"}`);
+    // main.js boots the whole app on import, so the key map is read as source.
+    const mainSrc = readFileSync(path.join(ROOT, "js", "main.js"), "utf8");
+    check("access: the O key reaches it, and it has a word to say for itself",
+      /const OVERLAYS = \[[^\]]*"access"[^\]]*\]/.test(mainSrc) && /access: "Overlay: road access[^"]+"/.test(mainSrc));
+  }
+  void _rr;
 }
 
 // ---- Part B: the code ----------------------------------------------------------
@@ -3321,6 +3808,7 @@ function costOfBulldoze(w, x, y) { return (0, costOfOp)(w, { kind: "bulldoze", x
   check("landmarks: a 2×2 takes no theme", r2.landmark === null && F.theme[a] === 0);
   house(a, 60); house(at(12, 10), 8); house(at(12, 11), 8); house(at(10, 12), 4);
   const s3 = lotScore(F, a);
+  const Tick = load(save(F)); // the same city one instant before the block forms, for the real-tick proof below
   const r3 = B.mergeLots(F, s3.merge);
   check("landmarks: the 3×3 of rabbits rises as Warren Towers — theme 1 on the anchor, the pick counts all 120, the report names it",
     s3.merge && s3.merge.side === 3 && r3.landmark && r3.landmark.theme === 1 && r3.landmark.n === 120 && r3.landmark.total === 120 && F.theme[a] === 1 && W.footprintOf(F, a).every((j) => j === a || F.theme[j] === 0)
@@ -3357,18 +3845,27 @@ function costOfBulldoze(w, x, y) { return (0, costOfOp)(w, { kind: "bulldoze", x
   const rb = apply(F, { kind: "bulldoze", x0: 11, y0: 11, x1: 11, y1: 11 });
   check("landmarks: the bulldozer on a part clears the landmark's theme with its footprint", rb.ok && F.theme[a] === 0 && F.big[a] === 0);
 
-  // The scripted mayor with a market still raises and reports a themed block;
-  // H deliberately moves the population RNG history, so the old exact month,
-  // species and coordinate are no longer a meaningful invariant.
-  const { createMayor } = await import("./mayor.mjs");
-  const M = createWorld({ seed: "7" });
-  const mayor = createMayor(M, { layout: "balanced", rates: [8, 8, 8], markets: 1 });
-  let seen = null;
-  for (let t = 0; t < 120; t++) { mayor.month(t); const { notices } = tick(M); for (const s of notices) if (/^LANDMARK/.test(s) && !seen) seen = { t, s }; }
+  // ANNOUNCED BY A REAL TICK. This used to be a scripted-mayor run on seed 7,
+  // which raised a landmark in year 7 and so looked like a fixture. It is a
+  // coin flip: a 3x3 needs nine tier-3 lots of one kind filled together, and a
+  // census of eight scripted 30-year towns (4 seeds x 2 layouts) finds a
+  // landmark in TWO of them - seed 7 at month 78 and seed 3 at month 233
+  // before Part R, seed 3 at 310 and seed 11 at 291 after it. The rate did not
+  // move; which town wins did, because access moved the trajectory. So the
+  // plumbing is proved where it can be made to happen: the same nine rabbits,
+  // merged by lotsTick INSIDE tick() with the merge roll forced, exactly as
+  // the killing and arrest fixtures force theirs.
+  const saveBigP = KNOBS.BIG_P;
+  KNOBS.BIG_P = 1e6;
+  const { notices: tickNotices } = tick(Tick);
+  KNOBS.BIG_P = saveBigP;
+  const M = Tick;
+  const seen = tickNotices.find((line) => /^LANDMARK/.test(line)) || null;
   const logRows = M.events.log.filter((e) => e.id === "landmark");
-  check("landmarks: the seed-7 market town raises a named block — the line carries coordinates, the log holds it, and the census counts it",
-    seen && /^LANDMARK — .+ at \(\d+,\d+\); \d+ of \d+ /.test(seen.s) && logRows.some((x) => x.line === seen.s) && M.last.census.landmarks > 0,
-    seen ? `m${seen.t}: ${seen.s} · log ${logRows.length} census ${M.last.census.landmarks}` : "no landmark in ten years");
+  refreshLast(M); // tick() takes its census BEFORE lotsTick; the block is one instant younger than the count
+  check("landmarks: a block that rises inside a real tick announces itself — lotsTick makes the line with the coordinates, logs it under its own id, and the census counts it",
+    !!seen && /^LANDMARK — .+ at \(\d+,\d+\); \d+ of \d+ /.test(seen) && logRows.length === 1 && logRows[0].line === seen && M.last.census.landmarks === 1 && M.last.census.landmarkCounts["Warren Towers"] === 1,
+    seen ? `${seen} · log ${logRows.length} census ${M.last.census.landmarks}` : `no LANDMARK among ${tickNotices.length} notices`);
   void lotsTick;
 }
 
@@ -3941,19 +4438,26 @@ if (existsSync(walkersPath)) {
   const { killTotal: killTotalD } = await import("../js/sim/justice.js");
   const savePD = KNOBS.KILL_P;
   let rec = null, pred = null, sawFall = false, sawTied = false, sawCarry = false, gone = false, stoodAtDoor = false, sawIdle = false, sawPreyLook = false;
+  // The FIRST predation walker seen, and the month's records it must have come
+  // from. `pred` below is the last one seen, which in a town where one killer
+  // kills twice is a different animal's sack: the pairing has to be captured,
+  // not inferred at the end.
+  let firstPred = null;
+  let firstRecs = null;
   for (let t = 0; t < 60; t++) {
     const force = t >= 30 && !rec;
     if (force) KNOBS.KILL_P = 1 / Math.max(1e-9, killTotalD(w1));
     tick(w1);
     tick(w2);
     if (force) KNOBS.KILL_P = savePD;
-    if (!rec && w2.predations && w2.predations.length) rec = w2.predations[0];
+    if (!rec && w2.predations && w2.predations.length) { rec = w2.predations[0]; firstRecs = w2.predations.slice(); }
     walkers.notify();
     for (let k = 0; k < 20; k++) {
       walkers.update(0.1, viewport);
       const p = walkers.list().find((x) => x.kind === "predation");
       if (p) {
         pred = p;
+        if (!firstPred) firstPred = { citizen: p.citizen, preyName: p.preyName };
         if (p.frame === 3 && p.idle > 1) sawIdle = true;
         if (p.prey && rec && JSON.stringify(p.prey.look) === JSON.stringify(art.look(rec.victim.id))) sawPreyLook = true;
         if (p.bag != null && p.prey && p.bag < 0.45) sawFall = true;
@@ -3982,7 +4486,10 @@ if (existsSync(walkersPath)) {
     walkers.list();
   }
   KNOBS.KILL_P = savePD;
-  check("a forced killing publishes a record and the walker layer takes it: the killer's own walker, the neighbour named in the sack", !!rec && !!pred && pred.citizen === rec.killer && pred.preyName === rec.victim.name, rec ? (pred ? `${pred.citizen} vs ${rec.killer}` : "no predation walker") : "no killing landed in 30 forced months");
+  const paired = firstPred && firstRecs ? firstRecs.find((r) => r.killer === firstPred.citizen) : null;
+  check("a forced killing publishes a record and the walker layer takes it: the walker is a killer of that month, carrying the neighbour that record names",
+    !!rec && !!firstPred && !!paired && firstPred.preyName === paired.victim.name,
+    rec ? (firstPred ? `walker ${firstPred.citizen} carrying "${firstPred.preyName}" · ${firstRecs.length} record(s), matched ${paired ? `"${paired.victim.name}"` : "none"}` : "no predation walker") : "no killing landed in 30 forced months");
   check("the sack falls, is tied at the door, goes home over the shoulder, and the walker finishes", sawFall && sawTied && stoodAtDoor && sawCarry && gone, `fall ${sawFall} tied ${sawTied} door ${stoodAtDoor} carry ${sawCarry} gone ${gone}`);
   check("walkers standing longer than one second select the species idle frame", sawIdle);
   check("walkers never write the sim: 30 years with Inspect needs on and off hash-equal", stateHash(w1) === stateHash(w2), `${stateHash(w1)} vs ${stateHash(w2)}`);

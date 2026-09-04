@@ -42,7 +42,7 @@
 
 import { KNOBS } from "./rules.js";
 import { ZONE, PART, anchorOf, sideOf, footprintOf, capacityOf } from "./world.js";
-import { hasAccess } from "./fields.js";
+import { served } from "./fields.js";
 import { placeHousehold, evictFromLot, fireFromLot } from "./citizens.js";
 import { KIND, remember } from "./life.js";
 import { themeFor } from "./landmarks.js";
@@ -50,10 +50,28 @@ import { themeFor } from "./landmarks.js";
 /** Can lot j join a block with the tier-3 lot i: same zone, tier 2 or better, a lot of its own, High, on the same line, untroubled, served. */
 function joinable(world, i, j) {
   return world.zone[j] === world.zone[i] && world.tier[j] >= 2 && world.big[j] === 0 && world.maxTier[j] === 3 && world.use[j] === world.use[i]
-    && !world.rubble[j] && !world.burning[j] && !world.flooded[j] && hasAccess(world, j);
+    && !world.rubble[j] && !world.burning[j] && !world.flooded[j] && served(world, j);
 }
 
-const troubled = (world, i) => world.rubble[i] || world.burning[i] || world.flooded[i] || !hasAccess(world, i);
+const troubled = (world, i) => world.rubble[i] || world.burning[i] || world.flooded[i] || !served(world, i);
+
+/**
+ * Merging and splitting change the SHAPE of a building, and access asks the
+ * whole shape (fields.doorSearch over world.siteTiles): four lots that each
+ * had one door become one block with a door on every side it touches a road.
+ * So everyone living or working here re-plans. Without this a straight run
+ * would keep a legal-but-older path while a reload computed the new one, and
+ * the two must agree tile for tile (SPEC 16) - the same law that caught a
+ * rehomed family's stale path in placeHousehold.
+ */
+function replanOn(world, tiles) {
+  const set = new Set(tiles);
+  for (const c of world.citizens) {
+    if (c.dead || (!set.has(c.home) && !set.has(c.job))) continue;
+    c.path = null;
+    c.stale = true;
+  }
+}
 
 /**
  * The window lot i could merge into next: { side, anchor, tiles } or null.
@@ -145,6 +163,7 @@ export function mergeLots(world, win) {
     c.stale = true;
   }
   for (const j of moving) { world.carnAt[anchor] += world.carnAt[j]; world.carnAt[j] = 0; }
+  replanOn(world, tiles); // the block has doors the four lots did not
   // A 3×3 is a LANDMARK if the animals now on its anchor are of a kind (landmarks.js): the
   // theme is chosen once, here, and kept until the block comes apart. A 2×2 has none.
   let landmark = null;
@@ -166,6 +185,7 @@ export function mergeLots(world, win) {
 export function splitLot(world, anchor, { evict = true } = {}) {
   const tiles = footprintOf(world, anchor);
   for (const j of tiles) { world.big[j] = 0; world.theme[j] = 0; }
+  replanOn(world, tiles); // and the doors are one lot's again
   if (evict) {
     const cap = capacityOf(world, anchor);
     if (world.zone[anchor] === ZONE.R) evictFromLot(world, anchor, cap);

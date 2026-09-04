@@ -31,7 +31,7 @@ import { DIET_OF, isPredatorOf } from "./species.js";
 import { post } from "./budget.js";
 import { removeCitizen, holdFuneral, releaseJob } from "./citizens.js";
 import { ageYears, isWorker } from "./census.js";
-import { hasAccess, exposure } from "./fields.js";
+import { served, exposure } from "./fields.js";
 import { reachFrom } from "./reach.js";
 import { KIND, remember } from "./life.js";
 import { hallReach, routeToHall, receiveMeat } from "./meat.js";
@@ -252,7 +252,7 @@ function centreWithBed(world, from) {
   let best = -1;
   let bestD = Infinity;
   for (let i = 0; i < n; i++) {
-    if (world.civic[i] !== CIVIC.CENTRE || !hasAccess(world, i)) continue;
+    if (world.civic[i] !== CIVIC.CENTRE || !served(world, i)) continue;
     if (bedsAt(world, i) >= KNOBS.CENTRE_BEDS) continue;
     const d = from >= 0 ? cheb(world, from, i) : 0;
     if (d < bestD) { bestD = d; best = i; }

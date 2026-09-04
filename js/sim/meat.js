@@ -9,7 +9,7 @@
 
 import { KNOBS } from "./rules.js";
 import { ZONE, anchorOf, footprintOf, capacityOf, absent } from "./world.js";
-import { WALK, dial, doorOf, hasAccess, nodePath } from "./fields.js";
+import { WALK, dial, doorsOf, nodePath } from "./fields.js";
 import { DIET_OF } from "./species.js";
 import { removeCitizen } from "./citizens.js";
 import { KIND, remember } from "./life.js";
@@ -161,12 +161,12 @@ function routeLimit(world, max) {
   return Math.max(0, Math.floor(max * WALK));
 }
 
-function routeResult(world, prev, from, door, hall, cost) {
+function routeResult(world, prev, door, hall, cost) {
   const path = nodePath(world, prev, door);
   return Object.freeze({
     hall,
     door,
-    from,
+    from: path.length ? path[0] & 0x7fff : -1, // the door the cart actually left by
     walkSteps: cost / WALK,
     physicalSteps: Math.max(0, path.length - 1),
     path,
@@ -176,14 +176,16 @@ function routeResult(world, prev, from, door, hall, cost) {
 function hallCandidates(world, opts) {
   const byDoor = new Map();
   for (let hall = 0; hall < world.w * world.h; hall++) {
-    if (!isHall(world, hall) || !hasAccess(world, hall)) continue;
+    if (!isHall(world, hall)) continue;
     if (opts.space && hallStock(world, hall) >= KNOBS.MEAT_CAP) continue;
     if (opts.penSpace && penCount(world, hall) >= penCapacity(world, hall)) continue;
-    const door = doorOf(world, hall);
-    if (door == null) continue;
-    let list = byDoor.get(door);
-    if (!list) byDoor.set(door, (list = []));
-    list.push(hall);
+    // Every side of the hall is a loading bay (SPEC 6c): the cart takes the
+    // one nearest wherever it is coming from. An unserved hall has no doors.
+    for (const door of doorsOf(world, hall)) {
+      let list = byDoor.get(door);
+      if (!list) byDoor.set(door, (list = []));
+      list.push(hall);
+    }
   }
   for (const list of byDoor.values()) list.sort((a, b) => a - b);
   return byDoor;
@@ -195,8 +197,8 @@ function hallCandidates(world, opts) {
  * Ties are settled by hall anchor, never by discovery order.
  */
 export function hallReach(world, lot, max = KNOBS.MEAT_ROAD, opts = {}) {
-  const from = doorOf(world, lot);
-  if (from == null) return null;
+  const from = doorsOf(world, lot);
+  if (!from.length) return null;
   if (world._meatReachTick !== world.tick || !world._meatReach) resetMeatRoutes(world);
   const key = `${lot}|${Number.isFinite(max) ? max : "inf"}|${opts.space ? 1 : 0}|${opts.penSpace ? 1 : 0}`;
   if (world._meatReach.has(key)) return world._meatReach.get(key);
@@ -216,7 +218,7 @@ export function hallReach(world, lot, max = KNOBS.MEAT_ROAD, opts = {}) {
     }
     return false;
   }, { railCost: KNOBS.MEAT_RAIL_COST, neutral: true });
-  const result = bestHall < 0 ? null : routeResult(world, prev, from, bestDoor, bestHall, bestCost);
+  const result = bestHall < 0 ? null : routeResult(world, prev, bestDoor, bestHall, bestCost);
   world._meatReach.set(key, result);
   return result;
 }
@@ -224,14 +226,15 @@ export function hallReach(world, lot, max = KNOBS.MEAT_ROAD, opts = {}) {
 /** The H route to a chosen hall, used to carry a body from a neighbour's door. */
 export function routeToHall(world, lot, hall, max = KNOBS.MEAT_ROAD) {
   hall = anchorOf(world, hall);
-  if (!isHall(world, hall) || !hasAccess(world, hall)) return null;
-  const from = doorOf(world, lot);
-  const to = doorOf(world, hall);
-  if (from == null || to == null) return null;
-  const { dist, prev } = dial(world, null, from, routeLimit(world, max), (tile) => tile === to,
+  if (!isHall(world, hall)) return null;
+  const from = doorsOf(world, lot);
+  const to = new Set(doorsOf(world, hall));
+  if (!from.length || !to.size) return null;
+  let end = -1;
+  const { dist, prev } = dial(world, null, from, routeLimit(world, max), (tile) => (to.has(tile) ? ((end = tile), true) : false),
     { railCost: KNOBS.MEAT_RAIL_COST, neutral: true });
-  if (dist[to] < 0) return null;
-  return routeResult(world, prev, from, to, hall, dist[to]);
+  if (end < 0) return null;
+  return routeResult(world, prev, end, hall, dist[end]);
 }
 
 function addStock(world, hall, source, units) {

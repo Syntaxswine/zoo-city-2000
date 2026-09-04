@@ -28,8 +28,7 @@ import { ROAD, CIVIC, ZONE, TERRAIN, inBounds, anchorOf, absent } from "./sim/wo
 import { ageYears } from "./sim/census.js";
 import { SPECIES_BY_ID } from "./sim/species.js";
 import { hash01 } from "./sim/rng.js";
-import { edgeRoads } from "./sim/fields.js";
-import { isBarrier } from "./sim/reach.js";
+import { doorSearch, edgeRoads } from "./sim/fields.js";
 import { KNOBS } from "./sim/rules.js";
 import { art } from "./art/index.js";
 import { BUBBLES_MAX, NEED_REACH, needOf, needsContext } from "./sim/needs.js";
@@ -46,7 +45,7 @@ const PREY_STEP = 0.32; // tiles past the door the neighbour stands, along the k
 const CARRY_SPEED = 0.8; // a full sack is heavy
 const ADULT = KNOBS.ADULT_AGE;
 
-const N4 = [[0, -1], [1, 0], [0, 1], [-1, 0]]; // N E S W — the same fixed order as fields.doorOf
+const N4 = [[0, -1], [1, 0], [0, 1], [-1, 0]]; // N E S W — the same fixed order as fields.doorSearch
 
 export function createWalkers(initialWorld) {
   let world = initialWorld;
@@ -114,34 +113,20 @@ export function createWalkers(initialWorld) {
   }
   const roadPath = (from, to) => roadSearch(from, (j) => j === to);
 
-  /** The road tile nearest a lot (BFS through any tile, ≤ ROAD_REACH), or -1. Mirrors fields.doorOf without its scratch. */
+  /**
+   * A door of the lot at i, or -1. The RULE is fields.doorSearch - one
+   * implementation for the sim and the street, so a walker never sets off
+   * from a side the commute does not use. Only the scratch is ours: the
+   * boundary law above forbids this layer a buffer on the world, and
+   * doorSearch takes the seen array from its caller for exactly that reason.
+   * A commuter needs none of this; its walk starts at its stored path's first
+   * tile, which IS the door the search chose.
+   */
   function door(i) {
     if (i < 0) return -1;
-    if (world.road[i] !== ROAD.NONE) return i;
     resize();
-    seen.fill(0);
-    const { w } = world;
-    let frontier = [i];
-    seen[i] = 1;
-    for (let d = 0; d < KNOBS.ROAD_REACH; d++) {
-      const next = [];
-      for (const cur of frontier) {
-        const tx = cur % w;
-        const ty = (cur / w) | 0;
-        for (const [dx, dy] of N4) {
-          const nx = tx + dx;
-          const ny = ty + dy;
-          if (!inBounds(world, nx, ny)) continue;
-          const j = ny * w + nx;
-          if (seen[j] || isBarrier(world, j)) continue;
-          seen[j] = 1;
-          if (world.road[j] !== ROAD.NONE) return j;
-          next.push(j);
-        }
-      }
-      frontier = next;
-    }
-    return -1;
+    const { doors } = doorSearch(world, i, seen);
+    return doors.length ? doors[0] : -1;
   }
 
   /** Does road tile j touch a tile satisfying pred? */

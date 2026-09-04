@@ -6,7 +6,7 @@
 
 import { KNOBS } from "./rules.js";
 import { ZONE, CIVIC, idx, inBounds, capacityOf, jobsOf, isPart, anchorOf, footprintOf, sideOf, occAt, carnAtOf } from "./world.js";
-import { hasAccess } from "./fields.js";
+import { served, siteRoadDist, doorsOf, nearestRoad } from "./fields.js";
 import { evictFromLot, fireFromLot } from "./citizens.js";
 import { mergeWindow, windowFill, mergeLots, splitLot } from "./blocks.js";
 import { landmarkOf, landmarkLine } from "./landmarks.js";
@@ -96,7 +96,7 @@ export function lotScore(world, i) {
   if (world.rubble[i]) { out.reason = REASON.RUBBLE; return out; }
   if (world.burning[i]) { out.reason = REASON.BURNING; return out; }
   if (world.flooded[i]) { out.reason = REASON.FLOODED; return out; }
-  const access = hasAccess(world, i);
+  const access = served(world, i);
   out.access = access;
   const valve = world.valves[z === ZONE.R ? "R" : z === ZONE.C ? "C" : z === ZONE.M ? "M" : "I"];
   const lv = world.lv[i];
@@ -121,7 +121,10 @@ export function lotScore(world, i) {
   out.score = score;
   const byLV = maxTierByLV(world, i);
   let max = Math.min(byLV, world.maxTier[i]);
-  if (z === ZONE.I && tier >= 2 && world.roadDist[i] > 1) max = Math.min(max, 2);
+  // SC2000's frontage rule used to hold industry above tier 2 to a lot with a
+  // road ONE tile away, which meant the inside of an industrial block could
+  // never rise as tall as its edge. Access is one standard now (SPEC 6c): a
+  // works within reach of a road is a works, wherever in the block it stands.
   out.maxTier = max;
   const cap = capacityOf(world, i);
   const filled = z === ZONE.R ? world.occupants[i] : world.staff[i];
@@ -240,7 +243,14 @@ export function lotReport(world, at) {
     lv: world.lv[i],
     pol: world.pol[i],
     dread: world.dread[i],
-    roadDist: world.roadDist[i],
+    roadDist: world.roadDist[i], // this TILE's distance; the rule reads the site's
+    // Access as the rule sees it (SPEC 6c): the whole site's distance, every
+    // door it has, and - only when it has none - how far the nearest road
+    // actually is, which is the one question the reader always asks next.
+    served: served(world, i),
+    siteDist: siteRoadDist(world, i),
+    doors: doorsOf(world, i),
+    nearest: served(world, i) ? null : nearestRoad(world, i),
     traffic: world.traffic[i],
     crime: world.crime[i],
     fireCov: world.fireCov[i],

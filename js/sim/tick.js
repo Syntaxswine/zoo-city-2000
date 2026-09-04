@@ -176,7 +176,7 @@ function advisor(world, cen, dem, fig) {
   if (cen.lotsNoRoad > 0) out.push(`ADVISOR: ${cen.lotsNoRoad} zoned lots have no road within 3 tiles.`);
   const maxRate = Math.max(world.rates.R, world.rates.C, world.rates.I);
   if (maxRate > dem.n + 3) out.push(`ADVISOR: taxes are well above the neutral ${dem.n.toFixed(1)}%. The animals are talking about leaving.`);
-  if (cen.P >= 800 && cen.zoos === 0) out.push("ADVISOR: the citizens want a Zoo.");
+  if (cen.P >= 800 && cen.zoos === 0) out.push(cen.zoosNoRoad ? "ADVISOR: the Zoo has no road within 3 tiles of it. Nobody can reach it, so nobody works there and no street is worth more for it." : "ADVISOR: the citizens want a Zoo.");
   if (cen.P >= 300 && cen.fireStations === 0) out.push(`ADVISOR: no fire station — a fire burns two months, spreads at ${KNOBS.FIRE_SPREAD}, and always takes the building. A station covers six tiles (§500) and its engine saves ${Math.round(KNOBS.FIRE_SAVED * 10)} fires in ten on its own beat.`);
   // No station at all is not "less policing", it is NO investigation: filesTick
   // does not roll where there is no force, so every file goes cold. The old

@@ -307,6 +307,48 @@ export function footprintOf(world, anchor) {
   for (let dy = 0; dy < s; dy++) for (let dx = 0; dx < s; dx++) out.push(anchor + dx + dy * world.w);
   return out;
 }
+/**
+ * The zoo is the one thing on the map with a footprint that is NOT a block:
+ * four civic tiles, CIVIC.ZOO on the north-west one and CIVIC.ZOO_PART on the
+ * other three. This is the single place that knows how to get from any of the
+ * four to the corner they share — the bulldozer, `siteTiles` and therefore
+ * access all ask it. Returns −1 for a tile that is not a zoo.
+ */
+export function zooAnchorOf(world, i) {
+  const c = world.civic[i];
+  if (c === CIVIC.ZOO) return i;
+  if (c !== CIVIC.ZOO_PART) return -1;
+  const tx = i % world.w;
+  const ty = (i / world.w) | 0;
+  for (let dy = -1; dy <= 0; dy++) for (let dx = -1; dx <= 0; dx++) {
+    const ax = tx + dx;
+    const ay = ty + dy;
+    if (inBounds(world, ax, ay) && world.civic[idx(world, ax, ay)] === CIVIC.ZOO) return idx(world, ax, ay);
+  }
+  return -1;
+}
+
+/** The four tiles of the zoo anchored at `a`, raster order (clipped to the map). */
+export function zooTiles(world, a) {
+  const ax = a % world.w;
+  const ay = (a / world.w) | 0;
+  const out = [];
+  for (let dy = 0; dy < 2; dy++) for (let dx = 0; dx < 2; dx++) if (inBounds(world, ax + dx, ay + dy)) out.push(idx(world, ax + dx, ay + dy));
+  return out;
+}
+
+/**
+ * Every tile of the SITE tile i belongs to — a block's footprint, a zoo's
+ * four, or the tile itself. ONE answer to "what is the whole thing here",
+ * so that access (fields.served, fields.doorSearch) asks about the building
+ * and never about a corner of it. SPEC §6c.
+ */
+export function siteTiles(world, i) {
+  const z = zooAnchorOf(world, i);
+  if (z >= 0) return zooTiles(world, z);
+  return footprintOf(world, anchorOf(world, i)); // [i] for a lot of its own
+}
+
 /** What a block holds over what its lots held: side² × BIG_BONUS (1 for a lot of its own). */
 export const blockMultiplier = (side) => (side > 1 ? side * side * KNOBS.BIG_BONUS : 1);
 /** People housed on tile j for readers that want them per TILE (crime's density, a shop's customers): a block's are spread over its footprint. */

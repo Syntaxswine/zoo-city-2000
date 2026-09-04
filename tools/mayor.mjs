@@ -18,7 +18,8 @@
 // 292e7fa1 before it and prints 292e7fa1 after it.
 
 import { ZONE, TERRAIN, idx, inBounds } from "../js/sim/world.js";
-import { apply } from "../js/sim/ops.js";
+import { apply, undo } from "../js/sim/ops.js";
+import { served } from "../js/sim/fields.js";
 
 const NORMAL_BLOCK = 7;
 const ESTATE_BLOCK = 8;
@@ -287,11 +288,20 @@ export function createMayor(world, opts = {}) {
     for (const [y, r] of schedule) if (year === y && mo === 0) for (const z of ["R", "C", "I"]) apply(world, { kind: "rate", zone: z, value: r });
     if (recessionYear != null && year === Number(recessionYear) && mo === 0) world.events.active.push({ id: "recession", until: t + 24, extMult: 0.6 });
     if (zooYear != null && year === Number(zooYear) && mo === 0) {
-      // Place a zoo on the first free 2×2 next to the start.
+      // The first free 2×2 next to the start THAT A ROAD REACHES. Taking the
+      // first free one put the estate layout's zoo at (26,0), five tiles from
+      // the nearest road: no visitor could reach it, and under the access
+      // standard (SPEC 6c) it buys no jobs, no halo and no room on the cap.
+      // A rig that cannot build a working zoo cannot measure one.
+      let placed = false;
       outer: for (let dy = -6; dy <= 6; dy++) for (let dx = -6; dx <= 6; dx++) {
         const r = apply(world, { kind: "zoo", tx: sx + dx, ty: sy + dy });
-        if (r.ok) break outer;
+        if (!r.ok) continue;
+        if (served(world, idx(world, sx + dx, sy + dy))) { placed = true; break outer; }
+        undo(world); // out of reach: put the ground back and keep looking
       }
+      // Nowhere in reach: build it anyway, so the run still has a zoo to report on.
+      if (!placed) outerAny: for (let dy = -6; dy <= 6; dy++) for (let dx = -6; dx <= 6; dx++) if (apply(world, { kind: "zoo", tx: sx + dx, ty: sy + dy }).ok) break outerAny;
     }
     // --markets N: the mayor opens N meat-hall blocks from year 2, one a year.
     if (marketsWanted && mo === 0 && year >= 2 && year < 2 + marketsWanted) { const b = nextBlock(); if (b) openBlock(b[0], b[1], ZONE.M); }

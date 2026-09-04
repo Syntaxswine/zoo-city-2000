@@ -5,7 +5,7 @@
 // radius²)); 4,096 tiles is microseconds.
 
 import { KNOBS } from "./rules.js";
-import { TERRAIN, ROAD, ZONE, CIVIC, idx, inBounds, N4, isStation, absent, occAt, anchorOf, footprintOf } from "./world.js";
+import { TERRAIN, ROAD, ZONE, CIVIC, idx, inBounds, N4, isStation, absent, occAt, anchorOf, footprintOf, siteTiles } from "./world.js";
 import { SPECIES_BY_ID, DIET_OF, admits } from "./species.js";
 import { forEachWithin, computeOcclusion, isBarrier } from "./reach.js";
 
@@ -46,7 +46,28 @@ export function computeRoadDist(world) {
   world.roadsDirty = false;
 }
 
-export const hasAccess = (world, i) => world.roadDist[i] <= KNOBS.ROAD_REACH;
+/**
+ * The road distance of the SITE at i: the NEAREST of its footprint's tiles
+ * (world.js siteTiles - a block's tiles, a zoo's four, or the tile itself).
+ * A 6x6 estate ringed by road has an interior tile at 3 and a corner at 0;
+ * the one building standing across them is at 0.
+ */
+export function siteRoadDist(world, i) {
+  let d = KNOBS.ROAD_REACH + 1;
+  for (const j of siteTiles(world, i)) if (world.roadDist[j] < d) d = world.roadDist[j];
+  return d;
+}
+
+/**
+ * ACCESS, the one standard (SPEC 6c). The owner: "as long as a tile is
+ * within 1-3 tiles of the road it has road access", and "i want that rule
+ * standardized, including rail and warehouses, and zoos". So every rule in
+ * the game that asks "is there a road?" asks this one function, and asks it
+ * of the WHOLE footprint: a lot, a 2x2 or 3x3 block, a zoo, a station, a
+ * hall. There is no second test of a road's nearness anywhere in js/sim -
+ * Part M' greps for one.
+ */
+export const served = (world, i) => siteRoadDist(world, i) <= KNOBS.ROAD_REACH;
 
 /** Traffic: number of commuter paths through each road tile (readout only). */
 export function computeTraffic(world) {
@@ -173,6 +194,7 @@ export function computeLandValue(world) {
   for (let i = 0; i < n; i++) {
     const c = world.civic[i];
     if (c !== CIVIC.PARK && c !== CIVIC.ZOO && c !== CIVIC.CENTRE) continue;
+    if (c === CIVIC.ZOO && !served(world, i)) continue; // nobody can visit it, so no street is worth more for it (SPEC 6c)
     const r = c === CIVIC.PARK ? KNOBS.LV_PARK_RADIUS : c === CIVIC.ZOO ? KNOBS.LV_ZOO_RADIUS : KNOBS.LV_VAN_RADIUS;
     const mask = c === CIVIC.PARK ? nearPark : c === CIVIC.ZOO ? nearZoo : nearVan;
     forEachWithin(world, i, r, (j) => { mask[j] = 1; }); // round a wall, not through it
@@ -215,7 +237,7 @@ export function computeCoverage(world) {
   world.policeCov.fill(0);
   for (let i = 0; i < n; i++) {
     const c = world.civic[i];
-    if (!isStation(c) || world.roadDist[i] > KNOBS.ROAD_REACH) continue;
+    if (!isStation(c) || !served(world, i)) continue;
     const R = c === CIVIC.FIRE ? KNOBS.FIRE_RADIUS : KNOBS.POLICE_RADIUS;
     forEachWithin(world, i, R, (j, d) => { // a patrol goes round a wall and through a tunnel
       if (c === CIVIC.FIRE) world.fireCov[j] = 1;
@@ -325,6 +347,7 @@ export function computeCrime(world) {
 export function computeFields(world) {
   if (world.wallsDirty) computeOcclusion(world);
   if (world.roadsDirty) computeRoadDist(world);
+  computeStationDoors(world);
   computeCoverage(world);
   computeTraffic(world);
   computePollution(world);
@@ -387,34 +410,127 @@ export function roadPath(world, from, to, max = KNOBS.COMMUTE_MAX) {
   return null;
 }
 
-/** The road tile nearest a lot (within ROAD_REACH), by BFS through any tile; null if none. */
-export function doorOf(world, i) {
-  if (world.road[i] !== ROAD.NONE) return i;
-  const { w, h } = world;
-  const seen = world._seen || (world._seen = new Uint8Array(w * h));
+// ---------------------------------------------------------------------------
+// Doors: ALL SIDES ARE ACCESS POINTS (SPEC 6c)
+// ---------------------------------------------------------------------------
+
+const DOOR_N4 = [[0, -1], [1, 0], [0, 1], [-1, 0]]; // N E S W
+
+/**
+ * The door search: a multi-source BFS OUT of the whole site (world.js
+ * siteTiles), through any tile a bare wall does not block, stopping at the
+ * first depth that reaches road. Returns `{ d, doors }` - the site's road
+ * distance and EVERY road tile at it, ascending, because the owner's other
+ * way of putting the rule is "all sides have access points". `d` is
+ * `reach + 1` and `doors` is empty when nothing is in range.
+ *
+ * `seen` is a caller-owned Uint8Array(w*h): fields.js hands it the world's
+ * scratch, the walker layer hands it its own (SPEC 14's boundary law says
+ * that layer may not write the world, not even a buffer). `opts.reach`
+ * widens the search - the hover card asks past ROAD_REACH to say how far the
+ * nearest road actually is. `opts.prev` is an Int32Array the search fills
+ * with each tile's parent, so a caller can walk a door back to the site (the
+ * station approach below).
+ */
+export function doorSearch(world, i, seen, { reach = KNOBS.ROAD_REACH, prev = null } = {}) {
+  const { w } = world;
   seen.fill(0);
-  let frontier = [i];
-  seen[i] = 1;
-  for (let d = 0; d < KNOBS.ROAD_REACH; d++) {
+  if (prev) prev.fill(-1);
+  const doors = [];
+  let frontier = [];
+  for (const j of siteTiles(world, i)) {
+    if (seen[j]) continue;
+    seen[j] = 1;
+    if (world.road[j] !== ROAD.NONE) doors.push(j); // the site stands on a road
+    frontier.push(j);
+  }
+  if (doors.length) { doors.sort((a, b) => a - b); return { d: 0, doors }; }
+  for (let d = 1; d <= reach; d++) {
     const next = [];
-    // Fixed order (N, E, S, W) so the door is deterministic.
     for (const cur of frontier) {
       const tx = cur % w;
       const ty = (cur / w) | 0;
-      for (const [dx, dy] of [[0, -1], [1, 0], [0, 1], [-1, 0]]) {
+      for (const [dx, dy] of DOOR_N4) {
         const nx = tx + dx;
         const ny = ty + dy;
         if (!inBounds(world, nx, ny)) continue;
         const j = ny * w + nx;
         if (seen[j] || isBarrier(world, j)) continue; // a bare wall is not a way to a road
         seen[j] = 1;
-        if (world.road[j] !== ROAD.NONE) return j;
-        next.push(j);
+        if (prev) prev[j] = cur;
+        if (world.road[j] !== ROAD.NONE) doors.push(j);
+        else next.push(j);
       }
     }
+    if (doors.length) { doors.sort((a, b) => a - b); return { d, doors }; }
     frontier = next;
   }
-  return null;
+  return { d: reach + 1, doors };
+}
+
+const doorScratch = (world) => {
+  const n = world.w * world.h;
+  return world._seen && world._seen.length === n ? world._seen : (world._seen = new Uint8Array(n));
+};
+
+/** Every door of the site at i, ascending; empty when no road is within reach. */
+export function doorsOf(world, i) {
+  return doorSearch(world, i, doorScratch(world)).doors;
+}
+
+/** ONE door of the site at i (the lowest-numbered), or null - for the readers that want a single tile. */
+export function doorOf(world, i) {
+  const { doors } = doorSearch(world, i, doorScratch(world));
+  return doors.length ? doors[0] : null;
+}
+
+/** How far the nearest road really is, PAST ROAD_REACH, and where. The hover card asks this of a lot at 4; no rule does. */
+export function nearestRoad(world, i, reach = 8) {
+  return doorSearch(world, i, doorScratch(world), { reach });
+}
+
+/**
+ * Platform-to-door edges. A station is served like anything else: its doors
+ * are doorSearch's, and the walk layer crosses the forecourt between them one
+ * tile at a time - so a platform two or three tiles off a road is a way onto
+ * the rail, and one four tiles off is not. Before this the graph only stepped
+ * onto a platform from a tile ORTHOGONALLY beside it, which is the d = 1 case
+ * of this same rule; nothing about an adjacent station moves.
+ *
+ * Each link carries the tiles BETWEEN its two ends, platform-first, so
+ * `nodePath` lays the approach into the stored path and every consecutive
+ * pair of walked tiles stays orthogonally adjacent (Part M' checks exactly
+ * that). Derived with roadDist, never saved. A sparse array, not a Map:
+ * `dial` looks this up once per settled walk node.
+ */
+export function computeStationDoors(world) {
+  const n = world.w * world.h;
+  const links = world._stationDoors && world._stationDoors.length === n ? world._stationDoors : (world._stationDoors = new Array(n));
+  links.fill(undefined);
+  world._hasStationDoors = false;
+  let any = false;
+  for (let i = 0; i < n && !any; i++) if (world.rail[i] === 2) any = true;
+  if (!any) return;
+  const prev = world._doorPrev && world._doorPrev.length === n ? world._doorPrev : (world._doorPrev = new Int32Array(n));
+  const seen = doorScratch(world);
+  // An edge carries only the tiles it crosses; its COST is worked out at
+  // relax time, because a forecourt tile can be a zoned lot or a rail tile
+  // and so can carry the player's line, and what a step across it costs
+  // depends on who is stepping (stepCost, SPEC 7.8).
+  const add = (a, b, chain) => { (links[a] || (links[a] = [])).push([b, chain]); };
+  for (let i = 0; i < n; i++) {
+    if (world.rail[i] !== 2) continue;
+    const { d, doors } = doorSearch(world, i, seen, { prev });
+    if (d < 1 || !doors.length) continue; // d === 0 cannot happen: ops.js refuses a station on a road
+    for (const j of doors) {
+      const chain = [];
+      for (let k = prev[j]; k !== -1 && k !== i; k = prev[k]) chain.push(k);
+      chain.reverse(); // platform-first
+      add(i, j, chain);
+      add(j, i, chain.slice().reverse());
+      world._hasStationDoors = true;
+    }
+  }
 }
 
 /** Edge road tiles (on the map border). */
@@ -477,9 +593,16 @@ export function dial(world, species, from, maxCost, settle, policy = {}) {
     prev[node] = via;
     buckets[nc].push(node);
   };
-  dist[from] = 0;
-  prev[from] = -1;
-  buckets[0].push(from);
+  // `from` is ONE road tile or a LIST of them. Multi-source costs nothing
+  // here - Dial settles in cost order whatever it starts from - and it is how
+  // a citizen leaves by whichever of its home's doors its road goes.
+  const sources = typeof from === "number" ? [from] : from;
+  for (const f of sources) {
+    if (dist[f] !== -1) continue;
+    dist[f] = 0;
+    prev[f] = -1;
+    buckets[0].push(f);
+  }
   const ride = policy.railCost == null ? KNOBS.RAIL_COST : Math.max(0, policy.railCost);
   const neutral = !!policy.neutral;
   for (let c = 0; c <= maxCost; c++) {
@@ -504,6 +627,17 @@ export function dial(world, species, from, maxCost, settle, policy = {}) {
           // animals living, working and walking, not for a hall's cart. It
           // still uses this one two-layer graph, with an explicit cost policy.
           relax(j, c + (neutral ? WALK : stepCost(world, species, j)), i);
+        }
+        // A station's forecourt: the platform and each of its doors, WALK per
+        // tile of the gap (computeStationDoors). At d = 1 this is the step the
+        // N4 loop just took, at the same cost, so nothing about a station
+        // beside a road moves. The tiles crossed are not roads and carry no
+        // use-zoning: a forecourt is nobody's lot.
+        const links = world._hasStationDoors ? world._stationDoors[tile] : null;
+        if (links) for (const [j, chain] of links) {
+          let lc = neutral ? WALK : stepCost(world, species, j);
+          for (const t of chain) lc += neutral ? WALK : stepCost(world, species, t);
+          relax(j, c + lc, i);
         }
       } else {
         if (rail[tile] === 2) relax(tile, c, i); // alight
@@ -542,6 +676,11 @@ export function nodePath(world, prev, toNode) {
     const tile = node >= n ? node - n : node;
     const isRide = node >= n;
     if (tile === lastTile) { allRide = allRide && isRide; out[out.length - 1] = tile | (allRide ? RIDE : 0); continue; }
+    // A station link is one graph EDGE across a forecourt of one to three
+    // tiles; the path lays those tiles out, so every consecutive pair of
+    // entries stays orthogonally adjacent and commuteTime, the traffic count
+    // and the walker all price the gap for what it is - a walk.
+    if (lastTile >= 0 && !ortho(world, lastTile, tile)) for (const t of approachBetween(world, lastTile, tile)) out.push(t);
     lastTile = tile;
     allRide = isRide;
     out.push(tile | (isRide ? RIDE : 0));
@@ -549,12 +688,33 @@ export function nodePath(world, prev, toNode) {
   return Uint16Array.from(out);
 }
 
-/** The commute from road tile `from` to road tile `to` as `species`: { path, cost } or null past max (in walk steps). */
+const ortho = (world, a, b) => Math.abs((a % world.w) - (b % world.w)) + Math.abs(((a / world.w) | 0) - ((b / world.w) | 0)) === 1;
+
+/** The forecourt tiles between two ends of a station link, in order; empty if they are not linked. */
+function approachBetween(world, a, b) {
+  const links = world._hasStationDoors ? world._stationDoors[a] : null;
+  if (!links) return [];
+  for (const [j, chain] of links) if (j === b) return chain;
+  return [];
+}
+
+/**
+ * The commute as `species`, from ANY of `from` to ANY of `to` - each is one
+ * road tile or a list of doors (fields.doorsOf). The cheapest pairing wins,
+ * because Dial settles in cost order and stops at the first goal it settles:
+ * a citizen with roads on two sides of its home leaves by the side nearer
+ * its work. { path, cost }, or null past max (in walk steps).
+ */
 export function commutePath(world, species, from, to, max = KNOBS.COMMUTE_MAX) {
-  if (from === to) return { path: new Uint16Array([from]), cost: 0 };
-  const { dist, prev } = dial(world, species, from, max * WALK, (i) => i === to);
-  if (dist[to] < 0) return null;
-  return { path: nodePath(world, prev, to), cost: dist[to] };
+  const F = typeof from === "number" ? [from] : from;
+  const T = typeof to === "number" ? [to] : to;
+  if (!F || !T || !F.length || !T.length) return null;
+  const goal = new Set(T);
+  for (const f of F) if (goal.has(f)) return { path: new Uint16Array([f]), cost: 0 };
+  let end = -1;
+  const { dist, prev } = dial(world, species, F, max * WALK, (i) => (goal.has(i) ? ((end = i), true) : false));
+  if (end < 0) return null;
+  return { path: nodePath(world, prev, end), cost: dist[end] };
 }
 
 /** How long a commute feels, in walk steps: a walking segment 1, a riding segment RAIL_COST/WALK — never the trespass penalty (that is the search's preference, not time). */

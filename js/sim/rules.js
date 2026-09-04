@@ -336,13 +336,13 @@ export const RULES = Object.freeze([
   },
   {
     id: "D5", title: "The cap: a city can only hold so many until it mixes",
-    formula: "Cap = (1200 + 150·parks + 500·zoos + festival) · (1 + 0.5·H) ;  V_R ≤ 1 − P/Cap ;  H fades in over the first 20 friendships",
+    formula: "Cap = (1200 + 150·parks + 500·zoos + festival) · (1 + 0.5·H) ;  V_R ≤ 1 − P/Cap ;  H fades in over the first 20 friendships ;  only SERVED zoos count (G1)",
     live: (w) => `Cap = (1200 + 150·${w.last.census.parks} + 500·${w.last.census.zoos} + ${w.festivalBonus}) · (1 + 0.5·${f2(w.last.census.H)}) = ${Math.round(w.last.demand.cap)} ; P ${w.last.census.P}`,
   },
   {
-    id: "G1", title: "A lot needs a road within 3 tiles",
-    formula: "access ⇔ roadDist ≤ 3 (BFS through any tile)",
-    live: (w) => `${w.last.census.lotsNoRoad} zoned lots have no road`,
+    id: "G1", title: "Road access: one rule, asked of the whole building, and every side is a way in",
+    formula: "served ⇔ min roadDist over the FOOTPRINT ≤ 3 (BFS through any tile, round a bare wall) — a lot, a block, a hall, a station, a zoo, all the same question; doors = every road tile at that distance",
+    live: (w) => `${w.last.census.lotsNoRoad} zoned lots have no road${w.last.census.zoosNoRoad ? ` · ${w.last.census.zoosNoRoad} zoo${w.last.census.zoosNoRoad === 1 ? "" : "s"} no road reaches (no keepers, no halo, no room on the cap)` : ""}`,
   },
   {
     id: "G2", title: "Local score: land value minus smog",

@@ -37,6 +37,8 @@ import { rasterize } from "./art/format.js";
 import { ZONE, CIVIC, TERRAIN, ROAD, isPart, anchorOf, sideOf } from "./sim/world.js";
 import { DECK_TOP } from "./art/roads.js";
 import { lotScore, REASON } from "./sim/lots.js";
+import { siteRoadDist } from "./sim/fields.js";
+import { KNOBS } from "./sim/rules.js";
 import { tunnelAxis } from "./sim/reach.js";
 import { isWorker } from "./sim/census.js";
 import { BAG_FALL } from "./walkers.js";
@@ -46,6 +48,12 @@ const MARGIN = 256; // projection px around the viewport kept in the static laye
 const REACH_UP = 120; // tallest sprite above its tile's north vertex
 const REACH_SIDE = 40;
 const BUSY = 40;
+// The access overlay (SPEC 6c): one entry per value siteRoadDist can take -
+// standing on the road, one, two and three tiles from it, and out of reach.
+// THREE DIFFERENT GREENS, not one green at three alphas: this paints over
+// grass, asphalt, chalk and water-side sand, and a band told apart only by
+// how strong it is stops being a band on a dark ground.
+const ACCESS_TINT = [null, "rgba(178,208,96,0.55)", "rgba(112,166,84,0.55)", "rgba(52,110,72,0.55)", "rgba(190,70,60,0.60)"];
 const BG = "#d6d1bf"; // beyond the map: the plate's ground, as in the sibling field guides
 const RED_TINT = { "=": "0", "(": "0" };
 // R chalk (terrain.js chalkKey) is drawn in grass keys because the R accent
@@ -326,6 +334,12 @@ export function createRenderer(canvas, initialWorld, art) {
         else if (mode === "crime") fill = world.crime[i] > 5 ? `rgba(150,50,70,${(world.crime[i] / 100) * 0.75})` : world.policeCov[i] ? "rgba(60,110,138,0.18)" : null;
         else if (mode === "dread") fill = world.dread[i] > 2 ? `rgba(110,40,70,${(world.dread[i] / 100) * 0.7})` : null;
         else if (mode === "use") fill = world.use[i] && (world.zone[i] !== ZONE.NONE || world.road[i] !== ROAD.NONE) ? (world.use[i] === 1 ? "rgba(160,70,40,0.55)" : "rgba(40,120,130,0.55)") : null; // the player's line: rust predator-only, teal prey-only
+        else if (mode === "access") {
+          // The number the RULE reads, not the tile's own: fields.siteRoadDist
+          // asks the whole footprint, so every tile of a block paints the one
+          // distance that decides whether the building is served.
+          fill = ACCESS_TINT[Math.min(KNOBS.ROAD_REACH + 1, siteRoadDist(world, i))];
+        }
         else if (mode === "score" && world.zone[i] !== ZONE.NONE) {
           const s = lotScore(world, i).score;
           fill = s >= 0 ? `rgba(80,110,150,${Math.min(1, s * 2) * 0.6 + 0.08})` : `rgba(170,70,60,${Math.min(1, -s * 2) * 0.6 + 0.08})`;

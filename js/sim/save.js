@@ -8,7 +8,7 @@
 
 import { createWorld } from "./world.js";
 import { makeRng } from "./rng.js";
-import { computeFields, recountRosters, commutePath, doorOf } from "./fields.js";
+import { computeFields, recountRosters, commutePath, doorsOf } from "./fields.js";
 import { citizenDefaults, rebuildMaps } from "./citizens.js";
 import { refreshLast } from "./tick.js";
 import { migrateLegacyNames } from "./legacy.js";
@@ -133,8 +133,8 @@ export function rebuildDerived(world) {
   computeFields(world); // computes roadDist so doorOf works
   for (const c of world.citizens) {
     if (c.job < 0 || c.home < 0) continue;
-    const a = doorOf(world, c.home);
-    const b = doorOf(world, c.job);
+    const a = doorsOf(world, c.home);
+    const b = doorsOf(world, c.job);
     c.path = a != null && b != null ? (commutePath(world, c.species, a, b) || { path: null }).path : null; // the weighted commute (use-zoning), never the unit BFS: a loaded city must take the roads the live one took
   }
   computeFields(world);

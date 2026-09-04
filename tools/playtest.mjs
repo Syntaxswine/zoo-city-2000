@@ -17,7 +17,7 @@ import { apply } from "../js/sim/ops.js";
 import { lotScore } from "../js/sim/lots.js";
 import { KNOBS } from "../js/sim/rules.js";
 import { stateHash } from "../js/sim/save.js";
-import { hasAccess } from "../js/sim/fields.js";
+import { served } from "../js/sim/fields.js";
 import { createMayor } from "./mayor.mjs";
 
 const argv = process.argv.slice(2);
@@ -67,7 +67,7 @@ for (let t = 0; t < totalTicks; t++) {
     let zoned = 0;
     let forbid = 0;
     for (let i = 0; i < world.w * world.h; i++) {
-      if (world.zone[i] === ZONE.NONE || !hasAccess(world, i)) continue;
+      if (world.zone[i] === ZONE.NONE || !served(world, i)) continue;
       zoned++;
       const s = lotScore(world, i);
       if (0.1 + s.parts.local <= KNOBS.GROW_THRESH) forbid++;
