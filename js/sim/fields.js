@@ -470,6 +470,7 @@ export function roadPath(world, from, to, max = KNOBS.COMMUTE_MAX) {
 // ---------------------------------------------------------------------------
 
 const DOOR_N4 = [[0, -1], [1, 0], [0, 1], [-1, 0]]; // N E S W
+const notBarrier = (world, j) => !isBarrier(world, j); // the default question: only a bare wall stops reach
 
 /**
  * The door search: a multi-source BFS OUT of the whole site (world.js
@@ -489,7 +490,7 @@ const DOOR_N4 = [[0, -1], [1, 0], [0, 1], [-1, 0]]; // N E S W
  */
 export function doorSearch(world, i, seen, { reach = KNOBS.ROAD_REACH, prev = null, passable: pass = null } = {}) {
   const { w } = world;
-  const open = pass || ((wo, j) => !isBarrier(wo, j));
+  const open = pass || notBarrier;
   seen.fill(0);
   if (prev) prev.fill(-1);
   const doors = [];
