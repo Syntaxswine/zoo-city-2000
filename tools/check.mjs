@@ -1708,6 +1708,61 @@ check("determinism: same seed + same inputs ⇒ same hash", stateHash(A.world) =
       `${doors(B2, b2(8, 9)).length} doors at the walled one`);
   }
 
+  // ---- the strongest gate in the repo, pointed at the new thing -------------
+  {
+    // save -> load -> continue is what caught the merge that did not re-plan.
+    // It has never been asked of a town whose commuters cross a FORECOURT:
+    // those tiles are in the stored path, and a reload rebuilds every path
+    // from scratch through the same link chains. If `computeStationDoors`
+    // rebuilt them in a different order, or `nodePath` spliced a different
+    // chain, this is where it shows.
+    const T2 = createWorld({ seed: "forecourt-load" });
+    const t2 = (x, y) => y * T2.w + x;
+    for (let y = 2; y <= 34; y++) for (let x = 2; x <= 56; x++) {
+      const i = t2(x, y);
+      T2.terrain[i] = TERRAIN.GRASS; T2.road[i] = ROAD.NONE; T2.zone[i] = ZONE.NONE;
+      T2.tier[i] = 0; T2.wall[i] = 0; T2.rail[i] = 0; T2.civic[i] = 0; T2.big[i] = 0;
+    }
+    T2.cash = 600000;
+    T2.events.noDisasters = true;
+    const av = [];
+    for (const y of [6, 18]) for (let x = 4; x <= 54; x++) av.push(t2(x, y));
+    for (let y = 6; y <= 18; y++) av.push(t2(4, y));
+    apply(T2, { kind: "road", tiles: av });
+    apply(T2, { kind: "zone", zone: ZONE.R, x0: 6, y0: 7, x1: 20, y1: 9, density: 3 });   // the homes at one end
+    apply(T2, { kind: "zone", zone: ZONE.C, x0: 38, y0: 19, x1: 52, y1: 21, density: 3 }); // and the work at the other
+    apply(T2, { kind: "zone", zone: ZONE.I, x0: 38, y0: 22, x1: 52, y1: 24, density: 3 });
+    const tline = [];
+    for (let x = 8; x <= 50; x++) tline.push(t2(x, 15)); // three tiles north of the second avenue
+    apply(T2, { kind: "rail", tiles: tline });
+    apply(T2, { kind: "station", tx: 10, ty: 15 });
+    apply(T2, { kind: "station", tx: 48, ty: 15 });
+    for (let k = 0; k < 15 * 12; k++) tick(T2);
+    let crossing = 0;
+    for (const c of T2.citizens) {
+      if (c.dead || !c.path) continue;
+      for (let k = 0; k < c.path.length; k++) {
+        const t = c.path[k] & TILE;
+        if (!(c.path[k] & RIDE) && T2.road[t] === ROAD.NONE && T2.rail[t] !== 2) { crossing++; break; }
+      }
+    }
+    const T3 = load(save(T2));
+    const same = stateHash(T2) === stateHash(T3);
+    let paths = 0;
+    const byId = new Map(T3.citizens.map((c) => [c.id, c]));
+    for (const c of T2.citizens) {
+      const d = byId.get(c.id);
+      if (!d) continue;
+      const a = c.path ? Array.from(c.path).join(",") : "-";
+      const b = d.path ? Array.from(d.path).join(",") : "-";
+      if (a !== b) paths++;
+    }
+    for (let k = 0; k < 24; k++) { tick(T2); tick(T3); }
+    check("access: save → load → two more years on a town whose animals CROSS FORECOURTS — the tiles between a platform and its door are in the stored path, and a reload rebuilds every one of them the same way",
+      crossing >= 10 && same && paths === 0 && stateHash(T2) === stateHash(T3),
+      `${crossing} commutes cross a forecourt · ${paths} paths differ at the save · ${stateHash(T2)} vs ${stateHash(T3)}`);
+  }
+
   // ---- WAREHOUSES: the frontage rule is gone --------------------------------
   {
     const I = clone();
