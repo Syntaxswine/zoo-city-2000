@@ -844,10 +844,11 @@ export const PACIFICATION_CENTRE = (() => {
   return solidSprite("pacification-centre", boxes, { tags: ["civic"] });
 })();
 
-export const CIVICS = { park: PARK, zoo: ZOO, fire: FIRE_STATION, police: POLICE_STATION, centre: PACIFICATION_CENTRE };
+export const CIVICS = { park: PARK, largePark: ZOO, zoo: ZOO, fire: FIRE_STATION, police: POLICE_STATION, centre: PACIFICATION_CENTRE };
 let LARGE_CIVICS = null;
 export function registerLargeCivics(table) { LARGE_CIVICS = table; }
 export function civicSprite(kind, side = null) {
+  if (kind === "zoo" && LARGE_CIVICS?.zoo) return LARGE_CIVICS.zoo;
   if (side === 3 && LARGE_CIVICS?.[kind]) return LARGE_CIVICS[kind];
   const s = CIVICS[kind];
   if (!s) throw new Error(`civicSprite: unknown kind '${kind}'`);

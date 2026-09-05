@@ -5,7 +5,7 @@
 // radius²)); 4,096 tiles is microseconds.
 
 import { KNOBS } from "./rules.js";
-import { TERRAIN, ROAD, ZONE, CIVIC, idx, inBounds, N4, isStation, isCivicEmployer, absent, occAt, anchorOf, footprintOf, siteTiles } from "./world.js";
+import { TERRAIN, ROAD, ZONE, CIVIC, idx, inBounds, N4, isStation, isCivicEmployer, absent, occAt, anchorOf, footprintOf, siteTiles, civicAnchorOf } from "./world.js";
 import { SPECIES_BY_ID, DIET_OF, admits } from "./species.js";
 import { forEachWithin, computeOcclusion, isBarrier, crossable } from "./reach.js";
 
@@ -135,8 +135,9 @@ export function passable(world, j) {
 export function asksAccess(world, i) {
   if (world.zone[i] !== ZONE.NONE) return true;
   if (world.rail[i] === 2) return true;
-  const c = world.civic[i];
-  return c === CIVIC.ZOO || c === CIVIC.ZOO_PART || isCivicEmployer(c);
+  const a = civicAnchorOf(world, i);
+  const c = world.civic[a];
+  return isCivicEmployer(c);
 }
 
 /**
@@ -144,6 +145,12 @@ export function asksAccess(world, i) {
  * scratch every reader here takes: `lotScore` reaches this from the score
  * overlay, and 14 forbids the draw layer a buffer on the world.
  */
+export function touchesRoad(world, tiles) {
+  if (world.wallsDirty) computeOcclusion(world);
+  if (world.roadsDirty) computeRoadDist(world);
+  return tiles.some(i => world.roadDist[i] === 1);
+}
+
 export const served = (world, i, seen = null) => siteRoadDist(world, i, seen) <= KNOBS.ROAD_REACH;
 
 /**
@@ -275,16 +282,11 @@ export function computeLandValue(world) {
   nearVan.fill(0);
   for (let i = 0; i < n; i++) {
     const c = world.civic[i];
-    if (c !== CIVIC.PARK && c !== CIVIC.ZOO && c !== CIVIC.CENTRE) continue;
-    // Nobody can reach it, so it does nothing to the street: no visitors for a
-    // zoo, and no van leaving a pacification centre. A PARK is not gated -
-    // SPEC 6c says a park is a place and not a service, and it never asks.
-    // (The centre's shadow was ungated while the zoo's halo was: an
-    // unreachable centre took no prisoners, employed nobody, and still put
-    // six points of land value on every street round it.)
-    if ((c === CIVIC.ZOO || c === CIVIC.CENTRE) && !served(world, i)) continue;
-    const r = c === CIVIC.PARK ? KNOBS.LV_PARK_RADIUS : c === CIVIC.ZOO ? KNOBS.LV_ZOO_RADIUS : KNOBS.LV_VAN_RADIUS;
-    const mask = c === CIVIC.PARK ? nearPark : c === CIVIC.ZOO ? nearZoo : nearVan;
+    if (c !== CIVIC.PARK && c !== CIVIC.LARGE_PARK && c !== CIVIC.CENTRE) continue;
+    // Parks keep their amenities without roads; a centre's van needs access.
+    if (c === CIVIC.CENTRE && !served(world, i)) continue;
+    const r = c === CIVIC.PARK ? KNOBS.LV_PARK_RADIUS : c === CIVIC.LARGE_PARK ? KNOBS.LV_LARGE_PARK_RADIUS : KNOBS.LV_VAN_RADIUS;
+    const mask = c === CIVIC.PARK ? nearPark : c === CIVIC.LARGE_PARK ? nearZoo : nearVan;
     forEachWithin(world, i, r, (j) => { mask[j] = 1; }); // round a wall, not through it
   }
   const cent = world.events.centenaries; // [{tile, radius, bonus}]
@@ -308,7 +310,7 @@ export function computeLandValue(world) {
     }
     let v = KNOBS.LV_BASE + KNOBS.LV_CENTRE * Math.max(0, 1 - dC / KNOBS.LV_CENTRE_RADIUS) + KNOBS.LV_NATURE * nature;
     if (nearPark[i]) v += KNOBS.LV_PARK;
-    if (nearZoo[i]) v += KNOBS.LV_ZOO;
+    if (nearZoo[i]) v += KNOBS.LV_LARGE_PARK;
     v -= KNOBS.LV_POL * world.pol[i];
     v -= KNOBS.LV_DREAD * world.dread[i]; // a meat hall: twice a works' shadow
     if (nearVan[i]) v -= KNOBS.LV_VAN; // the pacification centre's van

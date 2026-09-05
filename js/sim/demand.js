@@ -32,7 +32,7 @@ export function externalMarket(world, c) {
 }
 
 export function capacityLaw(world, c) {
-  return (KNOBS.CAP_BASE + KNOBS.CAP_PARK * c.parks + KNOBS.CAP_ZOO * c.zoos + world.festivalBonus) * (1 + KNOBS.CAP_H_GAIN * c.H);
+  return (KNOBS.CAP_BASE + KNOBS.CAP_PARK * c.parks + KNOBS.CAP_LARGE_PARK * c.largeParks + world.festivalBonus) * (1 + KNOBS.CAP_H_GAIN * c.H);
 }
 
 /** The breakdown for the current state WITHOUT advancing the valves (a loaded city, a rate change while paused). */

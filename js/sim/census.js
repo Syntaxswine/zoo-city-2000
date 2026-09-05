@@ -151,8 +151,8 @@ export function census(world) {
   let centres = 0;
   let maxDread = 0;
   let parks = 0;
-  let zoos = 0;
-  let zoosNoRoad = 0;
+  let largeParks = 0, zoos = 0;
+  let largeParksNoRoad = 0;
   let fireStationsNoRoad = 0;
   let policeStationsNoRoad = 0;
   let centresNoRoad = 0;
@@ -219,7 +219,8 @@ export function census(world) {
     // to still smells, and its dread is proximity, not access; the licence it
     // could earn asks `served` for itself (events.js).
     if (world.civic[i] === CIVIC.PARK) parks++;
-    else if (world.civic[i] === CIVIC.ZOO) { if (served(world, i)) zoos++; else zoosNoRoad++; } // a zoo no road reaches is a fenced field: no halo, no cap, no jobs (SPEC 6c)
+    else if (world.civic[i] === CIVIC.LARGE_PARK) { largeParks++; }
+    else if (world.civic[i] === CIVIC.ZOO) { zoos++; } // count the prison once; admission and employment ask served separately
     else if (world.civic[i] === CIVIC.FIRE) { if (served(world, i)) fireStations++; else fireStationsNoRoad++; }
     else if (world.civic[i] === CIVIC.POLICE) { if (served(world, i)) policeStations++; else policeStationsNoRoad++; }
     else if (world.civic[i] === CIVIC.CENTRE) { if (served(world, i)) centres++; else centresNoRoad++; }
@@ -269,7 +270,7 @@ export function census(world) {
     meatSlaughtered: (world.meatStats?.yearly?.slaughtered || 0) * KNOBS.PEN_YIELD,
     approval: P ? moodSum / P : 50,
     native: P ? native / P : 0,
-    parks, zoos, zoosNoRoad, fireStationsNoRoad, policeStationsNoRoad, centresNoRoad, lots, roads, walls, tunnels, usePred, usePrey, useSpecies: useBySpecies, railTiles, stations, riders, commuteN, meanCommute: commuteN ? commuteSum / commuteN : 0, lotsNoRoad,
+    parks, largeParks, zoos, largeParksNoRoad, fireStationsNoRoad, policeStationsNoRoad, centresNoRoad, lots, roads, walls, tunnels, usePred, usePrey, useSpecies: useBySpecies, railTiles, stations, riders, commuteN, meanCommute: commuteN ? commuteSum / commuteN : 0, lotsNoRoad,
     fireStations, policeStations, burning,
     blocks2, blocks3, // the 2×2 and 3×3 blocks standing (anchors; SPEC §3b)
     landmarks, landmarkCounts, // the 3×3s that rose as a species' landmark, and which by name (SPEC §3c)

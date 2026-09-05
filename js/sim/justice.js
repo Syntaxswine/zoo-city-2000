@@ -16,9 +16,9 @@
 // STREET's memory of it), the INVESTIGATION (every open file rolls once a
 // month; the town's FORCE and the cover at the scene are the probability, and
 // with no station in town no roll is made at all; 5% wrongful, random by
-// proximity), the SENTENCE (a predator's first
-// conviction: the centre; prey, or anyone already fixed: the meat hall —
-// sold; else the cells), EXONERATION when the real one is taken.
+// proximity), the SENTENCE (lighter crimes: Zoo prison; murder or second
+// theft: pacification; third theft or theft after pacification: meat hall),
+// EXONERATION when the real one is taken.
 //
 // Determinism: every draw is from world.rng in this order, and nothing draws
 // where nothing can happen (no open file → no roll; no hot lot → no burglary;
@@ -247,14 +247,14 @@ export function bedsAt(world, i) {
   return n;
 }
 
-/** The nearest centre with road access and a free bed, or −1. */
-function centreWithBed(world, from) {
+/** The nearest matching custody building with road access and a free bed, or −1. */
+function custodyWithBed(world, from, kind) {
   const n = world.w * world.h;
   let best = -1;
   let bestD = Infinity;
   for (let i = 0; i < n; i++) {
-    if (world.civic[i] !== CIVIC.CENTRE || !served(world, i)) continue;
-    if (bedsAt(world, i) >= KNOBS.CENTRE_BEDS) continue;
+    if (world.civic[i] !== kind || !served(world, i)) continue;
+    if (bedsAt(world, i) >= (kind === CIVIC.ZOO ? KNOBS.ZOO_BEDS : KNOBS.CENTRE_BEDS)) continue;
     const d = from >= 0 ? cheb(world, from, i) : 0;
     if (d < bestD) { bestD = d; best = i; }
   }
@@ -270,9 +270,15 @@ function exonerate(world, culprit, notices) {
     post(world, "compensation", -Math.min(KNOBS.COMPENSATION, Math.max(0, world.cash)));
     ev.active.push({ id: "namedMood", until: world.tick + KNOBS.NAMED_MONTHS, moodBoost: -KNOBS.NAMED_MOOD });
     const wronged = world.byId.get(a.citizenId);
-    if (wronged) { wronged.exonerated = true; remember(world, wronged, KIND.EXONERATED, a.cause); }
+    if (wronged) {
+      wronged.exonerated = true;
+      wronged.record = Math.max(0, (wronged.record || 0) - 1);
+      if (["burglary", "theft"].includes(a.cause)) wronged.thefts = Math.max(0, (wronged.thefts || 0) - 1);
+      if ((wronged.held || 0) > world.tick) { wronged.held = 0; wronged.heldAt = -1; }
+      remember(world, wronged, KIND.EXONERATED, a.cause);
+    }
     const first = a.name.split(" ")[0];
-    const tail = wronged ? `There is no way to unfix ${first}.` : `${first} was sold; there is no way to unsell anyone.`;
+    const tail = wronged ? (wronged.fixed ? `There is no way to unfix ${first}.` : `${first} is free; the wrongful conviction is cleared.`) : `${first} was sold; there is no way to unsell anyone.`;
     const line = `EXONERATED — ${a.name} was the wrong animal; ${nameOf(culprit)} was taken in today for the same ${a.cause}. The city pays §${KNOBS.COMPENSATION}. ${tail}`;
     ev.log.push({ t: world.tick, id: "exonerated", line, links: [...new Set([a.citizenId, culprit.id])] });
     notices.push(line);
@@ -281,18 +287,39 @@ function exonerate(world, culprit, notices) {
 
 /**
  * Convict `c` for file `f`. Exported so the suite can force one. The sentence
- * table (the owner's rulings): a predator's first conviction → the centre;
- * prey, or anyone already fixed → the meat hall; no hall / no bed → the cells.
+ * table: lighter crimes → zoo prison; murder / second theft → centre;
+ * third theft or theft after pacification → meat hall. No destination
+ * with capacity leaves the case open, without recording a conviction.
  */
 export function arrest(world, f, c, wrongful, notices, opts = {}) {
   const ev = world.events;
   const tick = world.tick;
+  const theft = f.cause === "burglary" || f.cause === "theft";
+  const thefts = (c.thefts || 0) + (theft ? 1 : 0);
+  const murder = f.cause === "killing" || f.cause === "murder";
+  const sentence = (theft && thefts >= 3) || (theft && c.fixed) ? "hall"
+    : murder || (theft && thefts === 2) ? "centre" : "zoo";
+  const market = sentence === "hall" ? hallReach(world, c.home, KNOBS.MEAT_ROAD, { space: true }) : null;
+  const destination = sentence === "hall" ? market?.hall ?? -1 : custodyWithBed(world, c.home, sentence === "zoo" ? CIVIC.ZOO : CIVIC.CENTRE);
+  if (destination < 0) {
+    // A missing/full building never becomes an invisible prison or a different sentence.
+    // Keep the case open; the ordinary case clock and future arrests still apply.
+    const waiting = sentence === "hall" ? "a reachable meat hall with capacity" : sentence === "centre" ? "a pacification centre with a free bed" : "a zoo prison with a free bed";
+    if (f.waitingFor !== sentence) {
+      f.waitingFor = sentence;
+      const line = `CASE WAITING — ${nameOf(c)}'s ${f.cause} case needs ${waiting}.`;
+      ev.log.push({ t: tick, id: "arrest", line, links: [c.id] });
+      notices.push(line);
+    }
+    return null;
+  }
   f.closed = true;
+  delete f.waitingFor;
   const culprit = world.byId.get(f.culpritId);
   c.record = (c.record || 0) + 1;
+  if (theft) c.thefts = thefts;
   remember(world, c, KIND.ARRESTED, f.cause);
-  // A minor (trespass, SPEC §9c): the cells for a month and the record — until the record reaches RECORD_HARD, when the table applies.
-  const minor = !!opts.minor && c.record < KNOBS.RECORD_HARD;
+  const minor = f.cause === "trespass";
   if (wrongful) { c.wrongful = true; c.wrongedBy = f.culpritId; ev.justice.wrongful++; }
   ev.arrests.push({ tick, tile: f.tile, citizenId: c.id, name: nameOf(c), culpritId: f.culpritId, culpritName: culprit ? nameOf(culprit) : "", wrongful, cause: f.cause, exonerated: false, hard: !!opts.minor && !minor });
   if (ev.arrests.length > 200) ev.arrests.splice(0, ev.arrests.length - 200);
@@ -301,42 +328,28 @@ export function arrest(world, f, c, wrongful, notices, opts = {}) {
   const still = wrongful && culprit && !culprit.dead ? ` ${nameOf(culprit)} is still at ${at(world, culprit.home)}.` : "";
   const tail = wrongful ? ` ${c.name} was at home on Tuesday; it was the wrong animal.${still}` : "";
   const home = c.home;
-  const diet = DIET_OF[c.species];
-  const market = minor || !(c.fixed || diet === "herb") ? null : hallReach(world, home, KNOBS.MEAT_ROAD, { space: true });
-  const hall = market?.hall ?? -1;
   let line;
-  if (minor) {
-    releaseJob(world, c);
-    c.held = tick + KNOBS.TRESPASS_MONTHS;
-    c.heldAt = -1;
-    ev.justice.trespass++;
-    const onWay = f.tile !== c.home && f.tile !== c.job;
-    const months = KNOBS.TRESPASS_MONTHS === 1 ? "A month" : `${KNOBS.TRESPASS_MONTHS} months`;
-    line = `TRESPASS — ${nameOf(c)} was stopped on ${useName(world.use[f.tile])} use-zoned ground at ${at(world, f.tile)}${onWay ? " on the way to work" : ", living where the line forbids"}. ${months} in the cells; offence ${c.record}${c.record === KNOBS.RECORD_HARD - 1 ? " — the next meets the sentence table" : ""}.`;
-  } else if (hall >= 0) {
+  releaseJob(world, c);
+  if (sentence === "hall") {
     const hh = world.hhById.get(c.household);
-    const family = hh ? hh.members.filter((id) => id !== c.id) : [];
-    const wasFixed = c.fixed;
-    releaseJob(world, c);
+    const family = hh ? hh.members.filter(id => id !== c.id) : [];
     removeCitizen(world, c, "sold");
     for (const id of family) { const o = world.byId.get(id); if (o) o.grief = tick + 12; }
     post(world, "cut", KNOBS.SOLD_PRICE);
-    receiveMeat(world, hall, "convicted", 1);
+    receiveMeat(world, destination, "convicted", 1);
     ev.justice.sold++;
-    line = `SOLD — ${nameOf(c)} was convicted ${why} and sold at the meat hall at ${at(world, hall)}.${wasFixed ? " Pacification is once." : ""}${tail}`;
+    line = `SOLD — ${nameOf(c)} was convicted ${why} and sold at the meat hall at ${at(world, destination)}. ${thefts >= 3 ? "Third theft." : "An offence after pacification."}${tail}`;
   } else {
-    const centre = centreWithBed(world, home);
-    releaseJob(world, c);
-    if (centre >= 0) {
-      c.held = tick + KNOBS.PACIFY_MONTHS;
-      c.heldAt = centre;
+    const months = sentence === "centre" ? KNOBS.PACIFY_MONTHS : minor ? KNOBS.TRESPASS_MONTHS : KNOBS.CELLS_MONTHS;
+    c.held = tick + months;
+    c.heldAt = destination;
+    if (sentence === "centre") {
       ev.justice.takenIn++;
-      line = `TAKEN IN — ${nameOf(c)} went from ${at(world, home)} to the Pacification Centre at ${at(world, centre)} ${why}. Six months.${tail}`;
+      line = `TAKEN IN — ${nameOf(c)} went from ${at(world, home)} to the Pacification Centre at ${at(world, destination)} ${why}. ${months} months.${tail}`;
     } else {
-      c.held = tick + KNOBS.CELLS_MONTHS;
-      c.heldAt = -1;
       ev.justice.cells++;
-      line = `CELLS — ${nameOf(c)} is in the cells until ${monthName(tick + KNOBS.CELLS_MONTHS)} ${why}. No centre in town; ${c.name} comes home as ${c.name} went.${tail}`;
+      if (minor) ev.justice.trespass++;
+      line = `CELLS — ${nameOf(c)} is in the Zoo prison at ${at(world, destination)} until ${monthName(tick + months)} ${why}.${tail}`;
     }
   }
   const links = [...new Set([c.id, wrongful ? culprit?.id : null].filter(Number.isInteger))];
@@ -403,7 +416,7 @@ export function custodyTick(world, notices) {
     // a direct custody tick can never turn a penned cub into an ordinary
     // released inmate at the exact expiry month.
     if (c.dead || c.pen || !c.held || c.held > tick) continue;
-    const fromCentre = c.heldAt >= 0;
+    const fromCentre = c.heldAt >= 0 && world.civic[c.heldAt] === CIVIC.CENTRE;
     c.held = 0;
     c.heldAt = -1;
     let line;

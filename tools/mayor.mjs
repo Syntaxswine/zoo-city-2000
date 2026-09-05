@@ -294,20 +294,20 @@ export function createMayor(world, opts = {}) {
       // standard (SPEC 6c) it buys no jobs, no halo and no room on the cap.
       // A rig that cannot build a working zoo cannot measure one.
       let placed = false;
-      outer: for (let dy = -6; dy <= 6; dy++) for (let dx = -6; dx <= 6; dx++) {
+      outer: for (let dy = -12; dy <= 12; dy++) for (let dx = -12; dx <= 12; dx++) {
         const r = apply(world, { kind: "zoo", tx: sx + dx, ty: sy + dy });
         if (!r.ok) continue;
         if (served(world, idx(world, sx + dx, sy + dy))) { placed = true; break outer; }
         undo(world); // out of reach: put the ground back and keep looking
       }
       // Nowhere in reach: build it anyway, so the run still has a zoo to report on.
-      if (!placed) outerAny: for (let dy = -6; dy <= 6; dy++) for (let dx = -6; dx <= 6; dx++) if (apply(world, { kind: "zoo", tx: sx + dx, ty: sy + dy }).ok) break outerAny;
+      if (!placed) outerAny: for (let dy = -12; dy <= 12; dy++) for (let dx = -12; dx <= 12; dx++) if (apply(world, { kind: "zoo", tx: sx + dx, ty: sy + dy }).ok) break outerAny;
     }
     // --markets N: the mayor opens N meat-hall blocks from year 2, one a year.
     if (marketsWanted && mo === 0 && year >= 2 && year < 2 + marketsWanted) { const b = nextBlock(); if (b) openBlock(b[0], b[1], ZONE.M); }
     // --pacify: a pacification centre beside the start at year 3.
     if (pacify && t === 36) {
-      outer4: for (let dy = -6; dy <= 6; dy++) for (let dx = -6; dx <= 6; dx++) {
+      outer4: for (let dy = -12; dy <= 12; dy++) for (let dx = -12; dx <= 12; dx++) {
         const r = apply(world, { kind: "centre", tx: sx + dx, ty: sy + dy });
         if (r.ok) break outer4;
       }
@@ -315,14 +315,14 @@ export function createMayor(world, opts = {}) {
     // --stations: one fire and one police station beside the start road at year 2.
     if (stations && t === 24) {
       for (const kind of ["fire", "police"]) {
-        outer3: for (let dy = -6; dy <= 6; dy++) for (let dx = -6; dx <= 6; dx++) {
+        outer3: for (let dy = -12; dy <= 12; dy++) for (let dx = -12; dx <= 12; dx++) {
           const r = apply(world, { kind, tx: sx + dx, ty: sy + dy });
           if (r.ok) break outer3;
         }
       }
     }
     if (parks < parksWanted && t >= 24 && mo === 6) {
-      outer2: for (let dy = -6; dy <= 6; dy++) for (let dx = -6; dx <= 6; dx++) {
+      outer2: for (let dy = -12; dy <= 12; dy++) for (let dx = -12; dx <= 12; dx++) {
         const r = apply(world, { kind: "park", tx: sx + dx, ty: sy + dy });
         if (r.ok) { parks++; break outer2; }
       }

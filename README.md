@@ -50,7 +50,7 @@ toggles disasters for the current city.
 
 The build remote on the left is the key: `1` Residential, `2` Commercial,
 `3` Industrial, `4` Meat, `5` Road, `6` Wall, `7` Rail, `8` Station, `9`
-Tree, `0` Park, `Z` Zoo, `V` Pacification, `P` Police, `F` Fire, `I` Inspect
+Tree, `0` Park, `G` Large Park, `Z` Zoo (prison), `V` Pacification, `P` Police, `F` Fire, `I` Inspect
 and `B` Bulldoze. `H` changes density and `U` opens the use-zoning checklist. WASD and the
 arrows only pan. `Backspace` or `Ctrl+Z` undoes; `Ctrl+S` opens save-as and
 `L` opens the saves list. The generated help line in the game carries the
@@ -72,20 +72,30 @@ them on the real map):
 | industry sells outside | `rI = (ext · 1.15 · Lab − 1) · 2`, `ext` from a 12.5-year cycle × edge roads × events |
 | taxes | neutral rate `n = clamp(9 − P/1600, 6, 9)`; `T = 0.04·(n − rate)` below it, `−(0.10·d + 0.0125·d²)` above |
 | demand | leaky integrator, 63% of a step in six months |
-| the cap | `Cap = (1200 + 150·parks + 500·zoos + festival) · (1 + 0.5·H)` |
+| the cap | `Cap = (1200 + 150·parks + 500·large parks + festival) · (1 + 0.5·H)` |
 | a lot grows | road within 3 tiles, `score = V + (LV − Pol − 40)/200 > 0.05`, 70% full, land value permits the storey |
 | pollution | every source spreads linearly over its radius; a lone works stinks next door, pigs and skunks dirty their lot, parks are sinks; no wind |
 | crime | `40 − 0.5·LV + 0.4·density + 3·jobless in the 3×3 + 40·unemployed share + a hall's hill + open files − police`; above 60 it costs land value and shops; it is also the killing's hazard |
 | dread | a meat hall spreads 40/70/105 over 2/3/4 tiles; LV −0.8·dread (twice a works); herbivores mind it, carnivores do not |
 | use-zoning | `U` opens predator, prey and all 14 species checkboxes, then paints lots and roads; no checks is mixed, otherwise matching any check is allowed; a gate on homes and jobs; a forbidden road step costs ×6; a repainted household has 3 months to rehome or leaves |
-| trespass | `E` forbidden walking tiles on the commute (+4 for a forbidding home or job); `p = min(0.3, 0.02·E·cover/60)` a month — no police, no stop; the cells for a month and a record; the third offence meets the sentence table |
+| trespass | `E` forbidden walking tiles on the commute (+4 for a forbidding home or job); `p = min(0.3, 0.02·E·cover/60)` a month — no police, no stop; Zoo prison for a month and a record; trespass does not count as theft |
 | rail | a commute is the cheapest walk-and-ride: a step 1, a ride 2/9 (0.22) between stations served by a road within 3 tiles (the forecourt is walked); riders move at ×4.5, 50% faster than before; traffic and trespass count walking steps only — neutral travel until you step off; a road and a line cross square-on on one tile |
 | walls | every area effect radiates by flood fill; a wall blocks it and receives nothing; a road through it is a tunnel, open along the road; a killer's reach stops at a wall (Glades of Arcadia's law) |
 
 The hover card's **WHY NOT** line is computed by the same function that
 decides growth — it can only ever say what the rule did.
 
-## The zoo
+## Civic campuses
+
+Fire, police, pacification, Large Park and Zoo are 3×3 buildings. Service buildings
+require a road touching any edge; small and large parks can stand without roads.
+The garden artwork belongs to Large Park and retains its recreation benefits.
+Zoo is a separate walled prison with 24 beds. First thefts and lighter crimes
+use prison; murder and second thefts use pacification; third thefts or theft
+after pacification go to a meat hall. A missing or full destination leaves
+the case open. Existing saves retain the physical sizes of old buildings.
+
+## The animals
 
 | species | what they want | what they do to the town |
 |---|---|---|

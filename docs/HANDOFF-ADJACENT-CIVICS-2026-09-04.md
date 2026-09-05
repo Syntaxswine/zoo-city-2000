@@ -1,3 +1,5 @@
+> Superseded by [the completed civic-campus handoff](HANDOFF-CIVIC-CAMPUSES-2026-09-05.md). The report below describes the historical intermediate branch.
+
 # Handoff — "adjacent to roads" for the four civic services
 
 **Branch `adjacent-civics` (`9732c04`), RED: 13 checks fail.** `main` is green

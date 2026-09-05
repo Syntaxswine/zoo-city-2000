@@ -105,7 +105,8 @@ One lot = one tile = one building. Tiers 0..3 (0 = zoned, empty).
 | R citizens | 4 | 10 | 24 |
 | C jobs | 3 | 8 | 20 |
 | I jobs | 4 | 10 | 24 |
-| Zoo (2×2 civic) | 12 C-type jobs | | |
+| Large Park (3×3 civic; legacy 2×2) | 12 C-type jobs | | |
+| Zoo prison (3×3 civic) | 8 C-type jobs; 24 beds | | |
 
 `maxTier` is the density brush: Low = 1, High = 3 (one byte per lot; the
 species-selection lever — mice want towers, bears want cottages).
@@ -963,17 +964,19 @@ THE FILE events.files [{tile, radius 2, crime 15, opened, until +24, culpritId, 
 THE WRONG ANIMAL 5% of arrests: any adult within 4 of the file, weighted 1/(1 + d) — no species weight ("random based on proximity")
          the innocent is sentenced like the guilty; the culprit stays; c.wrongful / c.wrongedBy saved; when the real one is later taken:
          EXONERATED, −§500 compensation, the town −5 mood for 6 months, "there is no way to unfix / unsell"
-THE SENTENCE (the owner's table): a predator's (carn or omni) first conviction → the PACIFICATION CENTRE if one has road access and a bed;
-         a prey animal, or anyone already fixed → a non-full MEAT HALL in H service reach (removed, cause "sold", +1 stock, +§100 to the cut);
-         otherwise the CELLS, 3 months, home with a record. Every conviction is record++.
-CUSTODY  c.held = untilTick (saved), c.heldAt = the centre or −1; `c.pen` is the separate market-pen state; the job is released (releaseJob — ONE function for retirement,
+THE SENTENCE lighter crimes → Zoo prison (24 beds), 3 months; trespass 1 month.
+         Murder or second theft → pacification (6 beds), 6 months, then fixed.
+         Third theft or theft after pacification → reachable non-full meat hall.
+         Missing/full destination leaves the case open without a conviction.
+         Every conviction increments record; only theft/burglary increments thefts.
+CUSTODY  c.held = untilTick (saved), c.heldAt = the prison or centre (−1 only for legacy cells); `c.pen` is the separate market-pen state; the job is released (releaseJob — ONE function for retirement,
          decay, bulldoze, custody); home kept; `absent(world, c) = pen || held > tick` is ONE predicate read by isWorker, computeCrime's inline
          copy, prey flight, births, friendship sampling, the walkers and every pool; mood −15 while held, while a pen freezes the last street mood
 FIXED    permanent, saved; no litter (a pair needs two unfixed fertile adults — skipped households count in last.littersLost);
          never a killer; PREY FLIGHT is proportional — flight = 10 × (unfixed adults of that species in the 3×3 / all of them);
          a fixed predator's friendship with its prey rolls at 0.7 (not 0.4) and counts ONCE in H (census.hKnife is the share
          "by pacification"); mood −5 for life; may keep any job, the counter included (the owner: "3. yes")
-THE CENTRE CIVIC.CENTRE, 1×1, key V, §1,500, §900/yr, 4 C-type jobs (isCivicEmployer — NOT isStation, which is coverage),
+THE CENTRE CIVIC.CENTRE, 3×3, key V, §1,500, §900/yr, 4 C-type jobs (isCivicEmployer — NOT isStation, which is coverage),
          6 beds counted from heldAt; LV −6 within 2; carnivores −5 mood within 4 (the van); bulldozing it releases the inmates
          unfixed and is not undoable
 ```
@@ -1054,14 +1057,10 @@ a prey only zone" is the same rule) + `TRESPASS_HOME` 4 for a forbidding
 home or job lot; `p = min(TRESPASS_MAX 0.3, TRESPASS_P 0.02 · E ·
 maxCover/60)` — **no police cover, no stop**. The stop is on the spot: a
 file opened (cause `trespass`, stain 5 within 1) and closed in the same
-`arrest()` call, never wrongful. The sentence is a **minor** while the record
-is below `RECORD_HARD` 3: the cells for `TRESPASS_MONTHS` 1 and `record++`
-(`justice.trespass` counts them; the ticker: *"TRESPASS — … was stopped on
-prey-only ground at (x,y) on the way to work. A month in the cells; offence
-2 — the next meets the sentence table."*); from the third conviction the
-§9c table applies — the owner's "multiple offenses should send the citizen
-to the meat market" for the habitual trespasser. The pinned citizen card
-prints the exposure and the monthly chance.
+`arrest()` call, never wrongful. The sentence is one month in a Zoo prison with a free bed and record++.
+Trespass never increments the separate theft counter or escalates through it.
+Without a prison bed the case remains open. The pinned citizen card prints
+the exposure and the monthly chance.
 
 ## 10. Goals and pacing
 
@@ -1087,7 +1086,7 @@ The build remote stands left of the map, two columns by eight rows (four by
 four below 720 px high). Its sixteen buttons, thumbnails, order, operations,
 keys and generated footer help all read the one DOM-free `TOOLS` registry:
 `1 R · 2 C · 3 I · 4 Meat · 5 Road · 6 Wall · 7 Rail · 8 Station · 9 Tree ·
-0 Park · Z Zoo · V Pacify · P Police · F Fire station · I Inspect · B Bulldoze`.
+0 Park · G Large Park · Z Zoo (prison) · V Pacify · P Police · F Fire station · I Inspect · B Bulldoze`.
 The top strip keeps only modifiers and commands: `H` density, `U` Use,
 `Space` pause, `, .` speed, `Backspace` or `Ctrl+Z` undo, `Ctrl+S` save-as,
 `L` load, `O` overlay, `R` news, `+ −` zoom, `N` new city and `Esc` menu.
@@ -1112,7 +1111,7 @@ painted on the GROUND, so a building hides its own tile's band.
 - **Road:** L-drag, horizontal leg then vertical; Shift = straight; over
   water = bridge §40. Auto-join by the 4-bit N/E/S/W mask into 16 tiles;
   busy variant when traffic > 40.
-- **Park 1×1 §150, Zoo 2×2 §2,500:** click-place with a ghost; red ghost when
+- **Park 1×1 §150, Large Park 3×3 §2,500, Zoo prison 3×3 §2,500:** click-place with a ghost; red ghost when
   blocked.
 - **Density `H`:** toggles the brush; painting R/C/I/M with Low sets
   `maxTier = 1`; the chalk shows an inner diamond for High.
@@ -1121,7 +1120,7 @@ painted on the GROUND, so a building hides its own tile's band.
   (23,41) R High  tier 2  occ 8/10  ▲ growing (V_R +0.31 + local +0.12 = +0.43, p 4.3%/mo)
   LV 62  Pol 14  road 1  traffic 12
   the Burrowes family (4 rabbits) · the Shelby household (tortoise, 2 owls)
-  WHY NOT: —                      ← or: no road within 3 / smog 71 > 60 / demand −0.24 (R 12% vs neutral 8.2%) / capacity reached — build a park or a Zoo
+  WHY NOT: —                      ← or: no road within 3 / smog 71 > 60 / demand −0.24 (R 12% vs neutral 8.2%) / capacity reached — build a park or a Large Park
   ```
 - **Demand bars:** three bars −1..+1 with the neutral-rate line and the cap
   tick drawn; they ARE V_R/V_C/V_I.
@@ -1428,14 +1427,17 @@ are `sheet-buildings.png`, `sheet-marks.png`, `sheet-building-lights.png`;
 Age-based ivy and patched roofs remain optional future work: no `since`
 array or save migration ships in E.
 
-### 12.2f Larger civic artwork
+### 12.2f Civic campuses and artwork
 
-`js/art/civics-large.js` supplies four original 3×3 campuses selected with
-`art.civic(kind, 3)`: firehouse, police station, pacification centre and zoo.
-Each uses a 48×48-unit recipe, hub 24, footprint `[3,3]`, and the existing
-hi-res and painter paths. The default civic selector retains legacy sizes
-until placement/save integration lands. The park is unchanged. See
-`docs/ART-CIVICS-3X3.md` for the designs, previews and integration contract.
+Fire, police, pacification, Large Park and Zoo use 3×3 footprints and
+art.civic(kind, 3). Large Park preserves the garden design and recreation
+benefits; Zoo uses a separate barred prison design and provides custody.
+All service campuses require road adjacency along any footprint edge at
+placement. Parks are exempt. One anchor owns every tile, job and bill;
+Inspect, demolition, undo, road access and drawing resolve any part to it.
+Save metadata preserves old 1×1 stations and 2×2 gardens without expansion.
+Old garden civic IDs remain Large Park IDs. See docs/ART-CIVICS-3X3.md and
+docs/HANDOFF-CIVIC-CAMPUSES-2026-09-05.md for migration and verification.
 
 ### 12.3 Citizens — hand-authored kit, the organic exception
 12×20 px adults, 8×12 cubs; facings SE and NE authored, SW/NW mirrored and
@@ -1746,7 +1748,7 @@ idx(world, tx, ty) → i ;  inBounds(world, tx, ty)
 // js/sim/tick.js
 tick(world) → { notices: [string], events: [eventRecord] }   // one month
 // js/sim/ops.js
-apply(world, op) → { ok, cost, reason, replaced, evicts, undoable }   // op.kind ∈ zone (with density)|road|rail|station|wall|bulldoze|tree|park|zoo|fire|police|centre|use|rate|toggle|choice|cheat ; logs to world.log; deducts cash
+apply(world, op) → { ok, cost, reason, replaced, evicts, undoable }   // op.kind ∈ zone (with density)|road|rail|station|wall|bulldoze|tree|park|largePark|zoo|fire|police|centre|use|rate|toggle|choice|cheat ; logs to world.log; deducts cash
 undo(world) → { ok }
 costOf(world, op) → { cost, tiles }        // for the live strip
 // js/sim/fields.js — access, one standard (§6c)
@@ -1761,7 +1763,7 @@ nearestRoad(world, i, reach?, seen?) → { d, doors }          // the card's sec
 dial(world, species, from, maxCost, settle, policy)          // `from` is ONE road tile or a LIST of doors
 commutePath(world, species, from, to, max) → { path, cost }  // a list at each end; the cheapest pairing wins
 // js/sim/world.js — what a footprint is
-siteTiles(world, i) → [tile]                // a block's tiles, a zoo's four, or [i]
+siteTiles(world, i) → [tile]                // a block's or civic campus's tiles, or [i]
 zooAnchorOf(world, i) → tile|−1 ; zooTiles(world, anchor) → [tile]
 // js/sim/lots.js
 lotScore(world, i) → { score, reason, p, parts: {valve, local} }

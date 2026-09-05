@@ -7,13 +7,13 @@
 // a lump posted under its own ledger key, logged, replayed, never undone.
 
 import { KNOBS } from "./rules.js";
-import { TERRAIN, ROAD, ZONE, CIVIC, idx, inBounds, anchorOf, footprintOf, zooAnchorOf, zooTiles } from "./world.js";
+import { TERRAIN, ROAD, ZONE, CIVIC, idx, inBounds, anchorOf, footprintOf, civicAnchorOf, civicTiles } from "./world.js";
 import { post, canSpend, exitReceivership } from "./budget.js";
 import { clearLot, invalidatePaths, releaseJob, replanStale } from "./citizens.js";
 import { resolveChoice } from "./events.js";
 import { refreshLast } from "./tick.js";
 import { computeOcclusion } from "./reach.js";
-import { computeRoadDist, computeStationDoors, served } from "./fields.js";
+import { computeRoadDist, computeStationDoors, touchesRoad } from "./fields.js";
 import { closeHall, hallStock, resetMeatRoutes } from "./meat.js";
 import { clampUse } from "./use.js";
 
@@ -155,23 +155,6 @@ function refuseCrossings(world, lay, laying) {
  * building ... if a building meets the requirements to exist it should be
  * functional."*
  */
-function servedAt(world, i) {
-  return served(world, i);
-}
-
-/**
- * A PLATFORM'S question is a WALK, not a distance (SPEC 6c), and the tile is
- * still plain track when this is asked - so it is asked AS a platform, and put
- * back. The forecourt it measures is the same ground either way.
- */
-function platformWouldBeServed(world, i) {
-  const was = world.rail[i];
-  world.rail[i] = 2;
-  const ok = served(world, i);
-  world.rail[i] = was;
-  return ok;
-}
-
 export function costOf(world, op) {
   const tiles = [];
   let cost = 0;
@@ -219,9 +202,10 @@ export function costOf(world, op) {
         if (world.rail[i]) { add(i, C.bulldoze, world.rail[i] === 2 ? "station" : "rail"); continue; }
         if (world.road[i]) { add(i, C.bulldoze, "road"); continue; }
         if (world.civic[i]) {
-          add(i, C.bulldoze, "civic");
-          // A centre with animals in its beds: releasing them is not undoable (tiles, never people).
-          if (world.civic[i] === CIVIC.CENTRE) for (const cz of world.citizens) if (cz.heldAt === i && !cz.dead) evicts++;
+          const a = civicAnchorOf(world, i);
+          for (const j of civicTiles(world, i)) { taken.add(j); add(j, C.bulldoze, "civic"); }
+          // Jobs/custody change on demolition, so occupied sites cannot be undone.
+          if (world.citizens.some(c => !c.dead && (c.job === a || (c.heldAt === a && c.held > world.tick)))) evicts++;
           continue;
         }
         if (world.big[i]) {
@@ -248,32 +232,16 @@ export function costOf(world, op) {
       }
       break;
     }
-    case "park": case "fire": case "police": case "centre": {
-      const i = idx(world, op.tx, op.ty);
-      if (!inBounds(world, op.tx, op.ty) || world.terrain[i] === TERRAIN.WATER || world.road[i] || world.zone[i] || world.civic[i] || world.wall[i] || world.rail[i]) return { cost: 0, tiles, reason: "blocked" };
-      // ANYTHING PLACEABLE IS FUNCTIONAL (the owner, 2026-09-04: "if a building
-      // meets the requirements to exist it should be functional"). A fire
-      // station, a police station or a pacification centre out of reach employs
-      // nobody, covers nothing and takes nobody in - so it may not be BUILT out
-      // of reach, and the player is told why instead of paying for a dud. A
-      // PARK is the exception and always has been: it asks no road, because it
-      // is a place rather than a service (SPEC 6c).
-      if (op.kind !== "park" && !servedAt(world, i)) return { cost: 0, tiles, reason: `no road within ${KNOBS.ROAD_REACH} tiles: nobody could reach it` };
-      add(i, C[op.kind] + (world.terrain[i] === TERRAIN.TREE ? C.bulldozeTree : 0), op.kind);
-      break;
-    }
-    case "zoo": {
-      for (let dy = 0; dy < 2; dy++) for (let dx = 0; dx < 2; dx++) {
-        const tx = op.tx + dx;
-        const ty = op.ty + dy;
-        if (!inBounds(world, tx, ty)) return { cost: 0, tiles, reason: "blocked" };
+    case "park": case "fire": case "police": case "centre": case "largePark": case "zoo": {
+      const side = op.kind === "park" ? 1 : 3;
+      for (let dy = 0; dy < side; dy++) for (let dx = 0; dx < side; dx++) {
+        const tx = op.tx + dx, ty = op.ty + dy;
+        if (!inBounds(world, tx, ty)) return { cost: 0, tiles: [], reason: "the whole footprint must fit on the map" };
         const i = idx(world, tx, ty);
-        if (world.terrain[i] === TERRAIN.WATER || world.road[i] || world.zone[i] || world.civic[i] || world.wall[i] || world.rail[i]) return { cost: 0, tiles, reason: "blocked" };
-        add(i, (dx || dy ? 0 : C.zoo) + (world.terrain[i] === TERRAIN.TREE ? C.bulldozeTree : 0), dx || dy ? "zooPart" : "zoo");
+        if (world.terrain[i] === TERRAIN.WATER || world.road[i] || world.zone[i] || world.civic[i] || world.wall[i] || world.rail[i] || isBuilt(world, i)) return { cost: 0, tiles: [], reason: "the whole footprint needs clear ground" };
+        add(i, (dx || dy ? 0 : C[op.kind]) + (world.terrain[i] === TERRAIN.TREE ? C.bulldozeTree : 0), dx || dy ? "civicPart" : op.kind);
       }
-      // A zoo is asked about all FOUR of its tiles (SPEC 6c), and a fenced
-      // field no road reaches is exactly the dud the rule above refuses.
-      if (!tiles.some((t) => servedAt(world, t.i))) return { cost: 0, tiles: [], reason: `no road within ${KNOBS.ROAD_REACH} tiles: nobody could reach it` };
+      if (op.kind !== "park" && op.kind !== "largePark" && !touchesRoad(world, tiles.map(t => t.i))) return { cost: 0, tiles: [], reason: "the building must be adjacent to a road" };
       break;
     }
     case "use": {
@@ -337,7 +305,7 @@ export function costOf(world, op) {
       let walled = 0;
       for (const i of op.tiles || []) {
         if (!(i >= 0 && i < world.w * world.h)) continue;
-        if (world.wall[i] || world.terrain[i] === TERRAIN.WATER || world.civic[i] || world.zone[i] || isBuilt(world, i)) continue;
+        if (world.wall[i] || world.rail[i] === 2 || world.terrain[i] === TERRAIN.WATER || world.civic[i] || world.zone[i] || isBuilt(world, i)) continue;
         if (world.road[i] && world.rail[i]) { walled++; continue; }
         let c = C.wall;
         if (world.terrain[i] === TERRAIN.TREE) c += C.bulldozeTree;
@@ -359,7 +327,7 @@ function snapshot(world, tiles) {
   return tiles.map(({ i }) => ({
     i,
     terrain: world.terrain[i], road: world.road[i], zone: world.zone[i], maxTier: world.maxTier[i],
-    tier: world.tier[i], civic: world.civic[i], rubble: world.rubble[i], wall: world.wall[i], use: world.use[i], rail: world.rail[i], big: world.big[i], theme: world.theme[i],
+    tier: world.tier[i], civic: world.civic[i], civicSize: world.civicSize[i], rubble: world.rubble[i], wall: world.wall[i], use: world.use[i], rail: world.rail[i], big: world.big[i], theme: world.theme[i],
   }));
 }
 
@@ -447,26 +415,13 @@ export function apply(world, op, { log = true } = {}) {
       case "tree":
         world.terrain[i] = TERRAIN.TREE;
         break;
-      case "park":
+      case "park": case "fire": case "police": case "centre": case "largePark": case "zoo": {
         world.terrain[i] = TERRAIN.GRASS;
-        world.civic[i] = CIVIC.PARK;
+        const a = idx(world, op.tx, op.ty), dx = i % world.w - op.tx, dy = ((i / world.w) | 0) - op.ty;
+        world.civic[i] = i === a ? ({ park: CIVIC.PARK, fire: CIVIC.FIRE, police: CIVIC.POLICE, centre: CIVIC.CENTRE, largePark: CIVIC.LARGE_PARK, zoo: CIVIC.ZOO })[op.kind] : CIVIC.PART;
+        world.civicSize[i] = i === a ? (op.kind === "park" ? 1 : 3) : 128 | dx | dy << 2;
         break;
-      case "fire":
-        world.terrain[i] = TERRAIN.GRASS;
-        world.civic[i] = CIVIC.FIRE;
-        break;
-      case "police":
-        world.terrain[i] = TERRAIN.GRASS;
-        world.civic[i] = CIVIC.POLICE;
-        break;
-      case "centre":
-        world.terrain[i] = TERRAIN.GRASS;
-        world.civic[i] = CIVIC.CENTRE;
-        break;
-      case "zoo":
-        world.terrain[i] = TERRAIN.GRASS;
-        world.civic[i] = what === "zoo" ? CIVIC.ZOO : CIVIC.ZOO_PART;
-        break;
+      }
       case "wall":
         if (world.terrain[i] === TERRAIN.TREE) world.terrain[i] = TERRAIN.GRASS;
         world.wall[i] = 1;
@@ -527,25 +482,14 @@ export function apply(world, op, { log = true } = {}) {
 }
 
 function removeCivic(world, i) {
-  const c = world.civic[i];
-  if (c === CIVIC.PARK) { world.civic[i] = CIVIC.NONE; return; }
-  if (c === CIVIC.FIRE || c === CIVIC.POLICE || c === CIVIC.CENTRE) {
-    for (const cz of world.citizens) if (cz.job === i) releaseJob(world, cz);
-    world.staff[i] = 0;
-    // Bulldozing the centre sends its inmates home early, unfixed.
-    if (c === CIVIC.CENTRE) for (const cz of world.citizens) if (cz.heldAt === i) { cz.held = 0; cz.heldAt = -1; }
-    world.civic[i] = CIVIC.NONE;
-    return;
+  const a = civicAnchorOf(world, i);
+  if (a < 0) return;
+  for (const c of world.citizens) {
+    if (c.job === a) releaseJob(world, c);
+    if (c.heldAt === a) { c.held = 0; c.heldAt = -1; }
   }
-  // Zoo: find the corner it shares and clear all four. world.zooAnchorOf is
-  // the one place that knows how a zoo is laid out; access asks it too.
-  const a = zooAnchorOf(world, i);
-  if (a >= 0) {
-    for (const cz of world.citizens) if (cz.job === a) releaseJob(world, cz); // fire the zoo's workers
-    for (const j of zooTiles(world, a)) world.civic[j] = CIVIC.NONE;
-    return;
-  }
-  world.civic[i] = CIVIC.NONE;
+  world.staff[a] = 0;
+  for (const j of civicTiles(world, a)) { world.civic[j] = CIVIC.NONE; world.civicSize[j] = 0; }
 }
 
 function stripOp(op) {
@@ -562,7 +506,7 @@ export function undo(world) {
   for (const s of u.snap) {
     if (world.tier[s.i] > 0 && s.tier === 0) continue; // something grew here since; leave it
     world.terrain[s.i] = s.terrain; world.road[s.i] = s.road; world.zone[s.i] = s.zone; world.maxTier[s.i] = s.maxTier;
-    world.tier[s.i] = s.tier; world.civic[s.i] = s.civic; world.rubble[s.i] = s.rubble; world.wall[s.i] = s.wall; world.use[s.i] = s.use; world.rail[s.i] = s.rail; world.big[s.i] = s.big; world.theme[s.i] = s.theme;
+    world.tier[s.i] = s.tier; world.civic[s.i] = s.civic; world.civicSize[s.i] = s.civicSize; world.rubble[s.i] = s.rubble; world.wall[s.i] = s.wall; world.use[s.i] = s.use; world.rail[s.i] = s.rail; world.big[s.i] = s.big; world.theme[s.i] = s.theme;
   }
   if (u.roads) { world.roadsDirty = true; invalidatePaths(world); computeOcclusion(world); computeRoadDist(world); computeStationDoors(world); } // live, as apply does
   else if (u.op.kind === "use") invalidatePaths(world);

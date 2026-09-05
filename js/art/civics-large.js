@@ -1,6 +1,6 @@
 // Large civic campuses: 48×48 world units = 3×3 tiles. Art only; placement,
 // access and save migration belong to the civic-footprint implementation.
-// Select with art.civic(kind, 3). Legacy art remains the default until then.
+// Select with art.civic(kind, 3); the renderer uses the saved civic footprint.
 import { box, flatSkin, litSkin } from "./solid.js";
 import { solidSprite, registerLargeCivics, KIT } from "./buildings.js";
 import { BLOCK_KIT } from "./blocks.js";
@@ -117,7 +117,7 @@ function centre() {
   ];
 }
 
-function zoo() {
+function largePark() {
   const fence = { top: () => EARTH[4], side: u => Math.floor(u) % 2 ? null : EARTH[3], end: u => Math.floor(u) % 2 ? null : EARTH[2] };
   return [
     slab(0, 0, 48, 48, 0, .6, LAWN),
@@ -147,12 +147,38 @@ function zoo() {
   ];
 }
 
-const PLANS = { fire: firehouse, police, centre, zoo };
+function zoo() {
+  const masonry = litSkin(CONC_WALL, { height: 16 });
+  const cells = wall(16, CONC_WALL, { storey: 8, sill: 3, winH: 3, period: 3, winW: 1 });
+  return [
+    slab(0, 0, 48, 48),
+    // Secure perimeter, a single public gate, and an open exercise yard.
+    box(1, 47, 1, 3, .6, 8, masonry), box(1, 3, 3, 46, .6, 8, masonry),
+    box(45, 47, 3, 46, .6, 8, masonry),
+    box(1, 19, 45, 47, .6, 8, masonry), box(29, 47, 45, 47, .6, 8, masonry),
+    box(5, 43, 5, 17, .6, 16.6, cells), slab(4.5, 4.5, 39, 13, 16.6, 1.2, C_ROOF),
+    box(5, 15, 18, 35, .6, 16.6, cells), slab(4.5, 17.5, 11, 18, 16.6, 1.2, C_ROOF),
+    // Gatehouse and a barred vehicle gate read differently from the park arch.
+    box(30, 43, 33, 43, .6, 10.6, wall(10)), slab(29.5, 32.5, 14, 11, 10.6, 1.2, C_ROOF),
+    ...[19, 21, 23, 25, 27, 29].map(a => box(a, a + .5, 45, 46, .6, 8, SLATE_SKIN)),
+    box(19, 30, 45, 46, 7.5, 8.5, SLATE_SKIN),
+    ...[[3,3], [41,41]].flatMap(([a,b]) => [
+      box(a, a + 4, b, b + 4, .6, 22, masonry),
+      box(a - .5, a + 4.5, b - .5, b + 4.5, 22, 25, wall(3, CONC_WALL, { sill: 0, winH: 2, period: 2, winW: 1 })),
+      slab(a - 1, b - 1, 6, 6, 25, 1, C_ROOF),
+    ]),
+    slab(20, 22, 18, 10, .6, .15, LAWN), ...bench(22, 34),
+    ...lamp(17, 39, 8), ...lamp(39, 21, 8),
+  ];
+}
+
+const PLANS = { fire: firehouse, police, centre, largePark, zoo };
 const TREES = {
   fire: [[TREE_ROUND, 39, 39, 2.8]],
   police: [[TREE_TALL, 5, 36, 2.8]],
   centre: [[TREE_ROUND, 39, 41, 2.8]],
-  zoo: [[TREE_ROUND, 8, 39, .6], [TREE_WILLOW, 9, 9, .6], [TREE_TALL, 42, 22, .6]],
+  largePark: [[TREE_ROUND, 8, 39, .6], [TREE_WILLOW, 9, 9, .6], [TREE_TALL, 42, 22, .6]],
+  zoo: [],
 };
 export const LARGE_CIVICS = Object.freeze(Object.fromEntries(Object.entries(PLANS).map(([kind, make]) =>
   [kind, solidSprite(`civic-${kind}-3x3`, make(), { hub: 24, footprint: [3, 3], tags: ["civic", "civic-large", kind],

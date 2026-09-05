@@ -13,9 +13,9 @@ export { USE } from "./use.js";
 export const TERRAIN = Object.freeze({ GRASS: 0, WATER: 1, TREE: 2 });
 export const ROAD = Object.freeze({ NONE: 0, ROAD: 1, BRIDGE: 2 });
 export const ZONE = Object.freeze({ NONE: 0, R: 1, C: 2, I: 3, M: 4 });
-export const CIVIC = Object.freeze({ NONE: 0, PARK: 1, ZOO: 2, ZOO_PART: 3, FIRE: 4, POLICE: 5, CENTRE: 6 });
+export const CIVIC = Object.freeze({ NONE: 0, PARK: 1, LARGE_PARK: 2, LARGE_PARK_PART: 3, FIRE: 4, POLICE: 5, CENTRE: 6, PART: 7, ZOO: 8 });
 export const isStation = (c) => c === CIVIC.FIRE || c === CIVIC.POLICE; // coverage
-export const isCivicEmployer = (c) => isStation(c) || c === CIVIC.CENTRE; // jobs
+export const isCivicEmployer = (c) => isStation(c) || c === CIVIC.CENTRE || c === CIVIC.ZOO; // jobs
 export const ZONE_NAME = ["none", "R", "C", "I", "M"];
 /** Use-zoning: who a lot or road admits. Stable 16-bit codes live in use.js; species.js applies them. */
 /** In custody or a market pen: not working, socialising, breeding, hunting or on the street. */
@@ -43,6 +43,7 @@ export function createWorld({ seed = "zoo", w = 64, h = 64 } = {}) {
     maxTier: new Uint8Array(n).fill(3),
     tier: new Uint8Array(n),
     civic: new Uint8Array(n),
+    civicSize: new Uint8Array(n), // anchor side, or 128 | dx | dy << 2 on a civic part; zero preserves legacy sizes
     burning: new Uint8Array(n),
     rubble: new Uint8Array(n),
     variant: new Uint8Array(n),
@@ -308,46 +309,47 @@ export function footprintOf(world, anchor) {
   for (let dy = 0; dy < s; dy++) for (let dx = 0; dx < s; dx++) out.push(anchor + dx + dy * world.w);
   return out;
 }
-/**
- * The zoo is the one thing on the map with a footprint that is NOT a block:
- * four civic tiles, CIVIC.ZOO on the north-west one and CIVIC.ZOO_PART on the
- * other three. This is the single place that knows how to get from any of the
- * four to the corner they share — the bulldozer, `siteTiles` and therefore
- * access all ask it. Returns −1 for a tile that is not a zoo.
- */
-export function zooAnchorOf(world, i) {
+/** Resolve any civic tile to its owner; parts encode offsets, so adjacent campuses are unambiguous. */
+export function civicAnchorOf(world, i) {
   const c = world.civic[i];
-  if (c === CIVIC.ZOO) return i;
-  if (c !== CIVIC.ZOO_PART) return -1;
-  const tx = i % world.w;
-  const ty = (i / world.w) | 0;
+  if (!c) return -1;
+  if (c === CIVIC.PART) {
+    const p = world.civicSize[i];
+    return p & 128 ? i - (p & 3) - ((p >> 2) & 3) * world.w : -1;
+  }
+  if (c !== CIVIC.LARGE_PARK_PART) return i;
+  // Legacy two-tile-side zoo parts retain their existing footprint on load.
+  const tx = i % world.w, ty = (i / world.w) | 0;
   for (let dy = -1; dy <= 0; dy++) for (let dx = -1; dx <= 0; dx++) {
-    const ax = tx + dx;
-    const ay = ty + dy;
-    if (inBounds(world, ax, ay) && world.civic[idx(world, ax, ay)] === CIVIC.ZOO) return idx(world, ax, ay);
+    const ax = tx + dx, ay = ty + dy;
+    if (inBounds(world, ax, ay) && world.civic[idx(world, ax, ay)] === CIVIC.LARGE_PARK) return idx(world, ax, ay);
   }
   return -1;
 }
 
-/** The four tiles of the zoo anchored at `a`, raster order (clipped to the map). */
-export function zooTiles(world, a) {
-  const ax = a % world.w;
-  const ay = (a / world.w) | 0;
-  const out = [];
-  for (let dy = 0; dy < 2; dy++) for (let dx = 0; dx < 2; dx++) if (inBounds(world, ax + dx, ay + dy)) out.push(idx(world, ax + dx, ay + dy));
+export function civicSideOf(world, i) {
+  const a = civicAnchorOf(world, i);
+  return a < 0 ? 1 : world.civicSize[a] || (world.civic[a] === CIVIC.LARGE_PARK ? 2 : 1);
+}
+
+export function civicTiles(world, i) {
+  const a = civicAnchorOf(world, i);
+  if (a < 0) return [i];
+  const side = civicSideOf(world, a), out = [];
+  for (let dy = 0; dy < side; dy++) for (let dx = 0; dx < side; dx++) out.push(a + dx + dy * world.w);
   return out;
 }
 
-/**
- * Every tile of the SITE tile i belongs to — a block's footprint, a zoo's
- * four, or the tile itself. ONE answer to "what is the whole thing here",
- * so that access (fields.served, fields.doorSearch) asks about the building
- * and never about a corner of it. SPEC §6c.
- */
+// Compatibility helpers for legacy callers; new code asks about any civic.
+export const zooAnchorOf = (world, i) => {
+  const a = civicAnchorOf(world, i);
+  return a >= 0 && world.civic[a] === CIVIC.LARGE_PARK ? a : -1;
+};
+export const zooTiles = civicTiles;
+
+/** Every tile of one site: a civic campus, zoned block, or individual lot. */
 export function siteTiles(world, i) {
-  const z = zooAnchorOf(world, i);
-  if (z >= 0) return zooTiles(world, z);
-  return footprintOf(world, anchorOf(world, i)); // [i] for a lot of its own
+  return world.civic[i] ? civicTiles(world, i) : footprintOf(world, anchorOf(world, i));
 }
 
 /** What a block holds over what its lots held: side² × BIG_BONUS (1 for a lot of its own). */
@@ -375,6 +377,7 @@ export function capacityOf(world, i) {
   if (z === ZONE.I) return Math.round(KNOBS.I_JOBS[t] * m);
   if (z === ZONE.M) return Math.round(KNOBS.M_JOBS[t] * m);
   if (world.civic[i] === CIVIC.ZOO) return KNOBS.ZOO_JOBS;
+  if (world.civic[i] === CIVIC.LARGE_PARK) return KNOBS.LARGE_PARK_JOBS;
   if (world.civic[i] === CIVIC.CENTRE) return KNOBS.CENTRE_JOBS;
   if (isStation(world.civic[i])) return KNOBS.STATION_JOBS;
   return 0;
@@ -382,6 +385,7 @@ export function capacityOf(world, i) {
 
 /** Jobs offered by a tile (C, I, M, a zoo anchor, a fire or police station, the centre); a block's part offers none. */
 export function jobsOf(world, i) {
+  if (world.civic[i] === CIVIC.ZOO) return KNOBS.ZOO_JOBS;
   const z = world.zone[i];
   const b = world.big[i];
   if (b & PART) return 0;
@@ -389,14 +393,14 @@ export function jobsOf(world, i) {
   if (z === ZONE.C) return Math.round(KNOBS.C_JOBS[world.tier[i]] * m);
   if (z === ZONE.I) return Math.round(KNOBS.I_JOBS[world.tier[i]] * m);
   if (z === ZONE.M) return Math.round(KNOBS.M_JOBS[world.tier[i]] * m);
-  if (world.civic[i] === CIVIC.ZOO) return KNOBS.ZOO_JOBS;
+  if (world.civic[i] === CIVIC.LARGE_PARK) return KNOBS.LARGE_PARK_JOBS;
   if (isCivicEmployer(world.civic[i])) return world.civic[i] === CIVIC.CENTRE ? KNOBS.CENTRE_JOBS : KNOBS.STATION_JOBS;
   return 0;
 }
 
 /** Which demand a job site counts toward: C (zoo, stations and the centre count as C), I, or M (the meat halls — their own valve). */
 export function jobZone(world, i) {
-  if (world.zone[i] === ZONE.C || world.civic[i] === CIVIC.ZOO || isCivicEmployer(world.civic[i])) return ZONE.C;
+  if (world.zone[i] === ZONE.C || world.civic[i] === CIVIC.LARGE_PARK || isCivicEmployer(world.civic[i])) return ZONE.C;
   if (world.zone[i] === ZONE.I) return ZONE.I;
   if (world.zone[i] === ZONE.M) return ZONE.M;
   return ZONE.NONE;

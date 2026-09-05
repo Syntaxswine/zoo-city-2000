@@ -24,7 +24,7 @@
 // cued by `world.predations`, which justice.kill publishes before the victim
 // is scrubbed; the figure in the sack is a record, not a citizen).
 
-import { ROAD, CIVIC, ZONE, TERRAIN, inBounds, anchorOf, absent } from "./sim/world.js";
+import { ROAD, CIVIC, civicAnchorOf, ZONE, TERRAIN, inBounds, anchorOf, absent } from "./sim/world.js";
 import { ageYears } from "./sim/census.js";
 import { SPECIES_BY_ID } from "./sim/species.js";
 import { hash01 } from "./sim/rng.js";
@@ -146,7 +146,7 @@ export function createWalkers(initialWorld) {
     return false;
   }
   const isPark = (i) => world.civic[i] === CIVIC.PARK;
-  const isZoo = (i) => world.civic[i] === CIVIC.ZOO || world.civic[i] === CIVIC.ZOO_PART;
+  const isZoo = (i) => world.civic[civicAnchorOf(world, i)] === CIVIC.LARGE_PARK;
   const isShop = (i) => world.zone[i] === ZONE.C && world.tier[i] > 0;
 
   /** The edge road nearest the city centroid (the world's door), or -1. */

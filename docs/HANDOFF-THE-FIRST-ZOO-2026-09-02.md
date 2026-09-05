@@ -2234,3 +2234,7 @@ to the allocated side. See `docs/ART-CIVICS-3X3.md` and SPEC §12.2f.
 Every new recipe participates in the existing palette, footprint, hi-res
 and pedestrian depth audits through `allSprites()`. The canonical suite
 also checks explicit selection and legacy footprint compatibility.
+
+## 27. Civic campuses, Large Park and Zoo prison — 2026-09-05
+
+The art-only handoff above is now integrated: five 3×3 campuses, adjacent-road placement for services, a road-free Large Park retaining the garden, and a separate 24-bed Zoo prison. Sentencing follows the owner's theft/murder rules. Existing saves retain old footprints. The canonical suite passes all 586 checks; both zooms and corner inspection were verified in the browser. See [the current handoff](HANDOFF-CIVIC-CAMPUSES-2026-09-05.md) for save migration, the population canary and six measured 30-year hashes.

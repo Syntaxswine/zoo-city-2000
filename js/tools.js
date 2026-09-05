@@ -20,17 +20,18 @@ export const TOOLS = Object.freeze([
   row(8, "station", "8", "Station", { kind: "station" }, { kind: "station", args: ["ns"] }, "click a plain rail tile; it is a door wherever a road comes within 3 tiles, and riders walk the forecourt"),
   row(9, "tree", "9", "Tree", { kind: "tree" }, { kind: "tree", args: ["round"] }, "plant trees (drag)"),
   row(10, "park", "0", "Park", { kind: "park" }, { kind: "civic", args: ["park"] }, "place a 1×1 park"),
-  row(11, "zoo", "Z", "Zoo", { kind: "zoo" }, { kind: "civic", args: ["zoo"] }, "place a 2×2 zoo"),
-  row(12, "centre", "V", "Pacification", { kind: "centre" }, { kind: "civic", args: ["centre"] }, "place a pacification centre"),
-  row(13, "police", "P", "Police", { kind: "police" }, { kind: "civic", args: ["police"] }, "place a police station"),
-  row(14, "fire", "F", "Fire station", { kind: "fire" }, { kind: "civic", args: ["fire"] }, "place a fire station"),
+  row(11, "zoo", "Z", "Zoo", { kind: "zoo" }, { kind: "civic", args: ["zoo", 3] }, "place a 3×3 prison zoo beside a road"),
+  row(12, "centre", "V", "Pacification", { kind: "centre" }, { kind: "civic", args: ["centre", 3] }, "place a 3×3 pacification centre beside a road"),
+  row(13, "police", "P", "Police", { kind: "police" }, { kind: "civic", args: ["police", 3] }, "place a 3×3 police station beside a road"),
+  row(14, "fire", "F", "Fire station", { kind: "fire" }, { kind: "civic", args: ["fire", 3] }, "place a 3×3 fire station beside a road"),
   row(15, "inspect", "I", "Inspect", { kind: "inspect" }, { kind: "overlay", args: ["cursor"] }, "pin a lot or citizen; left-drag pans"),
   row(16, "bulldoze", "B", "Bulldoze", { kind: "bulldoze" }, { kind: "ground", args: ["rubble"] }, "clear (drag); occupied lots cannot be undone"),
+  row(17, "largePark", "G", "Large park", { kind: "largePark" }, { kind: "civic", args: ["largePark", 3] }, "place a 3×3 large park; no road required"),
 ]);
 
 export const TOOL_BY_ID = Object.freeze(Object.fromEntries(TOOLS.map((tool) => [tool.id, tool])));
 export const TOOL_BY_KEY = Object.freeze(Object.fromEntries(TOOLS.map((tool) => [tool.key.toUpperCase(), tool])));
-export const PLACE_TOOLS = Object.freeze(TOOLS.filter((tool) => ["station", "park", "zoo", "centre", "police", "fire"].includes(tool.op.kind)).map((tool) => tool.id));
+export const PLACE_TOOLS = Object.freeze(TOOLS.filter((tool) => ["station", "park", "largePark", "zoo", "centre", "police", "fire"].includes(tool.op.kind)).map((tool) => tool.id));
 
 /** Resolve a concrete op back to the registry row that names it. */
 export function toolForOp(op) {

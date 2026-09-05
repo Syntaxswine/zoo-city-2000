@@ -14,7 +14,7 @@ import { refreshLast } from "./tick.js";
 import { migrateLegacyNames } from "./legacy.js";
 import { normalizeUse } from "./use.js";
 
-const TILE_ARRAYS = ["terrain", "road", "zone", "maxTier", "tier", "civic", "burning", "rubble", "variant", "flooded", "wall", "use", "rail", "meat", "big", "theme"];
+const TILE_ARRAYS = ["terrain", "road", "zone", "maxTier", "tier", "civic", "civicSize", "burning", "rubble", "variant", "flooded", "wall", "use", "rail", "meat", "big", "theme"];
 
 // This expanded shape is the pre-Part-B save shape. stateHash deliberately
 // keeps using it: storage compaction must not redefine simulation identity.
@@ -30,6 +30,7 @@ function canonicalCitizen(c) {
   };
   // Optional in old saves/hashes: a penned animal carries the market state;
   // ordinary citizens retain the exact pre-H canonical shape.
+  if (c.thefts) out.thefts = c.thefts;
   if (c.pen) { out.pen = true; out.penSince = c.penSince || 0; }
   return out;
 }
@@ -55,7 +56,7 @@ function plainCitizen(c) {
 
 export function toPlain(world) {
   const o = {
-    version: world.version, seed: world.seed, seedNum: world.seedNum, w: world.w, h: world.h, tick: world.tick,
+    version: world.version, justiceVersion: 2, seed: world.seed, seedNum: world.seedNum, w: world.w, h: world.h, tick: world.tick,
     cash: world.cash, rates: { ...world.rates }, start: world.start,
     valves: { ...world.valves }, festivalBonus: world.festivalBonus,
     citizens: world.citizens.filter((c) => !c.dead).map(plainCitizen),
@@ -75,7 +76,7 @@ export function toPlain(world) {
   if (world.meatStats) o.meatStats = JSON.parse(JSON.stringify(world.meatStats));
   if (world.legacy?.length) o.legacy = world.legacy.slice();
   if (Object.keys(world.names || {}).length) o.names = { ...world.names };
-  for (const k of TILE_ARRAYS) o[k] = Array.from(world[k]);
+  for (const k of TILE_ARRAYS) if (k !== "civicSize" || world[k].some(Boolean)) o[k] = Array.from(world[k]);
   return o;
 }
 
@@ -107,6 +108,12 @@ export function fromPlain(o) {
   world.campers = o.campers.map((c) => ({ ...c }));
   world.nextId = o.nextId;
   world.nextHouseholdId = o.nextHouseholdId;
+  // Legacy saves recorded total convictions, but not the theft count.
+  // Recover only thefts actually present in their retained arrest history.
+  if (!o.justiceVersion) for (const c of world.citizens) {
+    if (c.thefts) continue;
+    c.thefts = (o.events.arrests || []).filter(a => a.citizenId === c.id && !a.exonerated && ["burglary", "theft"].includes(a.cause)).length;
+  }
   const jDefaults = world.events.justice;
   world.events = { ...world.events, ...o.events };
   world.events.justice = { ...jDefaults, ...(o.events.justice || {}) }; // an old save without a counter keeps 0, never NaN
@@ -156,6 +163,7 @@ export function rebuildDerived(world) {
 export function stateHash(world, { news = true } = {}) {
   const o = toPlain(world);
   o.citizens = world.citizens.filter((c) => !c.dead).map(canonicalCitizen);
+  delete o.justiceVersion; // migration marker, not simulation state
   delete o.log;
   delete o.history;
   if (!news) delete o.events.log;

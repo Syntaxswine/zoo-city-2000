@@ -6,7 +6,7 @@
 
 import { buildingMark } from "./building-marks.js";
 import { KNOBS } from "./rules.js";
-import { ZONE, CIVIC, idx, inBounds, capacityOf, jobsOf, isPart, anchorOf, footprintOf, sideOf, occAt, carnAtOf } from "./world.js";
+import { ZONE, CIVIC, idx, inBounds, capacityOf, jobsOf, isPart, civicAnchorOf, civicSideOf, anchorOf, footprintOf, sideOf, occAt, carnAtOf } from "./world.js";
 import { served, siteRoadDist, doorsOf, nearestRoad } from "./fields.js";
 import { evictFromLot, fireFromLot } from "./citizens.js";
 import { mergeWindow, windowFill, mergeLots, splitLot } from "./blocks.js";
@@ -225,7 +225,7 @@ export function lotsTick(world) {
 
 /** Data for the hover card. A block's part reports its ANCHOR's building (`part` names the tile asked about). */
 export function lotReport(world, at) {
-  const i = anchorOf(world, at);
+  const i = world.civic[at] ? civicAnchorOf(world, at) : anchorOf(world, at);
   const z = world.zone[i];
   const s = lotScore(world, i);
   const rep = {
@@ -233,7 +233,7 @@ export function lotReport(world, at) {
     ty: (i / world.w) | 0,
     at: { tx: at % world.w, ty: (at / world.w) | 0 },
     part: at !== i,
-    side: sideOf(world, i),
+    side: world.civic[i] ? civicSideOf(world, i) : sideOf(world, i),
     theme: world.theme[i],
     mark: buildingMark(world, i),
     landmark: landmarkOf(world.theme[i]), // the roster row a 3×3 rose as, or null (SPEC §3c)

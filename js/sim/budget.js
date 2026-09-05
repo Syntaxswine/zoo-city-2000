@@ -46,7 +46,7 @@ export function yearlyFigures(world) {
   let bridges = 0;
   let tiers = 0;
   let parks = 0;
-  let zoos = 0;
+  let largeParks = 0, zoos = 0;
   let fireStations = 0;
   let policeStations = 0;
   let centres = 0;
@@ -64,15 +64,16 @@ export function yearlyFigures(world) {
     tiers += world.tier[i];
     if (world.zone[i] === ZONE.M && world.tier[i] > 0 && !isPart(world, i)) markets++; // the licence inspects a hall, not its tiles
     if (world.civic[i] === CIVIC.PARK) parks++;
+    else if (world.civic[i] === CIVIC.LARGE_PARK) largeParks++;
     else if (world.civic[i] === CIVIC.ZOO) zoos++;
     else if (world.civic[i] === CIVIC.FIRE) fireStations++;
     else if (world.civic[i] === CIVIC.POLICE) policeStations++;
     else if (world.civic[i] === CIVIC.CENTRE) centres++;
   }
-  let upkeepYr = KNOBS.UPKEEP_CITIZEN * citizens.length + KNOBS.UPKEEP_ROAD * roads + KNOBS.UPKEEP_BRIDGE * bridges + KNOBS.UPKEEP_TIER * tiers + KNOBS.UPKEEP_PARK * parks + KNOBS.UPKEEP_ZOO * zoos + KNOBS.UPKEEP_STATION * (fireStations + policeStations) + KNOBS.UPKEEP_CENTRE * centres + KNOBS.UPKEEP_WALL * walls + KNOBS.UPKEEP_RAIL * rails + KNOBS.UPKEEP_STATION_RAIL * stations + (licence ? KNOBS.UPKEEP_LICENCE * markets : 0);
+  let upkeepYr = KNOBS.UPKEEP_CITIZEN * citizens.length + KNOBS.UPKEEP_ROAD * roads + KNOBS.UPKEEP_BRIDGE * bridges + KNOBS.UPKEEP_TIER * tiers + KNOBS.UPKEEP_PARK * parks + KNOBS.UPKEEP_LARGE_PARK * largeParks + KNOBS.UPKEEP_ZOO * zoos + KNOBS.UPKEEP_STATION * (fireStations + policeStations) + KNOBS.UPKEEP_CENTRE * centres + KNOBS.UPKEEP_WALL * walls + KNOBS.UPKEEP_RAIL * rails + KNOBS.UPKEEP_STATION_RAIL * stations + (licence ? KNOBS.UPKEEP_LICENCE * markets : 0);
   const winter = world.events.active.find((e) => e.id === "bearWinter");
   if (winter) upkeepYr *= 0.8;
-  return { incomeYr: Math.round(incomeYr), upkeepYr: Math.round(upkeepYr), cutYr: Math.round(cutYr), fc, fi, fm, roads, bridges, parks, zoos, fireStations, policeStations, centres, markets, walls, rails, stations, licence };
+  return { incomeYr: Math.round(incomeYr), upkeepYr: Math.round(upkeepYr), cutYr: Math.round(cutYr), fc, fi, fm, roads, bridges, parks, largeParks, zoos, fireStations, policeStations, centres, markets, walls, rails, stations, licence };
 }
 
 /** The monthly slice: post tax and upkeep, apply receivership rules. */

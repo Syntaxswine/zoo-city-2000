@@ -35,7 +35,7 @@ import { lightLevel } from "./art/building-character.js";
 import { toScreen, toWorld, pickTile, HALF_H, HALF_W, TILE_W, TILE_H } from "./iso/iso.js";
 import { paintScene, Z_BUILDING } from "./iso/painter.js";
 import { rasterize } from "./art/format.js";
-import { ZONE, CIVIC, TERRAIN, ROAD, capacityOf, isPart, anchorOf, sideOf } from "./sim/world.js";
+import { ZONE, CIVIC, TERRAIN, ROAD, capacityOf, isPart, anchorOf, sideOf, civicAnchorOf, civicSideOf } from "./sim/world.js";
 import { DECK_TOP } from "./art/roads.js";
 import { lotScore, REASON } from "./sim/lots.js";
 import { siteRoadDist, asksAccess, served } from "./sim/fields.js";
@@ -229,13 +229,9 @@ export function createRenderer(canvas, initialWorld, art) {
   function footprintAt(tx, ty) {
     const i = ty * world.w + tx;
     if (world.big[i]) { const a = anchorOf(world, i); return { tx: a % world.w, ty: (a / world.w) | 0, side: sideOf(world, a) }; }
-    const c = world.civic[i];
-    if (c === CIVIC.ZOO) return { tx, ty, side: 2 };
-    if (c === CIVIC.ZOO_PART) {
-      for (let dy = -1; dy <= 0; dy++) for (let dx = -1; dx <= 0; dx++) {
-        const ax = tx + dx, ay = ty + dy;
-        if (ax >= 0 && ay >= 0 && world.civic[ay * world.w + ax] === CIVIC.ZOO) return { tx: ax, ty: ay, side: 2 };
-      }
+    if (world.civic[i]) {
+      const a = civicAnchorOf(world, i), side = civicSideOf(world, i);
+      if (a >= 0 && side > 1) return { tx: a % world.w, ty: (a / world.w) | 0, side };
     }
     return null;
   }
@@ -314,7 +310,7 @@ export function createRenderer(canvas, initialWorld, art) {
       for (let tx = range.x0; tx <= range.x1; tx++) {
         const i = ty * world.w + tx;
         if (world.zone[i] === ZONE.NONE) {
-          if (world.civic[i] === CIVIC.ZOO_PART) continue;             // the anchor speaks for the zoo
+          if (world.civic[i] && civicAnchorOf(world, i) !== i) continue;             // the anchor speaks for the zoo
           if (asksAccess(world, i) && !served(world, i, accessSeen(world))) zots.set(i, "noroad"); // the layer's own buffer (SPEC 14)
           continue;
         }
@@ -517,11 +513,12 @@ export function createRenderer(canvas, initialWorld, art) {
             standing = art.building(world.zone[i], world.tier[i], world.variant[i], sideOf(world, i), world.theme[i],
               { lit: lightLevel(fill), majority: world.majority[i], seed: i });
           }
-        } else if (world.civic[i] === CIVIC.PARK) standing = art.civic("park");
-        else if (world.civic[i] === CIVIC.ZOO) standing = art.civic("zoo");
-        else if (world.civic[i] === CIVIC.FIRE) standing = art.civic("fire");
-        else if (world.civic[i] === CIVIC.POLICE) standing = art.civic("police");
-        else if (world.civic[i] === CIVIC.CENTRE) standing = art.civic("centre");
+        } else if (world.civic[i] === CIVIC.PARK) standing = art.civic("park", civicSideOf(world, i));
+        else if (world.civic[i] === CIVIC.LARGE_PARK) standing = art.civic("largePark", civicSideOf(world, i));
+        else if (world.civic[i] === CIVIC.ZOO) standing = art.civic("zoo", 3);
+        else if (world.civic[i] === CIVIC.FIRE) standing = art.civic("fire", civicSideOf(world, i));
+        else if (world.civic[i] === CIVIC.POLICE) standing = art.civic("police", civicSideOf(world, i));
+        else if (world.civic[i] === CIVIC.CENTRE) standing = art.civic("centre", civicSideOf(world, i));
         else if (world.wall[i]) standing = world.road[i] !== ROAD.NONE || world.rail[i] ? art.tunnel(tunnelAxis(world, i)) : art.wall(wallMask(tx, ty)); // a wall stands; a tunnel stands over its road or rail
         else if (world.rail[i] === 2) standing = art.station(railAxis(tx, ty)); // the platform and shelter stand over the track
         if (standing) items.push({ sprite: standing, tx, ty, kind: "building" });

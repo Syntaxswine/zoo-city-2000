@@ -4,7 +4,7 @@
 //                                       variant is the whole tile byte; original families use & 3; the shop kind still uses >> 1
 //                                       character = {lit:0..3, majority:species index+1, seed:tile index}; omitted for previews
 //                                       theme > 0 with side 3 → that landmark (landmarks.js; ids per js/sim/landmarks.js)
-//   art.civic(kind, side)               'park' | 'zoo' | 'fire' | 'police' | 'centre'; side 3 selects new civic campuses, omitted preserves legacy footprint
+//   art.civic(kind, side)               'park' | 'largePark' | 'zoo' | 'fire' | 'police' | 'centre'; side 3 selects campuses; legacy saves supply their existing side
 //   art.road(mask, busy)                4-bit mask N=1 E=2 S=4 W=8
 //   art.bridge(mask)
 //   art.wall(mask)                      the same mask; a standing sprite (walls.js)

@@ -105,7 +105,7 @@ export function createUI(app) {
     for (let i = 0; i < w.w * w.h; i++) tiers += w.tier[i];
     const raw = [
       ["animals", KNOBS.UPKEEP_CITIZEN * w.citizens.length], ["roads", KNOBS.UPKEEP_ROAD * fig.roads], ["bridges", KNOBS.UPKEEP_BRIDGE * fig.bridges],
-      ["buildings", KNOBS.UPKEEP_TIER * tiers], ["parks", KNOBS.UPKEEP_PARK * fig.parks], ["zoos", KNOBS.UPKEEP_ZOO * fig.zoos],
+      ["buildings", KNOBS.UPKEEP_TIER * tiers], ["parks", KNOBS.UPKEEP_PARK * fig.parks], ["large parks", KNOBS.UPKEEP_LARGE_PARK * fig.largeParks], ["zoos", KNOBS.UPKEEP_ZOO * fig.zoos],
       ["fire stations", KNOBS.UPKEEP_STATION * (fig.fireStations || 0)], ["police stations", KNOBS.UPKEEP_STATION * (fig.policeStations || 0)],
       ["pacification centres", KNOBS.UPKEEP_CENTRE * (fig.centres || 0)], ["licence inspectors", fig.licence ? KNOBS.UPKEEP_LICENCE * (fig.markets || 0) : 0],
       ["walls", KNOBS.UPKEEP_WALL * (fig.walls || 0)],
@@ -401,7 +401,8 @@ export function createUI(app) {
     else if (w.road[i] === ROAD.BRIDGE) what = "Bridge";
     else if (w.road[i] === ROAD.ROAD) what = "Road";
     else if (rep.civic === CIVIC.PARK) what = "Park";
-    else if (rep.civic === CIVIC.ZOO || rep.civic === CIVIC.ZOO_PART) what = "Zoo";
+    else if (rep.civic === CIVIC.LARGE_PARK || rep.civic === CIVIC.LARGE_PARK_PART) what = "Large park";
+    else if (rep.civic === CIVIC.ZOO) what = "Zoo (prison)";
     else if (rep.civic === CIVIC.FIRE) what = "Fire station";
     else if (rep.civic === CIVIC.POLICE) what = "Police station";
     else if (rep.civic === CIVIC.CENTRE) what = "Pacification centre";
@@ -432,12 +433,12 @@ export function createUI(app) {
       // A landmark (SPEC §3c): the block the species made, named when it rose and kept until it comes apart.
       if (rep.landmark) lines.push(el("div", "dim", `a landmark — the block the ${rep.landmark.species.map(pluralSpecies).join(" and ")} made: ${rep.landmark.blurb}`));
     }
-    if (rep.civic === CIVIC.ZOO) head.append(el("span", "", `  jobs ${rep.staff}/${rep.jobs}`));
-    if (rep.civic === CIVIC.CENTRE) {
-      const held = w.citizens.filter((c) => c.heldAt === i && (c.held || 0) > w.tick);
-      head.append(el("span", "", `  beds ${held.length}/${KNOBS.CENTRE_BEDS} · jobs ${rep.staff}/${rep.jobs}`));
+    if (rep.civic === CIVIC.LARGE_PARK) head.append(el("span", "", `  jobs ${rep.staff}/${rep.jobs}`));
+    if (rep.civic === CIVIC.CENTRE || rep.civic === CIVIC.ZOO) {
+      const held = w.citizens.filter((c) => c.heldAt === rep.ty * w.w + rep.tx && (c.held || 0) > w.tick);
+      head.append(el("span", "", `  beds ${held.length}/${rep.civic === CIVIC.ZOO ? KNOBS.ZOO_BEDS : KNOBS.CENTRE_BEDS} · jobs ${rep.staff}/${rep.jobs}`));
       for (const c of held) lines.push(el("div", "", `held: ${c.name} ${c.surname} (${c.species}), home in ${c.held - w.tick} month${c.held - w.tick === 1 ? "" : "s"}${c.wrongful ? " — the wrong animal" : ""}`));
-      lines.push(el("div", "dim", "Six beds, six months. They come home calm and childless; one arrest in twenty was the wrong animal."));
+      lines.push(el("div", "dim", rep.civic === CIVIC.ZOO ? "Prison for lighter crimes. Release leaves fertility unchanged." : "Pacification for murder or a second theft. They come home calm and childless."));
     }
     if (rep.zone === ZONE.M && rep.tier > 0) {
       const hall = anchorOf(w, i);
@@ -579,7 +580,7 @@ export function createUI(app) {
       case REASON.LV_CAP: return `LV ${rep.lv} < ${rep.tier === 1 ? KNOBS.LV_TIER[0] : KNOBS.LV_TIER[1]} — parks and trees raise it`;
       case REASON.DENSITY_CAP: return "density brush: Low";
       case REASON.WAITING_FILL: return `waiting to fill up (${Math.round(s.fill * 100)}% of ${rep.capacity})`;
-      case REASON.CAPPED: return "capacity reached — build a park or a Zoo, or mix the species";
+      case REASON.CAPPED: return "capacity reached — build a park or a Large Park, or mix the species";
       case REASON.DECAYING: return `score ${f2(s.score)} < −0.15 — decaying`;
       default: return s.reason;
     }
@@ -623,7 +624,7 @@ export function createUI(app) {
       lines.push(el("div", "", `${hh ? `the ${hh.surname} household · ` : ""}home ${homeS} · job ${jobS} · mood ${Math.round(c.mood)}`));
       const status = [];
       if (c.pen) status.push(`in the market pen until ${dateOf(w, c.held).label}`);
-      else if ((c.held || 0) > w.tick) status.push(c.heldAt >= 0 ? `at the Pacification Centre until ${dateOf(w, c.held).label}` : `in the cells until ${dateOf(w, c.held).label}`);
+      else if ((c.held || 0) > w.tick) status.push(`${w.civic[c.heldAt] === CIVIC.ZOO ? "in the Zoo prison" : c.heldAt >= 0 ? "at the Pacification Centre" : "in legacy cells"} until ${dateOf(w, c.held).label}`);
       if (c.fixed) status.push(`fixed${c.wrongful ? " — the wrong animal" : ""}${c.exonerated ? ", exonerated" : ""}`);
       if (c.record) status.push(`record ${c.record}`);
       if (status.length) lines.push(el("div", "warn", status.join(" · ")));

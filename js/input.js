@@ -195,7 +195,7 @@ export function createInput(canvas, app) {
     const op = clickOp(tx, ty);
     if (op) {
       const plan = costOf(world(), op);
-      if (plan.reason) { app.ui.flash(`${state.tool}: blocked here`); return; }
+      if (plan.reason) { app.ui.flash(`${state.tool}: ${plan.reason}`); return; }
       if (!affordable(plan.cost)) { app.ui.flash(world().flags.receivership ? "Receivership: building is frozen" : `§${plan.cost.toLocaleString()} — cannot afford`); return; }
       app.doOp(op);
       refreshCost();
@@ -412,9 +412,9 @@ export function createInput(canvas, app) {
     if (state.drag && state.cost) h.drag = { tiles: state.cost.tiles, refused: state.cost.refused };
     if (!state.drag && state.hover && PLACE_TOOLS.includes(state.tool) && state.mouse.inside) {
       const [tx, ty] = state.hover;
-      const size = state.tool === "zoo" ? 2 : 1;
+      const size = ["largePark", "zoo", "fire", "police", "centre"].includes(state.tool) ? 3 : 1;
       const ok = !!state.cost && !state.cost.refused && state.cost.tiles.length > 0;
-      h.ghost = { tx, ty, w: size, h: size, ok, sprite: state.tool === "station" ? app.art.station("ns") : app.art.civic(state.tool) };
+      h.ghost = { tx, ty, w: size, h: size, ok, sprite: state.tool === "station" ? app.art.station("ns") : app.art.civic(state.tool, size) };
     }
     return h;
   }

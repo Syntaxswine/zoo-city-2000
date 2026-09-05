@@ -13,7 +13,10 @@ export const KNOBS = {
   R_CAP: [0, 4, 10, 24],
   C_JOBS: [0, 3, 8, 20],
   I_JOBS: [0, 4, 10, 24],
-  ZOO_JOBS: 12,
+  LARGE_PARK_JOBS: 12,
+  ZOO_JOBS: 8,
+  ZOO_BEDS: 24,
+  UPKEEP_ZOO: 1500,
   STATION_JOBS: 4,          // a fire or police station employs four (C-type jobs)
   // demand
   VALVE_LAG: 0.15,          // leaky integrator gain: 63% of a step in 6 months
@@ -34,7 +37,7 @@ export const KNOBS = {
   NEUTRAL_PER_P: 1 / 1600,  // n(P) = clamp(9 − P/1600, 6, 9)
   CAP_BASE: 1200,
   CAP_PARK: 150,
-  CAP_ZOO: 500,
+  CAP_LARGE_PARK: 500,
   CAP_H_GAIN: 0.5,          // Cap × (1 + 0.5·H)
   // lots
   ROAD_REACH: 3,
@@ -99,8 +102,8 @@ export const KNOBS = {
   LV_NATURE: 3,
   LV_PARK: 12,
   LV_PARK_RADIUS: 4,
-  LV_ZOO: 6,
-  LV_ZOO_RADIUS: 5,
+  LV_LARGE_PARK: 6,
+  LV_LARGE_PARK_RADIUS: 5,
   LV_POL: 0.6,
   COMMUTE_MAX: 40,
   // citizens
@@ -133,9 +136,9 @@ export const KNOBS = {
   UPKEEP_BRIDGE: 12,
   UPKEEP_TIER: 4,
   UPKEEP_PARK: 300,
-  UPKEEP_ZOO: 1500,
+  UPKEEP_LARGE_PARK: 1500,
   UPKEEP_STATION: 400,
-  COST: { zoneR: 5, zoneC: 8, zoneI: 8, zoneM: 12, road: 10, bridge: 40, bulldoze: 2, bulldozeTree: 4, tree: 4, park: 150, zoo: 2500, pond: 40, fire: 500, police: 500, centre: 1500, wall: 8, use: 1, rail: 20, station: 300 },
+  COST: { zoneR: 5, zoneC: 8, zoneI: 8, zoneM: 12, road: 10, bridge: 40, bulldoze: 2, bulldozeTree: 4, tree: 4, park: 150, largePark: 2500, zoo: 2500, pond: 40, fire: 500, police: 500, centre: 1500, wall: 8, use: 1, rail: 20, station: 300 },
   // ---- crime and punishment (the owner, 2026-09-02; docs/PROPOSAL-CRIME-AND-PUNISHMENT.md) ----
   // Zone M — the grey-market meat hall: stall / meat hall / cold store.
   M_JOBS: [0, 3, 8, 16],
@@ -247,7 +250,7 @@ export const KNOBS = {
   TRESPASS_HOME: 4,         // living or working on a forbidding lot counts as four tiles
   TRESPASS_MONTHS: 1,       // the minor sentence: the cells
   TRESPASS_CRIME: 5,        // the stain a stop leaves (radius 1)
-  RECORD_HARD: 3,           // from this record a trespasser meets the sentence table (the owner: multiple offences → the market)
+  RECORD_HARD: 3,           // legacy knob; escalation now uses the separate theft counter
   ZONED_OUT_MONTHS: 3,      // a household's notice when its lot is painted against it
   // rail (SPEC §7.9; docs/PROPOSAL-ZONING-RAIL-WALLS.md §3)
   UPKEEP_RAIL: 3,           // a tile a year
@@ -329,7 +332,7 @@ export const RULES = Object.freeze([
   },
   {
     id: "U2", title: "Trespass",
-    formula: "E = forbidden walking tiles on the commute (+4 for a forbidding home or job); p = min(0.3, 0.02·E·cover/60) a month — no police, no arrest; the cells for a month and a record; the third offence meets the sentence table",
+    formula: "E = forbidden walking tiles on the commute (+4 for a forbidding home or job); p = min(0.3, 0.02·E·cover/60) a month — no police, no arrest; the zoo prison for a month and a record; minor trespass does not count as theft",
     live: (w) => `${w.events.justice.trespass || 0} stop${w.events.justice.trespass === 1 ? "" : "s"} since founding`,
   },
   {
@@ -339,13 +342,13 @@ export const RULES = Object.freeze([
   },
   {
     id: "D5", title: "The cap: a city can only hold so many until it mixes",
-    formula: "Cap = (1200 + 150·parks + 500·zoos + festival) · (1 + 0.5·H) ;  V_R ≤ 1 − P/Cap ;  H fades in over the first 20 friendships ;  only SERVED zoos count (G1)",
-    live: (w) => `Cap = (1200 + 150·${w.last.census.parks} + 500·${w.last.census.zoos} + ${w.festivalBonus}) · (1 + 0.5·${f2(w.last.census.H)}) = ${Math.round(w.last.demand.cap)} ; P ${w.last.census.P}`,
+    formula: "Cap = (1200 + 150·parks + 500·large parks + festival) · (1 + 0.5·H) ;  V_R ≤ 1 − P/Cap ;  H fades in over the first 20 friendships ;  large parks work without roads",
+    live: (w) => `Cap = (1200 + 150·${w.last.census.parks} + 500·${w.last.census.largeParks} + ${w.festivalBonus}) · (1 + 0.5·${f2(w.last.census.H)}) = ${Math.round(w.last.demand.cap)} ; P ${w.last.census.P}`,
   },
   {
     id: "G1", title: "Road access: one rule, asked of the whole building, and every side is a way in",
-    formula: "a fire station, a police station, a pacification centre and a zoo can only be BUILT where a road reaches (a park and a platform anywhere; a platform out of reach shows the no-road mark). served ⇔ min roadDist over the FOOTPRINT ≤ ROAD_REACH (BFS through any tile, round a bare wall, and along a tunnel's own axis only) — a lot, a block, a hall, a zoo, one question. A STATION is asked the same question a different way: nobody walks a lot's gap, but a platform's forecourt is walked tile by tile, so it is a search over ground an animal can stand on (not water, not a wall, not a building) rather than a distance; doors = every road tile at that distance",
-    live: (w) => `${w.last.census.lotsNoRoad} zoned lots have no road${w.last.census.zoosNoRoad ? ` · ${w.last.census.zoosNoRoad} zoo${w.last.census.zoosNoRoad === 1 ? "" : "s"} no road reaches (no keepers, no halo, no room on the cap)` : ""}`,
+    formula: "a fire station, a police station, a pacification centre and a zoo occupy 3×3 tiles and can only be BUILT adjacent to a road along the footprint (small and large parks and a platform anywhere; a platform out of reach shows the no-road mark). served ⇔ min roadDist over the FOOTPRINT ≤ ROAD_REACH (BFS through any tile, round a bare wall, and along a tunnel's own axis only) — a lot, a block, a hall, a zoo, one question. A STATION is asked the same question a different way: nobody walks a lot's gap, but a platform's forecourt is walked tile by tile, so it is a search over ground an animal can stand on (not water, not a wall, not a building) rather than a distance; doors = every road tile at that distance",
+    live: (w) => `${w.last.census.lotsNoRoad} zoned lots have no road; parks retain their amenities without a road`,
   },
   {
     id: "G2", title: "Local score: land value minus smog",
@@ -379,7 +382,7 @@ export const RULES = Object.freeze([
   },
   {
     id: "F2", title: "Land value",
-    formula: "LV = 35 + 40·(1 − dCentre/24) + 3·nature8 + 12·[park within 4] + 6·[zoo within 5] − 0.6·Pol",
+    formula: "LV = 35 + 40·(1 − dCentre/24) + 3·nature8 + 12·[park within 4] + 6·[large park within 5] − 0.6·Pol",
     live: (w) => `mean LV ${f1(w.last.census.meanLV)}`,
   },
   {
@@ -389,7 +392,7 @@ export const RULES = Object.freeze([
   },
   {
     id: "B2", title: "Upkeep per year",
-    formula: "12·P + 5·roads + 12·bridges + 4·Σ tiers + 300·parks + 1500·zoos + 400·stations",
+    formula: "12·P + 5·roads + 12·bridges + 4·Σ tiers + 300·parks + 1500·large parks + 1500·zoos + 400·stations",
     live: (w) => `≈ §${w.last.budget.upkeepYr}/yr → net §${w.last.budget.incomeYr - w.last.budget.upkeepYr}/yr`,
   },
   {
@@ -449,7 +452,7 @@ export const RULES = Object.freeze([
   },
   {
     id: "M5", title: "The hall buys by a real service route",
-    formula: `nearest hall within 60 WALKED road steps; board, alight and every rail edge cost ZERO for meat carts and sacks, and their visible path carries those rail tiles. Citizen commutes price rail at ${f2(KNOBS.RAIL_COST / KNOBS.WALK)} of a walk. Property value, parks, Zoo, plaques and smell use geographic distance — rail never shortens them`,
+    formula: `nearest hall within 60 WALKED road steps; board, alight and every rail edge cost ZERO for meat carts and sacks, and their visible path carries those rail tiles. Citizen commutes price rail at ${f2(KNOBS.RAIL_COST / KNOBS.WALK)} of a walk. Property value, parks, Large Parks, plaques and smell use geographic distance — rail never shortens them`,
     live: (w) => `${w.last.census.railTiles || 0} rail tiles · freight rail distance 0 · property distance unchanged`,
   },
   {
@@ -469,7 +472,7 @@ export const RULES = Object.freeze([
   },
   {
     id: "P2", title: "The sentence",
-    formula: "a predator's first conviction: the Pacification Centre (§1,500, §900/yr, 4 jobs, 6 beds; six months, home FIXED) ; a prey animal, or anyone already fixed: the meat hall (sold; §100 to the cut) ; no centre with a bed, no hall: three months in the cells and a record",
+    formula: "lighter crimes: Zoo prison (24 beds, release unchanged); murder or second theft: Pacification Centre (6 beds, six months, home FIXED); third theft, or theft after pacification: meat hall (§100 cut). A missing or full destination leaves the case open. Species does not determine sentencing.",
     live: (w) => `${w.last.census.centres} centre${w.last.census.centres === 1 ? "" : "s"} · ${w.last.census.held} held · pacified ${w.events.justice.pacified} · sold ${w.events.justice.sold}`,
   },
   {
