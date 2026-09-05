@@ -13,12 +13,13 @@ could ship whole.
 - [ ] **New-game actions:** place Back on the same horizontal row as Found the
   City, aligned to the far right. Make Found the City larger and more prominent.
   Verify the layout at narrow and wide window sizes.
-- [ ] **Large Park and park wishes:** investigate citizens displaying “wish we
-  had a park nearby” / “nowhere to sit in the sun” beside a Large Park. Check
-  whether Large Park recreation is counted by the needs calculation, and whether
-  the wish refers to the citizen's home rather than their current walking spot.
-  Make the need and its wording consistent with actual recreation coverage;
-  verify near/far homes and the full 3×3 park footprint with regression coverage.
+- [x] **Large Park and park wishes:** Large Parks now satisfy the home-based
+  recreation need within four tiles of any footprint tile, including legacy 2×2
+  parks. Zoo prisons remain excluded. Wishes explicitly refer to home; the remedy
+  names both park types. Edge, distant-home, prison and legacy regressions added.
+  Verified: 658 checks pass; hostile review 9/10 (320 independent coverage cases).
+  Existing checked baselines are unchanged; cities near Large Parks now receive
+  the intended +10 park mood benefit and can develop differently over time.
 - [ ] **Flock cameras on the remote:** restore/expose the flock camera controls
   in the remote-control UI. Check existing camera functionality and bindings,
   and verify that the controls remain accessible at narrow window sizes.

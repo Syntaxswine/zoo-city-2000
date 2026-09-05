@@ -9,7 +9,7 @@
 import { addCamp } from "./camps.js";
 import { KNOBS } from "./rules.js";
 import { SPECIES, SPECIES_BY_ID, NAME_PARTS, affinity, ARRIVING, PREY_OF, DIET_OF, isPredatorOf, admits } from "./species.js";
-import { ZONE, CIVIC, TERRAIN, ROAD, idx, inBounds, capacityOf, jobsOf, jobZone, absent } from "./world.js";
+import { ZONE, CIVIC, TERRAIN, ROAD, idx, inBounds, capacityOf, jobsOf, jobZone, absent, civicAnchorOf } from "./world.js";
 import { useName } from "./use.js";
 import { doorsOf, edgeRoads, commutePath, dial, WALK, nodePath, commuteTime } from "./fields.js";
 import { ageYears, ageMonths, isWorker } from "./census.js";
@@ -1017,7 +1017,9 @@ export function moodTerms(world, c, context = moodContext(world)) {
       const yy = ty + dy;
       if (!inBounds(world, xx, yy)) continue;
       const civ = world.civic[yy * w + xx];
-      if (civ === CIVIC.PARK) park = true;
+      // Recreation reaches four tiles from any part of a park, measured
+      // at home. Generic civic parts must resolve to a Large Park, not a Zoo.
+      if (civ === CIVIC.PARK || (civ && world.civic[civicAnchorOf(world, yy * w + xx)] === CIVIC.LARGE_PARK)) park = true;
       else if (civ === CIVIC.CENTRE) van = true;
     }
     if (park) terms.push({ code: "PARK", value: 10 });

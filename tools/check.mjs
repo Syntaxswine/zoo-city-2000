@@ -4124,7 +4124,7 @@ check("no Math.random under js/", mathRandom.length === 0, mathRandom.join(", ")
   const { ACT, LINES, NEED_CODES, line } = await import("../js/sim/voice.js");
   const { BUBBLES_MAX, needOf, needsContext } = await import("../js/sim/needs.js");
   const { needCensus } = await import("../js/sim/census.js");
-  const { homeScore, homeTerms, removeCitizen } = await import("../js/sim/citizens.js");
+  const { homeScore, homeTerms, moodTerms, removeCitizen } = await import("../js/sim/citizens.js");
   const { SPECIES } = await import("../js/sim/species.js");
   const { refreshLast } = await import("../js/sim/tick.js");
   const { createWalkers } = await import("../js/walkers.js");
@@ -4206,6 +4206,31 @@ check("no Math.random under js/", mathRandom.length === 0, mathRandom.join(", ")
   const parkAfter = needOf(parkTruth.world, parkTruth.citizen).code;
   check("needs: the stated NO_PARK remedy makes that need fall at once",
     parkBefore === "NO_PARK" && parkAfter !== "NO_PARK", `${parkBefore} → ${parkAfter}`);
+  // The far edge, not just the anchor, must provide recreation. Keep the
+  // citizen at home while arbitrary visual walker coordinates cannot matter.
+  const largeTruth = needFixture("tortoise"), lw = largeTruth.world;
+  lw.civic.fill(0); lw.civicSize.fill(0);
+  largeTruth.citizen.home = 3 * lw.w + 7;
+  const campus = 1;
+  for(let dy=0;dy<3;dy++)for(let dx=0;dx<3;dx++){
+    const i=campus+dy*lw.w+dx;
+    lw.civic[i]=dx||dy?CIVIC.PART:CIVIC.LARGE_PARK;
+    lw.civicSize[i]=dx||dy?128|dx|dy<<2:3;
+  }
+  check("needs: a Large Park edge four tiles from home satisfies recreation",
+    needOf(lw,largeTruth.citizen).code!=="NO_PARK" && moodTerms(lw,largeTruth.citizen).some(t=>t.code==="PARK"&&t.value===10));
+  lw.civic[campus]=CIVIC.ZOO;
+  check("needs: a Zoo prison and its parts cannot satisfy recreation",
+    needOf(lw,largeTruth.citizen).code==="NO_PARK");
+  lw.civic[campus]=CIVIC.LARGE_PARK;
+  largeTruth.citizen.home=7*lw.w+7;
+  check("needs: a home beyond the Large Park radius still needs recreation",
+    needOf(lw,largeTruth.citizen).code==="NO_PARK");
+  largeTruth.citizen.home=3*lw.w+6;
+  lw.civic.fill(0);lw.civicSize.fill(0);lw.civic[campus]=CIVIC.LARGE_PARK;
+  for(const i of [campus+1,campus+lw.w,campus+lw.w+1])lw.civic[i]=CIVIC.LARGE_PARK_PART;
+  check("needs: legacy two-by-two Large Park parts satisfy recreation",
+    needOf(lw,largeTruth.citizen).code!=="NO_PARK");
   let scoreDrift = 0;
   for (const species of SPECIES.map((s) => s.id)) for (const strict of [false, true]) {
     const f = needFixture(species);

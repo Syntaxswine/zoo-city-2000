@@ -617,7 +617,10 @@ FRICTION: 0.4% of FRIENDLESS adults' households per month wander off regardless
   their homes and stand together for ~4 s with a small glyph. Cheap, visible,
   cosmetic (walker stream).
 - Mood = 50 + 15·[has job] − 20·[unemployed adult] − 0.5·max(0, Pol_home −
-  tolerance) + 5·friends + 10·[commute ≤ pref] + 10·[park within 4], clamped.
+  tolerance) + 5·friends + 10·[commute ≤ pref] + 10·[Park or Large Park footprint within 4 of home], clamped.
+  Recreation uses the existing square home-radius test, not the current walker
+  position. Any tile of a 3×3 Large Park (or legacy 2×2 park) counts; Zoo prisons
+  do not. NO_PARK wishes explicitly name home, and their remedy names both parks.
   Approval = mean mood.
 
 ### 7.6 The roster (weights, never gates; two soft home preferences that fall back in the same arrival pass)
