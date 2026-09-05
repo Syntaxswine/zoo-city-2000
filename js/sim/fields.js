@@ -5,9 +5,9 @@
 // radius²)); 4,096 tiles is microseconds.
 
 import { KNOBS } from "./rules.js";
-import { TERRAIN, ROAD, ZONE, CIVIC, idx, inBounds, N4, isStation, isCivicEmployer, absent, occAt, anchorOf, footprintOf, siteTiles, civicAnchorOf, civicTiles } from "./world.js";
+import { TERRAIN, ROAD, ZONE, CIVIC, idx, inBounds, N4, isStation, isCivicEmployer, isKnowledgeCivic, isCultureCivic, absent, occAt, anchorOf, footprintOf, siteTiles, civicAnchorOf, civicTiles } from "./world.js";
 import { SPECIES_BY_ID, DIET_OF, admits } from "./species.js";
-import { forEachWithin, forEachWithinAll, computeOcclusion, isBarrier, crossable } from "./reach.js";
+import { forEachWithin, forEachWithinAll, floodBudget, computeOcclusion, isBarrier, crossable } from "./reach.js";
 
 const NO_ROAD = 255;
 
@@ -312,12 +312,85 @@ export function computeLandValue(world) {
     let v = KNOBS.LV_BASE + KNOBS.LV_CENTRE * Math.max(0, 1 - dC / KNOBS.LV_CENTRE_RADIUS) + KNOBS.LV_NATURE * nature;
     if (nearPark[i]) v += KNOBS.LV_PARK;
     if (nearZoo[i]) v += KNOBS.LV_LARGE_PARK;
+    v += KNOBS.LV_CULTURE[world.culture[i]]; // culture (SPEC §9e): the owner's "property desirability" — +4 under a Gallery, +8 under an Amphitheater
     v -= KNOBS.LV_POL * world.pol[i];
     v -= KNOBS.LV_DREAD * world.dread[i]; // a meat hall: twice a works' shadow
     if (nearVan[i]) v -= KNOBS.LV_VAN; // the pacification centre's van
     v += plaque[i];
     world.lv[i] = Math.max(0, Math.min(100, Math.round(v)));
   }
+}
+
+/**
+ * KNOWLEDGE AND CULTURE (SPEC §9e; docs/PROPOSAL-KNOWLEDGE-CULTURE-2026-09-05.md,
+ * its review, and the owner's ruling of 2026-09-05). Two derived per-tile
+ * fields, rebuilt every tick and at any op that moves them, never saved:
+ * world.knowledge 0 / 1 (a Library) / 2 (a University), world.culture 0 / 1
+ * (a Gallery) / 2 (an Amphitheater) — the STRONGEST source reaching the tile,
+ * never a sum (two Libraries are still 50 knowledge; a Gallery under an
+ * Amphitheater is still +8). The knobs turn the class into a number:
+ * KNOWLEDGE[k], CULTURE_MOOD[k], LV_CULTURE[k].
+ *
+ * A building OPERATES while it is served (a road within ROAD_REACH of its
+ * footprint — the one predicate) and no tile of it is flooded or alight;
+ * otherwise it is billed and does nothing, and the Census says so. The small
+ * ones reach KNOW_RADIUS from every footprint tile (forEachWithinAll). The
+ * campuses take a BUDGET of the map's tiles, nearest first through the walls,
+ * ties by tile index (floodBudget): the owner ruled half the map for a
+ * University and an eighth for an Amphitheater, and ruled it as AREA — "do not
+ * halve a linear dimension". Water and open ground count; walls are never
+ * entered and never counted; a sealed quarter leaves the budget short.
+ */
+export function computeKnowledgeCulture(world) {
+  const { w, h } = world;
+  const n = w * h;
+  world.knowledge.fill(0);
+  world.culture.fill(0);
+  for (let i = 0; i < n; i++) {
+    const c = world.civic[i];
+    const knowledge = isKnowledgeCivic(c);
+    if (!knowledge && !isCultureCivic(c)) continue; // anchors only: a campus's other tiles are CIVIC.PART
+    if (!served(world, i)) continue;
+    const tiles = civicTiles(world, i);
+    if (tiles.some((j) => world.flooded[j] || world.burning[j])) continue;
+    const field = knowledge ? world.knowledge : world.culture;
+    const cls = c === CIVIC.LIBRARY || c === CIVIC.GALLERY ? 1 : 2;
+    const paint = (j) => { if (field[j] < cls) field[j] = cls; };
+    if (cls === 1) forEachWithinAll(world, tiles, KNOBS.KNOW_RADIUS, paint);
+    else floodBudget(world, tiles, Math.ceil(n * (c === CIVIC.UNIVERSITY ? KNOBS.KNOW_UNI_SHARE : KNOBS.CULT_AMPH_SHARE)), paint);
+  }
+}
+
+/**
+ * What ONE knowledge or culture building reaches, for its Inspect card: its
+ * kind, side, budget (a tile count for a campus, a radius for the small ones),
+ * how many tiles its own flood covers on this map right now, and whether it
+ * operates — the same floods computeKnowledgeCulture runs, so the card and the
+ * field cannot disagree. `why` names the reason a silent building is silent.
+ */
+export function campusReach(world, anchor) {
+  const c = world.civic[anchor];
+  const knowledge = isKnowledgeCivic(c);
+  if (!knowledge && !isCultureCivic(c)) return null;
+  const tiles = civicTiles(world, anchor);
+  const small = c === CIVIC.LIBRARY || c === CIVIC.GALLERY;
+  const budget = small ? null : campusBudget(world, c);
+  let covered = 0;
+  const one = () => { covered++; };
+  if (small) forEachWithinAll(world, tiles, KNOBS.KNOW_RADIUS, one);
+  else floodBudget(world, tiles, budget, one);
+  const flooded = tiles.some((j) => world.flooded[j] || world.burning[j]);
+  const isServed = served(world, anchor);
+  return {
+    kind: knowledge ? "knowledge" : "culture", side: tiles.length === 9 ? 3 : 2, cls: small ? 1 : 2,
+    budget, radius: small ? KNOBS.KNOW_RADIUS : null, covered, operating: isServed && !flooded,
+    why: !isServed ? "no road within 3 of the building — upkeep is due, nothing is served" : flooded ? "flooded — the service is suspended until the water goes" : null,
+  };
+}
+
+/** The tile budget a campus kind takes on THIS map, for the card and the Rules tab — the same arithmetic computeKnowledgeCulture uses. */
+export function campusBudget(world, c) {
+  return c === CIVIC.UNIVERSITY ? Math.ceil(world.w * world.h * KNOBS.KNOW_UNI_SHARE) : c === CIVIC.AMPHITHEATER ? Math.ceil(world.w * world.h * KNOBS.CULT_AMPH_SHARE) : 0;
 }
 
 /** Fire and police coverage from stations that have road access. */
@@ -516,6 +589,7 @@ export function computeFields(world) {
   computeStationDoors(world);
   computeCoverage(world);
   computeCamCover(world);
+  computeKnowledgeCulture(world); // before land value, which reads culture
   computeTraffic(world);
   computePollution(world);
   computeDread(world);

@@ -130,3 +130,51 @@ saved, so the later housing gate reads a tile — that is the only thing the
 wealth arc asks of this build ([PROPOSAL-WEALTH-AND-CLASS-2026-09-05.md](PROPOSAL-WEALTH-AND-CLASS-2026-09-05.md) §5).
 Still open from the review: the University's +600·K against the Large Park's
 +500, and the keys.
+
+
+## BUILT — 2026-09-05 (session 17), and where the built thing differs from this specification
+
+Built in one commit after [the review](REVIEW-KNOWLEDGE-CULTURE-2026-09-05.md)
+and the owner's ruling above. The record of what is different, so nobody reads
+this document as the code:
+
+- **Culture is a mood term AND a land-value halo** (`LV_CULTURE [0, 4, 8]`
+  over the same catchment), by the owner's ruling. The spec's "no direct
+  land-value modifier" for culture is superseded; knowledge still has none.
+- **Keys K Y M T** (Library, University, Gallery, Amphitheater), chosen from
+  the free set after the review's collision audit. Mouse access works
+  regardless; the palette scrolls as it already did.
+- **The culture wish at priority 4 means CONTENT requires culture.** NEED_MIN
+  is 4, so an otherwise-content animal in a town with no Gallery in reach says
+  "wish for art or music nearby". The suite's CONTENT truth fixture and the
+  coherent-stress CONTENT witness now stand beside a served Gallery. The lines
+  are shorter than the spec's ("wish for art or music nearby"), because every
+  voice line is held to 30 characters.
+- **The CAPPED remedy** adds "or bring a Library or University's reach to more
+  homes" when K < 1, as a composed string; there is no separate need code.
+- **Fields refresh at the op** (placing or razing one of the four, or any road
+  or wall edit) as well as every tick, so a paused city shows the catchment the
+  moment the building lands. The proposal asked for exactly this.
+- **No range preview under the placement ghost.** The ghost is the footprint,
+  green or red, as for every campus; the overlays on O (`knowledge`,
+  `culture`) show the catchment the moment the building lands. A preview is
+  listed open in BACKLOG.
+- **Water counts toward a campus budget; walls are never entered and never
+  counted** — as specified. The budget flood takes whole layers and the last
+  layer in ascending tile index; `reach.floodBudget` is the one implementation
+  and the card's "covered now" runs the same flood.
+- **`jobsOf` no longer falls through to STATION_JOBS** for an unlisted civic
+  employer (the review's F4); `world.civicJobs` is an explicit table.
+- **Art**: one sprite per kind (like the campuses), built on the block kit so
+  the 2× set comes free; the Amphitheater's bowl is stepped straight tiers in a
+  U with two aisles, not a semicircle (boxes are axis-aligned). Contact sheets
+  in `docs/shots/sheet-civics-knowledge*.png`.
+- **Not built**: a species-skinned set; the deferred school; any knowledge
+  effect beyond the cap.
+
+Measured at the build: a 40×40 University covers exactly 800 tiles and an
+Amphitheater 200; 80×48 → 1,920 / 480; 33×21 → 347 / 87; a sealed 15×15
+quarter holds a University to 225; half the animals under a Library is K 0.25.
+Every published mayor rig is byte-identical (the mayor builds none of these).
+The K-mean dynamic the review pre-registered is measured by
+`tools/knowprobe.mjs` and reported in the keystone handoff §31.

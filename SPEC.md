@@ -1201,6 +1201,66 @@ not because the camera deters but because a smaller town is less dense. The
 accurate statement of the joke is therefore: *a mayor who blankets the town in
 cameras lowers its crime by driving a fifth of the animals out of it.*
 
+## 9e. Knowledge and culture — four public buildings (`js/sim/fields.js`, `reach.js`, `demand.js`, `citizens.js`; session 17, 2026-09-05)
+
+The owner asked for a University and an Amphitheater at 3×3, a Library and a
+Gallery at 2×2, and RULED the reach: *five tiles* for the small ones, *half the
+map's tiles* for the University, *an eighth* for the Amphitheater — an AREA,
+never a radius. On the culture channel (2026-09-05): *"culture will be a boon to
+both happiness as well as property desirability, but later when we start
+getting into wealth/class it will be a prerequisite to more affluent housing."*
+Specified in `docs/PROPOSAL-KNOWLEDGE-CULTURE-2026-09-05.md`, reviewed in
+`docs/REVIEW-KNOWLEDGE-CULTURE-2026-09-05.md`, built in session 17.
+
+```
+CIVIC 9 LIBRARY (2×2) · 10 UNIVERSITY (3×3) · 11 GALLERY (2×2) · 12 AMPHITHEATER (3×3)   — appended after ZOO, never renumbered,
+                                                                                                never inferred from a footprint's size
+build          §1,000 / §4,000 / §800 / §3,000 (KNOBS.COST) · a road TOUCHING the footprint to place (like every service)
+upkeep/yr      §350 / §1,200 / §300 / §900 — due whether or not a road reaches it (like every civic)
+jobs           4 / 12 / 4 / 8, C-type (Jc), on the anchor, EXPLICIT in world.civicJobs (the review's F4: jobsOf used to fall through
+               to STATION_JOBS for any employer it did not list)
+operates       served (SPEC 6c, the one predicate) AND no tile of it flooded or alight; else billed, silent, and the card says why
+knowledge[i]   0 none · 1 a Library · 2 a University reaches tile i        — derived, per tick and at the op, never saved
+culture[i]     0 none · 1 a Gallery · 2 an Amphitheater                   — the STRONGEST source, never a sum
+  small        reach KNOW_RADIUS 5 from EVERY tile of the 2×2 (reach.forEachWithinAll): 144 tiles on open ground
+  campus       a BUDGET of the map's tiles, ceil(w·h · 1/2) for a University and ceil(w·h · 1/8) for an Amphitheater
+               (reach.floodBudget): whole distance layers nearest first through the walls the way a smell goes, the
+               final layer taken in ASCENDING TILE INDEX — exact, deterministic, no RNG. Water and open ground count;
+               walls are never entered and never counted; near an edge the flood reaches farther in to fill the budget;
+               a sealed quarter leaves it short. 64×64 → 2,048 and 512 tiles.
+K              mean over living, housed, PRESENT animals of KNOWLEDGE[knowledge[home]]/100 (Library 50, University 100)
+Cap            = (1200 + 150·parks + 500·large parks + festival + 600·K − 400·watched) · (1 + 0.5·H)      ← the absolute channel
+CULTURE mood   +4 under a Gallery, +8 under an Amphitheater (moodTerms, sayable; children's floor of 50 hides it)
+LV             += LV_CULTURE[culture[i]] = +4 / +8 over the catchment                                   ← the measurable channel
+wish           NO_CULTURE at exactly NEED_MIN 4 for a home no culture reaches — it speaks only when nothing else is wrong,
+               and never asks a Gallery's animal for an Amphitheater; CAPPED's remedy adds the Library when K < 1
+```
+
+Tools K Library · Y University · M Gallery · T Amphitheater (the free letters
+after the review's collision audit; C was free and left alone because every
+city-builder player reads it as Commercial). Overlays `knowledge` and `culture`
+on O. The Inspect card on any tile of a building: cost, upkeep, jobs, its reach
+on THIS map and the tiles it covers now (`fields.campusReach`, the same floods),
+and whether it is in service. A home's card: "Library: 50 knowledge ·
+Amphitheater: +8 culture, +8 land value". Census: the four counts, K → the
+capacity it buys, the share of animals under culture and the mean bonus. Rules
+D5 carries K; K1 is the rule.
+
+Measured on the way in: a 40×40 University covers exactly 800 tiles, an
+Amphitheater 200; on 80×48, 1,920 and 480; on 33×21, 347 and 87. A sealed 15×15
+quarter holds a University to 225. Half the animals under a Library is K 0.25
+and +150·(1 + 0.5H) capacity. Every published mayor rig is byte-identical: the
+mayor builds none of these. A town with none has zero fields and the capacity
+law of before.
+
+Not built, said out loud: a range preview under the placement ghost (the
+proposal asked for it; the overlay on O shows the catchment the moment the
+building lands); a species-skinned set; any knowledge effect beyond the cap.
+Open from the review: the University's +600·K against the Large Park's +500
+for more upkeep is the owner's call, and the K-mean dynamic (a town outgrowing
+its catchment lowers its own cap into camping) is pre-registered for measuring
+with `tools/knowprobe.mjs`.
+
 ## 10. Goals and pacing
 
 - **Milestones** (plaque + advisor line, never a fail state): hamlet 50,

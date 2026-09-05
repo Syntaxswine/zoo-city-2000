@@ -23,7 +23,7 @@ import { ZONE, CIVIC, TERRAIN, ROAD, ZONE_NAME, anchorOf } from "./sim/world.js"
 import { dateOf, characterLine } from "./sim/tick.js";
 import { eventTitle, TICKER_FLASH } from "./sim/events.js";
 import { lotReport, REASON } from "./sim/lots.js";
-import { exposure, asksAccess, nearReach } from "./sim/fields.js";
+import { exposure, asksAccess, nearReach, campusReach } from "./sim/fields.js";
 import { RULES, KNOBS } from "./sim/rules.js";
 import { yearlyFigures } from "./sim/budget.js";
 import { SPECIES, SPECIES_BY_ID, admits } from "./sim/species.js";
@@ -110,6 +110,8 @@ export function createUI(app) {
       ["buildings", KNOBS.UPKEEP_TIER * tiers], ["parks", KNOBS.UPKEEP_PARK * fig.parks], ["large parks", KNOBS.UPKEEP_LARGE_PARK * fig.largeParks], ["zoos", KNOBS.UPKEEP_ZOO * fig.zoos],
       ["fire stations", KNOBS.UPKEEP_STATION * (fig.fireStations || 0)], ["police stations", KNOBS.UPKEEP_STATION * (fig.policeStations || 0)],
       ["pacification centres", KNOBS.UPKEEP_CENTRE * (fig.centres || 0)], ["licence inspectors", fig.licence ? KNOBS.UPKEEP_LICENCE * (fig.markets || 0) : 0],
+      ["libraries", KNOBS.UPKEEP_LIBRARY * (fig.libraries || 0)], ["universities", KNOBS.UPKEEP_UNIVERSITY * (fig.universities || 0)],
+      ["galleries", KNOBS.UPKEEP_GALLERY * (fig.galleries || 0)], ["amphitheaters", KNOBS.UPKEEP_AMPHITHEATER * (fig.amphitheaters || 0)],
       ["walls", KNOBS.UPKEEP_WALL * (fig.walls || 0)],
       ["rail", KNOBS.UPKEEP_RAIL * ((fig.rails || 0) - (fig.railBridges || 0))], ["rail bridges", KNOBS.UPKEEP_RAIL_BRIDGE * (fig.railBridges || 0)], ["stations", KNOBS.UPKEEP_STATION_RAIL * (fig.stations || 0)],
       // FLAT, and the only row here that is: the network is billed once while
@@ -163,7 +165,7 @@ export function createUI(app) {
     mk("btnUndo", "⌫", "undo", "Backspace or Ctrl+Z: undo the last op (this month only)", () => app.undo());
     mk("btnSave", "Ctrl+S", "save", "Ctrl+S: open named saves with the save-as name focused", () => app.save());
     mk("btnLoad", "L", "load", "L: open named saves on the slot list", () => app.load());
-    mk("btnOverlay", "O", "overlay", "O: cycle land value / pollution / crime / dread / use / road access / lot score / camera cover overlays", () => app.cycleOverlay());
+    mk("btnOverlay", "O", "overlay", "O: cycle land value / pollution / crime / dread / use / road access / lot score / camera cover / knowledge / culture overlays", () => app.cycleOverlay());
     mk("btnNews", "R", "news", "R: the news — every dispatch this city ever made, oldest first; ← → step one at a time", () => app.news.toggle());
     mk("btnZoom", "+", "zoom", "+ / −: zoom ×1 / ×2", () => app.zoomAt(app.camera.zoom === 1 ? 1 : -1));
     sep();
@@ -421,6 +423,10 @@ export function createUI(app) {
     else if (rep.civic === CIVIC.FIRE) what = "Fire station";
     else if (rep.civic === CIVIC.POLICE) what = "Police station";
     else if (rep.civic === CIVIC.CENTRE) what = "Pacification centre";
+    else if (rep.civic === CIVIC.LIBRARY) what = "Library";
+    else if (rep.civic === CIVIC.UNIVERSITY) what = "University";
+    else if (rep.civic === CIVIC.GALLERY) what = "Gallery";
+    else if (rep.civic === CIVIC.AMPHITHEATER) what = "Amphitheater";
     else if (rep.zone === ZONE.M) what = `Meat market ${rep.maxTier === 1 ? "Low" : "High"}`;
     else if (rep.zone !== ZONE.NONE) what = `${ZONE_NAME[rep.zone]} ${rep.maxTier === 1 ? "Low" : "High"}`;
     else if (w.terrain[i] === TERRAIN.WATER) what = "Water";
@@ -453,6 +459,25 @@ export function createUI(app) {
       if (rep.landmark) lines.push(el("div", "dim", `a landmark — the block the ${rep.landmark.species.map(pluralSpecies).join(" and ")} made: ${rep.landmark.blurb}`));
     }
     if (rep.civic === CIVIC.LARGE_PARK) head.append(el("span", "", `  jobs ${rep.staff}/${rep.jobs}`));
+    // Knowledge and culture (SPEC §9e): the building says what it costs, what it reaches on THIS map, and why it is silent.
+    if (rep.civic === CIVIC.LIBRARY || rep.civic === CIVIC.UNIVERSITY || rep.civic === CIVIC.GALLERY || rep.civic === CIVIC.AMPHITHEATER) {
+      const reach = campusReach(w, rep.ty * w.w + rep.tx);
+      const kindName = { [CIVIC.LIBRARY]: "library", [CIVIC.UNIVERSITY]: "university", [CIVIC.GALLERY]: "gallery", [CIVIC.AMPHITHEATER]: "amphitheater" }[rep.civic];
+      const upkeep = { library: KNOBS.UPKEEP_LIBRARY, university: KNOBS.UPKEEP_UNIVERSITY, gallery: KNOBS.UPKEEP_GALLERY, amphitheater: KNOBS.UPKEEP_AMPHITHEATER }[kindName];
+      head.append(el("span", "", `  jobs ${rep.staff}/${rep.jobs}`));
+      lines.push(el("div", "", `§${KNOBS.COST[kindName].toLocaleString("en-US")} to build · §${upkeep.toLocaleString("en-US")}/yr · ${reach.side}×${reach.side}`));
+      const gives = reach.kind === "knowledge" ? `knowledge ${KNOBS.KNOWLEDGE[reach.cls]}` : `culture +${KNOBS.CULTURE_MOOD[reach.cls]} mood and +${KNOBS.LV_CULTURE[reach.cls]} land value`;
+      lines.push(el("div", "", reach.budget
+        ? `reach: the nearest ${reach.budget.toLocaleString("en-US")} tiles of the map (${reach.kind === "knowledge" ? "half" : "an eighth"}) — ${reach.covered.toLocaleString("en-US")} covered now · ${gives}`
+        : `reach: ${reach.radius} tiles from every tile of the building — ${reach.covered} covered now · ${gives}`));
+      lines.push(el("div", reach.operating ? "dim" : "warn", reach.operating ? "in service" : `NOT IN SERVICE — ${reach.why}`));
+    }
+    // A home says which building reaches it and with what (SPEC §9e): the strongest, never a sum.
+    if (rep.zone === ZONE.R && rep.tier > 0) {
+      const ki = rep.ty * w.w + rep.tx;
+      const kn = w.knowledge[ki], cu = w.culture[ki];
+      if (kn || cu) lines.push(el("div", "dim", [kn ? `${kn === 2 ? "University" : "Library"}: ${KNOBS.KNOWLEDGE[kn]} knowledge` : null, cu ? `${cu === 2 ? "Amphitheater" : "Gallery"}: +${KNOBS.CULTURE_MOOD[cu]} culture, +${KNOBS.LV_CULTURE[cu]} land value` : null].filter(Boolean).join(" · ")));
+    }
     if (rep.civic === CIVIC.CENTRE || rep.civic === CIVIC.ZOO) {
       const held = w.citizens.filter((c) => c.heldAt === rep.ty * w.w + rep.tx && (c.held || 0) > w.tick);
       head.append(el("span", "", `  beds ${held.length}/${rep.civic === CIVIC.ZOO ? KNOBS.ZOO_BEDS : KNOBS.CENTRE_BEDS} · jobs ${rep.staff}/${rep.jobs}`));
@@ -842,6 +867,12 @@ export function createUI(app) {
     tr("friendships", `${c.friendships}`);
     tr("crime (built lots, mean / max)", `${Math.round(c.meanCrime)} / ${c.maxCrime}`);
     tr("stations", `${c.fireStations} fire · ${c.policeStations} police${c.centres ? ` · ${c.centres} pacification` : ""}`);
+    // Knowledge and culture (SPEC §9e): the buildings, the knowledge index K and what it buys, who is under culture.
+    if (c.libraries || c.universities || c.galleries || c.amphitheaters || c.knowledgeNoRoad || c.cultureNoRoad) {
+      tr("knowledge · culture buildings", `${c.libraries} librar${c.libraries === 1 ? "y" : "ies"} · ${c.universities} universit${c.universities === 1 ? "y" : "ies"} · ${c.galleries} galler${c.galleries === 1 ? "y" : "ies"} · ${c.amphitheaters} amphitheater${c.amphitheaters === 1 ? "" : "s"}${(c.knowledgeNoRoad || 0) + (c.cultureNoRoad || 0) ? ` · ${(c.knowledgeNoRoad || 0) + (c.cultureNoRoad || 0)} without a road` : ""}`);
+      tr("knowledge access K → capacity", `${(c.K || 0).toFixed(2)} → +${Math.round(KNOBS.CAP_KNOWLEDGE * (c.K || 0))} before the H multiplier`);
+      tr("under culture · mean bonus", `${Math.round(100 * (c.cultureShare || 0))}% · +${(c.cultureMean || 0).toFixed(1)} mood`);
+    }
     if (c.walls) tr("walls · tunnels", `${c.walls} · ${c.tunnels}`);
     if (c.railTiles || c.stations) tr("rail · stations · riders", `${c.railTiles} · ${c.stations} · ${c.riders}`);
     if (c.commuteN) tr(`mean commute (walk-steps; a ride is ${railShare()})`, c.meanCommute.toFixed(1));

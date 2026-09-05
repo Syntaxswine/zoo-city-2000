@@ -150,7 +150,28 @@ export const KNOBS = {
   UPKEEP_PARK: 300,
   UPKEEP_LARGE_PARK: 1500,
   UPKEEP_STATION: 400,
-  COST: { zoneR: 5, zoneC: 8, zoneI: 8, zoneM: 12, road: 10, bridge: 40, bulldoze: 2, bulldozeTree: 4, tree: 4, park: 150, largePark: 2500, zoo: 2500, pond: 40, fire: 500, police: 500, centre: 1500, wall: 8, use: 1, rail: 20, railBridge: 60, station: 300, camera: 100 },
+  COST: { zoneR: 5, zoneC: 8, zoneI: 8, zoneM: 12, road: 10, bridge: 40, bulldoze: 2, bulldozeTree: 4, tree: 4, park: 150, largePark: 2500, zoo: 2500, pond: 40, fire: 500, police: 500, centre: 1500, wall: 8, use: 1, rail: 20, railBridge: 60, station: 300, camera: 100, library: 1000, university: 4000, gallery: 800, amphitheater: 3000 },
+  // ---- knowledge and culture (the owner, 2026-09-05; docs/PROPOSAL-KNOWLEDGE-CULTURE-2026-09-05.md, its review and the owner's ruling) ----
+  // Four public buildings: Library 2×2 and University 3×3 give KNOWLEDGE, Gallery 2×2 and Amphitheater 3×3 give CULTURE.
+  // C-type jobs, a road touching to build, served to operate. The owner ruled the reach: five tiles for the small
+  // ones, HALF THE MAP'S TILES for the University, an EIGHTH for the Amphitheater — an AREA, never a radius.
+  LIBRARY_JOBS: 4,
+  UNIVERSITY_JOBS: 12,
+  GALLERY_JOBS: 4,
+  AMPHITHEATER_JOBS: 8,
+  UPKEEP_LIBRARY: 350,
+  UPKEEP_UNIVERSITY: 1200,
+  UPKEEP_GALLERY: 300,
+  UPKEEP_AMPHITHEATER: 900,
+  KNOW_RADIUS: 5,           // Library and Gallery: reach 5 from EVERY tile of the 2×2 (reach.forEachWithinAll) — 144 tiles on open ground
+  KNOW_UNI_SHARE: 1 / 2,    // the University's catchment: ceil(w·h/2) tiles of the whole map, nearest first through the walls (reach.floodBudget)
+  CULT_AMPH_SHARE: 1 / 8,   // the Amphitheater's: ceil(w·h/8). Near an edge the flood reaches farther in to fill the budget; a sealed quarter leaves it short
+  KNOWLEDGE: [0, 50, 100],  // by the strongest source on the tile: none / Library / University — the MAX where they overlap, never a sum
+  CULTURE_MOOD: [0, 4, 8],  // none / Gallery / Amphitheater — the mood term, the half an animal can SAY (the owner: "a boon to happiness")
+  LV_CULTURE: [0, 4, 8],    // … and the half the town can MEASURE: land value over the same catchment (the owner: "property desirability")
+  CAP_KNOWLEDGE: 600,       // × K, the mean knowledge/100 over housed, present animals — inside the capacity law's (1 + 0.5·H) like the parks.
+                            // K is a MEAN: a town that grows past its catchment lowers its own cap. The review pre-registers measuring that.
+  NEED_CULTURE_PTS: 4,      // the culture wish sits exactly on NEED_MIN — it speaks only when nothing else is wrong
   // ---- crime and punishment (the owner, 2026-09-02; docs/PROPOSAL-CRIME-AND-PUNISHMENT.md) ----
   // Zone M — the grey-market meat hall: stall / meat hall / cold store.
   M_JOBS: [0, 3, 8, 16],
@@ -355,8 +376,13 @@ export const RULES = Object.freeze([
   },
   {
     id: "D5", title: "The cap: a city can only hold so many until it mixes",
-    formula: "Cap = (1200 + 150·parks + 500·large parks + festival) · (1 + 0.5·H) ;  V_R ≤ 1 − P/Cap ;  H fades in over the first 20 friendships ;  large parks work without roads",
-    live: (w) => `Cap = (1200 + 150·${w.last.census.parks} + 500·${w.last.census.largeParks} + ${w.festivalBonus}) · (1 + 0.5·${f2(w.last.census.H)}) = ${Math.round(w.last.demand.cap)} ; P ${w.last.census.P}`,
+    formula: "Cap = (1200 + 150·parks + 500·large parks + festival + 600·K − 400·watched share) · (1 + 0.5·H) ;  K = mean knowledge/100 over housed animals (Library 50, University 100) ;  V_R ≤ 1 − P/Cap ;  H fades in over the first 20 friendships ;  large parks work without roads",
+    live: (w) => `Cap = (1200 + 150·${w.last.census.parks} + 500·${w.last.census.largeParks} + ${w.festivalBonus} + 600·${f2(w.last.census.K || 0)} − 400·${f2(w.last.census.watchedShare || 0)}) · (1 + 0.5·${f2(w.last.census.H)}) = ${Math.round(w.last.demand.cap)} ; P ${w.last.census.P}`,
+  },
+  {
+    id: "K1", title: "Knowledge and culture: two public services, four buildings",
+    formula: "Library 2×2 (§1,000, §350/yr, 4 jobs) and Gallery 2×2 (§800, §300/yr, 4 jobs) reach 5 from every tile of the building ; University 3×3 (§4,000, §1,200/yr, 12 jobs) covers the nearest HALF of the map's tiles, Amphitheater 3×3 (§3,000, §900/yr, 8 jobs) the nearest EIGHTH — through walls the way a smell goes, nearest first, ties by tile index ; a building serves only while a road is within 3 and no tile of it is flooded ; knowledge 50 / 100 and culture 4 / 8 by the STRONGEST source at home, never summed ; knowledge raises the cap by 600·K ; culture is +4 / +8 mood AND +4 / +8 land value over the catchment",
+    live: (w) => { const c = w.last.census; return `${c.libraries || 0} librar${c.libraries === 1 ? "y" : "ies"} · ${c.universities || 0} universit${c.universities === 1 ? "y" : "ies"} · ${c.galleries || 0} galler${c.galleries === 1 ? "y" : "ies"} · ${c.amphitheaters || 0} amphitheater${c.amphitheaters === 1 ? "" : "s"} · K ${f2(c.K || 0)} (+${Math.round(KNOBS.CAP_KNOWLEDGE * (c.K || 0))} capacity before the H multiplier) · ${Math.round(100 * (c.cultureShare || 0))}% of animals under culture, mean +${f2(c.cultureMean || 0)} mood${(c.knowledgeNoRoad || 0) + (c.cultureNoRoad || 0) ? ` · ${(c.knowledgeNoRoad || 0) + (c.cultureNoRoad || 0)} without a road (upkeep due, no service)` : ""}`; },
   },
   {
     id: "G1", title: "Road access: one rule, asked of the whole building, and every side is a way in",

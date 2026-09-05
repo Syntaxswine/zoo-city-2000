@@ -73,6 +73,16 @@ function buildGrid(world, code) {
   const centre = code === "VAN" ? at(world, 6, 4) : -1;
   world.civic[park] = CIVIC.PARK;
   if (centre >= 0) world.civic[centre] = CIVIC.CENTRE;
+  // CONTENT means content AND cultured since SPEC §9e (the culture wish speaks at NEED_MIN for a home no
+  // Gallery reaches): a 2×2 Gallery at (5,5), served by the spur at (4,3) two tiles off its corner, one
+  // tile from the target's home at (4,4).
+  if (code === "CONTENT") {
+    const g = at(world, 5, 5);
+    world.civic[g] = CIVIC.GALLERY; world.civicSize[g] = 2;
+    world.civic[at(world, 6, 5)] = CIVIC.PART; world.civicSize[at(world, 6, 5)] = 128 | 1;
+    world.civic[at(world, 5, 6)] = CIVIC.PART; world.civicSize[at(world, 5, 6)] = 128 | (1 << 2);
+    world.civic[at(world, 6, 6)] = CIVIC.PART; world.civicSize[at(world, 6, 6)] = 128 | 1 | (1 << 2);
+  }
 
   // Three ordinary road tiles emit three points at the low-value home.  The
   // nearby tier-3 shop supplies the other three, leaving a computed LV of 43

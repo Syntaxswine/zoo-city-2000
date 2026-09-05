@@ -847,9 +847,14 @@ export const PACIFICATION_CENTRE = (() => {
 export const CIVICS = { park: PARK, largePark: ZOO, zoo: ZOO, fire: FIRE_STATION, police: POLICE_STATION, centre: PACIFICATION_CENTRE };
 let LARGE_CIVICS = null;
 export function registerLargeCivics(table) { LARGE_CIVICS = table; }
+/** Kinds that are not in CIVICS or the 3×3 table — the knowledge and culture buildings (js/art/civics-knowledge.js) — registered by kind and side. */
+const CIVIC_KINDS = {};
+export function registerCivicKind(kind, side, sprite) { (CIVIC_KINDS[kind] ||= {})[side] = sprite; }
 export function civicSprite(kind, side = null) {
   if (kind === "zoo" && LARGE_CIVICS?.zoo) return LARGE_CIVICS.zoo;
   if (side === 3 && LARGE_CIVICS?.[kind]) return LARGE_CIVICS[kind];
+  const k = CIVIC_KINDS[kind];
+  if (k) return k[side] || k[Object.keys(k)[0]]; // a kind built at one side only answers for any side asked (a legacy save cannot hold another)
   const s = CIVICS[kind];
   if (!s) throw new Error(`civicSprite: unknown kind '${kind}'`);
   return s;

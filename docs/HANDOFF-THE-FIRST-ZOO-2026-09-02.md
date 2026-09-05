@@ -2395,3 +2395,91 @@ that compared the restored rates against `A.world.rates` compares against
 done: `knowledgeCov` / `cultureCov` should seed through `forEachWithinAll`
 with the campus's tiles, and a budget-limited flood for the University and
 the Amphitheater can be the same BFS with a count instead of a radius.
+
+
+## 31. Knowledge and culture — four public buildings, built solo on the owner's trust (session 17, 2026-09-05)
+
+The owner, leaving for work: *"please do as much work as you feel comfortable
+doing solo … i trust you though."* The proposal was another agent's
+(`docs/PROPOSAL-KNOWLEDGE-CULTURE-2026-09-05.md`), the review mine (§30's
+sibling, `docs/REVIEW-KNOWLEDGE-CULTURE-2026-09-05.md`), and the one open
+design question — what culture DOES — the owner had just ruled: *"a boon to
+both happiness as well as property desirability."* The two remaining
+decisions had defensible defaults and were taken, said out loud: the
+proposal's prices and the +600·K (the review flags that a University beats a
+Large Park on capacity per § of upkeep — the owner's call to reprice), and the
+keys K Y M T from the collision audit's free set.
+
+**What was built, in one commit.** SPEC §9e is the rule. `CIVIC 9–12`;
+`ops.js` places at side 2 or 3 through `CIVIC_SIDE`; `world.civicJobs` is the
+explicit jobs table (the review's F4 trap closed: `jobsOf` used to fall
+through to STATION_JOBS); `reach.floodBudget` is the owner's "half the map /
+an eighth" as a flood with a tile budget — whole layers nearest first through
+the walls, the last layer in ascending tile index, one `expand` step shared
+with the radius flood so the two can never disagree about a wall;
+`fields.computeKnowledgeCulture` paints `world.knowledge` and `world.culture`
+(0 / 1 / 2 by the strongest source) every tick and at the op; `+600·K` in
+`capacityLaw`; CULTURE in `moodTerms` and `LV_CULTURE` in land value; the
+NO_CULTURE wish at NEED_MIN; four palette tools; four sprites on the block kit
+(`js/art/civics-knowledge.js`, 2× free through hires); two overlays; the
+campus card with its reach on THIS map (`fields.campusReach` runs the same
+flood); Census, Budget and Rules rows; `tools/knowprobe.mjs`.
+
+**Numbers.** 799 → 852 checks (52 in `tools/check-knowledge-culture.mjs`),
+ten mutants all caught — a summed field, floor for ceil, the last layer
+unsorted, K over 200, no LV term, no mood term, no operating gate, no cap
+term, no refresh at the op, the old jobs fall-through. The six published
+mayor rigs byte-identical (the mayor builds none of these). Exact catchments:
+40×40 → 800 / 200; 64×64 → 2,048 / 512; 80×48 → 1,920 / 480; 33×21 → 347 / 87;
+a sealed 15×15 quarter holds a University to 225. Browser: all four placed
+along one road on a fresh 64×64 (seed "culture"), the knowledge overlay
+painting the University's 2,048 tiles, the culture overlay the Amphitheater's
+512 plus the Gallery's 144, the Library's card reading "reach: 5 tiles from
+every tile of the building — 144 covered now · knowledge 50 · in service",
+the University's "the nearest 2,048 tiles of the map (half) — 2,048 covered
+now", both zooms, zero console messages.
+
+**The dynamic the review pre-registered (F2), measured with `tools/knowprobe.mjs`** — the
+scripted mayor's town, seed 7, a University dropped beside the start at year 0
+or year 10, a Library at year 0, or nothing:
+
+| rig · building (where) | P y30 | cap y30 | K | V_R | campers | cash y30 |
+|---|---:|---:|---:|---:|---|---:|
+| balanced · none at 0 | 1,673 | 1,965 | 0.00 | 0.15 | none | 78,202 |
+| balanced · university at 0 (44,0) | 2,173 | 2,792 | 1.00 | 0.22 | none | 41,723 |
+| balanced · university at 10 (30,10) | 2,117 | 2,522 | 1.00 | 0.16 | none | 33,324 |
+| balanced · library at 0 (21,0) | 1,765 | 2,254 | 0.04 | 0.22 | none | 42,701 |
+| estate · none at 0 | 1,334 | 2,224 | 0.00 | 0.37 | none | 5,839 |
+| estate · university at 0 (29,0) | 1,446 | 2,556 | 0.69 | 0.43 | 27 months, up to 80 | -1,543 |
+| estate · university at 10 (29,0) | 1,392 | 2,507 | 0.68 | 0.44 | none | -7,201 |
+| estate · library at 0 (30,0) | 1,294 | 2,254 | 0.00 | 0.41 | none | 7,864 |
+
+On the compact balanced rig a University covers EVERY home: K = 1.00 from the
+year it lands, P +30% (1,673 → 2,173) with it at year 0 and +27% at year 10,
+no campers, P never above the cap — the K-mean bust CANNOT happen there,
+because the town never leaves the catchment. On the estate rig (6×6 blocks,
+the owner's shape) K sits at 0.66–0.69 — a third of the homes lie outside
+half the map — P rises 8% only, and the University's §1,200 a year puts a
+town that nets about §1,000 a year under water (cash −1,543 and −7,201 at
+year 30 against +5,839 without it); the year-0 run had 27 months with
+campers, up to 80 of them, in a downturn the baseline never had. At the
+owner's scale the RISK is the bill, not the mean. A Library beside the
+mayor's start on the estate covers no home at all (K 0.00): five tiles is a
+neighbourhood, and the start is not one. The outgrow-the-catchment-into-tents
+dynamic did not occur on either rig; it stays a control-city question.
+
+**Symptom-keyed traps, for whoever comes next.**
+
+| what you see | what it is |
+|---|---|
+| a Library placed and no blue on the overlay | its footprint has no road within 3, or a tile of it is flooded; the card says which — upkeep is still due |
+| a University's card says 2,048 covered on a 64×64 but the K on the Census is small | K is a MEAN over housed animals: half the map's TILES is not half the map's ANIMALS; the overlay shows where the homes are not |
+| every content animal in a town with no Gallery says "wish for art or music nearby" | by design (the proposal's priority 4 = NEED_MIN); CONTENT means content and cultured now, and the suite's CONTENT fixtures stand beside a Gallery |
+| `needFixture` or the stress CONTENT witness reads NO_CULTURE after an edit | the Gallery in the fixture must be SERVED: roadDist counts the road tile as 1 and ROAD_REACH is 3, so its nearest tile must be within two of the road |
+| a 2×2 kind asked for at side 3 (or the reverse) | `civicSprite` answers with the side it has; a legacy save cannot hold another side for these four |
+| the amphitheater's tiers read as one grey slope | alternate rows are `SEAT_DARK`; the sheet is `docs/shots/sheet-civics-knowledge.png` |
+
+**Left open, said out loud.** The University vs the Large Park (price); a
+range preview under the ghost; the owner's control city for the K dynamic at
+the owner's scale; the wealth arc's prerequisite reads these fields as they
+are (`docs/PROPOSAL-WEALTH-AND-CLASS-2026-09-05.md` §5).

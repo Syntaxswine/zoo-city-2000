@@ -22,6 +22,7 @@ import { rasterize } from "../js/art/format.js";
 import { art } from "../js/art/index.js";
 import { MARKS, characterSprite } from "../js/art/building-character.js";
 import { LARGE_CIVICS } from "../js/art/civics-large.js";
+import { KNOWLEDGE_CIVICS } from "../js/art/civics-knowledge.js";
 import { BUILDINGS, PARK, ZOO, FIRE_STATION, POLICE_STATION, PACIFICATION_CENTRE, OVERLAYS } from "../js/art/buildings.js";
 import { BLOCKS } from "../js/art/blocks.js";
 import { LANDMARK_ART } from "../js/art/landmarks.js";
@@ -124,6 +125,9 @@ function sheets(z) {
 
   out.push(sheet("sheet-civics-large.png", Object.entries(LARGE_CIVICS).map(([kind, sprite]) => ({ sprite, label: `${kind} 3x3` })), { cols: 2, cellW: 224, cellH: 198, groundY: 139, z }));
   out.push(sheet("sheet-civics-large-hires.png", Object.entries(LARGE_CIVICS).map(([kind, sprite]) => ({ sprite: art.hires(sprite), label: `${kind} 3x3 hires` })), { cols: 2, cellW: 448, cellH: 396, groundY: 278, z: 1 }));
+  // Knowledge and culture (SPEC §9e): the four, and their 2× twins.
+  out.push(sheet("sheet-civics-knowledge.png", Object.entries(KNOWLEDGE_CIVICS).map(([kind, sprite]) => ({ sprite, label: `${kind} ${sprite.footprint[0]}x${sprite.footprint[1]}` })), { cols: 2, cellW: 224, cellH: 198, groundY: 139, z }));
+  out.push(sheet("sheet-civics-knowledge-hires.png", Object.entries(KNOWLEDGE_CIVICS).map(([kind, sprite]) => ({ sprite: art.hires(sprite), label: `${kind} hires` })), { cols: 2, cellW: 448, cellH: 396, groundY: 278, z: 1 }));
 
   // The hi-res set (js/art/hires.js): a 1× sprite scaled ×2 beside its 2× twin, at zoom 1 so the sheet IS the comparison.
   {

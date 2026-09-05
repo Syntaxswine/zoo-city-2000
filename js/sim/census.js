@@ -3,7 +3,7 @@
 
 import { KNOBS } from "./rules.js";
 import { SPECIES, SPECIES_BY_ID, isPredPrey, isPredatorOf, DIET_OF } from "./species.js";
-import { ZONE, CIVIC, ROAD, jobsOf, jobZone, absent, capacityOf, isPart } from "./world.js";
+import { ZONE, CIVIC, ROAD, jobsOf, jobZone, absent, capacityOf, isPart, isKnowledgeCivic, isCultureCivic } from "./world.js";
 import { served, edgeRoads , commuteTime, rides, fireExposure } from "./fields.js";
 import { landmarkOf } from "./landmarks.js";
 import { needOf, needsContext } from "./needs.js";
@@ -156,6 +156,9 @@ export function census(world) {
   let fireStationsNoRoad = 0;
   let policeStationsNoRoad = 0;
   let centresNoRoad = 0;
+  // Knowledge and culture (SPEC §9e): the buildings by kind, served or not, and what reaches the animals at home.
+  let libraries = 0, universities = 0, galleries = 0, amphitheaters = 0, knowledgeNoRoad = 0, cultureNoRoad = 0;
+  let knowledgeSum = 0, knowledgeN = 0, cultureServed = 0, cultureSum = 0;
   let lotsNoRoad = 0;
   let lvSum = 0;
   let polSum = 0;
@@ -231,6 +234,8 @@ export function census(world) {
     else if (world.civic[i] === CIVIC.FIRE) { if (served(world, i)) fireStations++; else fireStationsNoRoad++; }
     else if (world.civic[i] === CIVIC.POLICE) { if (served(world, i)) policeStations++; else policeStationsNoRoad++; }
     else if (world.civic[i] === CIVIC.CENTRE) { if (served(world, i)) centres++; else centresNoRoad++; }
+    else if (isKnowledgeCivic(world.civic[i])) { if (served(world, i)) { if (world.civic[i] === CIVIC.LIBRARY) libraries++; else universities++; } else knowledgeNoRoad++; }
+    else if (isCultureCivic(world.civic[i])) { if (served(world, i)) { if (world.civic[i] === CIVIC.GALLERY) galleries++; else amphitheaters++; } else cultureNoRoad++; }
     if (world.burning[i]) burning++;
     if (world.tier[i] > 0) { crimeSum += world.crime[i]; crimeN++; if (world.crime[i] > maxCrime) maxCrime = world.crime[i]; }
     if (world.zone[i] !== ZONE.NONE) {
@@ -264,8 +269,22 @@ export function census(world) {
   const H = wAll ? (wCross / wAll) * Math.min(1, friendships / KNOBS.H_FLOOR) : 0;
   // The share of cross-species friendship that involves a fixed predator — the report card's "by pacification".
   const hKnife = wAll ? (predPreyFixed / wAll) * Math.min(1, friendships / KNOBS.H_FLOOR) : 0;
+  // K, THE KNOWLEDGE INDEX: the mean of knowledge/100 at home over living, housed, present animals — the same
+  // eligibility in numerator and denominator (a penned or held animal is neither). Culture the same way, for the
+  // Census's "under culture" share and mean bonus. Both read the fields computeFields just rebuilt.
+  for (const c of world.citizens) {
+    if (c.dead || c.home < 0 || absent(world, c)) continue;
+    knowledgeN++;
+    knowledgeSum += KNOBS.KNOWLEDGE[world.knowledge[c.home]] / 100;
+    const cul = world.culture[c.home];
+    if (cul) { cultureServed++; cultureSum += KNOBS.CULTURE_MOOD[cul]; }
+  }
+  const K = knowledgeN ? knowledgeSum / knowledgeN : 0;
   return {
     P, W, J, Jc, Ji, Jm, F, U, Lab,
+    // knowledge and culture (SPEC §9e)
+    libraries, universities, galleries, amphitheaters, knowledgeNoRoad, cultureNoRoad,
+    K, knowledgeN, cultureServed, cultureShare: knowledgeN ? cultureServed / knowledgeN : 0, cultureMean: knowledgeN ? cultureSum / knowledgeN : 0,
     counts, shares, speciesPresent, diet, carnivores: diet.carn,
     friendships, cross, predPrey, predPreyFixed, H, hKnife,
     fixed, wrongful, exonerated, held, penned, herbNear, maxDread, markets, centres,

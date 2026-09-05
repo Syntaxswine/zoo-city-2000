@@ -9,13 +9,13 @@
 import { campAt } from "./camps.js";
 import { buildingSnapshot, syncBuildingAge } from "./building-age.js";
 import { KNOBS } from "./rules.js";
-import { TERRAIN, ROAD, ZONE, CIVIC, idx, inBounds, anchorOf, footprintOf, civicAnchorOf, civicTiles } from "./world.js";
+import { TERRAIN, ROAD, ZONE, CIVIC, CIVIC_SIDE, CIVIC_OF_KIND, idx, inBounds, anchorOf, footprintOf, civicAnchorOf, civicTiles } from "./world.js";
 import { post, canSpend, exitReceivership } from "./budget.js";
 import { clearLot, invalidatePaths, releaseJob, replanStale } from "./citizens.js";
 import { resolveChoice } from "./events.js";
 import { refreshLast } from "./tick.js";
 import { computeOcclusion } from "./reach.js";
-import { computeRoadDist, computeStationDoors, touchesRoad, computeCamCover } from "./fields.js";
+import { computeRoadDist, computeStationDoors, touchesRoad, computeCamCover, computeKnowledgeCulture } from "./fields.js";
 import { closeHall, hallStock, resetMeatRoutes } from "./meat.js";
 import { clampUse } from "./use.js";
 
@@ -240,8 +240,8 @@ export function costOf(world, op) {
       }
       break;
     }
-    case "park": case "fire": case "police": case "centre": case "largePark": case "zoo": {
-      const side = op.kind === "park" ? 1 : 3;
+    case "park": case "fire": case "police": case "centre": case "largePark": case "zoo": case "library": case "university": case "gallery": case "amphitheater": {
+      const side = CIVIC_SIDE[op.kind]; // 1 the park · 2 the Library and the Gallery · 3 the campuses (world.js)
       for (let dy = 0; dy < side; dy++) for (let dx = 0; dx < side; dx++) {
         const tx = op.tx + dx, ty = op.ty + dy;
         if (!inBounds(world, tx, ty)) return { cost: 0, tiles: [], reason: "the whole footprint must fit on the map" };
@@ -410,6 +410,7 @@ function applyOperation(world, op, { log = true } = {}) {
   let lines = false; // a use repaint: every commute may prefer another way now
   let rails = false;
   let cams = false;
+  let civics = false; // a knowledge or culture building placed or razed: its field is rebuilt at the op, like a camera's cover
   for (const { i, what } of plan.tiles) {
     switch (op.kind) {
       case "zone":
@@ -434,7 +435,7 @@ function applyOperation(world, op, { log = true } = {}) {
         else if (what === "road") { world.road[i] = ROAD.NONE; world.cam[i] = 0; roads = true; }
         else if (what === "wall") { world.wall[i] = 0; walls = true; }
         else if (what === "rail" || what === "station") { world.rail[i] = 0; rails = true; }
-        else if (what === "civic") removeCivic(world, i);
+        else if (what === "civic") { removeCivic(world, i); civics = true; }
         else if (what === "building") {
           // Unzone FIRST: clearLot rehomes the family by bestHome(), which
           // would otherwise see this very lot as a freshly vacated R lot and
@@ -453,11 +454,12 @@ function applyOperation(world, op, { log = true } = {}) {
       case "tree":
         world.terrain[i] = TERRAIN.TREE;
         break;
-      case "park": case "fire": case "police": case "centre": case "largePark": case "zoo": {
+      case "park": case "fire": case "police": case "centre": case "largePark": case "zoo": case "library": case "university": case "gallery": case "amphitheater": {
         world.terrain[i] = TERRAIN.GRASS;
         const a = idx(world, op.tx, op.ty), dx = i % world.w - op.tx, dy = ((i / world.w) | 0) - op.ty;
-        world.civic[i] = i === a ? ({ park: CIVIC.PARK, fire: CIVIC.FIRE, police: CIVIC.POLICE, centre: CIVIC.CENTRE, largePark: CIVIC.LARGE_PARK, zoo: CIVIC.ZOO })[op.kind] : CIVIC.PART;
-        world.civicSize[i] = i === a ? (op.kind === "park" ? 1 : 3) : 128 | dx | dy << 2;
+        world.civic[i] = i === a ? CIVIC_OF_KIND[op.kind] : CIVIC.PART;
+        world.civicSize[i] = i === a ? CIVIC_SIDE[op.kind] : 128 | dx | dy << 2;
+        civics = true;
         break;
       }
       case "wall":
@@ -520,6 +522,10 @@ function applyOperation(world, op, { log = true } = {}) {
   // above: that would re-run four O(tiles) passes for no reason AND make the
   // op look like a road change to undo's `u.roads`. Its own field, only.
   if (cams || roads || walls || rails) computeCamCover(world);
+  // A Library placed while the clock is stopped must SHOW its catchment, and a
+  // road taken away must take the service with it before the month ends —
+  // the overlay, the card and the wishes read the field, not the tick.
+  if (civics || roads || walls) computeKnowledgeCulture(world);
   resetMeatRoutes(world); // a hall, its door, capacity or the freight graph may have changed inside this tick
   post(world, "build", -plan.cost);
   world.undoStack = plan.evicts ? [] : [{ op, snap, cost: plan.cost, roads: roads || walls || rails, t: world.tick }];
@@ -562,6 +568,7 @@ export function undo(world) {
   if (world.doorsMoved) { world.doorsMoved = false; invalidatePaths(world); }
   replanStale(world, { release: false }); // an undo is an op: it rebuilds, and it fires nobody
   computeCamCover(world);
+  computeKnowledgeCulture(world); // an undo can put a building or a road back
   resetMeatRoutes(world);
   post(world, "build", u.cost);
   world.log.push({ t: world.tick, op: { kind: "undo" } });

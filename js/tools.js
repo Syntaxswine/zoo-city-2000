@@ -28,11 +28,16 @@ export const TOOLS = Object.freeze([
   row(16, "bulldoze", "B", "Bulldoze", { kind: "bulldoze" }, { kind: "ground", args: ["rubble"] }, "clear (drag); occupied lots cannot be undone"),
   row(17, "largePark", "G", "Large park", { kind: "largePark" }, { kind: "civic", args: ["largePark", 3] }, "place a 3×3 large park; no road required"),
   row(18, "camera", "E", "Camera", { kind: "camera" }, { kind: "camera", args: [0] }, "L-drag along a street; needs a police station to do anything, and watches the lots the street serves"),
+  // Knowledge and culture (SPEC §9e, 2026-09-05). Keys from the free set after the collision audit in the review: K Y M T.
+  row(19, "library", "K", "Library", { kind: "library" }, { kind: "civic", args: ["library", 2] }, "place a 2×2 library beside a road; knowledge 50 within 5 tiles of it — raises the town's capacity"),
+  row(20, "university", "Y", "University", { kind: "university" }, { kind: "civic", args: ["university", 3] }, "place a 3×3 university beside a road; knowledge 100 over the nearest half of the map's tiles"),
+  row(21, "gallery", "M", "Gallery", { kind: "gallery" }, { kind: "civic", args: ["gallery", 2] }, "place a 2×2 gallery beside a road; culture +4 mood and land value within 5 tiles of it"),
+  row(22, "amphitheater", "T", "Amphitheater", { kind: "amphitheater" }, { kind: "civic", args: ["amphitheater", 3] }, "place a 3×3 amphitheater beside a road; culture +8 over the nearest eighth of the map's tiles"),
 ]);
 
 export const TOOL_BY_ID = Object.freeze(Object.fromEntries(TOOLS.map((tool) => [tool.id, tool])));
 export const TOOL_BY_KEY = Object.freeze(Object.fromEntries(TOOLS.map((tool) => [tool.key.toUpperCase(), tool])));
-export const PLACE_TOOLS = Object.freeze(TOOLS.filter((tool) => ["station", "park", "largePark", "zoo", "centre", "police", "fire"].includes(tool.op.kind)).map((tool) => tool.id));
+export const PLACE_TOOLS = Object.freeze(TOOLS.filter((tool) => ["station", "park", "largePark", "zoo", "centre", "police", "fire", "library", "university", "gallery", "amphitheater"].includes(tool.op.kind)).map((tool) => tool.id));
 /**
  * Tools that get a GHOST under the cursor — the ground diamond
  * (`art.overlay("ghost")`), green where the tile will take the thing and red

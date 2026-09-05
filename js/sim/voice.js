@@ -29,6 +29,7 @@ export const ACT = Object.freeze({
   CLEAN: "leave this street less tidy",
   NO_ROAD: "lay a road within 3 tiles",
   CAPPED: "build a park or Large Park",
+  NO_CULTURE: "build a Gallery or Amphitheater in reach of this home",
   NO_DEMAND: "lower taxes or improve the lot",
   TAX: "lower this zone's tax rate",
 });
@@ -59,6 +60,7 @@ export const LINES = Object.freeze({
   CLEAN: { raccoon: ["it's too clean round here", "not a decent bin in sight"], default: ["this street is much too tidy", "leave a little mess for us"] },
   NO_ROAD: { default: ["no road to our door", "how do we reach the road?"] },
   CAPPED: { default: ["town's full, they say", "a park could make us room"] },
+  NO_CULTURE: { default: ["wish for art or music nearby", "no music on our street"] },
   NO_DEMAND: { default: ["nobody builds on this street", "this street is being passed by"] },
   TAX: { default: ["the taxes eat the wage", "rates take too much today"] },
 });

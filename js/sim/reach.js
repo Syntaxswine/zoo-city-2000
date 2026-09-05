@@ -205,9 +205,6 @@ export function forEachWithinAll(world, tiles, R, fn) {
  * disagree about what a wall, a tunnel or a corner does.
  */
 function flood(world, gen, tail, R, fn) {
-  const { w, h } = world;
-  const occl = world.occl;
-  const stamp = world._reachStamp;
   const dist = world._reachDist;
   const queue = world._reachQueue;
   let head = 0;
@@ -216,27 +213,90 @@ function flood(world, gen, tail, R, fn) {
     const d = dist[cur];
     fn(cur, d);
     if (d >= R) continue;
-    const cx = cur % w;
-    const cy = (cur / w) | 0;
-    const m = occl[cur];
-    if (!m) continue;
-    for (let k = 0; k < 8; k++) {
-      if (!(m & (1 << k))) continue;
-      const nx = cx + DIRS[k][0];
-      const ny = cy + DIRS[k][1];
-      if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
-      const j = ny * w + nx;
-      if (stamp[j] === gen) continue;
-      if (!(occl[j] & (1 << OPP(k)))) continue;
-      if (k & 1) {
-        // A diagonal between two walls that touch at the corner is not a gap.
-        if (occl[cy * w + nx] === 0 && occl[ny * w + cx] === 0) continue;
-      }
-      stamp[j] = gen;
-      dist[j] = d + 1;
-      queue[tail++] = j;
-    }
+    tail = expand(world, cur, d, gen, tail);
   }
+}
+
+/**
+ * THE ONE STEP of every flood: queue cur's unvisited neighbours at d + 1,
+ * across the occlusion masks — a wall is never entered, a tunnel only along
+ * its axis, and a diagonal between two walls that touch at the corner is not
+ * a gap. Returns the new tail. flood and floodBudget both step through here,
+ * so a radius flood and a budget flood can never disagree about a wall.
+ */
+function expand(world, cur, d, gen, tail) {
+  const { w, h } = world;
+  const occl = world.occl;
+  const stamp = world._reachStamp;
+  const dist = world._reachDist;
+  const queue = world._reachQueue;
+  const cx = cur % w;
+  const cy = (cur / w) | 0;
+  const m = occl[cur];
+  if (!m) return tail;
+  for (let k = 0; k < 8; k++) {
+    if (!(m & (1 << k))) continue;
+    const nx = cx + DIRS[k][0];
+    const ny = cy + DIRS[k][1];
+    if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
+    const j = ny * w + nx;
+    if (stamp[j] === gen) continue;
+    if (!(occl[j] & (1 << OPP(k)))) continue;
+    if (k & 1) {
+      // A diagonal between two walls that touch at the corner is not a gap.
+      if (occl[cy * w + nx] === 0 && occl[ny * w + cx] === 0) continue;
+    }
+    stamp[j] = gen;
+    dist[j] = d + 1;
+    queue[tail++] = j;
+  }
+  return tail;
+}
+
+/**
+ * A flood with a BUDGET of tiles instead of a radius (SPEC §9e; the owner's
+ * ruling that a University reaches half the map's tiles and an Amphitheater
+ * an eighth — an AREA, not a distance). From every footprint tile at d = 0,
+ * take whole distance layers nearest first until the next layer would
+ * overrun the budget; from that final layer take the remainder in ASCENDING
+ * TILE INDEX, so the catchment is exact and the same on every machine with no
+ * RNG. Walls are never entered (so never counted), tunnels only along their
+ * axis, water and open ground count like anything else. Near a map edge the
+ * layers are smaller and the flood reaches farther in to fill the budget; a
+ * sealed quarter runs out of tiles and stays short. fn(j, d) once per tile.
+ * Returns the tiles taken.
+ */
+export function floodBudget(world, tiles, budget, fn) {
+  if (world.wallsDirty) computeOcclusion(world);
+  scratch(world);
+  const stamp = world._reachStamp;
+  const dist = world._reachDist;
+  const queue = world._reachQueue;
+  const gen = ++world._reachGen;
+  let tail = 0;
+  for (const i of tiles) {
+    if (stamp[i] === gen) continue;
+    stamp[i] = gen;
+    dist[i] = 0;
+    queue[tail++] = i;
+  }
+  let head = 0;
+  let taken = 0;
+  while (head < tail && taken < budget) {
+    const d = dist[queue[head]];
+    let end = head;
+    while (end < tail && dist[queue[end]] === d) end++;
+    if (taken + (end - head) > budget) {
+      const layer = Array.from(queue.subarray(head, end)).sort((a, b) => a - b);
+      for (let k = 0; k < budget - taken; k++) fn(layer[k], d);
+      return budget;
+    }
+    for (let k = head; k < end; k++) fn(queue[k], d);
+    taken += end - head;
+    for (let k = head; k < end; k++) tail = expand(world, queue[k], d, gen, tail);
+    head = end;
+  }
+  return taken;
 }
 
 /**

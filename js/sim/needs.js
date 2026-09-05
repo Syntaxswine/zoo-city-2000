@@ -8,6 +8,7 @@ import { DIET_OF } from "./species.js";
 import { ZONE, anchorOf, footprintOf, absent } from "./world.js";
 import { hash01, seedFromString } from "./rng.js";
 import { ACT } from "./voice.js";
+import { KNOBS } from "./rules.js";
 
 export const NEED_MIN = 4;
 export const NEED_VALVE_PTS = 8;
@@ -51,6 +52,10 @@ export function needOf(world, c, context = null) {
     if (value < 0) add(code, -value, code === "FLIGHT" ? { species: moodArgs.get(code) } : null);
   }
   if (c.home >= 0 && !sums.has("PARK")) add("NO_PARK", 10);
+  // The culture wish (SPEC §9e) sits exactly on NEED_MIN: it speaks only when
+  // nothing else is wrong, and never while any culture reaches home — a
+  // Gallery's animal does not ask for an Amphitheater.
+  if (c.home >= 0 && !world.culture[c.home]) add("NO_CULTURE", KNOBS.NEED_CULTURE_PTS);
   if (c.job >= 0 && !sums.has("COMMUTE")) add("COMMUTE", 10);
 
   // Home preferences: potential − actual from homeScore's own terms.
@@ -96,7 +101,9 @@ export function needOf(world, c, context = null) {
   choices.sort((a, b) => b.points - a.points || b.tie - a.tie || a.code.localeCompare(b.code));
   const best = choices[0];
   if (!best || best.points < NEED_MIN) return { code: "CONTENT", arg: null, act: ACT.CONTENT };
-  return { code: best.code, arg: best.arg, act: ACT[best.code] };
+  // A capped town whose knowledge is not yet full (K < 1) has a second remedy; the code and its voice are CAPPED's.
+  const act = best.code === "CAPPED" && (world.last?.census?.K ?? 1) < 1 ? `${ACT.CAPPED}, or bring a Library or University's reach to more homes` : ACT[best.code];
+  return { code: best.code, arg: best.arg, act };
 }
 
 /** Shared scratch for callers evaluating more than one citizen. */

@@ -13,9 +13,36 @@ export { USE } from "./use.js";
 export const TERRAIN = Object.freeze({ GRASS: 0, WATER: 1, TREE: 2 });
 export const ROAD = Object.freeze({ NONE: 0, ROAD: 1, BRIDGE: 2 });
 export const ZONE = Object.freeze({ NONE: 0, R: 1, C: 2, I: 3, M: 4 });
-export const CIVIC = Object.freeze({ NONE: 0, PARK: 1, LARGE_PARK: 2, LARGE_PARK_PART: 3, FIRE: 4, POLICE: 5, CENTRE: 6, PART: 7, ZOO: 8 });
+// 9–12 are the knowledge-and-culture buildings (SPEC §9e, 2026-09-05): appended after the Zoo, never renumbered,
+// and never inferred from a footprint's size — a 2×2 Library and a legacy 2×2 Large Park share a side and nothing else.
+export const CIVIC = Object.freeze({ NONE: 0, PARK: 1, LARGE_PARK: 2, LARGE_PARK_PART: 3, FIRE: 4, POLICE: 5, CENTRE: 6, PART: 7, ZOO: 8, LIBRARY: 9, UNIVERSITY: 10, GALLERY: 11, AMPHITHEATER: 12 });
 export const isStation = (c) => c === CIVIC.FIRE || c === CIVIC.POLICE; // coverage
-export const isCivicEmployer = (c) => isStation(c) || c === CIVIC.CENTRE || c === CIVIC.ZOO; // jobs
+export const isKnowledgeCivic = (c) => c === CIVIC.LIBRARY || c === CIVIC.UNIVERSITY; // the knowledge field
+export const isCultureCivic = (c) => c === CIVIC.GALLERY || c === CIVIC.AMPHITHEATER; // the culture field
+export const isCivicEmployer = (c) => isStation(c) || c === CIVIC.CENTRE || c === CIVIC.ZOO || isKnowledgeCivic(c) || isCultureCivic(c); // jobs
+/** The footprint side a kind is BUILT at (ops.js): the small services 2×2, the campuses 3×3, the park 1×1. Legacy saves carry their own side in civicSize. */
+export const CIVIC_SIDE = Object.freeze({ park: 1, fire: 3, police: 3, centre: 3, largePark: 3, zoo: 3, library: 2, university: 3, gallery: 2, amphitheater: 3 });
+export const CIVIC_OF_KIND = Object.freeze({ park: CIVIC.PARK, fire: CIVIC.FIRE, police: CIVIC.POLICE, centre: CIVIC.CENTRE, largePark: CIVIC.LARGE_PARK, zoo: CIVIC.ZOO, library: CIVIC.LIBRARY, university: CIVIC.UNIVERSITY, gallery: CIVIC.GALLERY, amphitheater: CIVIC.AMPHITHEATER });
+export const KIND_OF_CIVIC = Object.freeze(Object.fromEntries(Object.entries(CIVIC_OF_KIND).map(([k, v]) => [v, k])));
+/**
+ * The jobs a civic anchor offers — EXPLICIT per kind. The knowledge-and-culture
+ * review (F4) found that jobsOf fell through to STATION_JOBS for any employer
+ * it did not list, so an unlisted University would have offered four jobs and
+ * nothing would have said so. A kind not in this table offers none.
+ */
+export function civicJobs(c) {
+  switch (c) {
+    case CIVIC.ZOO: return KNOBS.ZOO_JOBS;
+    case CIVIC.LARGE_PARK: return KNOBS.LARGE_PARK_JOBS;
+    case CIVIC.CENTRE: return KNOBS.CENTRE_JOBS;
+    case CIVIC.FIRE: case CIVIC.POLICE: return KNOBS.STATION_JOBS;
+    case CIVIC.LIBRARY: return KNOBS.LIBRARY_JOBS;
+    case CIVIC.UNIVERSITY: return KNOBS.UNIVERSITY_JOBS;
+    case CIVIC.GALLERY: return KNOBS.GALLERY_JOBS;
+    case CIVIC.AMPHITHEATER: return KNOBS.AMPHITHEATER_JOBS;
+    default: return 0;
+  }
+}
 export const ZONE_NAME = ["none", "R", "C", "I", "M"];
 /** Use-zoning: who a lot or road admits. Stable 16-bit codes live in use.js; species.js applies them. */
 /** In custody or a market pen: not working, socialising, breeding, hunting or on the street. */
@@ -65,6 +92,8 @@ export function createWorld({ seed = "zoo", w = 64, h = 64 } = {}) {
     fireCov: new Uint8Array(n),
     policeCov: new Uint8Array(n),
     camCov: new Uint8Array(n),
+    knowledge: new Uint8Array(n), // 0 none · 1 a Library · 2 a University reaches this tile (the strongest; fields.computeKnowledgeCulture; SPEC §9e)
+    culture: new Uint8Array(n), // 0 none · 1 a Gallery · 2 an Amphitheater
     _camGen: 0, // the camera walk’s visited-set generation (fields.computeCamCover)
     dread: new Uint8Array(n),
     carnAt: new Uint16Array(n), // Uint16 since the blocks: a 3×3 R block keeps 270 animals on its anchor
@@ -380,11 +409,7 @@ export function capacityOf(world, i) {
   if (z === ZONE.C) return Math.round(KNOBS.C_JOBS[t] * m);
   if (z === ZONE.I) return Math.round(KNOBS.I_JOBS[t] * m);
   if (z === ZONE.M) return Math.round(KNOBS.M_JOBS[t] * m);
-  if (world.civic[i] === CIVIC.ZOO) return KNOBS.ZOO_JOBS;
-  if (world.civic[i] === CIVIC.LARGE_PARK) return KNOBS.LARGE_PARK_JOBS;
-  if (world.civic[i] === CIVIC.CENTRE) return KNOBS.CENTRE_JOBS;
-  if (isStation(world.civic[i])) return KNOBS.STATION_JOBS;
-  return 0;
+  return civicJobs(world.civic[i]); // a civic anchor's places; a PART is 0 by the table
 }
 
 /** Jobs offered by a tile (C, I, M, a zoo anchor, a fire or police station, the centre); a block's part offers none. */
@@ -397,9 +422,7 @@ export function jobsOf(world, i) {
   if (z === ZONE.C) return Math.round(KNOBS.C_JOBS[world.tier[i]] * m);
   if (z === ZONE.I) return Math.round(KNOBS.I_JOBS[world.tier[i]] * m);
   if (z === ZONE.M) return Math.round(KNOBS.M_JOBS[world.tier[i]] * m);
-  if (world.civic[i] === CIVIC.LARGE_PARK) return KNOBS.LARGE_PARK_JOBS;
-  if (isCivicEmployer(world.civic[i])) return world.civic[i] === CIVIC.CENTRE ? KNOBS.CENTRE_JOBS : KNOBS.STATION_JOBS;
-  return 0;
+  return civicJobs(world.civic[i]);
 }
 
 /** Which demand a job site counts toward: C (zoo, stations and the centre count as C), I, or M (the meat halls — their own valve). */

@@ -39,7 +39,7 @@ const TICK_SECONDS = 1.5;
 const SPEEDS = [1, 3, 10];
 const MAX_CATCHUP = 3;
 const AUTOSAVE_EVERY = 12;
-const OVERLAYS = ["off", "lv", "pol", "crime", "dread", "use", "access", "score", "watch"];
+const OVERLAYS = ["off", "lv", "pol", "crime", "dread", "use", "access", "score", "watch", "knowledge", "culture"];
 const META = (name) => `zoo.meta:${name}`;
 const LAST = "zoo.last";
 const PREF = "zoo.pref"; // UI preferences (the cheat switch, the news read marks) — this browser's, never the city's

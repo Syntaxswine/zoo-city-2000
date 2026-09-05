@@ -378,6 +378,9 @@ export function createRenderer(canvas, initialWorld, art) {
         else if (mode === "crime") fill = world.crime[i] > 5 ? `rgba(150,50,70,${(world.crime[i] / 100) * 0.75})` : world.policeCov[i] ? "rgba(60,110,138,0.18)" : null;
         else if (mode === "dread") fill = world.dread[i] > 2 ? `rgba(110,40,70,${(world.dread[i] / 100) * 0.7})` : null;
         else if (mode === "watch") fill = world.camCov[i] ? `rgba(70,120,150,${(world.camCov[i] / 100) * 0.75})` : null;
+        // Knowledge and culture (SPEC §9e): the class the tile is under — a Library or Gallery's reach light, a University's or Amphitheater's deep.
+        else if (mode === "knowledge") fill = world.knowledge[i] ? (world.knowledge[i] === 2 ? "rgba(60,80,170,0.5)" : "rgba(60,80,170,0.26)") : null;
+        else if (mode === "culture") fill = world.culture[i] ? (world.culture[i] === 2 ? "rgba(170,90,40,0.5)" : "rgba(170,90,40,0.26)") : null;
         else if (mode === "use") fill = world.use[i] && (world.zone[i] !== ZONE.NONE || world.road[i] !== ROAD.NONE) ? useTint(world.use[i]) : null; // exact category is named on the card; each saved code has one stable tint
         else if (mode === "access") {
           // The number the RULE reads, not the tile's own: fields.siteRoadDist
@@ -537,6 +540,10 @@ export function createRenderer(canvas, initialWorld, art) {
         else if (world.civic[i] === CIVIC.FIRE) standing = art.civic("fire", civicSideOf(world, i));
         else if (world.civic[i] === CIVIC.POLICE) standing = art.civic("police", civicSideOf(world, i));
         else if (world.civic[i] === CIVIC.CENTRE) standing = art.civic("centre", civicSideOf(world, i));
+        else if (world.civic[i] === CIVIC.LIBRARY) standing = art.civic("library", civicSideOf(world, i)); // knowledge and culture (SPEC §9e)
+        else if (world.civic[i] === CIVIC.UNIVERSITY) standing = art.civic("university", civicSideOf(world, i));
+        else if (world.civic[i] === CIVIC.GALLERY) standing = art.civic("gallery", civicSideOf(world, i));
+        else if (world.civic[i] === CIVIC.AMPHITHEATER) standing = art.civic("amphitheater", civicSideOf(world, i));
         else if (world.wall[i]) standing = world.road[i] !== ROAD.NONE || world.rail[i] ? art.tunnel(tunnelAxis(world, i)) : art.wall(wallMask(tx, ty)); // a wall stands; a tunnel stands over its road or rail
         else if (world.rail[i] === 2) standing = art.station(railAxis(tx, ty)); // the platform and shelter stand over the track
         if (standing) items.push({ sprite: standing, tx, ty, kind: "building" });

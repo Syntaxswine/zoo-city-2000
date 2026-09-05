@@ -48,7 +48,13 @@ export function externalMarket(world, c) {
  * the same reason, backwards.
  */
 export function capacityLaw(world, c) {
-  return (KNOBS.CAP_BASE + KNOBS.CAP_PARK * c.parks + KNOBS.CAP_LARGE_PARK * c.largeParks + world.festivalBonus - KNOBS.CAM_CAP * (c.watchedShare || 0)) * (1 + KNOBS.CAP_H_GAIN * c.H);
+  // KNOWLEDGE (SPEC §9e) is the same shape as the parks and for the same
+  // reason: the cap is the one ABSOLUTE lever, so a Library or a University
+  // is measurable where a mood term would not be. K is the census's mean of
+  // knowledge/100 over housed, present animals — a MEAN, so a town that grows
+  // past its catchment lowers its own ceiling (pre-registered for measuring
+  // in the review; the number is CAP_KNOWLEDGE).
+  return (KNOBS.CAP_BASE + KNOBS.CAP_PARK * c.parks + KNOBS.CAP_LARGE_PARK * c.largeParks + world.festivalBonus + KNOBS.CAP_KNOWLEDGE * (c.K || 0) - KNOBS.CAM_CAP * (c.watchedShare || 0)) * (1 + KNOBS.CAP_H_GAIN * c.H);
 }
 
 /** The breakdown for the current state WITHOUT advancing the valves (a loaded city, a rate change while paused). */

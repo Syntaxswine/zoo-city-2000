@@ -1029,6 +1029,15 @@ export function moodTerms(world, c, context = moodContext(world)) {
       else if (owner === CIVIC.CENTRE) van = true;
     }
     if (park) terms.push({ code: "PARK", value: 10 });
+    // CULTURE (SPEC §9e; the owner: "a boon to both happiness as well as
+    // property desirability"): +4 under a Gallery, +8 under an Amphitheater,
+    // the strongest at home and never the sum. This is the half an animal
+    // can SAY; the half the town can measure is LV_CULTURE in the land value,
+    // because mood alone is a dead end in a growing town (demand.js
+    // capacityLaw says why). Children benefit too, though their floor of 50
+    // hides it whenever it would matter.
+    const culture = world.culture[c.home];
+    if (culture) terms.push({ code: "CULTURE", value: KNOBS.CULTURE_MOOD[culture] });
     // The meat hall's dread: herbivores mind it (halved with a carnivore friend); carnivores like the smell.
     const dread = world.dread[c.home];
     if (dread > 0) {
