@@ -8,6 +8,21 @@ Open work, ranked. The design record is `SPEC.md`; the numbers are in
 `js/sim/rules.js` (KNOBS). Later layers were labelled at design time so v1
 could ship whole.
 
+## Owner-reported follow-ups — 2026-09-05
+
+- [ ] **New-game actions:** place Back on the same horizontal row as Found the
+  City, aligned to the far right. Make Found the City larger and more prominent.
+  Verify the layout at narrow and wide window sizes.
+- [ ] **Large Park and park wishes:** investigate citizens displaying “wish we
+  had a park nearby” / “nowhere to sit in the sun” beside a Large Park. Check
+  whether Large Park recreation is counted by the needs calculation, and whether
+  the wish refers to the citizen's home rather than their current walking spot.
+  Make the need and its wording consistent with actual recreation coverage;
+  verify near/far homes and the full 3×3 park footprint with regression coverage.
+- [ ] **Flock cameras on the remote:** restore/expose the flock camera controls
+  in the remote-control UI. Check existing camera functionality and bindings,
+  and verify that the controls remain accessible at narrow window sizes.
+
 ## Building character — People E core shipped 2026-09-05
 
 The twelve original families now have four distinct plans. The same occupancy
