@@ -239,7 +239,7 @@ another's. Git merges those. `citizens.js`, `justice.js` and `events.js`
 are the risk: B adds one-liners at call sites; A adds one function; H
 edits two `post` sites; F edits one advisor function; D never opens them.
 
-## Road access, standardized — SHIPPED 2026-09-04 (plan §4-R; SPEC §6c, §5, §7.9, §9b, §11; handoff §24–§24h; `tools/accessprobe.mjs`; the suite went 428 → 526 across SIX hostile reviews, 6 → 6.5 → 6.5 → 7 → 7 → 7)
+## Road access, standardized — SHIPPED 2026-09-04 (plan §4-R; SPEC §6c, §5, §7.9, §9b, §11; handoff §24–§24i; `tools/accessprobe.mjs`; the suite went 428 → 531 across SEVEN hostile reviews, 6 → 6.5 → 6.5 → 7 → 7 → 7 → 7, plus the owner's placeable-is-functional ruling)
 
 The owner: *"as long as a tile is within 1-3 tiles of the road it has road
 access"*, *"the 6x6 squares have roads around the whole perimeter, so nothing
@@ -267,12 +267,19 @@ and are not reproducible from anything on `main`; these are.
 
 | command (all with `--years 30 --quiet`) | 411d903 | Part R |
 |---|---|---|
-| `node tools/playtest.mjs --layout balanced` | `771239e1` | `8707f655` |
+| `node tools/playtest.mjs --layout balanced` | `771239e1` | `8707f655` → **`92b2a0d2`** |
 | `node tools/playtest.mjs --layout dormitory` | `27376829` | `f86913c3` |
-| `node tools/playtest.mjs --layout millbelt` | `10a8a697` | `a20db622` |
+| `node tools/playtest.mjs --layout millbelt` | `10a8a697` | `a20db622` → **`c9cf4a1f`** |
 | `node tools/playtest.mjs --layout estate` | `e48a4e21` | `df5631eb` |
-| `node tools/playtest.mjs --layout balanced --stations --zoo 12` | `8ee1a3dc` | `aaac75f4` |
+| `node tools/playtest.mjs --layout balanced --stations --zoo 12` | `8ee1a3dc` | `aaac75f4` → **`f8b8fd1c`** |
 | `node tools/playtest.mjs --layout estate --zoo 12` | `7a719fce` | `418c5b2c` |
+
+The three bold ones moved on 2026-09-04 when `ops` began re-planning at the op
+(the seventh review's finding 1): a town whose mayor edits roads no longer
+spends the following month counting its traffic from nothing. Balanced 1629 →
+1659 animals, millbelt 1563 → 1596. The other three layouts do not move,
+because their mayors op less often. Everything since — the placement rule, the
+tunnel axis, the census gates, the zot — is hash-neutral on all six.
 
 Every one moves, on purpose, and the balanced gate moves for the same three
 reasons as the rest: commutes redistribute over the doors a lot now has, the
@@ -450,6 +457,85 @@ doors itself. So the check was watching the wrong half of its own fix: deleting
 the op-time settle left it green with 317 animals walking through a police
 station. The measurement is taken before the tick now. **A line added for one
 reason can take the teeth out of a check written for another.**
+
+## A PLACEABLE BUILDING IS A FUNCTIONAL BUILDING — the owner's ruling (2026-09-04)
+
+Reading the sixth review's finding (an unreachable police station solving 35 of
+38 crimes), the owner ruled: *"any placeable building should be a functional
+building. any placeable building should be an enterable building. if a building
+meets the requirements to exist it should be functional."*
+
+So `ops` now REFUSES a fire station, a police station, a pacification centre or
+a zoo where no road reaches, with the reason in words. A zoned lot was always
+like this — chalk with no road never becomes a building — and this makes the
+civics agree with it. Asked whether a rail platform should be refused too, the
+owner said no: *"that should have the no road symbol like houses that are too
+far from the road."* So a line is still laid ahead of the town, and
+`render.computeZots` follows `asksAccess` — a stranded platform, zoo or civic
+employer wears the NO ROAD zot on the MAP, not only in the card. A park asks
+nothing and is placed anywhere, as it always was.
+
+**The gate is at PLACEMENT, and every effect stays gated on `served` as well**,
+because a building can still be stranded by bulldozing the road that served it.
+That is now the only way to a dead building — and it is how every fixture in
+the suite that needs one builds it, which is the honest reproduction anyway.
+
+Hash-neutral on all six gates: the scripted mayor never placed one out of
+reach.
+
+## The SEVENTH hostile review — an op erased a month of the town's traffic (2026-09-04)
+
+A seventh adversarial reader scored `67be6bf` **7/10**. 104 mutants of their
+own: 87 died by a named check, 14 survived.
+
+1. **AN OP ERASED THE WHOLE TOWN'S TRAFFIC FOR A MONTH, AND IT WAS FARMABLE.**
+   `ops.apply` invalidated every commute and nothing rebuilt them: the next
+   tick counts TRAFFIC at step 1 and repairs stale commutes at step 5, so
+   pollution, land value and crime were computed from nothing, in the same tick
+   that rolls growth and decay. Measured over 20 years, one §1 repaint of an
+   isolated corner road a month against a control that laid the same tile and
+   left it alone: **P 1556 against 1488, maxTraffic 0 against 202, pollution
+   7.67 against 10.85, land value 41.40 against 39.64 — and more cash.** It
+   showed on the panel with no tick at all, because `refreshLast` recounts off
+   the null paths. Fixed: `apply` and `undo` call `replanStale` before they
+   return. Afterwards the farming town is the SAME town, and only §239 poorer.
+   **This is the "OPEN — a save taken in the SAME MONTH as an op" item, which
+   was framed as a save/load divergence and was really this.** Three of the six
+   gate hashes move with it and are re-recorded below.
+2. **A forecourt walked through a wall, sideways.** `passable` refused only a
+   BARE wall, so a wall pierced north-south by a rail line was a doorway
+   east-west on foot — the same tile a smell could not cross. SPEC §6b's own
+   law ("open along its axis only") was enforced for every area effect and for
+   neither road distance nor the door search. Both ask `reach.crossable` now,
+   so §6b is one law instead of two. The existing check built its tunnel ALONG
+   the way in, which is the easy case.
+3. **The sixth review's fix was pinned at the counter and not at the reader.**
+   One line putting `policeStationsNoRoad` back into the arrest force left the
+   suite green while a station at the edge of the map worked 34 cases. Three
+   towns now assert the ARRESTS, not the count.
+4. **SPEC §6c described a call deleted two commits earlier** — the fourth
+   consecutive round with a false sentence in that section, and the second in a
+   row where the false one was a CORRECTION. The settle table there is written
+   out per caller now, and the boundary re-plan is documented as the backstop
+   it is: measured dead over 1,440 boundaries of four weathered towns, kept
+   because the law is about the boundary.
+5. **`need-stress`'s new half was vacuous** — "every walked tile is ground a
+   citizen may stand on" cannot fail in a fixture with no rail at all. Its
+   other half is real (614 of 1239 commutes do not start at the lowest door, so
+   the pre-Part-R assertion would fail loudly there).
+6. Two more survivors closed: `approachBetween` looked its chain up by DOOR and
+   nothing left a platform by its second one (the mutant put a three-tile
+   teleport in a stored path); and the `staleAtJustice` readout could be
+   neutered together with the re-plan it watches, because the check read it
+   with `|| 0`.
+
+**Found SOUND by the seventh reader** — do not re-verify: every published
+number reproduces (six gate hashes, both `accessprobe` rigs, the `--cost`
+table); a 25-op random-op fuzz on a town where riding is necessary never
+diverged; 240 tick boundaries of a weathered town showed no drift in any
+derived state; the rulings table is real; the class the earlier rounds kept
+missing is covered; Law 6 and §14 hold behaviourally; no access claim leaks
+into the news or story modules.
 
 ## The SIXTH hostile review — the loop was the class and one member got fixed (2026-09-04)
 

@@ -2113,3 +2113,43 @@ the law can be checked rather than argued.
 | a fixture that builds its own answer | `need-stress` built commutes with `roadPath` and then checked they were all road. 1258 of 1258 passed, forever |
 | a rig built for a case | check it can still MAKE the case. The deep rig's forecourts sit on unzoned ground: nothing can be built or burnt there, and the settle fires 0 times in 360 months of it |
 | a correction to a previous false sentence | it can be the false one. Round five "corrected" SPEC's "only a platform" and SPEC was right — 354,843 sites say so |
+
+## 24i. The seventh review, and the owner's ruling (session 15, 2026-09-04)
+
+**7/10.** **526 → 531 checks, 0 failures.** Three of six gate hashes move, for
+the first time since the part shipped, and the reason is a real bug.
+
+**AN OP ERASED THE TOWN'S TRAFFIC FOR A MONTH.** `ops.apply` invalidated every
+commute and nothing rebuilt them; the next tick counts traffic at step 1 and
+repairs at step 5. So pollution, land value and crime were computed from
+nothing, in the same tick that rolls growth and decay — and it was FARMABLE:
+one §1 repaint a month bought +4.6% population, -29% pollution and more cash
+than doing nothing. `apply` and `undo` re-plan now. **This was the long-standing
+"same month as an op" item in BACKLOG, which had been written up as a save/load
+divergence for weeks. It was never only that.** Look at what an invalidation
+costs the LIVE game before deciding it is a save-file question.
+
+**A forecourt walked through a wall, sideways.** `passable` refused only a bare
+wall, so a wall pierced north-south by rail was a doorway east-west on foot —
+the same tile a smell could not cross. §6b said "open along its axis only" and
+was enforced for every area effect and neither of the two that matter here.
+
+**And the owner ruled while it was open:** *"any placeable building should be a
+functional building … if a building meets the requirements to exist it should
+be functional."* `ops` refuses a fire station, a police station, a centre or a
+zoo where no road reaches. A park and a PLATFORM stay placeable — a line is
+laid ahead of the town — and an unreachable platform wears the NO ROAD zot,
+"like houses that are too far from the road". Every fixture that needed a dead
+building now builds it and bulldozes its road, which is the only way a player
+gets one and the honest reproduction besides.
+
+### The traps, keyed by what you would see
+
+| what you see | what it is |
+|---|---|
+| an invalidation with no re-plan | ask what reads the derived thing BEFORE the repair. Traffic is counted at step 1 and repaired at step 5 |
+| a bug filed as a save/load divergence | check whether it changes the live game too. This one was worth +4.6% population to anyone who noticed |
+| a law enforced in one traversal | grep for the other traversals of the same relation. §6b's axis rule held for `forEachWithin` and not for `computeRoadDist` or `doorSearch` |
+| a fix pinned at a counter | pin it at the READER. Gating `cen.policeStations` did nothing for `justice`'s force, one line away |
+| a check that reads a readout with `\|\| 0` | a missing field reads as compliance, and a mutant can delete both together |
+| a fixture that cannot make its case | `need-stress` asserts "no walked tile is un-walkable" in a world with no rail: there is nothing to walk that is not a road |

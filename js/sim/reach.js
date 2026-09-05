@@ -36,6 +36,26 @@ const hasWay = (world, i) => world.road[i] !== ROAD.NONE || onRail(world, i);
 export const isBarrier = (world, i) => world.wall[i] === 1 && !hasWay(world, i);
 
 /**
+ * MAY A STEP FROM `a` TO `b` CROSS? A gate is open ALONG ITS AXIS ONLY (SPEC
+ * 6b): the way through it is the way through it, and a wall pierced
+ * north-south is still a wall to anything moving east-west. `world.occl` holds
+ * exactly that mask per wall tile (0 for a bare wall), and every area effect -
+ * smells, dread, cover, a killer's reach - already reads it through
+ * `forEachWithin`.
+ *
+ * ROAD DISTANCE AND THE DOOR SEARCH DID NOT, and asked only "is this a bare
+ * wall". So a wall with a north-south RAIL line through it was a doorway
+ * east-west for a citizen on foot: a hostile review put a platform on one side
+ * and a road on the other and got a stored commute walking through the
+ * masonry, at right angles to the tunnel's own axis - the same tile a smell
+ * could not cross. Both callers ask this now, so 6b is one law and not two.
+ */
+export function crossable(world, a, b) {
+  const axis = (b - a) % world.w === 0 ? AXIS_NS : AXIS_EW; // orthogonal steps only; a row apart is N/S
+  return (!world.wall[a] || (world.occl[a] & axis) !== 0) && (!world.wall[b] || (world.occl[b] & axis) !== 0);
+}
+
+/**
  * A tunnel's open axes, from the arms of the way ON that tile — a road
  * tunnel reads its road neighbours, a rail tunnel its rail neighbours (a
  * road running beside a rail tunnel must not open it sideways; the suite

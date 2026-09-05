@@ -7,7 +7,7 @@
 import { KNOBS } from "./rules.js";
 import { TERRAIN, ROAD, ZONE, CIVIC, idx, inBounds, N4, isStation, isCivicEmployer, absent, occAt, anchorOf, footprintOf, siteTiles } from "./world.js";
 import { SPECIES_BY_ID, DIET_OF, admits } from "./species.js";
-import { forEachWithin, computeOcclusion, isBarrier } from "./reach.js";
+import { forEachWithin, computeOcclusion, isBarrier, crossable } from "./reach.js";
 
 const NO_ROAD = 255;
 
@@ -37,6 +37,7 @@ export function computeRoadDist(world) {
       if (!inBounds(world, nx, ny)) continue;
       const j = ny * w + nx;
       if (roadDist[j] !== NO_ROAD || isBarrier(world, j)) continue; // reach stops at a bare wall (a tunnel is a road)
+      if (!crossable(world, i, j)) continue; // ...and a tunnel is a road ALONG ITS OWN AXIS (SPEC 6b)
       roadDist[j] = d + 1;
       queue[tail++] = j;
     }
@@ -563,6 +564,7 @@ export function doorSearch(world, i, seen, { reach = KNOBS.ROAD_REACH, prev = nu
         if (seen[j]) continue;
         seen[j] = 1;
         if (prev) prev[j] = cur; // a DOOR needs its parent too: the chain back to the platform is read off it
+        if (!crossable(world, cur, j)) continue; // a gate is open along its axis only (SPEC 6b), door or no door
         if (world.road[j] !== ROAD.NONE) { doors.push(j); continue; } // a road is the answer, whatever else is on it
         if (!open(world, j)) continue; // a bare wall is not a way to a road; nor, for a forecourt, is a river or a house
         next.push(j);

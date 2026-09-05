@@ -9,11 +9,11 @@
 import { KNOBS } from "./rules.js";
 import { TERRAIN, ROAD, ZONE, CIVIC, idx, inBounds, anchorOf, footprintOf, zooAnchorOf, zooTiles } from "./world.js";
 import { post, canSpend, exitReceivership } from "./budget.js";
-import { clearLot, invalidatePaths, releaseJob } from "./citizens.js";
+import { clearLot, invalidatePaths, releaseJob, replanStale } from "./citizens.js";
 import { resolveChoice } from "./events.js";
 import { refreshLast } from "./tick.js";
 import { computeOcclusion } from "./reach.js";
-import { computeRoadDist, computeStationDoors } from "./fields.js";
+import { computeRoadDist, computeStationDoors, served } from "./fields.js";
 import { closeHall, hallStock, resetMeatRoutes } from "./meat.js";
 import { clampUse } from "./use.js";
 
@@ -147,6 +147,31 @@ function refuseCrossings(world, lay, laying) {
 }
 
 /** What an op would do: { cost, tiles: [{i, cost, what}], reason }. */
+/**
+ * WOULD A BUILDING PUT HERE BE REACHABLE? Asked BEFORE the tile is written, so
+ * it answers for ground that is still empty - which is the same ground the
+ * building will stand on, because `computeRoadDist` walks through a lot either
+ * way. The owner, 2026-09-04: *"any placeable building should be a functional
+ * building ... if a building meets the requirements to exist it should be
+ * functional."*
+ */
+function servedAt(world, i) {
+  return served(world, i);
+}
+
+/**
+ * A PLATFORM'S question is a WALK, not a distance (SPEC 6c), and the tile is
+ * still plain track when this is asked - so it is asked AS a platform, and put
+ * back. The forecourt it measures is the same ground either way.
+ */
+function platformWouldBeServed(world, i) {
+  const was = world.rail[i];
+  world.rail[i] = 2;
+  const ok = served(world, i);
+  world.rail[i] = was;
+  return ok;
+}
+
 export function costOf(world, op) {
   const tiles = [];
   let cost = 0;
@@ -226,6 +251,14 @@ export function costOf(world, op) {
     case "park": case "fire": case "police": case "centre": {
       const i = idx(world, op.tx, op.ty);
       if (!inBounds(world, op.tx, op.ty) || world.terrain[i] === TERRAIN.WATER || world.road[i] || world.zone[i] || world.civic[i] || world.wall[i] || world.rail[i]) return { cost: 0, tiles, reason: "blocked" };
+      // ANYTHING PLACEABLE IS FUNCTIONAL (the owner, 2026-09-04: "if a building
+      // meets the requirements to exist it should be functional"). A fire
+      // station, a police station or a pacification centre out of reach employs
+      // nobody, covers nothing and takes nobody in - so it may not be BUILT out
+      // of reach, and the player is told why instead of paying for a dud. A
+      // PARK is the exception and always has been: it asks no road, because it
+      // is a place rather than a service (SPEC 6c).
+      if (op.kind !== "park" && !servedAt(world, i)) return { cost: 0, tiles, reason: `no road within ${KNOBS.ROAD_REACH} tiles: nobody could reach it` };
       add(i, C[op.kind] + (world.terrain[i] === TERRAIN.TREE ? C.bulldozeTree : 0), op.kind);
       break;
     }
@@ -238,6 +271,9 @@ export function costOf(world, op) {
         if (world.terrain[i] === TERRAIN.WATER || world.road[i] || world.zone[i] || world.civic[i] || world.wall[i] || world.rail[i]) return { cost: 0, tiles, reason: "blocked" };
         add(i, (dx || dy ? 0 : C.zoo) + (world.terrain[i] === TERRAIN.TREE ? C.bulldozeTree : 0), dx || dy ? "zooPart" : "zoo");
       }
+      // A zoo is asked about all FOUR of its tiles (SPEC 6c), and a fenced
+      // field no road reaches is exactly the dud the rule above refuses.
+      if (!tiles.some((t) => servedAt(world, t.i))) return { cost: 0, tiles: [], reason: `no road within ${KNOBS.ROAD_REACH} tiles: nobody could reach it` };
       break;
     }
     case "use": {
@@ -286,6 +322,10 @@ export function costOf(world, op) {
       const i = inBounds(world, op.tx, op.ty) ? idx(world, op.tx, op.ty) : -1;
       if (i < 0 || world.rail[i] !== 1) return { cost: 0, tiles, reason: "blocked" };
       if (world.road[i]) return { cost: 0, tiles, reason: "a station cannot stand on a level crossing" }; // the platform would sit in the road
+      // A PLATFORM IS THE EXCEPTION, and the owner ruled it so: a line is laid
+      // ahead of the town, and a platform no road reaches yet wears the NO ROAD
+      // zot, exactly as a house too far from one does. Placeable, visibly idle,
+      // and its effects gated by `served` like everything else.
       add(i, C.station, "station");
       break;
     }
@@ -463,6 +503,22 @@ export function apply(world, op, { log = true } = {}) {
   // applies after lotsTick, for the same reason.
   computeStationDoors(world);
   if (world.doorsMoved) { world.doorsMoved = false; invalidatePaths(world); }
+  // AND RE-PLAN, AT THE OP. An invalidation is a promise that someone will
+  // rebuild, and nobody was: the next tick counts TRAFFIC at step 1 and
+  // repairs stale commutes at step 5, so the month after any op the whole
+  // town's traffic was counted from nothing - and pollution, land value and
+  // crime are computed from traffic, in the same tick that rolls growth and
+  // decay. It was farmable: one §1 use-op a month bought +5.8% population,
+  // -27% pollution, +1.5 land value, -1.7 crime and MORE cash than doing
+  // nothing (balanced seed 7 and millbelt seed 5, 20 years, weather on). It
+  // also showed on the panel with no tick at all, because `refreshLast`
+  // recounts the census off the null paths.
+  //
+  // This is the "OPEN - a save taken in the SAME MONTH as an op" item in
+  // BACKLOG, which was framed as a save/load divergence and was really this.
+  // The cost is one commute pass per op, measured at well under the tick it
+  // sits in; the alternative was a hole a curious player finds by accident.
+  replanStale(world);
   resetMeatRoutes(world); // a hall, its door, capacity or the freight graph may have changed inside this tick
   post(world, "build", -plan.cost);
   world.undoStack = plan.evicts ? [] : [{ op, snap, cost: plan.cost, roads: roads || walls || rails, t: world.tick }];
@@ -512,6 +568,7 @@ export function undo(world) {
   else if (u.op.kind === "use") invalidatePaths(world);
   computeStationDoors(world);
   if (world.doorsMoved) { world.doorsMoved = false; invalidatePaths(world); }
+  replanStale(world); // an undo is an op: it may not leave the town without commutes either
   resetMeatRoutes(world);
   post(world, "build", u.cost);
   world.log.push({ t: world.tick, op: { kind: "undo" } });

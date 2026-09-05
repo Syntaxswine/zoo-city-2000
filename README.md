@@ -113,7 +113,12 @@ growing, and lets a named fox, raccoon or cat rob a store. The `O` overlay
 shows crime in red and police cover in blue.
 
 **Road access.** A building is served when a road comes within three tiles
-of ANY part of it, and every side it touches a road is a way in. A 6×6
+of ANY part of it, and every side it touches a road is a way in. **If you can
+build it, it works**: a fire station, a police station, a pacification centre
+or a zoo is refused where no road reaches, and says why, rather than standing
+there employing nobody. A park needs no road; a rail platform can be placed
+anywhere on the line, because a line is laid ahead of the town — and until a
+road reaches it, it wears the same no-road mark a stranded house does. A 6×6
 estate ringed by roads is served all the way to its middle; a 3×3 block
 whose far corner is four tiles out is served because its near corner is
 three, though a block never GROWS across that line — it is what keeps a

@@ -475,14 +475,36 @@ moved (a rate op, a load) so that a raised flag is never left lying for the
 next tick to act on. The fourth never fires; it exists so that nothing else has
 to know it doesn't.
 
-**And a settle RE-PLANS, it does not merely invalidate.** One of those callers
-runs AFTER `citizensTick`, so no stale pass is coming: the month would end with
-every commute null, and next month's traffic, riders and mean commute would be
-taken from nothing in the straight run and from everything after a reload
-(`save.rebuildDerived` re-plans unconditionally). §15's hash at the boundary is
-equal either way — `c.path` is not in `canonicalCitizen` — so the two cities
-part a month later. **Nothing may end a tick stale**: `settleDoors` calls
-`citizens.replanStale`, which is the same pass `citizensTick` runs.
+**A SETTLE INVALIDATES; SOMEBODY ELSE RE-PLANS.** `settleDoors` does one
+thing, and who repairs the damage depends on where the caller stands:
+
+| caller | who rebuilds |
+|---|---|
+| after `lotsTick` | `citizensTick`'s own stale pass, two steps later |
+| after `eventsTick` | `tick` itself, immediately and unconditionally — `justiceTick` prices a trespass from `c.path` and `meatTick` routes carts on it, both inside this tick |
+| `ops.apply` / `ops.undo` | the op, immediately — see below |
+| `refreshLast` | nobody; it consumes the flag on a path where the ground cannot have moved |
+
+and `tick` calls `citizens.replanStale` once more at the very end, as a
+backstop for anything a future step might mark stale after justice. **That last
+call is currently dead** — measured over 1,440 tick boundaries of four weathered
+towns, nothing is ever left flagged there — and it stays because the law is
+about the boundary and the cost is one pass over a list of clean citizens.
+
+**Nothing may end a tick stale, and nothing may READ a stale commute.** A month
+that ends with commutes null takes next month's traffic, riders and mean
+commute from nothing in the straight run and from everything after a reload
+(`save.rebuildDerived` re-plans unconditionally); §15's hash at the boundary is
+equal either way, because `c.path` is not in `canonicalCitizen`, so the two
+cities part a month later.
+
+**An op re-plans too, and that is not only a save/load matter.** `ops.apply`
+invalidates every commute; the next tick counts TRAFFIC at step 1 and repairs
+at step 5, so for a long time the month after any op counted the whole town's
+traffic from nothing — and pollution, land value and crime are computed from
+traffic. It was farmable: one §1 repaint a month bought +4.6% population, -29%
+pollution and more cash than doing nothing. `apply` and `undo` call
+`replanStale` before they return.
 Without any of this a straight run keeps the stale commutes while a reload
 re-plans, and the two part company a month later — hidden at first, because
 `c.path` is not in the saved citizen and §15's hash could not see it for two
@@ -496,6 +518,28 @@ is a walk: *"a road is 2 tiles away, but nothing can walk to it"*. And nothing
 at all within `nearReach()`: *"no road within 8 tiles in any direction"*. The
 middle one exists because the card printed the third beside `road 2` on the
 env line of the same card — a false sentence, contradicted two lines down.
+
+**A PLACEABLE BUILDING IS A FUNCTIONAL BUILDING.** The owner, 2026-09-04:
+*"any placeable building should be a functional building. any placeable
+building should be an enterable building. if a building meets the requirements
+to exist it should be functional."* So `ops` REFUSES a fire station, a police
+station, a pacification centre or a zoo where no road reaches, with the reason
+in words — rather than taking the money for a building that employs nobody,
+covers nothing and takes nobody in. A zoned lot was always like this: chalk
+with no road never becomes a building at all.
+
+Two exceptions, both the owner's:
+
+- a **PARK** asks no road, because it is a place and not a service;
+- a **PLATFORM** is placeable anywhere on track, because a line is laid ahead
+  of the town — and instead it wears the NO ROAD zot, *"like houses that are
+  too far from the road"*. `render.computeZots` follows `asksAccess` for that,
+  so a stranded station, zoo or civic employer says so on the MAP and not only
+  in the card. A zoo wears it on its anchor alone; four would be a rash.
+
+The gate is at PLACEMENT. A building can still be stranded afterwards by
+bulldozing the road that served it, which is why every effect stays gated on
+`served` as well — that is the case the table above is about.
 
 **Not access.** A building's drawn door is on its south face whatever side
 the road is on (art, §12.2). `ROAD_REACH` stays 3.

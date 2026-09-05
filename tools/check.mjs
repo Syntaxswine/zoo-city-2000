@@ -134,7 +134,9 @@ check("tick cost is not catastrophic (the printed number is the instrument; this
     // trespass from `c.path` and `meatTick` routes carts on it, both after the
     // settle that follows the fire. A commute missing THERE changes who is
     // exposed and how many rolls justice takes, and the city never comes back.
-    worstAtJustice = Math.max(worstAtJustice, B.last.staleAtJustice || 0);
+    // NO `|| 0` HERE: a missing field would read as compliance, and a mutant
+    // that deleted the re-plan AND the counter together lived on exactly that.
+    worstAtJustice = Math.max(worstAtJustice, B.last.staleAtJustice);
   }
   // AND THE CASE FORCED, because the passive walk is a canary and a canary
   // waits for weather. The reachable trigger is a FIRE ON A FULL HOME: the
@@ -159,7 +161,7 @@ check("tick cost is not catastrophic (the printed number is the instrument; this
   const burntPathless = BF.citizens.filter((c) => !c.dead && c.home >= 0 && c.job >= 0 && !c.path).length;
   const burntStale = BF.citizens.filter((c) => !c.dead && c.stale).length;
   check("NOTHING MAY END A TICK STALE — 180 tick boundaries of a real town with the weather on, AND the case forced: burn down the fullest house in the city and the month still ends with every employed animal carrying a commute and nobody left flagged — and nobody is missing one at the moment JUSTICE and the CARTS read them either, which is inside the same tick",
-    !worst && staleLeft === 0 && worstAtJustice === 0 && (BF.last.staleAtJustice || 0) === 0
+    !worst && staleLeft === 0 && worstAtJustice === 0 && BF.last.staleAtJustice === 0
       && fattestN >= 5 && razedAt > 0 && burntPathless === 0 && burntStale === 0,
     `${boundaries} boundaries · ${worst ? `WORST month ${worst.month}: ${worst.n} employed animals with no commute` : "0 pathless at every boundary"} · ${staleLeft} left flagged · the fire: ${fattestN} employed animals burnt out, razed after ${razedAt} month${razedAt === 1 ? "" : "s"}, ${burntPathless} left with no commute and ${burntStale} still flagged`);
 }
@@ -347,6 +349,68 @@ function auditIds(w) {
   check("held citizens hold no job; beds point at a centre and never exceed it", heldN > 0 && heldBad === 0 && bedsOver === 0, `held ${heldN} · with a job ${heldBad} · bad beds ${bedsOver}`);
   check("the sold are gone (dangling-id law)", auditIds(F) === 0, `${auditIds(F)}`);
 
+  // A POLICE STATION NOBODY CAN REACH INVESTIGATES NOTHING. `justice` sizes
+  // the town's FORCE from `cen.policeStations`, and that counter is gated on
+  // `served` - but the gate was pinned at the COUNTER and not at the reader,
+  // so one line putting `policeStationsNoRoad` back into the force left the
+  // suite green while a building at the edge of the map, employing nobody and
+  // covering nothing, worked 34 cases. Three towns, identical but for where
+  // the one station stands, and the arrests are the assertion.
+  {
+    const arrestsIn = (place) => {
+      const U = load(save(F));
+      const ux = (x, y) => y * U.w + x;
+      // Raze the centre and the station the fixture already put down, so the
+      // only civic in town is the one this run is about.
+      for (let i = 0; i < U.w * U.h; i++) {
+        if (U.civic[i] === CIVIC.POLICE || U.civic[i] === CIVIC.CENTRE) apply(U, { kind: "bulldoze", x0: i % U.w, y0: (i / U.w) | 0, x1: i % U.w, y1: (i / U.w) | 0, what: "civic" });
+      }
+      let where = -1;
+      if (place === "served") {
+        for (let i = 0; i < U.w * U.h && where < 0; i++) {
+          const x = i % U.w;
+          const y = (i / U.w) | 0;
+          if (x < 4 || y < 4 || x > U.w - 6 || y > U.h - 6) continue;
+          if (U.roadDist[i] > KNOBS.ROAD_REACH) continue;
+          if (apply(U, { kind: "police", tx: x, ty: y }).ok) where = i;
+        }
+      } else if (place) {
+        // STRANDED THE WAY A PLAYER STRANDS ONE. A station out of reach can no
+        // longer be BUILT (the owner: a placeable building is a functional
+        // building), so the only way to one is to build it on a road and then
+        // take the road away - which is exactly how a town ends up with one.
+        for (let i = 0; i < U.w * U.h && where < 0; i++) {
+          const x = i % U.w;
+          const y = (i / U.w) | 0;
+          if (x < 6 || y < 6 || x > U.w - 8 || y > U.h - 8) continue;
+          if (U.roadDist[i] <= KNOBS.ROAD_REACH) continue; // far from the town, so the stub serves nothing else
+          const stub = [i - 1, i - 2];
+          if (!apply(U, { kind: "road", tiles: stub }).ok) continue;
+          if (apply(U, { kind: "police", tx: x, ty: y }).ok) where = i;
+          apply(U, { kind: "bulldoze", x0: (i - 2) % U.w, y0: ((i - 2) / U.w) | 0, x1: (i - 1) % U.w, y1: ((i - 1) / U.w) | 0, what: "road" });
+        }
+      }
+      const j0 = U.events.justice;
+      const before = j0.takenIn + j0.cells + j0.sold;
+      const kp = KNOBS.KILL_P;
+      for (let k = 0; k < 24; k++) {
+        KNOBS.KILL_P = 1 / Math.max(1e-9, killTotal(U));
+        tick(U);
+        KNOBS.KILL_P = kp;
+      }
+      const j1 = U.events.justice;
+      return { where, served: where >= 0 ? served(U, where) : null, stations: U.last.census.policeStations, noRoad: U.last.census.policeStationsNoRoad, arrests: j1.takenIn + j1.cells + j1.sold - before, cold: j1.cold };
+    };
+    const noneAtAll = arrestsIn(null);
+    const outOfReach = arrestsIn("far");
+    const inReach = arrestsIn("served");
+    check("a police station nobody can reach investigates nothing — a town with no station at all and a town with one at the edge of the map, employing nobody and covering nothing, work the same number of cases (none); put the same building where a road reaches it and the files start closing",
+      noneAtAll.arrests === 0 && outOfReach.where >= 0 && outOfReach.served === false
+        && outOfReach.stations === 0 && outOfReach.noRoad === 1 && outOfReach.arrests === 0
+        && inReach.where >= 0 && inReach.served === true && inReach.stations === 1 && inReach.arrests > 0,
+      `no station ${noneAtAll.arrests} arrests · out of reach ${outOfReach.arrests} (census ${outOfReach.stations} served, ${outOfReach.noRoad} not) · in reach ${inReach.arrests} (census ${inReach.stations})`);
+  }
+
   // A CENTRE NOBODY CAN REACH TAKES NO PRISONERS. `justice.centreWithBed`
   // asks `served`, and nothing held it to that: a mutation sweep replaced
   // justice's `served` with `() => true` and 502 checks stayed green. Part M'
@@ -382,11 +446,15 @@ function auditIds(w) {
       for (let i = 0; i < U.w * U.h && far < 0; i++) {
         const x = i % U.w;
         const y = (i / U.w) | 0;
-        if (x < 4 || y < 4 || x > U.w - 6 || y > U.h - 6) continue;
+        if (x < 6 || y < 6 || x > U.w - 8 || y > U.h - 8) continue;
         if (U.roadDist[i] <= KNOBS.ROAD_REACH) continue;
+        // A centre out of reach cannot be BUILT any more, so it is built on a
+        // stub and stranded - which is the only way a town gets one, and is
+        // what the check is about.
+        if (!apply(U, { kind: "road", tiles: [i + 2, i + 3] }).ok) continue;
         if (apply(U, { kind: "centre", tx: x, ty: y }).ok) far = i;
+        if (far >= 0 && !withRoad) apply(U, { kind: "bulldoze", x0: (i + 2) % U.w, y0: ((i + 2) / U.w) | 0, x1: (i + 3) % U.w, y1: ((i + 3) / U.w) | 0, what: "road" });
       }
-      if (far >= 0 && withRoad) apply(U, { kind: "road", tiles: [far + 2, far + 3] }); // two tiles east: `served` is a distance, not a connection
       const before = { takenIn: U.events.justice.takenIn, cells: U.events.justice.cells };
       forceRounds(U, 6);
       const after = { takenIn: U.events.justice.takenIn, cells: U.events.justice.cells };
@@ -2162,6 +2230,64 @@ check("determinism: same seed + same inputs ⇒ same hash", stateHash(A.world) =
       `lotsTick@${lots} → settle@${settle1} → citizens@${citizens} → events@${events} → settle@${settle2} → justice@${justice} → replan@${replan} → tick++@${bump}`);
   }
 
+  // ---- AN OP MAY NOT ERASE THE TOWN'S TRAFFIC ------------------------------
+  {
+    // `ops.apply` invalidates every commute, and for a long time nothing
+    // rebuilt them: the next tick counts TRAFFIC at step 1 and repairs stale
+    // commutes at step 5, so the month after ANY op the whole town's traffic
+    // was counted from nothing - and pollution, land value and crime are
+    // computed from traffic, in the same tick that rolls growth and decay.
+    //
+    // It was FARMABLE. Measured on a 20-year mayor town, one §1 repaint of an
+    // isolated corner road each month against a control that laid the same
+    // tile and left it alone:
+    //
+    //   before  control  P 1488 · maxTraffic 202 · commutes 893 · pol 10.85 · LV 39.64 · cash 29277
+    //   before  farming  P 1556 · maxTraffic   0 · commutes   0 · pol  7.67 · LV 41.40 · cash 35384
+    //
+    // +4.6% population, -29% pollution, +1.8 land value and MORE cash, for a
+    // penny a month. Now the two towns are the same town and the farmer is
+    // only poorer - which is the assertion below, and it is not a golden
+    // number: it says the op buys NOTHING but its own price.
+    const twin = (repaint) => {
+      const T5 = load(A.saved);
+      const t5 = (x, y) => y * T5.w + x;
+      let corner = -1;
+      for (let i = 0; i < T5.w * T5.h && corner < 0; i++) {
+        const x = i % T5.w;
+        const y = (i / T5.w) | 0;
+        if (x < 3 || y < 3 || x > T5.w - 4 || y > T5.h - 4) continue;
+        if (T5.terrain[i] !== TERRAIN.GRASS || T5.road[i] || T5.zone[i] || T5.civic[i] || T5.wall[i] || T5.rail[i] || T5.tier[i]) continue;
+        if (T5.roadDist[i] <= KNOBS.ROAD_REACH) continue; // far from everything, so the road itself changes nothing
+        if (apply(T5, { kind: "road", tiles: [i] }).ok) corner = i;
+      }
+      for (let k = 0; k < 24; k++) {
+        const painted = repaint ? apply(T5, { kind: "use", use: k % 2 ? 1 : 0, x0: corner % T5.w, y0: (corner / T5.w) | 0, x1: corner % T5.w, y1: (corner / T5.w) | 0 }) : null;
+        // AN UNDO IS AN OP TOO, and it invalidates the same way. `repaint === 2`
+        // paints and takes it straight back - and only when the paint took, or
+        // the undo would reach past it and pull up the road underneath.
+        if (repaint === 2 && painted && painted.ok) undo(T5);
+        tick(T5);
+      }
+      const c = T5.last.census;
+      return { corner, P: c.P, traffic: c.maxTraffic, commutes: c.commuteN, pol: c.meanPol, lv: c.meanLV, cash: T5.cash, hash: stateHashNoNews(T5) };
+    };
+    const calm = twin(false);
+    const farmed = twin(true);
+    const undone = twin(2);
+    check("access: an op may not erase the town's traffic — repaint one isolated road tile every month for two years and the city is the SAME city as one that never touched it: the same commutes counted, the same traffic, the same pollution and land value, and the farmer only poorer by what the paint cost. And the same when the paint is UNDONE each month, because an undo invalidates too",
+      calm.corner >= 0 && farmed.corner === calm.corner && calm.traffic > 0 && calm.commutes > 0
+        && farmed.traffic === calm.traffic && farmed.commutes === calm.commutes
+        && farmed.P === calm.P && farmed.pol === calm.pol && farmed.lv === calm.lv
+        && farmed.cash < calm.cash
+        && undone.traffic === calm.traffic && undone.commutes === calm.commutes
+        && undone.P === calm.P && undone.pol === calm.pol && undone.lv === calm.lv
+        && undone.cash === calm.cash,
+      `calm P ${calm.P} · traffic ${calm.traffic} · commutes ${calm.commutes} · pol ${calm.pol.toFixed(2)} · LV ${calm.lv.toFixed(2)} · cash ${calm.cash}`
+        + ` || farmed P ${farmed.P} · traffic ${farmed.traffic} · commutes ${farmed.commutes} · pol ${farmed.pol.toFixed(2)} · LV ${farmed.lv.toFixed(2)} · cash ${farmed.cash}`
+        + ` || undone P ${undone.P} · traffic ${undone.traffic} · commutes ${undone.commutes} · pol ${undone.pol.toFixed(2)} · LV ${undone.lv.toFixed(2)} · cash ${undone.cash}`);
+  }
+
   // ---- THE SIGNATURE, ONE TRANSITION PER ROW -------------------------------
   {
     // `markDoorsMoved` is the whole of "a move is a re-plan": every stale
@@ -2820,16 +2946,99 @@ check("determinism: same seed + same inputs ⇒ same hash", stateHash(A.world) =
       !walled.served && walled.doors === 0 && tunnelled.served && tunnelled.doors === 1 && tunnelled.d === 3,
       `walled ${walled.d}/${walled.doors} doors · with a rail tunnel ${tunnelled.d}/${tunnelled.doors}`);
 
+    // (3b) AND A GATE IS OPEN ALONG ITS AXIS ONLY. The check above builds the
+    // tunnel ALONG the way in, which is the easy case: the hard one is a wall
+    // pierced NORTH-SOUTH and a citizen trying to cross it EAST-WEST. Every
+    // area effect already refused that (`forEachWithin` reads `world.occl`);
+    // road distance and the door search asked only "is this a BARE wall", so
+    // the same tile was a wall for a smell and a doorway for a rabbit, and a
+    // stored commute walked through the masonry sideways.
+    const X6 = createWorld({ seed: "crosswise" });
+    const x6 = (x, y) => y * X6.w + x;
+    for (let y = 2; y <= 26; y++) for (let x = 2; x <= 30; x++) {
+      const i = x6(x, y);
+      X6.terrain[i] = TERRAIN.GRASS; X6.road[i] = ROAD.NONE; X6.zone[i] = ZONE.NONE;
+      X6.tier[i] = 0; X6.wall[i] = 0; X6.rail[i] = 0; X6.civic[i] = 0; X6.big[i] = 0; X6.use[i] = 0;
+    }
+    X6.events.noDisasters = true;
+    const xwall = [];
+    for (let y = 6; y <= 20; y++) xwall.push(x6(20, y));
+    apply(X6, { kind: "wall", tiles: xwall });
+    const xrail = [];
+    for (let y = 10; y <= 14; y++) xrail.push(x6(20, y)); // a NORTH-SOUTH line through it
+    apply(X6, { kind: "rail", tiles: xrail });
+    const xroad = [];
+    for (let y = 6; y <= 20; y++) xroad.push(x6(21, y));  // the road EAST of the wall
+    apply(X6, { kind: "road", tiles: xroad });
+    apply(X6, { kind: "zone", zone: ZONE.R, x0: 19, y0: 12, x1: 19, y1: 12, density: 3 }); // a lot WEST of it
+    computeFields(X6);
+    const westLot = x6(19, 12);
+    const northLot = (() => { // and the same tunnel, approached ALONG its axis, still works
+      const Y6 = load(save(X6));
+      apply(Y6, { kind: "zone", zone: ZONE.R, x0: 20, y0: 16, x1: 20, y1: 16, density: 3 });
+      apply(Y6, { kind: "road", tiles: [x6(20, 8), x6(20, 7)] });
+      computeFields(Y6);
+      return { d: siteRoadDist(Y6, x6(20, 16)), served: sv(Y6, x6(20, 16)) };
+    })();
+    check("access: a gate is open ALONG ITS AXIS ONLY, for a citizen as well as for a smell — a wall pierced north-south by a rail line is still a wall to anything crossing it east-west, and the lot behind it has no road; approach the same tunnel along its own axis and it is a way through",
+      X6.wall[x6(20, 12)] === 1 && X6.rail[x6(20, 12)] === 1
+        && !sv(X6, westLot) && doors(X6, westLot).length === 0 && X6.roadDist[westLot] > KNOBS.ROAD_REACH,
+      `the lot west of the wall: ${X6.roadDist[westLot]} away, served ${sv(X6, westLot)}, ${doors(X6, westLot).length} doors · along the axis instead: ${northLot.d}, served ${northLot.served}`);
+
     // (4) A ZOO'S JOBS ARE THE ZOO'S, ONCE. `world.jobsOf` answers for the
     // ANCHOR only; letting a ZOO_PART answer too would pay a zoo four times.
     const Z6 = load(save(T6));
+    apply(Z6, { kind: "road", tiles: [t6(20, 5), t6(21, 5)] }); // the road first: a zoo out of reach cannot be built
     apply(Z6, { kind: "zoo", tx: 20, ty: 6 });
-    apply(Z6, { kind: "road", tiles: [t6(20, 5), t6(21, 5)] });
     computeFields(Z6);
     const zooTilesJobs = siteTiles(Z6, t6(20, 6)).map((i) => jobsOf(Z6, i));
     check("access: a zoo pays for its keepers ONCE — the anchor holds all four tiles' jobs and the three parts hold none, so a 2×2 is one employer and not four",
       zooTilesJobs.length === 4 && zooTilesJobs[0] === KNOBS.ZOO_JOBS && zooTilesJobs.slice(1).every((j) => j === 0),
       `the four tiles hold ${zooTilesJobs.join(", ")} jobs (ZOO_JOBS is ${KNOBS.ZOO_JOBS})`);
+  }
+
+  // ---- A PLACEABLE BUILDING IS A FUNCTIONAL BUILDING -----------------------
+  {
+    // The owner, 2026-09-04: *"any placeable building should be a functional
+    // building. any placeable building should be an enterable building. if a
+    // building meets the requirements to exist it should be functional."* So
+    // `ops` refuses a fire station, a police station, a pacification centre or
+    // a zoo where no road reaches, and says why, instead of taking the money
+    // for a building that employs nobody and covers nothing.
+    //
+    // TWO EXCEPTIONS, both the owner's. A PARK asks no road - it is a place,
+    // not a service (SPEC 6c). A PLATFORM stays placeable because a line is
+    // laid ahead of the town, and instead it wears the NO ROAD zot, "like
+    // houses that are too far from the road" (checked in Part T').
+    const P7 = createWorld({ seed: "placeable" });
+    const p7 = (x, y) => y * P7.w + x;
+    for (let y = 2; y <= 26; y++) for (let x = 2; x <= 40; x++) {
+      const i = p7(x, y);
+      P7.terrain[i] = TERRAIN.GRASS; P7.road[i] = ROAD.NONE; P7.zone[i] = ZONE.NONE;
+      P7.tier[i] = 0; P7.wall[i] = 0; P7.rail[i] = 0; P7.civic[i] = 0; P7.big[i] = 0; P7.use[i] = 0;
+    }
+    P7.cash = 900000;
+    P7.events.noDisasters = true;
+    const prow = [];
+    for (let x = 4; x <= 36; x++) prow.push(p7(x, 6));
+    apply(P7, { kind: "road", tiles: prow });
+    const line = [];
+    for (let x = 8; x <= 34; x++) line.push(p7(x, 20));
+    apply(P7, { kind: "rail", tiles: line });
+    // y = 9 is three tiles from the road: in reach. y = 20 is fourteen: not.
+    const near = [
+      ["fire", 10, 9], ["police", 14, 9], ["centre", 18, 9], ["zoo", 22, 9], ["park", 26, 9],
+    ].map(([kind, x, y]) => ({ kind, r: apply(P7, { kind, tx: x, ty: y }) }));
+    const far = [
+      ["fire", 10, 24], ["police", 14, 24], ["centre", 18, 24], ["zoo", 22, 24], ["park", 26, 24],
+    ].map(([kind, x, y]) => ({ kind, r: apply(P7, { kind, tx: x, ty: y }) }));
+    const farStation = apply(P7, { kind: "station", tx: 30, ty: 20 });
+    const refusedFor = far.filter((f) => f.kind !== "park" && !f.r.ok && /no road within/.test(f.r.reason || "")).length;
+    check("access: a placeable building is a functional building — a fire station, a police station, a pacification centre and a zoo are all REFUSED where no road reaches, and told why, rather than taking the money for something that employs nobody and covers nothing; a park is placed anywhere, because it asks no road; and a platform is placed anywhere too, because a line is laid ahead of the town and it wears the no-road mark until one arrives",
+      near.every((n) => n.r.ok) && refusedFor === 4
+        && far.find((f) => f.kind === "park").r.ok === true
+        && farStation.ok === true && P7.rail[p7(30, 20)] === 2 && !sv(P7, p7(30, 20)),
+      `in reach: ${near.map((n) => `${n.kind} ${n.r.ok}`).join(", ")} · out of reach: ${far.map((f) => `${f.kind} ${f.r.ok ? "BUILT" : "refused"}`).join(", ")} · a platform out of reach ${farStation.ok ? "stands, unserved" : "REFUSED"}`);
   }
 
   // ---- WHAT A ROAD ACTUALLY BUYS, ARM BY ARM -------------------------------
@@ -2852,12 +3061,18 @@ check("determinism: same seed + same inputs ⇒ same hash", stateHash(A.world) =
       E.events.noDisasters = true;
       const rr = [];
       for (let x = 4; x <= 36; x++) rr.push(e(x, 6));
-      if (reach) for (let x = 10; x <= 30; x++) rr.push(e(x, 15)); // the one difference between the two runs
+      for (let x = 10; x <= 30; x++) rr.push(e(x, 15)); // laid in BOTH runs, so both can build
       apply(E, { kind: "road", tiles: rr });
       apply(E, { kind: "zoo", tx: 12, ty: 17 });
       apply(E, { kind: "centre", tx: 18, ty: 17 });
       apply(E, { kind: "police", tx: 22, ty: 17 });
       apply(E, { kind: "fire", tx: 24, ty: 17 });
+      // AND THEN TAKE THE ROAD AWAY AGAIN in the unreached run. A building the
+      // player cannot reach can no longer be BUILT (the owner: "if a building
+      // meets the requirements to exist it should be functional"), so the only
+      // way to a stranded one is the way a player finds it - by bulldozing the
+      // road that served it. That is the honest reproduction anyway.
+      if (!reach) apply(E, { kind: "bulldoze", x0: 10, y0: 15, x1: 30, y1: 15, what: "road" });
       apply(E, { kind: "zone", zone: ZONE.M, x0: 28, y0: 17, x1: 28, y1: 17, density: 3 });
       E.tier[e(28, 17)] = 2;
       computeFields(E);
@@ -3053,8 +3268,18 @@ check("determinism: same seed + same inputs ⇒ same hash", stateHash(A.world) =
     const route0 = commutePath(C2, "rabbit", from, to);
     const sig0 = C2._stationDoorSig;
     const doors0 = doors(C2, platform).join(",");
-    const sentinel = { path: route0?.path, stale: false };
+    // A sentinel with a REAL home and job, because `ops.apply` re-plans at the
+    // op now: the old assertion was "the live path is null afterwards", which
+    // was the shape of the bug, not of the fix. What the op has to do is
+    // REBUILD the commute round the new building, in the same breath.
+    apply(C2, { kind: "zone", zone: ZONE.R, x0: 10, y0: 5, x1: 10, y1: 5, density: 3 });
+    apply(C2, { kind: "zone", zone: ZONE.C, x0: 20, y0: 5, x1: 20, y1: 5, density: 3 });
+    C2.tier[c2(10, 5)] = 2;
+    C2.tier[c2(20, 5)] = 2;
+    computeFields(C2);
+    const sentinel = { id: 1, species: 0, home: c2(10, 5), job: c2(20, 5), path: route0?.path, stale: false, dead: false };
     C2.citizens = [sentinel];
+    C2.byId = new Map([[1, sentinel]]);
     const block = apply(C2, { kind: "police", tx: 9, ty: 7 });
     const route1 = commutePath(C2, "rabbit", from, to);
     const sig1 = C2._stationDoorSig;
@@ -3063,7 +3288,9 @@ check("determinism: same seed + same inputs ⇒ same hash", stateHash(A.world) =
     const tiles1 = route1 ? Array.from(route1.path, (p) => p & TILE) : [];
     const rerouted = tiles0.includes(c2(9, 7)) && !tiles1.includes(c2(9, 7))
       && [c2(10, 8), c2(10, 7)].every((i) => tiles1.includes(i));
-    const invalidated = sentinel.path === null && sentinel.stale === true;
+    // REBUILT, not merely thrown away: a path, not stale, and it goes round.
+    const live = sentinel.path ? Array.from(sentinel.path, (p) => p & TILE) : [];
+    const rebuilt = !!sentinel.path && sentinel.stale === false && !live.includes(c2(9, 7));
     C2.citizens = [];
     C2.byId = new Map();
     const C3 = load(save(C2));
@@ -3071,10 +3298,10 @@ check("determinism: same seed + same inputs ⇒ same hash", stateHash(A.world) =
     const reloadPath = !!route1 && !!route2 && Array.from(route1.path).join(",") === Array.from(route2.path).join(",");
     const same0 = stateHash(C2) === stateHash(C3);
     for (let k = 0; k < 12; k++) { tick(C2); tick(C3); }
-    check("access: a forecourt reroute to the SAME door at the SAME distance changes the graph signature, invalidates the live path, avoids the new building and survives save → load → continue",
+    check("access: a forecourt reroute to the SAME door at the SAME distance changes the graph signature, REBUILDS the live commute round the new building at the op, and survives save → load → continue",
       block.ok && doors0 === `${from}` && doors1 === doors0 && sig1 !== sig0
-        && invalidated && rerouted && reloadPath && same0 && stateHash(C2) === stateHash(C3),
-      `door ${doors0}→${doors1} · sig moved ${sig1 !== sig0} · invalidated ${invalidated} · rerouted ${rerouted} · reload ${reloadPath} · hash ${stateHash(C2)}/${stateHash(C3)}`);
+        && rebuilt && rerouted && reloadPath && same0 && stateHash(C2) === stateHash(C3),
+      `door ${doors0}→${doors1} · sig moved ${sig1 !== sig0} · the live commute rebuilt round it ${rebuilt} · rerouted ${rerouted} · reload ${reloadPath} · hash ${stateHash(C2)}/${stateHash(C3)}`);
   }
 
   // ---- WAREHOUSES: the frontage rule is gone --------------------------------
@@ -3121,6 +3348,7 @@ check("determinism: same seed + same inputs ⇒ same hash", stateHash(A.world) =
     // unambiguous, so it is checked here beside the thing that relies on it.
     const N2 = load(save(F));
     const n2 = (x, y) => y * N2.w + x;
+    apply(N2, { kind: "road", tiles: [n2(26, 13), n2(27, 13), n2(28, 13), n2(29, 13)] }); // both zoos need a road to be built at all
     const z1 = apply(N2, { kind: "zoo", tx: 26, ty: 14 });
     const z2 = apply(N2, { kind: "zoo", tx: 28, ty: 14 });
     const overlap = apply(N2, { kind: "zoo", tx: 27, ty: 13 });
@@ -3280,6 +3508,9 @@ check("determinism: same seed + same inputs ⇒ same hash", stateHash(A.world) =
     const a2 = (x, y) => y * A2.w + x;
     apply(A2, { kind: "zone", zone: ZONE.R, x0: 12, y0: 12, x1: 12, y1: 12, density: 3 });
     apply(A2, { kind: "park", tx: 14, ty: 12 });
+    // A road for the zoo and the station to be built beside: a civic that
+    // could not be reached can no longer be placed at all.
+    apply(A2, { kind: "road", tiles: [a2(16, 11), a2(17, 11), a2(18, 11), a2(19, 11), a2(20, 11), a2(21, 11)] });
     apply(A2, { kind: "zoo", tx: 16, ty: 12 });
     apply(A2, { kind: "police", tx: 20, ty: 12 });
     apply(A2, { kind: "rail", tiles: [a2(24, 12), a2(25, 12)] });
@@ -3379,8 +3610,8 @@ check("determinism: same seed + same inputs ⇒ same hash", stateHash(A.world) =
     // assertion said ">= 5", so the number in the sentence was untested by
     // construction - and it was wrong. An exact list fails in both directions:
     // a module that stops asking, and a module that starts.
-    check("access: and the OLD predicate is gone, not merely unused — `hasAccess` is nowhere under js/, and exactly five sim modules import `served` in its place: blocks, census, events, justice and lots",
-      !anyHasAccess && served5.join(" ") === "blocks.js census.js events.js justice.js lots.js",
+    check("access: and the OLD predicate is gone, not merely unused — `hasAccess` is nowhere under js/, and exactly six sim modules import `served` in its place: blocks, census, events, justice, lots and ops — ops because a building that could not be reached may not be BUILT (the owner: if it meets the requirements to exist it should be functional)",
+      !anyHasAccess && served5.join(" ") === "blocks.js census.js events.js justice.js lots.js ops.js",
       `${served5.length} sim modules import served: ${served5.join(" ")}`);
   }
 
@@ -3559,6 +3790,46 @@ check("determinism: same seed + same inputs ⇒ same hash", stateHash(A.world) =
     check("access: a PLATFORM out of reach takes the same red a refused lot takes — the overlay's red is every refusal, not the zoned ones only",
       O.rail[oat(22, 13)] === 2 && !sv(O, oat(22, 13)) && platRed >= 0 && platRed === colour(acc, loneFar),
       `platform ${platRed >= 0 ? platRed.toString(16) : "no tinted pixel"} vs a refused lot ${colour(acc, loneFar).toString(16)}`);
+    // THE NO-ROAD ZOT IS NOT A LOT'S ALONE. The owner, 2026-09-04, on a
+    // platform no road reaches: it "should have the no road symbol like houses
+    // that are too far from the road". So the zot pass follows `asksAccess` -
+    // the one list of what asks for a road - and a stranded platform or a fire
+    // station whose road was bulldozed says so ON THE MAP, not only in the
+    // card. Photographed on ITS OWN WORLD and its own canvas, because serving
+    // the platform is the experiment and `O` is still needed unserved below.
+    {
+      const ZW = load(save(O));
+      const zc = HC.createCanvas(700, 460);
+      const zr = createRenderer(zc, ZW, artR);
+      // A zot BLINKS (`Math.floor(clock * 1.5) & 1`), so the shutter has to be
+      // open on the lit half of it or the photograph is of nothing.
+      const zshot = () => { zr.invalidate(); zr.draw(camera, null, { list: () => [] }, "off", 1); return Buffer.from(zc._data); };
+      const zpix = (buf) => {
+        const [sx, sy] = ts(22.5, 13.5);
+        const bx = Math.round((sx - camera.x) * camera.zoom + zc.width / 2);
+        const by = Math.round((sy - camera.y) * camera.zoom + zc.height / 2);
+        const out = [];
+        // A zot floats ABOVE whatever stands on the tile, and a station house
+        // is tall - so the window has to reach well over the platform.
+        for (let dy = -70; dy <= 6; dy++) for (let dx = -20; dx <= 20; dx++) {
+          const px = bx + dx;
+          const py = by + dy;
+          if (px < 0 || py < 0 || px >= zc.width || py >= zc.height) continue;
+          out.push(colour(buf, (py * zc.width + px) * 4));
+        }
+        return out;
+      };
+      const marked = zpix(zshot());
+      const reached = apply(ZW, { kind: "road", tiles: [oat(22, 10), oat(23, 10)] }); // three tiles north, a different diamond
+      computeFields(ZW);
+      const clear = zpix(zshot());
+      let moved = 0;
+      for (let k = 0; k < marked.length; k++) if (marked[k] !== clear[k]) moved++;
+      check("access: a platform no road reaches wears the NO ROAD zot, like a house too far from one — the mark is drawn over the platform while nothing can reach it and is gone once a road three tiles away reaches it, so the MAP says it and not only the card",
+        !sv(O, oat(22, 13)) && reached.ok && sv(ZW, oat(22, 13)) && moved > 8,
+        `${moved} of ${marked.length} pixels over the platform changed when a road reached it`);
+    }
+
     // AND THE DRAW LAYER WRITES NOTHING ON THE WORLD (SPEC 14). Asking
     // `siteRoadDist` of a platform is a SEARCH, and a search needs a `seen`
     // array - so the overlay was filling `world._seen`, per platform tile per

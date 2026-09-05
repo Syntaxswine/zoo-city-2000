@@ -37,7 +37,7 @@ import { rasterize } from "./art/format.js";
 import { ZONE, CIVIC, TERRAIN, ROAD, isPart, anchorOf, sideOf } from "./sim/world.js";
 import { DECK_TOP } from "./art/roads.js";
 import { lotScore, REASON } from "./sim/lots.js";
-import { siteRoadDist, asksAccess } from "./sim/fields.js";
+import { siteRoadDist, asksAccess, served } from "./sim/fields.js";
 import { useTint } from "./sim/use.js";
 import { KNOBS } from "./sim/rules.js";
 import { tunnelAxis } from "./sim/reach.js";
@@ -294,13 +294,29 @@ export function createRenderer(canvas, initialWorld, art) {
     dirty = false;
   }
 
-  /** Zots: lots that want to grow and cannot — no road, smog, no demand — and homes with a jobless worker. */
+  /**
+   * Zots: lots that want to grow and cannot — no road, smog, no demand — and
+   * homes with a jobless worker.
+   *
+   * AND ANYTHING ELSE THAT IS ASKING FOR A ROAD AND HAS NOT GOT ONE. The owner
+   * (2026-09-04): a platform no road reaches "should have the no road symbol
+   * like houses that are too far from the road". `fields.asksAccess` is the
+   * one list of what asks — a lot, a zoo, a platform, a civic employer, never
+   * a park and never open ground — so the zot follows it rather than the zone
+   * array, and a stranded station or a fire station whose road was bulldozed
+   * says so on the map instead of only in the card. A ZOO wears it on its
+   * anchor alone: four of them would be a rash, not a sign.
+   */
   function computeZots(range) {
     zots = new Map();
     for (let ty = range.y0; ty <= range.y1; ty++) {
       for (let tx = range.x0; tx <= range.x1; tx++) {
         const i = ty * world.w + tx;
-        if (world.zone[i] === ZONE.NONE) continue;
+        if (world.zone[i] === ZONE.NONE) {
+          if (world.civic[i] === CIVIC.ZOO_PART) continue;             // the anchor speaks for the zoo
+          if (asksAccess(world, i) && !served(world, i, accessSeen(world))) zots.set(i, "noroad"); // the layer's own buffer (SPEC 14)
+          continue;
+        }
         const s = lotScore(world, i);
         if (s.reason === REASON.NO_ROAD) zots.set(i, "noroad");
         else if (s.reason === REASON.SMOG) zots.set(i, "smog");

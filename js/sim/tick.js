@@ -138,23 +138,22 @@ export function tick(world) {
     world.events.log.push(who.length ? { t: world.tick, id: "notice", line, who, links } : { t: world.tick, id: "notice", line });
   }
   if (world.events.log.length > 400) world.events.log.splice(0, world.events.log.length - 400);
-  // NOTHING MAY END A TICK STALE, and this is where that is true rather than
-  // hoped. `c.stale` is written in three places - `citizens.placeHousehold`,
-  // `citizens.invalidatePaths` and `blocks.replanOn` - and only one of their
-  // callers runs after `citizensTick`: `eventsTick` at step 7, where a fire
-  // razes a home, the family is evicted and rehomed, and the commute it was
-  // holding is thrown away with nobody left to rebuild it. A door-graph settle
-  // cannot cover that: no door moved. So the re-plan is UNCONDITIONAL and it
-  // is here, at the boundary, after everything that can mark an animal stale.
+  // THE BACKSTOP, and it is honest about being one. `c.stale` is written in
+  // three places - `citizens.placeHousehold`, `citizens.invalidatePaths` and
+  // `blocks.replanOn` - and everything that reaches them inside a tick is
+  // repaired above: the citizens' own pass for anything before it, the
+  // unconditional re-plan after `eventsTick` for the fire that rehomes a
+  // family, and `ops` for a player's edit. So this call is CURRENTLY DEAD:
+  // measured over 1,440 tick boundaries of four weathered towns, nothing is
+  // ever left flagged here.
   //
-  // Without it the month ends with those commutes null, `moods` reads them as
-  // no commute at all (mood is SAVED, and drives departures and approval), and
-  // next month's traffic is taken from nothing in the straight run and from
-  // everything after a reload, which re-plans on load. The hash at the
+  // It stays because the law is about the BOUNDARY, not about any of those
+  // three, and a step added after justice would otherwise end a month with
+  // commutes null - which costs a whole month of traffic, riders and mean
+  // commute in the straight run while a reload rebuilds them (the hash at the
   // boundary is equal either way, so the two cities part a month later:
-  // measured 53 pathless workers and `9324161b` against `9e3e5077` on a
-  // balanced town whose only event was one fire. It predates this part - it is
-  // reproducible on 411d903 - but Part R is what claimed the law.
+  // measured at 53 pathless workers and `9324161b` against `9e3e5077`). One
+  // pass over a list of clean citizens is what that insurance costs.
   replanStale(world);
   world.tick++;
   world.last.needs = needCensus(world); // cards and walkers now read this same tick
