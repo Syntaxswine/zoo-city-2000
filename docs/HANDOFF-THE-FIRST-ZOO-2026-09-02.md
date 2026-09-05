@@ -2238,3 +2238,7 @@ also checks explicit selection and legacy footprint compatibility.
 ## 27. Civic campuses, Large Park and Zoo prison — 2026-09-05
 
 The art-only handoff above is now integrated: five 3×3 campuses, adjacent-road placement for services, a road-free Large Park retaining the garden, and a separate 24-bed Zoo prison. Sentencing follows the owner's theft/murder rules. Existing saves retain old footprints. The canonical suite passes all 586 checks; both zooms and corner inspection were verified in the browser. See [the current handoff](HANDOFF-CIVIC-CAMPUSES-2026-09-05.md) for save migration, the population canary and six measured 30-year hashes.
+
+## 28. Economic camping — 2026-09-05
+
+Families facing downturn departures or housing decay can stay in physical tents. Tents reserve their tiles against construction and bulldozing; resident families persist and rehouse before newcomers when demand and housing recover. See [the camping handoff](HANDOFF-ECONOMIC-CAMPING-2026-09-05.md) for rules, save compatibility and measured simulation baselines.

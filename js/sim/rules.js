@@ -401,9 +401,9 @@ export const RULES = Object.freeze([
     live: (w) => `vacant homes ${w.last.census.vacantR} · arrived last tick ${w.last.arrived}`,
   },
   {
-    id: "C2", title: "Animals leave when demand is negative",
-    formula: "p/household = (0.06 unemployed | 0.015) · (−V_R) · (1 − 0.2·friends) · (1.5 − mood/100)",
-    live: (w) => `left last tick ${w.last.left} · unemployed ${w.last.census.U}`,
+    id: "C2", title: "Downturns create temporary camps",
+    formula: "p/household = (0.06 unemployed | 0.015) · (−V_R) · (1 − 0.2·friends) · (1.5 − mood/100); at V_R ≤ 0 this moves a family to a free campsite; occupied tents block construction; at V_R > 0 camping families take suitable vacant homes before newcomers",
+    live: (w) => `${w.campers.filter(c => c.householdId).length} resident households camping · unemployed ${w.last.census.U}`,
   },
   {
     id: "C3", title: "Live and grow together",

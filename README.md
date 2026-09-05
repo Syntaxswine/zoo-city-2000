@@ -85,6 +85,13 @@ them on the real map):
 The hover card's **WHY NOT** line is computed by the same function that
 decides growth — it can only ever say what the rule did.
 
+## Camping through downturns
+
+Families that would leave during a downturn can pitch tents on free land and
+remain citizens. Occupied tents block construction and bulldozing. When housing
+demand recovers, camping households get suitable homes before new arrivals.
+Inspect a tent to see its household and recovery condition.
+
 ## Civic campuses
 
 Fire, police, pacification, Large Park and Zoo are 3×3 buildings. Service buildings

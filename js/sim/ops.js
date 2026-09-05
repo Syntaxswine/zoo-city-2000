@@ -6,6 +6,7 @@
 // one-step snapshot for `undo`. The Options cheat is an op too ("cheat"):
 // a lump posted under its own ledger key, logged, replayed, never undone.
 
+import { campAt } from "./camps.js";
 import { KNOBS } from "./rules.js";
 import { TERRAIN, ROAD, ZONE, CIVIC, idx, inBounds, anchorOf, footprintOf, civicAnchorOf, civicTiles } from "./world.js";
 import { post, canSpend, exitReceivership } from "./budget.js";
@@ -157,6 +158,11 @@ function refuseCrossings(world, lay, laying) {
  */
 export function costOf(world, op) {
   const tiles = [];
+  if (["zone", "road", "rail", "station", "wall", "bulldoze", "tree", "park", "largePark", "zoo", "fire", "police", "centre"].includes(op.kind)) {
+    const side = ["largePark", "zoo", "fire", "police", "centre"].includes(op.kind) ? 3 : 1;
+    const requested = op.tiles || (op.x0 != null ? rect(world, op) : Array.from({ length: side * side }, (_, k) => idx(world, op.tx + k % side, op.ty + Math.floor(k / side))));
+    if (requested.some(i => campAt(world, i))) return { cost: 0, tiles, reason: "someone is camping here — provide housing before building" };
+  }
   let cost = 0;
   let replaced = 0;
   let evicts = 0;
@@ -503,6 +509,7 @@ export function undo(world) {
   const u = world.undoStack && world.undoStack.pop();
   if (!u) return { ok: false, reason: "nothing to undo" };
   if (u.t !== world.tick) { world.undoStack = []; return { ok: false, reason: "too late — the month has turned" }; }
+  if (u.snap.some(s => campAt(world, s.i))) return {ok:false, reason:"someone is camping here — cannot restore construction"};
   for (const s of u.snap) {
     if (world.tier[s.i] > 0 && s.tier === 0) continue; // something grew here since; leave it
     world.terrain[s.i] = s.terrain; world.road[s.i] = s.road; world.zone[s.i] = s.zone; world.maxTier[s.i] = s.maxTier;

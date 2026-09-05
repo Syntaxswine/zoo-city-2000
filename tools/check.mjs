@@ -180,10 +180,11 @@ check("tick cost is not catastrophic (the printed number is the instrument; this
 // 478 checks and no failures. A canary with a band wider than the damage is
 // not a canary. Civic campuses and crime-specific sentencing reset 385 to 326
 // (2026-09-05); explicit destinations change custody and growth.
-// 310-342 is +/-5%: a change that moves the town further than
+// Economic camps retain households after departure/decay (326 to 368).
+// 350-386 is +/-5%: a change that moves the town further than
 // that is a FINDING, and re-baselining this line is a deliberate act with a
 // number in the commit message, not a nuisance to be widened away.
-check("the scripted city is still a town", world.citizens.length > 310 && world.citizens.length < 342, `${world.citizens.length} citizens after ${YEARS} years (the band is 310-342, \u00b15% of 326; moving it is a finding, and re-baselining is a decision)`);
+check("the scripted city is still a town", world.citizens.length > 350 && world.citizens.length < 386, `${world.citizens.length} citizens after ${YEARS} years (the band is 350-386, \u00b15% of 368; moving it is a finding, and re-baselining is a decision)`);
 
 // ledger
 let sum = 0;
@@ -2080,6 +2081,17 @@ check("determinism: same seed + same inputs ⇒ same hash", stateHash(A.world) =
     apply(T2, { kind: "station", tx: 10, ty: 15 });
     apply(T2, { kind: "station", tx: 48, ty: 15 });
     for (let k = 0; k < 15 * 12; k++) tick(T2);
+    // Guarantee route users independently of a changing economic population.
+    const {createHousehold,placeHousehold,replanStale} = await import("../js/sim/citizens.js");
+    const home=t2(10,19), work=t2(50,17);
+    T2.zone[home]=ZONE.R; T2.tier[home]=3;
+    T2.zone[work]=ZONE.C; T2.tier[work]=3;
+    const commuters=createHousehold(T2,"fox",12); placeHousehold(T2,commuters,home);
+    for(const id of commuters.members) {
+      const c=T2.byId.get(id); c.born=T2.tick-30*12; c.deathAge=99999;
+      c.job=work; T2.staff[work]++; c.stale=true;
+    }
+    computeFields(T2); replanStale(T2);
     let crossing = 0;
     for (const c of T2.citizens) {
       if (c.dead || !c.path) continue;
@@ -3615,8 +3627,8 @@ check("determinism: same seed + same inputs ⇒ same hash", stateHash(A.world) =
     // assertion said ">= 5", so the number in the sentence was untested by
     // construction - and it was wrong. An exact list fails in both directions:
     // a module that stops asking, and a module that starts.
-    check("access: and the OLD predicate is gone, not merely unused — `hasAccess` is nowhere under js/, and exactly six sim modules import `served` in its place: blocks, census, events, justice, lots and ops — ops because a building that could not be reached may not be BUILT (the owner: if it meets the requirements to exist it should be functional)",
-      !anyHasAccess && served5.join(" ") === "blocks.js census.js events.js justice.js lots.js ops.js",
+    check("access: and the OLD predicate is gone, not merely unused — `hasAccess` is nowhere under js/, and five sim modules import `served`: blocks, census, events, justice and lots; ops uses the shared touchesRoad placement rule",
+      !anyHasAccess && served5.join(" ") === "blocks.js census.js events.js justice.js lots.js" && /touchesRoad/.test(readFileSync(path.join(ROOT,"js/sim/ops.js"),"utf8")),
       `${served5.length} sim modules import served: ${served5.join(" ")}`);
   }
 
@@ -3937,8 +3949,8 @@ check("no Math.random under js/", mathRandom.length === 0, mathRandom.join(", ")
   check("lives: compact save round-trips without changing canonical state",
     stateHash(migrated) === stateHash(load(compactJson)));
   for (let t = 0; t < 10 * 12; t++) tick(migrated);
-  check("lives: v1 plain fixture continues ten years at its pre-Part-F simulation hash",
-    stateHashNoNews(migrated) === "566f48db", `${stateHashNoNews(migrated)} without news · ${stateHash(migrated)} with news`);
+  check("lives: v1 plain fixture continues ten years at its physical-camping migration baseline",
+    stateHashNoNews(migrated) === "98d2a6a8", `${stateHashNoNews(migrated)} without news · ${stateHash(migrated)} with news`);
 }
 
 // ---- Part B'': lives, graveyard, memorial, and the call-site mutation run ---
@@ -6797,6 +6809,8 @@ if (existsSync(walkersPath)) {
     kinds.every(kind => art.civic(kind).footprint.every(side => side === (kind === "largePark" ? 2 : kind === "zoo" ? 3 : 1))) &&
     art.civic("park", 3) === art.civic("park"));
 }
+
+{ const { checkCamping } = await import("./check-camping.mjs"); checkCamping(check); }
 
 console.log(`${checks} checks, ${failures.length} failures`);
 for (const f of failures) console.log(`  FAIL ${f}`);

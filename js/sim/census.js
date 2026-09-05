@@ -284,7 +284,7 @@ export function census(world) {
     meanPol: polSum / n,
     maxPol,
     maxTraffic,
-    vacantR: Math.max(0, rCap - P),
+    vacantR: Math.max(0, rCap - world.citizens.filter(c => !c.dead && c.home >= 0).length),
     rCap,
     notables: notables(world),
   };

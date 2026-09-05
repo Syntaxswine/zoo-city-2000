@@ -10,6 +10,7 @@ import { createWorld } from "./world.js";
 import { makeRng } from "./rng.js";
 import { computeFields, recountRosters, commutePath, doorsOf } from "./fields.js";
 import { citizenDefaults, rebuildMaps } from "./citizens.js";
+import { locateCamps } from "./camps.js";
 import { refreshLast } from "./tick.js";
 import { migrateLegacyNames } from "./legacy.js";
 import { normalizeUse } from "./use.js";
@@ -106,6 +107,7 @@ export function fromPlain(o) {
   migrateLegacyNames(world);
   world.deaths = (o.deaths || []).map((entry) => Array.isArray(entry) ? entry.slice() : { ...entry });
   world.campers = o.campers.map((c) => ({ ...c }));
+  locateCamps(world);
   world.nextId = o.nextId;
   world.nextHouseholdId = o.nextHouseholdId;
   // Legacy saves recorded total convictions, but not the theft count.

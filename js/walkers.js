@@ -434,7 +434,7 @@ export function createWalkers(initialWorld) {
   }
 
   function spawnCamper(cp, k) {
-    const tile = campSite(k);
+    const tile = cp.tile ?? campSite(k);
     if (tile < 0) return null;
     return add(make("camper", null, [], { id: cp.id, species: cp.species, name: cp.name, tent: true, tile, facing: k % 2 ? "sw" : "se" }));
   }

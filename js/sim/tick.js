@@ -62,6 +62,7 @@ export function tick(world) {
   settleDoors(world);
   // 5. citizens
   const cit = citizensTick(world, cen, dem);
+  notices.push(...cit.notices);
   notices.push(...cit.zonedOutLines); // use-zoning: households that left under the player's line (SPEC §7.8)
   // 6. budget
   const bud = budgetTick(world);

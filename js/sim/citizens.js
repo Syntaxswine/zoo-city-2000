@@ -6,6 +6,7 @@
 // every reference in the same call — friends' lists, the household, the
 // occupant and staff counts. check.mjs recounts all of it.
 
+import { addCamp } from "./camps.js";
 import { KNOBS } from "./rules.js";
 import { SPECIES, SPECIES_BY_ID, NAME_PARTS, affinity, ARRIVING, PREY_OF, DIET_OF, isPredatorOf, admits } from "./species.js";
 import { ZONE, CIVIC, TERRAIN, ROAD, idx, inBounds, capacityOf, jobsOf, jobZone, absent } from "./world.js";
@@ -174,6 +175,7 @@ export function removeCitizen(world, c, cause, lastHome = c.home) {
     if (hh.members.length === 0) {
       world.hhById.delete(hh.id);
       hh.gone = true;
+      world.campers = world.campers.filter(cp => cp.householdId !== hh.id);
     }
   }
   world.byId.delete(c.id);
@@ -383,7 +385,7 @@ function lotsWithinRoad(world, fromLot, maxRoad) {
   return set;
 }
 
-/** R decay: households beyond the new capacity rehome within 12 road tiles or leave. */
+/** R decay: displaced households seek another home, then a campsite. */
 export function evictFromLot(world, i, newCap) {
   if (world.occupants[i] <= newCap) return;
   const hhs = [];
@@ -404,7 +406,7 @@ export function evictFromLot(world, i, newCap) {
     if (!allowed) allowed = lotsWithinRoad(world, i, KNOBS.REHOME_RADIUS);
     const to = bestHome(world, moving.species, moving.members.length, false, allowed);
     if (to >= 0) { placeHousehold(world, moving, to); if (to !== i) for (const id of moving.members) remember(world, world.byId.get(id), KIND.MOVED, to); }
-    else removeHousehold(world, moving, "evicted", i);
+    else if (!startCamping(world, moving)) removeHousehold(world, moving, "evicted", i);
   }
 }
 
@@ -524,11 +526,47 @@ function pickSpecies(world, weights) {
 // The tick
 // ---------------------------------------------------------------------------
 
+/** Keep the household and citizen identities through a downturn. No free site means stay housed. */
+export function startCamping(world, hh) {
+  if (hh.gone || !hh.members.length || world.campers.some(cp => cp.householdId === hh.id)) return false;
+  const members = hh.members.map(id => world.byId.get(id));
+  if (members.some(c => !c || c.dead || absent(world, c))) return false;
+  const cp = {id: world.nextId, name: "The " + hh.surname + " household", species: hh.species, kind: "camper", householdId: hh.id, since: world.tick};
+  if (!addCamp(world, cp)) return false;
+  world.nextId++;
+  for (const c of members) {
+    if (c.home >= 0) world.occupants[c.home]--;
+    releaseJob(world, c);
+    c.home = -1; c.path = null; c.stale = false;
+  }
+  hh.home = -1; hh.notice = 0;
+  return true;
+}
+
+/** Resident camps never expire. Rehouse existing families before new arrivals. */
+export function rehouseCampers(world) {
+  let housed = 0;
+  world.campers = world.campers.filter(cp => {
+    if (!cp.householdId) return cp.until > world.tick;
+    const hh = world.hhById.get(cp.householdId);
+    if (!hh || hh.gone || !hh.members.length) return false;
+    if (world.valves.R <= 0) return true;
+    const lot = bestHome(world, hh.species, hh.members.length, false);
+    if (lot < 0) return true;
+    placeHousehold(world, hh, lot);
+    for (const id of hh.members) remember(world, world.byId.get(id), KIND.MOVED, lot);
+    housed += hh.members.length;
+    return false;
+  });
+  return housed;
+}
+
 export function citizensTick(world, cen, dem) {
   const out = { arrived: 0, left: 0, births: 0, deaths: 0, notices: [], meetings: [], funerals: 0, littersLost: 0, rehomed: 0, zonedOut: 0, zonedOutLines: [] };
   const rng = world.rng;
   const tick = world.tick;
   world.meetings = out.meetings;
+  out.rehomed += rehouseCampers(world);
 
   // 0. No ghosts: a household whose home is no longer a standing R lot is
   //    rehomed or leaves (rubble, a road, a bulldoze that missed a step).
@@ -693,7 +731,7 @@ export function citizensTick(world, cen, dem) {
     let households = Math.floor(KNOBS.ARRIVE_GAIN * world.valves.R * vacantR / KNOBS.ARRIVE_DIV + rng.next());
     if (vacantR === 0 && world.campers.length < KNOBS.CAMPERS_MAX && rng.chance(Math.min(0.9, world.valves.R))) {
       const species = pickSpecies(world, weights);
-      world.campers.push({ id: world.nextId++, name: firstName(world, species) + " " + surname(world, species), species, kind: "camper", until: tick + KNOBS.CAMPER_TICKS });
+      addCamp(world, { id: world.nextId++, name: firstName(world, species) + " " + surname(world, species), species, kind: "camper", until: tick + KNOBS.CAMPER_TICKS });
     }
     for (let k = 0; k < households; k++) {
       const species = pickSpecies(world, weights);
@@ -720,7 +758,7 @@ export function citizensTick(world, cen, dem) {
       }
     }
   }
-  world.campers = world.campers.filter((c) => c.until > tick);
+  world.campers = world.campers.filter((c) => c.householdId || c.until > tick);
 
   // 6. Departures and friction (per household).
   const VR = world.valves.R;
@@ -755,6 +793,10 @@ export function citizensTick(world, cen, dem) {
     if (adults > 0 && friendless === adults) p += KNOBS.FRICTION_P;
     const bear = hh.species === "bear" ? 1 / 1.5 : 1;
     if (p > 0 && rng.chance(Math.max(0, p * bear))) {
+      if (VR <= 0) {
+        if (startCamping(world, hh)) out.notices.push("CAMPING — the " + hh.surname + " household is staying in a tent until the economy and housing recover.");
+        continue;
+      }
       out.left += nM;
       world.departures = world.departures || [];
       world.departures.push({ species: hh.species, surname: hh.surname, n: nM, from: hh.home });

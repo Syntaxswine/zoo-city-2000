@@ -1,5 +1,7 @@
 # BACKLOG — Zoo City 2000
 
+**Economic camping, 2026-09-05:** downturns and housing decay can preserve resident households in physical tents. Occupied sites block construction; families rehouse first during recovery. [Behaviour, tests and baseline changes](docs/HANDOFF-ECONOMIC-CAMPING-2026-09-05.md).
+
 **Civic campuses shipped 2026-09-05:** five 3×3 buildings, adjacent-road placement for services, Large Park garden and separate Zoo prison, crime-specific sentencing and safe legacy footprints. 586 checks pass. [Handoff and six measured hashes](docs/HANDOFF-CIVIC-CAMPUSES-2026-09-05.md).
 
 Open work, ranked. The design record is `SPEC.md`; the numbers are in

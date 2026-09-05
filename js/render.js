@@ -555,13 +555,14 @@ export function createRenderer(canvas, initialWorld, art) {
     const winter = world.events.active.some((e) => e.id === "bearWinter");
     const list = walkers ? walkers.list() : [];
     const tent = art.overlay("tent");
+    for (const cp of world.campers) if (cp.kind !== "scout" && cp.tile >= 0) items.push({sprite:tent, tx:cp.tile % world.w, ty:Math.floor(cp.tile / world.w), kind:"building"});
     const meet = art.overlay("meeting");
     for (const w of list) {
       if (winter && w.species === "bear") continue;
       if (w.tx < range.x0 - 1 || w.tx > range.x1 + 1 || w.ty < range.y0 - 1 || w.ty > range.y1 + 1) continue;
       if (w.tent) {
+        if (!world.campers.some(cp => cp.id === w.id)) continue;
         const ttx = Math.floor(w.tx), tty = Math.floor(w.ty);
-        items.push({ sprite: tent, tx: ttx, ty: tty, kind: "building" });
         items.push({ sprite: art.citizen(w.species, w.facing, w.frame, w.age, { look: w.look }), tx: ttx + 0.82, ty: tty + 0.55, kind: "walker" });
         continue;
       }

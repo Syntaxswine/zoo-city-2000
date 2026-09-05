@@ -392,6 +392,11 @@ export function createUI(app) {
     const w = world();
     const rep = lotReport(w, i);
     const tx = rep.tx, ty = rep.ty;
+    const camp = w.campers.find(cp => cp.kind !== "scout" && cp.tile === i);
+    if (camp) {
+      const family = camp.householdId ? w.hhById.get(camp.householdId) : null;
+      return [el("div", "head", "(" + tx + "," + ty + ") Occupied campsite"), el("div", "", camp.name + (family ? " · " + family.members.length + " residents" : "")), el("div", "warn", "Construction blocked while occupied."), el("div", "dim", family ? "Waiting for positive housing demand and a suitable home; this household gets priority over new arrivals." : "A visitor waiting for housing.")];
+    }
     const lines = [];
     const head = el("div", "head");
     let what;
@@ -623,6 +628,8 @@ export function createUI(app) {
       const hh = w.hhById?.get(c.household);
       lines.push(el("div", "", `${hh ? `the ${hh.surname} household · ` : ""}home ${homeS} · job ${jobS} · mood ${Math.round(c.mood)}`));
       const status = [];
+      const camp = w.campers.find(cp => cp.householdId === c.household);
+      if (camp) status.push("camping at (" + camp.tile % w.w + "," + Math.floor(camp.tile / w.w) + ") — waiting for housing and economic recovery");
       if (c.pen) status.push(`in the market pen until ${dateOf(w, c.held).label}`);
       else if ((c.held || 0) > w.tick) status.push(`${w.civic[c.heldAt] === CIVIC.ZOO ? "in the Zoo prison" : c.heldAt >= 0 ? "at the Pacification Centre" : "in legacy cells"} until ${dateOf(w, c.held).label}`);
       if (c.fixed) status.push(`fixed${c.wrongful ? " — the wrong animal" : ""}${c.exonerated ? ", exonerated" : ""}`);
@@ -673,7 +680,7 @@ export function createUI(app) {
   function cardForWalker(wk) {
     const head = el("div", "head");
     head.append(el("b", "", wk.name || cap(wk.species)), el("span", "dim", `  ${wk.species}`));
-    const doing = { departure: "leaving town for the edge road", camper: "camping by the edge road — wants a home the town has not built", scout: "a scout: this species would come if the town suited it" }[wk.kind] || wk.kind;
+    const doing = { departure: "leaving town for the edge road", camper: "camping — waiting for a home", scout: "a scout: this species would come if the town suited it" }[wk.kind] || wk.kind;
     return [head, el("div", "dim", doing)];
   }
 
@@ -825,7 +832,7 @@ export function createUI(app) {
     tr("vacant homes", `${c.vacantR}`);
     tr("capacity", `${Math.round(fig.demand.cap)}${fig.demand.capped ? " — REACHED" : ""}`);
     tr("mean LV / Pol", `${c.meanLV.toFixed(0)} / ${c.meanPol.toFixed(0)}`);
-    if (w.campers.length) tr("camping by the road", `${w.campers.filter((x) => x.kind === "camper").length}`);
+    if (w.campers.length) tr("occupied tents", `${w.campers.filter((x) => x.kind === "camper").length}`);
     body.append(grid);
     const remembered = memorial(w);
     if (remembered.length) {

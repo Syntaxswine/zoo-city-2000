@@ -1802,3 +1802,9 @@ art.citizen(species, facing, frame, age) / art.overlay(kind, frame)   // each â†
 Later layers, labelled in BACKLOG.md: L1 road rot, owl academy, wedding,
 species building skins, minimap, school; L2 elevation (Glades'
 level machinery), shore autotile, 128Ã—128; L3 power; L4 sound; L5 scenarios.
+
+## Economic camping (2026-09-05)
+
+Downturn departure rolls now move households to persistent campsites; housing decay first seeks another home, then a campsite. Resident identities and family ties survive. Camping residents have no occupied home or job, remain counted in population and do not consume housing vacancies. At positive residential demand, families rehouse before new arrivals when a suitable home exists.
+
+Each tent occupies one saved free grass tile. Construction and bulldozing cannot overlap it, including multi-tile footprints and undo. Tents are drawn from simulation records and can be inspected. Visitor campers retain their timer; resident tents do not expire. Old untiled visitors receive sites on load. See docs/HANDOFF-ECONOMIC-CAMPING-2026-09-05.md for fallbacks, tests and intentional baseline changes.
