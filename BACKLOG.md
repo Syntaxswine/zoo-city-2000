@@ -19,7 +19,13 @@ SPEC §12.2e; handoff §25; before/after frames and contact sheets in docs/shots
 Remaining E stretch: saved building age, ivy after 15 years and roof patches
 after 25. This pass deliberately adds no age array or save migration.
 
-## The People — IN PROGRESS 2026-09-03 (`docs/PLAN-THE-PEOPLE-2026-09-02.md`); Parts K, A, C, D, F, H, P and S shipped
+## The People — core integrated 2026-09-05
+
+K, A–F core, H, P, S, X/X2 and R are integrated. G adds exported-city probes,
+citizen recording and regression closure. [Results and traps](docs/HANDOFF-PEOPLE-INTEGRATION-2026-09-05.md).
+Still open: the owner's control-city export and its measurements; C favourites
+and automatic browser camera-follow; E saved building age, ivy and roof patches.
+The historical planning discussion below is retained as design context.
 
 **Part F SHIPPED 2026-09-03:** the paper now selects permanent-id people
 stories from the monthly biography bus: one obituary after three mourners,

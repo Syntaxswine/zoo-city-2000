@@ -5,7 +5,7 @@
 // live walker, fall back to home between walks, and become an epitaph after
 // the citizen leaves the simulation.
 
-import { absent } from "./sim/world.js";
+import { absent, CIVIC } from "./sim/world.js";
 import { epitaph, legacyOf } from "./sim/legacy.js";
 
 const xy = (world, tile) => tile >= 0
@@ -26,10 +26,11 @@ export function pinTarget(world, walkers, rawId) {
   if (c && !c.dead) {
     const winter = c.species === "bear" && world.events?.active?.some((e) => e.id === "bearWinter" && e.until > world.tick);
     if (absent(world, c) || c.onLeave || winter || c.home < 0) {
-      const place = c.heldAt >= 0 ? xy(world, c.heldAt) : xy(world, c.home);
+      const camp = world.campers?.find(cp => cp.householdId === c.household);
+      const place = c.heldAt >= 0 ? xy(world, c.heldAt) : xy(world, c.home >= 0 ? c.home : camp?.tile ?? -1);
       const detail = c.pen ? "in the market pen"
-        : (c.held || 0) > world.tick ? (c.heldAt >= 0 ? "at the Pacification Centre" : "in the cells")
-          : c.onLeave ? "away from town" : winter ? "asleep for bear winter" : "without a settled home";
+        : (c.held || 0) > world.tick ? (c.heldAt >= 0 ? (world.civic[c.heldAt] === CIVIC.ZOO ? "in the Zoo prison" : "at the Pacification Centre") : "in the cells")
+          : c.onLeave ? "away from town" : winter ? "asleep for bear winter" : camp ? "camping while waiting for housing and recovery" : "without a settled home";
       return Object.freeze({ id, state: "away", citizen: c, walker: null, ...place, line: detail });
     }
     const walker = liveWalker(walkers, id);

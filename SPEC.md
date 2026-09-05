@@ -1805,6 +1805,12 @@ level machinery), shore autotile, 128×128; L3 power; L4 sound; L5 scenarios.
 
 ## Economic camping (2026-09-05)
 
+People G integration: Inspect resolves custody kinds and physical campsites;
+tent cards link to real residents, and camping residents ask for housing even
+after retirement. Exoneration clears only its own current custody, preserving
+newer independent sentences. Saved-city probes and citizen recording are
+specified with measured results in docs/HANDOFF-PEOPLE-INTEGRATION-2026-09-05.md.
+
 Downturn departure rolls now move households to persistent campsites; housing decay first seeks another home, then a campsite. Resident identities and family ties survive. Camping residents have no occupied home or job, remain counted in population and do not consume housing vacancies. At positive residential demand, families rehouse before new arrivals when a suitable home exists.
 
 Each tent occupies one saved free grass tile. Construction and bulldozing cannot overlap it, including multi-tile footprints and undo. Tents are drawn from simulation records and can be inspected. Visitor campers retain their timer; resident tents do not expire. Old untiled visitors receive sites on load. See docs/HANDOFF-ECONOMIC-CAMPING-2026-09-05.md for fallbacks, tests and intentional baseline changes.

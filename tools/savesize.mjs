@@ -2,6 +2,7 @@
 //
 //   node tools/savesize.mjs [--seed 7]
 
+import { probeSave, wholeYears } from "./probe-save.mjs";
 import { createWorld } from "../js/sim/world.js";
 import { tick } from "../js/sim/tick.js";
 import { toPlain } from "../js/sim/save.js";
@@ -14,26 +15,29 @@ const bytes = (value) => Buffer.byteLength(JSON.stringify(value));
 const BASELINE_CITIZEN_BYTES = 732_000;
 const LIMIT = BASELINE_CITIZEN_BYTES * 0.60;
 
-const world = createWorld({ seed: arg("--seed", "7") });
-const mayor = createMayor(world, {
+const SAVED = probeSave(argv, ["--seed"]);
+const YEARS = wholeYears(arg("--years", SAVED ? 0 : 30), 0);
+const world = SAVED ? SAVED.world : createWorld({ seed: arg("--seed", "7") });
+const mayor = SAVED ? null : createMayor(world, {
   layout: "balanced", rates: [8, 8, 8], schedule: [], parks: 0, markets: 0,
   pacify: false, stations: false, disasters: false, recessionYear: null, zooYear: null,
 });
-for (let t = 0; t < 30 * 12; t++) { mayor.month(t); tick(world); }
+for (let t = 0; t < YEARS * 12; t++) { if (mayor) mayor.month(t); tick(world); }
 
 const plain = toPlain(world);
 const sections = Object.entries(plain)
   .map(([name, value]) => [name, bytes(value)])
   .sort((a, b) => b[1] - a[1]);
-console.log(`year 30 · ${world.citizens.length} citizens · ${bytes(plain)} bytes total`);
+console.log(`${SAVED ? "export snapshot" : "scripted town"} at month ${world.tick} · ${world.citizens.length} citizens · ${bytes(plain)} bytes total`);
 for (const [name, size] of sections) console.log(`${name.padEnd(18)} ${String(size).padStart(8)} bytes`);
 const citizenBytes = bytes(plain.citizens);
-console.log(`citizens: ${citizenBytes} / ${LIMIT} bytes (${(citizenBytes / BASELINE_CITIZEN_BYTES * 100).toFixed(1)}% of the 732 KB baseline)`);
+const citizenLimit = SAVED ? (LIMIT / 1732) * Math.max(1, world.citizens.length) : LIMIT;
+console.log(`citizens: ${citizenBytes} / ${Math.round(citizenLimit)} bytes (${SAVED ? "population-adjusted budget" : "60% of the 732 KB baseline"})`);
 const archive = legacyStats(world);
 const archiveJson = bytes(plain.legacy || []);
 console.log(`legacy: ${archive.records} permanent records · ${archive.bytes} shorthand bytes · ${archive.mean.toFixed(2)} mean · ${archiveJson} JSON bytes`);
-if (citizenBytes > LIMIT) {
-  console.error("FAIL: citizen section exceeds Part B's 60% budget");
+if (citizenBytes > citizenLimit) {
+  console.error("FAIL: citizen section exceeds Part B's population-adjusted 60% budget");
   process.exitCode = 1;
 }
 if (archive.mean > 45) {

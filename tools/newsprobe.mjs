@@ -7,6 +7,7 @@
 // the live 400-row cap rolls, so the people percentage is a true 30-year
 // editorial budget rather than a flattering measurement of the final page.
 
+import { probeSave } from "./probe-save.mjs";
 import { createWorld, ZONE, TERRAIN, CIVIC } from "../js/sim/world.js";
 import { tick } from "../js/sim/tick.js";
 import { apply } from "../js/sim/ops.js";
@@ -33,17 +34,20 @@ try {
   console.error(`newsprobe: ${e.message}`);
   process.exit(2);
 }
+const SAVED = probeSave(argv, ["--seeds"]);
+if (SAVED) SEEDS = ["export"];
 const CSV = argv.includes("--csv");
 const BLOCK = 6;
 const ZONES = [ZONE.R, ZONE.R, ZONE.C, ZONE.I, ZONE.R, ZONE.C, ZONE.M, ZONE.I];
 
 function build(seed) {
-  const w = createWorld({ seed });
+  const w = SAVED ? SAVED.world : createWorld({ seed });
+  let blocks = 0;
+  if (!SAVED) {
   const idx = (x, y) => y * w.w + x;
   const S = w.start;
   const inx = Math.sign(w.w / 2 - S.tx) || 1;
   const iny = Math.sign(w.h / 2 - S.ty) || 1;
-  let blocks = 0;
   for (let b = 0; b < ZONES.length; b++) {
     const x0 = S.tx + inx * (2 + (b % 3) * BLOCK);
     const y0 = S.ty + iny * (2 + Math.floor(b / 3) * BLOCK);
@@ -61,8 +65,14 @@ function build(seed) {
     apply(w, { kind: "zone", zone: ZONES[b], x0: X0 + 1, y0: Y0 + 1, x1: X0 + BLOCK - 1, y1: Y0 + BLOCK - 1, density: 3 });
     blocks++;
   }
-  apply(w, { kind: "civic", civic: CIVIC.FIRE, tile: idx(S.tx + inx * 3, S.ty + iny * 3) });
-  apply(w, { kind: "civic", civic: CIVIC.POLICE, tile: idx(S.tx + inx * 4, S.ty + iny * 3) });
+  for (const kind of ["fire", "police"]) {
+    let placed=false;
+    for(let i=0;i<w.w*w.h;i++) {
+      if(apply(w,{kind,tx:i%w.w,ty:Math.floor(i/w.w)}).ok){placed=true;break;}
+    }
+    if(!placed) throw Error("news fixture could not place "+kind);
+  }
+  }
   const emitted = [];
   for (let n = 0; n < YEARS * 12; n++) {
     const month = w.tick;
@@ -105,16 +115,19 @@ if (CSV) {
   console.log("seed,pop,dispatches,people,peoplePct,obituary,litter,centenary,reports,flashed,multiFlashMonths,unresolved,whoLost,noNewsHash");
   for (const r of rows) console.log([r.seed, r.pop, r.rows, r.people, r.pct.toFixed(1), r.obituary, r.litter, r.centenary, r.reports, r.flashed, r.multi, r.unresolved, r.whoLost, r.noNews].join(","));
 } else {
-  console.log(`newsprobe: ${YEARS} years · eight-block news town + fire + police`);
+  console.log(`newsprobe: ${YEARS} years · ${SAVED ? "export (no scripted construction)" : "eight-block news town + fire + police"}`);
   console.log("| seed | rows | people | share | obit / litter / 100 | reports | flashed | unresolved / lost | no-news hash |");
   console.log("|---|---:|---:|---:|---:|---:|---:|---:|---|");
   for (const r of rows) console.log(`| ${r.seed} | ${r.rows} | ${r.people} | ${r.pct.toFixed(1)}% | ${r.obituary} / ${r.litter} / ${r.centenary} | ${r.reports} | ${r.flashed} | ${r.unresolved} / ${r.whoLost} | ${r.noNews} |`);
 }
 
-const bad = rows.filter((r) => r.pct > 40 || r.unresolved || r.whoLost || r.blocks < 1);
+// A tiny export may emit only one story: report its share, without treating
+// that sample as a long-run budget measurement. Identity gates always apply.
+const budgetSample = r => r.rows >= 30;
+const bad = rows.filter((r) => (budgetSample(r) && r.pct > 40) || r.unresolved || r.whoLost || (!SAVED && r.blocks < 1));
 if (bad.length) {
   console.error(`newsprobe: FAIL ${bad.map((r) => r.seed).join(", ")} (people must be <=40%; every who must resolve and survive save/load)`);
   process.exitCode = 1;
 } else if (!CSV) {
-  console.log(`PASS: ${rows.length}/${rows.length} cities stay at or below the 40% people budget; every named id resolves and survives the saved tail.`);
+  console.log(`PASS: every named id resolves and survives the saved tail; ${rows.filter(budgetSample).length} city samples meet the 40% people budget. ${rows.filter(r=>!budgetSample(r)).length} samples have fewer than 30 dispatches: budget reported, not gated.`);
 }

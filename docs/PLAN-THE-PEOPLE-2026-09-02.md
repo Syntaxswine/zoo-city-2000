@@ -392,6 +392,9 @@ personal hurt above the town's wish; the probe's 40% line is the guard.
 
 ### B. Lives — the biography every animal carries
 
+**SHIPPED; integrated 2026-09-05.** Life rings, permanent archive, compact saves,
+call sites and biography cards are covered by the merged suite.
+
 **Goal.** The card reads like a life: *born here 1998 to the Burrowes ·
 moved to (12,30) 2003 · hired at the works 2004 · befriended Fenpa Howell
 2006 · lost Fenpa 2011 — the wolves · retired 2033.* And the town remembers
@@ -1127,6 +1130,8 @@ session.
 
 ### X. The level crossing — *"railroads and roads should be able to cross over each other perpendicularly"*
 
+**SHIPPED 2026-09-03; integrated with X2 and R.** See SPEC §7.9 and the suite.
+
 **Goal.** A rail line may cross a road square-on, on one tile that is
 both; walkers cross on foot along the road, riders cross on the rail, and
 the tile draws as a crossing. Rail bridges (rail over water) stay out, as
@@ -1342,6 +1347,12 @@ walks it; the card's line on a tile at 2, at 3, at 4; the probe's table
 in the commit. Half a session, no keel.
 
 ### G. Integration — after the parts have merged
+
+**CORE CLOSED 2026-09-05.** [Evidence, combined probes, recording and symptom
+traps](HANDOFF-PEOPLE-INTEGRATION-2026-09-05.md). The owner's control-city fixture
+has not arrived; its regression and probe numbers remain deferred. C's favourite
+and automatic browser camera-follow, and E's building-age decoration, remain
+stretch. The recording selects a stable citizen ID and is a monthly time-lapse.
 
 One agent, after A–F, H, P, S, X and R are on `main`:
 - **The control city** (the owner: *"i will build one for you soon"*):

@@ -2,6 +2,7 @@
 // peopleprobe.mjs — which actionable need wins in three kinds of town.
 // An instrument, never a gate: it always exits 0 and prints what it measured.
 
+import { probeSave, wholeYears } from "./probe-save.mjs";
 import { createWorld, isPart, ZONE } from "../js/sim/world.js";
 import { tick } from "../js/sim/tick.js";
 import { NEED_CODES } from "../js/sim/voice.js";
@@ -11,9 +12,10 @@ import { COHERENT_STRESS_CODES, coherentStressFacts, coherentStressFixture } fro
 
 const argv = process.argv.slice(2);
 const arg = (name, fallback) => { const i = argv.indexOf(name); return i >= 0 ? argv[i + 1] : fallback; };
-const YEARS = Number(arg("--years", 30));
-const SEEDS = String(arg("--seeds", "7,3,5,11")).split(",");
-const LAYOUTS = String(arg("--layouts", "balanced,dormitory,millbelt")).split(",");
+const SAVED = probeSave(argv, ["--seeds", "--layouts"]);
+const YEARS = wholeYears(arg("--years", 30));
+const SEEDS = SAVED ? ["export"] : String(arg("--seeds", "7,3,5,11")).split(",");
+const LAYOUTS = SAVED ? ["saved"] : String(arg("--layouts", "balanced,dormitory,millbelt")).split(",");
 
 const totals = new Map(LAYOUTS.map((layout) => [layout, { samples: 0, codes: {} }]));
 const stresses = [];
@@ -21,15 +23,15 @@ const stresses = [];
 for (const layout of LAYOUTS) {
   for (let seedIndex = 0; seedIndex < SEEDS.length; seedIndex++) {
     const seed = SEEDS[seedIndex];
-    const world = createWorld({ seed: `needs-${layout}-${seed}` });
-    const mayor = createMayor(world, {
+    const world = SAVED ? SAVED.world : createWorld({ seed: `needs-${layout}-${seed}` });
+    const mayor = SAVED ? null : createMayor(world, {
       layout,
       parks: layout === "balanced" ? 4 : layout === "millbelt" ? 1 : 0,
       markets: layout === "balanced" ? 1 : 0,
       stations: layout === "balanced",
     });
     for (let t = 0; t < YEARS * 12; t++) {
-      mayor.month(t);
+      if (mayor) mayor.month(t);
       // Let the industrial layout establish itself, then keep its works at
       // full output. This is the probe's deliberately ugly mill belt: it asks
       // whether a physically smoky town actually says SMOKE, not whether the
@@ -71,6 +73,7 @@ for (const layout of LAYOUTS) {
   }
 }
 
+if (SAVED) console.log("source: " + SAVED.path + " (no scripted mayor or synthetic stress fixtures)");
 console.log(`peopleprobe: ${SEEDS.length} seeds × ${LAYOUTS.length} layouts × ${YEARS} years`);
 console.log("| layout | samples | content | top three needs |");
 console.log("|---|---:|---:|---|");

@@ -28,11 +28,15 @@
 //   --film N      N frames at the end, --fps apart, so the walkers move.
 // Every shot prints a caption line: the month, the town, and what happened.
 //
-// An INSTRUMENT: it reports, never gates, exit 0 always.
+// An instrument: it reports rather than grading the city. Invalid input fails.
+// --follow citizen ID selects a permanent identity; --film-year YYYY takes
+// twelve monthly samples when that year lies within the simulated interval.
 
-import { mkdirSync, writeFileSync, rmSync, readdirSync } from "node:fs";
+import { mkdirSync, writeFileSync, rmSync, readFileSync, existsSync } from "node:fs";
 import { resolve, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { probeSave, wholeYears } from "./probe-save.mjs";
+import { parseFollow, citizenFrame } from "./play-follow.mjs";
 import { installCanvas, createCanvas, encodePNG, zoom as zoomCanvas } from "./headless-canvas.mjs";
 
 installCanvas();
@@ -45,6 +49,7 @@ const { createWalkers } = await import("../js/walkers.js");
 const { art } = await import("../js/art/index.js");
 const { toScreen, HALF_H, mapBounds } = await import("../js/iso/iso.js");
 const { TICKER_FLASH } = await import("../js/sim/events.js");
+const { stateHash } = await import("../js/sim/save.js");
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const argv = process.argv.slice(2);
@@ -54,7 +59,7 @@ const num = (k, d) => Number(arg(k, d));
 const list = (k, d) => String(arg(k, d)).split(",").map((s) => s.trim()).filter(Boolean);
 
 const SEED = arg("--seed", "7");
-const YEARS = num("--years", 12);
+const YEARS = wholeYears(num("--years", 12), 0);
 const W = num("--w", 960);
 const H = num("--h", 600);
 const ZOOM = num("--zoom", 2);
@@ -65,14 +70,22 @@ const WHEN = arg("--when", null);
 const AFTER = list("--after", "0").map(Number);
 const FILM = num("--film", 0);
 const FPS = num("--fps", 12);
-const FOLLOW = arg("--follow", "city");
+const FOLLOW = parseFollow(argv);
+const FILM_YEAR = arg("--film-year", null) == null ? null : num("--film-year", 0);
+if (FILM_YEAR != null && (!Number.isInteger(FILM_YEAR) || FILM_YEAR < 2000 || FILM_YEAR > 2200)) throw Error("--film-year expects a year from 2000 to 2200");
+if (![W,H].every(n=>Number.isInteger(n)&&n>=64&&n<=4096) || ![1,2].includes(ZOOM) || !Number.isFinite(FPS) || FPS<=0 || FPS>120 || !Number.isInteger(FILM) || FILM<0 || FILM>10000) throw Error("invalid frame dimensions, zoom, fps or film count");
+if (OUT === ROOT) throw Error("--out must be a dedicated output directory");
 const OVERLAY = arg("--overlay", "off");
 const KEEP = flag("--keep");
 const WATCH_TILE = arg("--watch", null) ? arg("--watch", "").split(",").map(Number) : null;
+if (!Number.isInteger(EVERY) || EVERY < 0 || AFTER.some(n=>!Number.isInteger(n)||n<0) || AT.some(s=>!/^\d{4}-(0[1-9]|1[0-2])$/.test(s))) throw Error("invalid shutter month or interval");
+const re = WHEN ? new RegExp(WHEN) : null;
 
 // ---- the town ---------------------------------------------------------------
-const world = createWorld({ seed: SEED });
-const mayor = createMayor(world, {
+const SAVED = probeSave(argv, ["--seed","--layout","--rates","--parks","--markets","--pacify","--stations","--disasters","--zoo","--recession"]);
+const world = SAVED ? SAVED.world : createWorld({ seed: SEED });
+const startTick = world.tick;
+const mayor = SAVED ? null : createMayor(world, {
   layout: arg("--layout", "balanced"),
   rates: ((r) => (r.length === 1 ? [r[0], r[0], r[0]] : r))(list("--rates", "8,8,8").map(Number)),
   parks: num("--parks", 0),
@@ -109,8 +122,10 @@ function cityCentre() {
 
 function aim(at) {
   if (at) { lookAt(at[0], at[1]); return; }
-  if (FOLLOW === "start") lookAt(world.start.tx, world.start.ty);
-  else if (/^\d+,\d+$/.test(FOLLOW)) { const [x, y] = FOLLOW.split(",").map(Number); lookAt(x, y); }
+  const target = citizenFrame(world, walkers.list(), FOLLOW);
+  if (target && target.tx != null && target.ty != null) lookAt(target.tx,target.ty);
+  else if (FOLLOW.mode === "start") lookAt(world.start.tx, world.start.ty);
+  else if (/^\d+,\d+$/.test(FOLLOW.mode)) { const [x, y] = FOLLOW.mode.split(",").map(Number); lookAt(x, y); }
   else lookAt(...cityCentre());
   // main.js's clampCamera, to the letter: the camera CENTRE stays inside the
   // map's projection, and the viewport is allowed to overhang the edge. (The
@@ -145,12 +160,16 @@ function tileReport(at) {
 const shots = [];
 function shoot(name, caption, at = null, dt = 0) {
   aim(at);
+  const focus = citizenFrame(world, walkers.list(), FOLLOW);
+  if (focus?.tx != null) walkers.setCursor([focus.tx, focus.ty], FOLLOW.id);
   walkers.update(dt, renderer.viewportTiles());
+  aim(at);
   renderer.draw(camera, null, walkers, OVERLAY, dt);
   const file = join(OUT, `${name}.png`);
   writeFileSync(file, encodePNG(canvas));
-  const line = `${caption}${tileReport(at)}`;
-  shots.push({ name, caption: line });
+  const person = citizenFrame(world, walkers.list(), FOLLOW);
+  const line = `${caption}${tileReport(at)}${person ? " · " + person.label + ": " + person.line : ""}`;
+  shots.push({ name, caption: line, tick: world.tick, person });
   console.log(`  ${name}.png  ${line}`);
 }
 
@@ -167,17 +186,22 @@ const town = () => {
 };
 
 // ---- run --------------------------------------------------------------------
-if (!KEEP) { try { for (const f of readdirSync(OUT)) if (f.endsWith(".png")) rmSync(join(OUT, f)); } catch { /* first run */ } }
+// Delete only files named by our prior manifest, never arbitrary PNGs.
+if (!KEEP && existsSync(join(OUT,"manifest.json"))) {
+  const previous=JSON.parse(readFileSync(join(OUT,"manifest.json"),"utf8"));
+  for(const row of previous.shots || []) if (/^[a-zA-Z0-9+_-]+$/.test(row.name)) {
+    const file=join(OUT,row.name+".png"); if(existsSync(file)) rmSync(file);
+  }
+}
 mkdirSync(OUT, { recursive: true });
 
 const atSet = new Set(AT);
 const queue = []; // { atTick, name, why, tile } — the --when shutter's delayed frames
-const re = WHEN ? new RegExp(WHEN) : null;
 const total = YEARS * 12;
-console.log(`play: seed ${SEED}, ${YEARS} years, ${W}×${H} @ ${ZOOM}x${OVERLAY === "off" ? "" : `, overlay ${OVERLAY}`}\n`);
+console.log(`play: ${SAVED ? "export " + SAVED.path : "scripted seed " + SEED}, ${YEARS} years, ${W}×${H} @ ${ZOOM}x${OVERLAY === "off" ? "" : `, overlay ${OVERLAY}`}\n`);
 
 for (let t = 0; t < total; t++) {
-  mayor.month(t);
+  if (mayor) mayor.month(t);
   // main.js stepTick(): tick, invalidate, notify — in that order. The
   // invalidate is not optional. The static layer holds the ground AND the
   // buildings and is only rebuilt when it is dirty or the camera has walked
@@ -211,10 +235,11 @@ for (let t = 0; t < total; t++) {
     }
   }
 
-  const due = (EVERY && t % EVERY === 0) || atSet.has(key);
+  const due = (EVERY && t % EVERY === 0) || atSet.has(key) || d.year === FILM_YEAR;
   if (due) {
     const head = notices.find((s) => TICKER_FLASH.test(s));
-    shoot(`m${String(t).padStart(4, "0")}-${key}`, `${key}  ${town()}${head ? `  · ${head.slice(0, 70)}` : ""}`);
+    // A monthly time-lapse samples the real walker layer between ticks.
+    shoot(`m${String(t).padStart(4, "0")}-${key}`, `${key}  ${town()}${head ? `  · ${head.slice(0, 70)}` : ""}`, null, d.year === FILM_YEAR ? 0.5 : 0);
   }
 }
 
@@ -224,5 +249,11 @@ if (FILM > 0) {
   for (let f = 0; f < FILM; f++) shoot(`film-${String(f).padStart(2, "0")}`, `frame ${f + 1}/${FILM}  ${town()}`, null, f === 0 ? 0 : 1 / FPS);
 }
 
-console.log(`\n${shots.length} PNG(s) in ${OUT} — now LOOK at them.`);
+const manifest = { version: 1, source: SAVED ? "saved city" : `scripted seed ${SEED}`, startTick, endTick: world.tick, finalHash: stateHash(world), follow: FOLLOW, shots };
+writeFileSync(join(OUT,"manifest.json"), JSON.stringify(manifest,null,2)+"\n");
+writeFileSync(join(OUT,"index.html"), `<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>A citizen's year — Zoo City 2000</title>
+<style>body{margin:24px auto;max-width:960px;padding:0 16px;background:#202b2a;color:#efe8cc;font:16px system-ui}img{width:100%;image-rendering:pixelated}button,input{margin:12px 8px 12px 0}input{width:65%}p{min-height:3em}</style>
+<h1>A citizen's year</h1><img id="frame" alt="Recorded game frame"><br><button id="play">Play</button><input id="seek" type="range" min="0" value="0" aria-label="Recorded frame"><p id="caption"></p>
+<script>const data=${JSON.stringify(manifest).replace(/</g,"\\u003c")};const rows=data.shots;let timer=null;const image=document.getElementById('frame'),seek=document.getElementById('seek'),caption=document.getElementById('caption'),play=document.getElementById('play');seek.max=Math.max(0,rows.length-1);function show(){const row=rows[+seek.value];if(!row){caption.textContent='No frames recorded';return;}image.src=row.name+'.png';image.alt=row.caption;caption.textContent=row.caption;}seek.oninput=show;play.onclick=()=>{if(timer){clearInterval(timer);timer=null;play.textContent='Play';}else{play.textContent='Pause';timer=setInterval(()=>{seek.value=(+seek.value+1)%rows.length;show();},800);}};if(!rows.length)play.disabled=true;show();</script>`);
+console.log(`\n${shots.length} PNG(s) and index.html player in ${OUT}; final hash ${manifest.finalHash}.`);
 if (!shots.length) console.log("Nothing matched the shutter: pass --every N, --at YYYY-MM, --when REGEX or --film N.");

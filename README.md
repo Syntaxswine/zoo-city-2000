@@ -16,6 +16,12 @@ introduces the mourners to each other. The town's growth ceiling rises with
 how well the animals mix — the **Zoo City index** on the census card is the
 share of friendships that cross species, and it multiplies the cap.
 
+Inspect a resident to read their life, friendships and current need; names in
+the newspaper open the same person. Displaced families keep their identities
+while camping and can return to homes during recovery. [Watch one rabbit's
+2010, month by month](docs/people-film/index.html), or read the
+[People integration results](docs/HANDOFF-PEOPLE-INTEGRATION-2026-09-05.md).
+
 ## Run
 
 ```

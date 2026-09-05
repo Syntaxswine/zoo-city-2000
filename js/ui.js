@@ -395,7 +395,9 @@ export function createUI(app) {
     const camp = w.campers.find(cp => cp.kind !== "scout" && cp.tile === i);
     if (camp) {
       const family = camp.householdId ? w.hhById.get(camp.householdId) : null;
-      return [el("div", "head", "(" + tx + "," + ty + ") Occupied campsite"), el("div", "", camp.name + (family ? " · " + family.members.length + " residents" : "")), el("div", "warn", "Construction blocked while occupied."), el("div", "dim", family ? "Waiting for positive housing demand and a suitable home; this household gets priority over new arrivals." : "A visitor waiting for housing.")];
+      const residents = el("div", "household");
+      if (family) for (const id of family.members) { const c = w.byId.get(id); if (c) { residents.append(personLink(c)); residents.append(document.createTextNode(" · ")); } }
+      return [residents, el("div", "head", "(" + tx + "," + ty + ") Occupied campsite"), el("div", "", camp.name + (family ? " · " + family.members.length + " residents" : "")), el("div", "warn", "Construction blocked while occupied."), el("div", "dim", family ? "Waiting for positive housing demand and a suitable home; this household gets priority over new arrivals." : "A visitor waiting for housing.")];
     }
     const lines = [];
     const head = el("div", "head");

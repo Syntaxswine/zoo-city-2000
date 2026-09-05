@@ -31,6 +31,7 @@ const zoneCode = (zone) => zone === ZONE.R ? "R" : zone === ZONE.C ? "C" : zone 
  */
 export function needOf(world, c, context = null) {
   if (!world?.last || !c || c.dead || absent(world, c)) return { code: "CONTENT", arg: null, act: ACT.CONTENT };
+  if (c.home < 0 && world.campers?.some(cp => cp.householdId === c.household)) return { code: "ROOMS", arg: { camping: true }, act: "provide road-served housing and restore positive housing demand with jobs and affordable taxes" };
   const choices = [];
   const add = (code, points, arg = null) => {
     if (!(points > 0) || !ACT[code]) return;

@@ -274,11 +274,13 @@ function exonerate(world, culprit, notices) {
       wronged.exonerated = true;
       wronged.record = Math.max(0, (wronged.record || 0) - 1);
       if (["burglary", "theft"].includes(a.cause)) wronged.thefts = Math.max(0, (wronged.thefts || 0) - 1);
-      if ((wronged.held || 0) > world.tick) { wronged.held = 0; wronged.heldAt = -1; }
+      // Only this conviction can release its custody, never a later sentence or pen.
+      const latest = ev.arrests.findLast(row => row.citizenId === wronged.id);
+      if (!wronged.pen && (wronged.held || 0) > world.tick && latest === a) { wronged.held = 0; wronged.heldAt = -1; }
       remember(world, wronged, KIND.EXONERATED, a.cause);
     }
     const first = a.name.split(" ")[0];
-    const tail = wronged ? (wronged.fixed ? `There is no way to unfix ${first}.` : `${first} is free; the wrongful conviction is cleared.`) : `${first} was sold; there is no way to unsell anyone.`;
+    const tail = wronged ? ((wronged.held || 0) > world.tick ? "The wrongful conviction is cleared; a separate sentence remains in force." : wronged.fixed ? `There is no way to unfix ${first}.` : `${first} is free; the wrongful conviction is cleared.`) : `${first} was sold; there is no way to unsell anyone.`;
     const line = `EXONERATED — ${a.name} was the wrong animal; ${nameOf(culprit)} was taken in today for the same ${a.cause}. The city pays §${KNOBS.COMPENSATION}. ${tail}`;
     ev.log.push({ t: world.tick, id: "exonerated", line, links: [...new Set([a.citizenId, culprit.id])] });
     notices.push(line);

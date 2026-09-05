@@ -1,0 +1,169 @@
+{
+  "version": 1,
+  "source": "saved city",
+  "startTick": 120,
+  "endTick": 132,
+  "finalHash": "b33462ba",
+  "follow": {
+    "mode": "citizen",
+    "id": 52
+  },
+  "shots": [
+    {
+      "name": "m0000-2010-01",
+      "caption": "2010-01  P 1797 · §13686 · crime 38 · 1F 1P · 58 afoot  · BURGLARY — Tabkin Mousewell (cat) broke into the house at (18,3). A fi · Fernble Clovermere: at home at (30,4)",
+      "tick": 121,
+      "person": {
+        "id": 52,
+        "state": "home",
+        "tx": 30,
+        "ty": 4,
+        "label": "Fernble Clovermere",
+        "line": "at home at (30,4)"
+      }
+    },
+    {
+      "name": "m0001-2010-02",
+      "caption": "2010-02  P 1800 · §13816 · crime 38 · 1F 1P · 82 afoot  · EMPTY HOOKS — the hall at (24,10) has nothing on the hooks. · Fernble Clovermere: at home at (30,4)",
+      "tick": 122,
+      "person": {
+        "id": 52,
+        "state": "home",
+        "tx": 30,
+        "ty": 4,
+        "label": "Fernble Clovermere",
+        "line": "at home at (30,4)"
+      }
+    },
+    {
+      "name": "m0002-2010-03",
+      "caption": "2010-03  P 1797 · §13861 · crime 38 · 1F 1P · 98 afoot  · BURGLARY — Reysin Russet (fox) broke into the house at (30,8). A file  · Fernble Clovermere: at home at (30,4)",
+      "tick": 123,
+      "person": {
+        "id": 52,
+        "state": "home",
+        "tx": 30,
+        "ty": 4,
+        "label": "Fernble Clovermere",
+        "line": "at home at (30,4)"
+      }
+    },
+    {
+      "name": "m0003-2010-04",
+      "caption": "2010-04  P 1799 · §13987 · crime 38 · 1F 1P · 110 afoot  · EMPTY HOOKS — the hall at (21,10) has nothing on the hooks. · Fernble Clovermere: at home at (30,4)",
+      "tick": 124,
+      "person": {
+        "id": 52,
+        "state": "home",
+        "tx": 30,
+        "ty": 4,
+        "label": "Fernble Clovermere",
+        "line": "at home at (30,4)"
+      }
+    },
+    {
+      "name": "m0004-2010-05",
+      "caption": "2010-05  P 1806 · §14046 · crime 38 · 1F 1P · 118 afoot · Fernble Clovermere: at home at (30,4)",
+      "tick": 125,
+      "person": {
+        "id": 52,
+        "state": "home",
+        "tx": 30,
+        "ty": 4,
+        "label": "Fernble Clovermere",
+        "line": "at home at (30,4)"
+      }
+    },
+    {
+      "name": "m0005-2010-06",
+      "caption": "2010-06  P 1813 · §14099 · crime 38 · 1F 1P · 125 afoot · Fernble Clovermere: at home at (30,4)",
+      "tick": 126,
+      "person": {
+        "id": 52,
+        "state": "home",
+        "tx": 30,
+        "ty": 4,
+        "label": "Fernble Clovermere",
+        "line": "at home at (30,4)"
+      }
+    },
+    {
+      "name": "m0006-2010-07",
+      "caption": "2010-07  P 1817 · §14156 · crime 38 · 1F 1P · 134 afoot · Fernble Clovermere: at home at (30,4)",
+      "tick": 127,
+      "person": {
+        "id": 52,
+        "state": "home",
+        "tx": 30,
+        "ty": 4,
+        "label": "Fernble Clovermere",
+        "line": "at home at (30,4)"
+      }
+    },
+    {
+      "name": "m0007-2010-08",
+      "caption": "2010-08  P 1820 · §14263 · crime 37 · 1F 1P · 141 afoot · Fernble Clovermere: at home at (30,4)",
+      "tick": 128,
+      "person": {
+        "id": 52,
+        "state": "home",
+        "tx": 30,
+        "ty": 4,
+        "label": "Fernble Clovermere",
+        "line": "at home at (30,4)"
+      }
+    },
+    {
+      "name": "m0008-2010-09",
+      "caption": "2010-09  P 1823 · §14343 · crime 37 · 1F 1P · 147 afoot  · THE GREENS' LEAGUE — the Trotters and the Gnawleys marched on the meat · Fernble Clovermere: at home at (30,4)",
+      "tick": 129,
+      "person": {
+        "id": 52,
+        "state": "home",
+        "tx": 30,
+        "ty": 4,
+        "label": "Fernble Clovermere",
+        "line": "at home at (30,4)"
+      }
+    },
+    {
+      "name": "m0009-2010-10",
+      "caption": "2010-10  P 1823 · §14680 · crime 37 · 1F 1P · 150 afoot  · EMPTY HOOKS — the hall at (17,10) has nothing on the hooks. · Fernble Clovermere: at home at (30,4)",
+      "tick": 130,
+      "person": {
+        "id": 52,
+        "state": "home",
+        "tx": 30,
+        "ty": 4,
+        "label": "Fernble Clovermere",
+        "line": "at home at (30,4)"
+      }
+    },
+    {
+      "name": "m0010-2010-11",
+      "caption": "2010-11  P 1823 · §14835 · crime 37 · 1F 1P · 150 afoot  · SKUNK INCIDENT — Whifgent Blackstripe sprayed Whisitha Purrington (cat · Fernble Clovermere: at home at (30,4)",
+      "tick": 131,
+      "person": {
+        "id": 52,
+        "state": "home",
+        "tx": 30,
+        "ty": 4,
+        "label": "Fernble Clovermere",
+        "line": "at home at (30,4)"
+      }
+    },
+    {
+      "name": "m0011-2010-12",
+      "caption": "2010-12  P 1825 · §14869 · crime 37 · 1F 1P · 150 afoot  · BURGLARY — Luda Fangley (wolf) broke into the house at (18,8). A file  · Fernble Clovermere: at home at (30,4)",
+      "tick": 132,
+      "person": {
+        "id": 52,
+        "state": "home",
+        "tx": 30,
+        "ty": 4,
+        "label": "Fernble Clovermere",
+        "line": "at home at (30,4)"
+      }
+    }
+  ]
+}

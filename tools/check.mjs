@@ -6812,6 +6812,12 @@ if (existsSync(walkersPath)) {
 
 { const { checkCamping } = await import("./check-camping.mjs"); checkCamping(check); }
 
+{ const { checkIntegration } = await import("./check-integration.mjs"); checkIntegration(check); }
+{ const { checkIntegrationTools } = await import("./check-integration-tools.mjs"); checkIntegrationTools(check); }
+if (existsSync(path.join(ROOT,"docs/fixtures/control-city.json"))) {
+  try { const { verifyControlCity } = await import("./control-city.mjs"); verifyControlCity(path.join(ROOT,"docs/fixtures/control-city.json")); check("integration: owner control city twelve-month baseline",true); }
+  catch(e) { check("integration: owner control city twelve-month baseline",false,e.message); }
+} else console.log("DEFERRED: owner control-city.json has not arrived; no owner-city regression claimed.");
 console.log(`${checks} checks, ${failures.length} failures`);
 for (const f of failures) console.log(`  FAIL ${f}`);
 process.exit(failures.length ? 1 : 0);

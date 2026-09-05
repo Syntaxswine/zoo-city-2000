@@ -27,7 +27,7 @@ export const ACT = Object.freeze({
   LV: "raise land value with parks or trees",
   CLEAN: "leave this street less tidy",
   NO_ROAD: "lay a road within 3 tiles",
-  CAPPED: "build a park or Zoo",
+  CAPPED: "build a park or Large Park",
   NO_DEMAND: "lower taxes or improve the lot",
   TAX: "lower this zone's tax rate",
 });
@@ -66,6 +66,7 @@ export const NEED_CODES = Object.freeze(Object.keys(ACT));
 /** Resolve the stable, short line for a citizen and a need record. */
 export function line(_world, c, need) {
   const code = need?.code || "CONTENT";
+  if (code === "ROOMS" && (need?.arg?.camping || c?.home < 0 && _world?.campers?.some(cp => cp.householdId === c.household))) return "we need a home again";
   const table = LINES[code] || LINES.CONTENT;
   const diet = DIET_OF[c?.species];
   const choices = table[c?.species] || table[diet] || table.default;

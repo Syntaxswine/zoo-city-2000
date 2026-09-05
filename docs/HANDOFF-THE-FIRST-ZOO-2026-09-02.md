@@ -2242,3 +2242,12 @@ The art-only handoff above is now integrated: five 3×3 campuses, adjacent-road 
 ## 28. Economic camping — 2026-09-05
 
 Families facing downturn departures or housing decay can stay in physical tents. Tents reserve their tiles against construction and bulldozing; resident families persist and rehouse before newcomers when demand and housing recover. See [the camping handoff](HANDOFF-ECONOMIC-CAMPING-2026-09-05.md) for rules, save compatibility and measured simulation baselines.
+
+## 29. People G — closing integration, 2026-09-05
+
+The core People tranches are integrated. [The closing handoff](HANDOFF-PEOPLE-INTEGRATION-2026-09-05.md)
+contains the combined §16 probe results, symptom traps, citizen recording,
+629-check verification and browser evidence. It also documents the four review
+regressions fixed here. The owner's control-city export and its measurements
+remain deferred; favourites/camera-follow and building-age decoration remain
+explicit stretch work.
