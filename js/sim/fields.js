@@ -562,9 +562,16 @@ export function doorSearch(world, i, seen, { reach = KNOBS.ROAD_REACH, prev = nu
         if (!inBounds(world, nx, ny)) continue;
         const j = ny * w + nx;
         if (seen[j]) continue;
+        // CROSSABLE FIRST, and only THEN seen. Marking a tile visited on the
+        // ATTEMPT burns it: a tunnel first touched ACROSS its axis could never
+        // afterwards be entered ALONG it, from a tile the law allows. That put
+        // a lot at `served` with no doors at all - the field said three tiles,
+        // the search said none - and the card printed "no road, the nearest is
+        // 6 tiles away" one line above "road 3". `computeRoadDist` had it right
+        // and this had it wrong, so SPEC 6b was still two laws.
+        if (!crossable(world, cur, j)) continue; // a gate is open along its axis only (SPEC 6b), door or no door
         seen[j] = 1;
         if (prev) prev[j] = cur; // a DOOR needs its parent too: the chain back to the platform is read off it
-        if (!crossable(world, cur, j)) continue; // a gate is open along its axis only (SPEC 6b), door or no door
         if (world.road[j] !== ROAD.NONE) { doors.push(j); continue; } // a road is the answer, whatever else is on it
         if (!open(world, j)) continue; // a bare wall is not a way to a road; nor, for a forecourt, is a river or a house
         next.push(j);

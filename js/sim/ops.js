@@ -518,7 +518,7 @@ export function apply(world, op, { log = true } = {}) {
   // BACKLOG, which was framed as a save/load divergence and was really this.
   // The cost is one commute pass per op, measured at well under the tick it
   // sits in; the alternative was a hole a curious player finds by accident.
-  replanStale(world);
+  replanStale(world, { release: false }); // rebuild what still has a route; the TICK decides who loses a job
   resetMeatRoutes(world); // a hall, its door, capacity or the freight graph may have changed inside this tick
   post(world, "build", -plan.cost);
   world.undoStack = plan.evicts ? [] : [{ op, snap, cost: plan.cost, roads: roads || walls || rails, t: world.tick }];
@@ -568,7 +568,7 @@ export function undo(world) {
   else if (u.op.kind === "use") invalidatePaths(world);
   computeStationDoors(world);
   if (world.doorsMoved) { world.doorsMoved = false; invalidatePaths(world); }
-  replanStale(world); // an undo is an op: it may not leave the town without commutes either
+  replanStale(world, { release: false }); // an undo is an op: it rebuilds, and it fires nobody
   resetMeatRoutes(world);
   post(world, "build", u.cost);
   world.log.push({ t: world.tick, op: { kind: "undo" } });

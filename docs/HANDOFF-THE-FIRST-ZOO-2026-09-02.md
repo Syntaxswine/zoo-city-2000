@@ -1787,8 +1787,9 @@ hashes as the untouched tree — and 428 checks, 0 failures. A claim of the
 form "this changes nothing" is cheap to make and cheap to check; check it.
 
 **Measured** (`tools/accessprobe.mjs --layout millbelt`, seed 7, 30 years):
-mean **1.42 doors a lot**, **37% of lots leavable by more than one side**,
-**11 industrial lots at tier 3 that the frontage rule capped at 2**, 0 lots
+mean **1.37 doors a lot**, **36% of lots leavable by more than one side**,
+**6 industrial lots at tier 3 that the frontage rule capped at 2** (1.42 / 37%
+/ 11 before the op-time re-plan of 2026-09-04 changed the year-30 town), 0 lots
 out of reach (the mayor's 6×6 estates are ringed, exactly as the owner said).
 
 ### The traps, by what each one LOOKED like

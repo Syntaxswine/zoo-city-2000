@@ -308,8 +308,14 @@ millbelt, `e48a4e21` estate) and the suite passes 428/0. Everything else in
 this part moves the hash on purpose.
 
 Measured (`tools/accessprobe.mjs --layout millbelt`, seed 7, 30 years):
-**37% of zoned lots can be left by more than one side** (mean 1.42 doors),
-and **11 industrial lots stand at tier 3 that the frontage rule capped at 2**.
+**36% of zoned lots can be left by more than one side** (mean 1.37 doors),
+and **6 industrial lots stand at tier 3 that the frontage rule capped at 2**.
+(It read 1.42 / 37% / 11 until 2026-09-04. Those were measured before `ops`
+began re-planning at the op, which changes the town at year 30 - the same
+change that moved three gate hashes. An eighth hostile review caught the stale
+figures being carried forward under a "every published number reproduces"
+line; they are re-measured at HEAD. **The 11 was this part's own evidence that
+deleting SC2000's frontage rule bought anything. It is 6.**)
 Every gate hash moved and each is recorded in the commit.
 
 Two defects the standard turned up on its way in:
@@ -323,7 +329,7 @@ Two defects the standard turned up on its way in:
   The mayor now takes the first free 2×2 a road REACHES; a rig that cannot
   build a working zoo cannot measure one.
 
-## OPEN — a save taken in the SAME MONTH as an op reloads to a different city (PRE-EXISTING, found 2026-09-04)
+## CLOSED — a save taken in the SAME MONTH as an op reloaded to a different city (2026-09-04)
 
 Not Part R's, and older than it: measured on `411d903`, before any of this
 work. `invalidatePaths` nulls every commute; a reload's `rebuildDerived`
@@ -350,6 +356,18 @@ paths are stale (it would have to tick or wait); or accept it and say so in
 SPEC §15. The suite's own convention is already the third - every save/load
 check ticks before it saves - so today the law is really "hash-equal from any
 TICK boundary", and §15 does not say that.
+
+**CLOSED on 2026-09-04**, by the first of the three ways out below: `ops.apply`
+and `ops.undo` re-plan. Measured after — a road op, a use op and a bulldoze,
+each saved with NO tick between, both cities run 12 months: equal at the save
+and equal for twelve months, where each of the three had diverged at month +1
+before. It was not, in the end, a rule call: the same hole was erasing the
+whole town's traffic for a month in the LIVE game, and was farmable (the
+seventh review's finding 1). **The cost the note below predicted — "it moves
+WHEN a job is lost, which is a rule change" — is real and was paid for one
+commit**: firing at the op made `undo` stop undoing. `replanStale` takes a
+policy now (`release: false` at an op), so an op rebuilds and the TICK decides
+who loses a job.
 
 **And that workaround was itself false for one commit.** At `4b9b6d0` a settle
 placed after `citizensTick` left the tick BOUNDARY stale too, so "hash-equal

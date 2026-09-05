@@ -1041,19 +1041,32 @@ function moods(world) {
  *
  * So the rule is simply: NOTHING MAY END A TICK STALE.
  */
-export function replanStale(world) {
+export function replanStale(world, { release = true } = {}) {
   for (const c of world.citizens) {
     if (!c.stale || c.dead) continue;
-    c.stale = false;
-    if (c.job < 0 || c.home < 0) continue;
+    if (c.job < 0 || c.home < 0) { c.stale = false; continue; }
     // The player's line: a lot repainted against its workers releases them (they search again under the gate).
-    if (!admits(world.use[c.job], c.species)) { releaseJob(world, c); continue; }
-    const a = doorsOf(world, c.home);
-    const b = doorsOf(world, c.job);
-    const r = a.length && b.length ? commutePath(world, c.species, a, b) : null;
+    const barred = !admits(world.use[c.job], c.species);
+    const a = barred ? null : doorsOf(world, c.home);
+    const b = barred ? null : doorsOf(world, c.job);
+    const r = !barred && a.length && b.length ? commutePath(world, c.species, a, b) : null;
     const path = r ? r.path : null;
-    if (path) c.path = path;
-    else releaseJob(world, c);
+    if (path) { c.path = path; c.stale = false; continue; }
+    // NO ROUTE. Whether that costs the animal its JOB is a policy, and it
+    // belongs to the caller:
+    //
+    //   a TICK releases it. That is the rule: a workplace you can no longer
+    //   reach is a workplace you no longer hold, and the job search runs in
+    //   the same pass to find another.
+    //
+    //   an OP does not. `ops.apply` re-plans so that nothing READS a missing
+    //   commute before the month turns - but firing at the op moves WHEN a job
+    //   is lost out of the tick and into the click, and then an UNDO cannot
+    //   give it back. Measured: one bulldozer press and Backspace took a town
+    //   from 136 employed to 0 and left it there, where the same pair had been
+    //   a hash-identical no-op. So the op leaves the animal STALE and the next
+    //   tick decides, which is where the decision always lived.
+    if (release) { c.stale = false; releaseJob(world, c); } else c.stale = true;
   }
 }
 
