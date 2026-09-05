@@ -20,6 +20,11 @@ could ship whole.
   Verified: 658 checks pass; hostile review 9/10 (320 independent coverage cases).
   Existing checked baselines are unchanged; cities near Large Parks now receive
   the intended +10 park mood benefit and can develop differently over time.
+- [ ] **Rail bridges over water:** rail placement currently rejects water. Add
+  rail bridge placement and distinct bridge artwork, with connected routes for
+  commuters and freight. Define bridge cost/upkeep and placement constraints;
+  verify shore connections, both orientations, demolition/undo, save/load and
+  pathfinding. Keep stations and road/rail level crossings off water spans.
 - [ ] **Flock cameras on the remote:** restore/expose the flock camera controls
   in the remote-control UI. Check existing camera functionality and bindings,
   and verify that the controls remain accessible at narrow window sizes.
