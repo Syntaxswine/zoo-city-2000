@@ -50,11 +50,13 @@ export function createInput(canvas, app) {
     if (changed && state.tool !== "inspect") refreshCost();
   }
   function clearPins() {
+    app.stopFollowing?.();
     state.pinned = null;
     state.pinnedCitizen = null;
     syncThoughts();
   }
   function setTool(id) {
+    if (id !== "inspect") app.stopFollowing?.();
     if (id !== "use" && !TOOL_BY_ID[id]) throw new Error(`input: unknown tool '${id}'`);
     state.tool = id;
     state.drag = null;
@@ -211,6 +213,7 @@ export function createInput(canvas, app) {
     const [sx, sy] = screenXY(e);
     state.mouse = { x: sx, y: sy, inside: true };
     if (state.pan) {
+      app.stopFollowing?.();
       const z = app.camera.zoom;
       app.camera.x = state.pan.cx - (sx - state.pan.sx) / z;
       app.camera.y = state.pan.cy - (sy - state.pan.sy) / z;
@@ -241,6 +244,7 @@ export function createInput(canvas, app) {
       const p = state.pan;
       state.pan = null;
       if (!p.moved && p.pinTile) {
+        app.stopFollowing?.();
         // Inspect click: pin (or unpin) the card.
         if (p.pinWalker?.citizen != null && pinTarget(world(), app.walkers.list(), p.pinWalker.citizen)) {
           state.pinnedCitizen = p.pinWalker.citizen;
@@ -396,6 +400,7 @@ export function createInput(canvas, app) {
       if (v) { dx += v[0]; dy += v[1]; }
     }
     if (dx || dy) {
+      app.stopFollowing?.();
       const s = (PAN_SPEED * dt) / app.camera.zoom;
       app.camera.x += dx * s;
       app.camera.y += dy * s;
@@ -462,6 +467,7 @@ export function createInput(canvas, app) {
     previewTool,
     toggleDensity() { command("H", { preventDefault() {} }); },
     pinCitizen(id) {
+      if (app.following !== Number(id)) app.stopFollowing?.();
       const target = pinTarget(world(), app.walkers.list(), id);
       if (!target) return false;
       state.pinnedCitizen = Number(id);

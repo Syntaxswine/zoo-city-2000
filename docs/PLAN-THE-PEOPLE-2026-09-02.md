@@ -50,6 +50,12 @@ zoos."* and *"the other way to think about it is that all sides have
 access points"* → R4 is ONE predicate, `served`, doors on every side, and
 a table of every rule that asks for a road (§4-R).
 
+**Closure, 2026-09-05:** core integration and C/E stretches are shipped. Favourites,
+camera follow, saved age, ivy and roof repairs are detailed in
+[the finishing handoff](HANDOFF-PEOPLE-EXTRAS-2026-09-05.md). Only the owner's
+control-city export and its measurements remain pending for this plan. The original
+proposal below is retained; shipping notes supersede its proposed keys/storage.
+
 This began as a plan; sections marked SHIPPED are now built and verified.
 Each remaining part is sized for one agent-session,
 owns its own files, and codes against contracts written down in §3 so the
@@ -469,7 +475,7 @@ compaction first as its own commit.
 **SHIPPED 2026-09-03.** The stable-id pin, pure walking/home/away/gone
 resolver, portrait/want/remedy/life/friend card, linked household roster and
 permanent gone-person epitaph are live. Canvas thought bubbles remain pop-outs
-beside walkers. The optional follow/star stretch remains open. The canonical
+beside walkers. The follow/star stretch is now shipped; see the finishing handoff. The canonical
 suite has 391 checks after the level-crossing merge; the archive measurements
 are recorded under Part B.
 
@@ -496,10 +502,10 @@ favourites are the stretch half, not the core.
   a link that pins that friend) · doing.
 - The house card lists its households with each member a link (pin), and
   the household's top need (A).
-- **Stretch, only after the card is done:** `F` follows the pinned citizen
+- **Shipped stretch:** the Follow button follows the pinned citizen
   (camera lerps to `pinTarget`, 4 tiles/s, released by any drag);
   `walkers.attend(id)` samples it first when its path crosses the
-  viewport; `S` stars it into `zoo.pref.stars[city]` (browser-only, like
+  viewport; the Star button stars it into `zoo.pref.stars[city]` (browser-only, like
   read marks), and a **People** section at the top of the Census tab
   (not a fifth tab — `#tools` must not unwrap, handoff §11) lists starred
   citizens with find · follow. Starred citizens' `world.lifeEvents` become
@@ -609,7 +615,7 @@ one session with the art workflow.
 **E core SHIPPED 2026-09-05:** four plans per original family, occupancy
 lighting and all fourteen species marks across the original lots, shop pool,
 blocks and landmarks. Inspect names the mark and current residents/staff.
-SPEC §12.2e; handoff §25. Wear remains the optional stretch below.
+SPEC §12.2e; handoff §25. Wear is now shipped; see the finishing handoff.
 
 **Earlier work (2026-09-03, session 9):** the owner redirected E's first act to
 the BUILDING REDUX — *"some of commercial, industrial, residential, and
@@ -652,8 +658,8 @@ there. The house becomes part of the citizen.
   spike · skunk a warning stripe on the kerb. C/I/M marks go on the roof
   socket (the shop's majority STAFF). The card says *a warren door — the
   Burrowes live here*.
-- **Wear (stretch).** `world.since[i]` Uint16 (the tick the tier last
-  rose; saved, +8 KB): ivy stamp after 15 years, a patched roof after 25.
+- **Wear (shipped).** `world.since[i]` Uint32 (construction/expansion tick
+  plus one; saved, +16 KB raw on a 64×64 map): ivy stamp after 15 years, a patched roof after 25.
   Only if the four variants and the marks are in.
 
 **Owns.** `js/art/buildings.js`, `art.mark` in `index.js`, the building
@@ -700,8 +706,8 @@ month's removals and name the current oldest resident and largest household.
 The fifth People chip links through one tested pin-and-centre action to C's
 living card or permanent epitaph. Existing named operational rows keep their
 own `links` ids and are clickable too; only editorial `who` rows enter the
-People chip, preserving its measured budget. C's optional browser-only star/follow
-stretch remains deliberately unshipped, so the “starred family's first job”
+People chip, preserving its measured budget. C's browser-only star/follow stretch is now shipped with direct biography-bus
+toasts. The earlier “starred family's first job”
 variant is deferred: letting sim news read `zoo.pref` would violate §0.4.
 
 Four 30-year `newsprobe` towns measured people shares of 6.0%, 6.4%, 15.4%
@@ -1350,9 +1356,9 @@ in the commit. Half a session, no keel.
 
 **CORE CLOSED 2026-09-05.** [Evidence, combined probes, recording and symptom
 traps](HANDOFF-PEOPLE-INTEGRATION-2026-09-05.md). The owner's control-city fixture
-has not arrived; its regression and probe numbers remain deferred. C's favourite
-and automatic browser camera-follow, and E's building-age decoration, remain
-stretch. The recording selects a stable citizen ID and is a monthly time-lapse.
+has not arrived; its regression and probe numbers remain deferred. C favourites,
+automatic browser camera-follow and E building-age decoration subsequently shipped
+in the finishing handoff. The recording selects a stable citizen ID and is a monthly time-lapse.
 
 One agent, after A–F, H, P, S, X and R are on `main`:
 - **The control city** (the owner: *"i will build one for you soon"*):

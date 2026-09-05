@@ -16,15 +16,15 @@ landmarks. Inspect names the current residents' or staff's mark; empty lots
 have none. The shop-kind mapping and all simulation/save rules are unchanged.
 SPEC §12.2e; handoff §25; before/after frames and contact sheets in docs/shots.
 
-Remaining E stretch: saved building age, ivy after 15 years and roof patches
-after 25. This pass deliberately adds no age array or save migration.
+E stretch shipped: saved construction/expansion dates, ivy after 15 years and
+roof patches after 25. [People finishing work](docs/HANDOFF-PEOPLE-EXTRAS-2026-09-05.md).
 
 ## The People — core integrated 2026-09-05
 
 K, A–F core, H, P, S, X/X2 and R are integrated. G adds exported-city probes,
 citizen recording and regression closure. [Results and traps](docs/HANDOFF-PEOPLE-INTEGRATION-2026-09-05.md).
-Still open: the owner's control-city export and its measurements; C favourites
-and automatic browser camera-follow; E saved building age, ivy and roof patches.
+C favourites/follow and E age decoration are now shipped. [People finishing work](docs/HANDOFF-PEOPLE-EXTRAS-2026-09-05.md).
+Still open for this plan: the owner's control-city export and its measurements.
 The historical planning discussion below is retained as design context.
 
 **Part F SHIPPED 2026-09-03:** the paper now selects permanent-id people
@@ -118,8 +118,7 @@ deaths a year, SOLD as ruled; outflow = carnivores eat; measured first:
 11 halls made §38.9k of cut with 4 killings and 2 sold in 30 y — meat is
 not a quantity today) · **B** lives (a 12-entry ring per living citizen + a
 permanent shorthand record after removal; save compaction pays for it) ·
-**C** Inspect extended (SHIPPED: the pin is a CITIZEN; follow/star remains a
-stretch) · **D** looks and faces (4 looks per
+**C** Inspect extended (SHIPPED: the pin is a CITIZEN; follow/star now shipped) · **D** looks and faces (4 looks per
 species, portraits, an idle pose) · **E** buildings with character (4
 plans per family, windows lit by fill, a species mark on the socket) ·
 **F** the story channel (obituaries, litters, a people chip, clickable

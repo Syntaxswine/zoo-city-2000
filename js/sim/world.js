@@ -42,6 +42,7 @@ export function createWorld({ seed = "zoo", w = 64, h = 64 } = {}) {
     zone: new Uint8Array(n),
     maxTier: new Uint8Array(n).fill(3),
     tier: new Uint8Array(n),
+    since: new Uint32Array(n), // cosmetic building history: last expansion tick + 1; zero when empty
     civic: new Uint8Array(n),
     civicSize: new Uint8Array(n), // anchor side, or 128 | dx | dy << 2 on a civic part; zero preserves legacy sizes
     burning: new Uint8Array(n),

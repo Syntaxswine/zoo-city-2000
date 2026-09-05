@@ -1181,6 +1181,22 @@ permanent civic-record card rather than disappearing.
 
 ---
 
+### Favourites and camera follow
+
+Citizen cards and Census → People provide Star and Follow buttons. Favourites
+persist in `zoo.pref.stars`, keyed by city name and seed; they are excluded from
+city exports and simulation identity. Archived or unavailable IDs remain removable,
+including when loading an earlier checkpoint. Recorded `world.lifeEvents` for
+starred citizens produce personal UI toasts, without creating news rows. This does
+not promise notifications for every death: only events on that biography bus.
+
+Follow uses the real walker when visible and its stable citizen location otherwise.
+The display sampler attends that citizen first. Camera motion normally approaches
+at four tiles/second, with catch-up keeping fast rail targets within three tiles
+before map-edge clamping. Pause/modal freezes camera movement. Drag, pan, map
+selection, a build tool, death/departure or world replacement cancels following;
+explicit Stop retains the pinned card. Existing F (fire) and WASD keys are unchanged.
+
 ## 11b. The news (`js/news.js`; the News tab and the strip button in `ui.js`)
 
 The owner: *"i'd like a news button, something where you can read the updates
@@ -1424,8 +1440,16 @@ and bounds, monotone glass pixels, cache identity, vacancy and resident/staff
 descriptions, and thirty-year display-on/off simulation equality. The sheets
 are `sheet-buildings.png`, `sheet-marks.png`, `sheet-building-lights.png`;
 `people-e-before.png` / `people-e-after.png` show the same seed-7 June 2020.
-Age-based ivy and patched roofs remain optional future work: no `since`
-array or save migration ships in E.
+Building age now uses saved Uint32 `world.since`: construction/expansion tick
+plus one; zero means empty or unknown. A tier increase or changed block footprint
+resets the date; ordinary tier decline preserves it. Demolition clears it and undo
+restores it. Old exports and invalid dates start observation at the load tick,
+without invented history. The array participates in the canonical saved-state hash.
+After 180 months ivy recolours solid facade cells; after 300 months roof patches
+appear on elevated roof faces (above eight world-height units). Ground lawns,
+paths and low platforms retain their colours; neither stage changes geometry,
+glazing, species stamps or simulation rules. Inspect shows years since construction
+or expansion. `node tools/wear-sheet.mjs` regenerates the three-stage sheet.
 
 ### 12.2f Civic campuses and artwork
 

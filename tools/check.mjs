@@ -3949,8 +3949,8 @@ check("no Math.random under js/", mathRandom.length === 0, mathRandom.join(", ")
   check("lives: compact save round-trips without changing canonical state",
     stateHash(migrated) === stateHash(load(compactJson)));
   for (let t = 0; t < 10 * 12; t++) tick(migrated);
-  check("lives: v1 plain fixture continues ten years at its physical-camping migration baseline",
-    stateHashNoNews(migrated) === "98d2a6a8", `${stateHashNoNews(migrated)} without news · ${stateHash(migrated)} with news`);
+  check("lives: v1 plain fixture continues ten years with saved building-age history",
+    stateHashNoNews(migrated) === "5bbfb789", `${stateHashNoNews(migrated)} without news · ${stateHash(migrated)} with news`);
 }
 
 // ---- Part B'': lives, graveyard, memorial, and the call-site mutation run ---
@@ -6814,6 +6814,7 @@ if (existsSync(walkersPath)) {
 
 { const { checkIntegration } = await import("./check-integration.mjs"); checkIntegration(check); }
 { const { checkIntegrationTools } = await import("./check-integration-tools.mjs"); checkIntegrationTools(check); }
+{ const { checkPeopleStretch } = await import("./check-people-stretch.mjs"); checkPeopleStretch(check); }
 if (existsSync(path.join(ROOT,"docs/fixtures/control-city.json"))) {
   try { const { verifyControlCity } = await import("./control-city.mjs"); verifyControlCity(path.join(ROOT,"docs/fixtures/control-city.json")); check("integration: owner control city twelve-month baseline",true); }
   catch(e) { check("integration: owner control city twelve-month baseline",false,e.message); }

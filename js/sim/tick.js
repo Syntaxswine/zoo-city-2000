@@ -14,6 +14,7 @@ import { storyTick } from "./story.js";
 import { beginMeatMonth, penMaturityTick, meatTick, meatCensus, resetMeatRoutes } from "./meat.js";
 import { SPECIES } from "./species.js";
 import { ZONE } from "./world.js";
+import { buildingSnapshot, syncBuildingAge } from "./building-age.js";
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
@@ -23,6 +24,7 @@ export function dateOf(world, tick = world.tick) {
 
 /** Advance one month. Returns { notices, events } for the ticker. */
 export function tick(world) {
+  const buildingsBefore=buildingSnapshot(world);
   const notices = [];
   world.departures = [];
   world.arrivals = [];
@@ -156,6 +158,7 @@ export function tick(world) {
   // measured at 53 pathless workers and `9324161b` against `9e3e5077`). One
   // pass over a list of clean citizens is what that insurance costs.
   replanStale(world);
+  syncBuildingAge(world,buildingsBefore);
   world.tick++;
   world.last.needs = needCensus(world); // cards and walkers now read this same tick
   return { notices, events: evNotices };

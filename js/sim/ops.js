@@ -7,6 +7,7 @@
 // a lump posted under its own ledger key, logged, replayed, never undone.
 
 import { campAt } from "./camps.js";
+import { buildingSnapshot, syncBuildingAge } from "./building-age.js";
 import { KNOBS } from "./rules.js";
 import { TERRAIN, ROAD, ZONE, CIVIC, idx, inBounds, anchorOf, footprintOf, civicAnchorOf, civicTiles } from "./world.js";
 import { post, canSpend, exitReceivership } from "./budget.js";
@@ -332,13 +333,19 @@ export function costOf(world, op) {
 function snapshot(world, tiles) {
   return tiles.map(({ i }) => ({
     i,
+    since: world.since[i],
     terrain: world.terrain[i], road: world.road[i], zone: world.zone[i], maxTier: world.maxTier[i],
     tier: world.tier[i], civic: world.civic[i], civicSize: world.civicSize[i], rubble: world.rubble[i], wall: world.wall[i], use: world.use[i], rail: world.rail[i], big: world.big[i], theme: world.theme[i],
   }));
 }
 
 /** Apply an op. Returns { ok, cost, reason }. */
-export function apply(world, op, { log = true } = {}) {
+export function apply(world,op,options) {
+  const before=buildingSnapshot(world),result=applyOperation(world,op,options);
+  if(result.ok)syncBuildingAge(world,before);
+  return result;
+}
+function applyOperation(world, op, { log = true } = {}) {
   // Non-tile ops first.
   if (op.kind === "rate") {
     const v = Math.max(0, Math.min(20, Math.round(op.value)));
@@ -512,6 +519,7 @@ export function undo(world) {
   if (u.snap.some(s => campAt(world, s.i))) return {ok:false, reason:"someone is camping here — cannot restore construction"};
   for (const s of u.snap) {
     if (world.tier[s.i] > 0 && s.tier === 0) continue; // something grew here since; leave it
+    world.since[s.i] = s.since || 0;
     world.terrain[s.i] = s.terrain; world.road[s.i] = s.road; world.zone[s.i] = s.zone; world.maxTier[s.i] = s.maxTier;
     world.tier[s.i] = s.tier; world.civic[s.i] = s.civic; world.civicSize[s.i] = s.civicSize; world.rubble[s.i] = s.rubble; world.wall[s.i] = s.wall; world.use[s.i] = s.use; world.rail[s.i] = s.rail; world.big[s.i] = s.big; world.theme[s.i] = s.theme;
   }

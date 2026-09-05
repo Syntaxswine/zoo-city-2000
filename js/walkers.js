@@ -57,6 +57,7 @@ export function createWalkers(initialWorld) {
   let pending = []; // predations not yet on the map (the killer's other walker is released first); each carries `until`, a tick
   let needCursor = null; // [tx, ty] only while Inspect is active
   let pinnedNeed = null; // a pinned citizen's walker is kept in the eight
+  let attended = null;
   let needSig = "";
 
   // ---- BFS scratch, local to this module -----------------------------------
@@ -565,6 +566,20 @@ export function createWalkers(initialWorld) {
   }
 
   function sample(vp) {
+    // The followed person's real path gets first choice of a visual slot.
+    const chosen = attended == null ? null : world.byId.get(attended);
+    const winterNow = world.events.active.some(e => e.id === "bearWinter");
+    if (chosen && !chosen.dead && chosen.home >= 0 && !absent(world,chosen) && !chosen.onLeave && !(winterNow && chosen.species === "bear") && !activeIds.has(chosen.id) &&
+        (inView(chosen.home,vp) || chosen.path?.some(i=>inView(i & 0x7fff,vp)))) {
+      if (active.length >= MAX_WALKERS) {
+        const spare=active.findIndex(w=>["stroller","cub","commuter"].includes(w.kind)&&w.citizen!==attended);
+        if(spare>=0)remove(spare);
+      }
+      if(active.length<MAX_WALKERS) {
+        if(chosen.path?.length>=2&&!chosen.stale)spawnCommuter(chosen);
+        else spawnStroll(chosen,ageYears(world,chosen)<ADULT?"cub":"stroller");
+      }
+    }
     const cs = world.citizens;
     if (!cs.length || active.length >= MAX_WALKERS) return;
     const winter = world.events.active.some((e) => e.id === "bearWinter");
@@ -737,6 +752,7 @@ export function createWalkers(initialWorld) {
   }
 
   function setWorld(nw) {
+    attended = null;
     world = nw;
     active = [];
     activeIds.clear();
@@ -749,5 +765,5 @@ export function createWalkers(initialWorld) {
     resize();
   }
 
-  return { update, list, notify, setCursor, setWorld, get count() { return active.length; } };
+  return { update, list, notify, setCursor, setWorld, attend(id) { attended=Number.isInteger(id)&&id>=0?id:null; }, get count() { return active.length; } };
 }

@@ -36,6 +36,8 @@ import { needOf } from "./sim/needs.js";
 import { ACT, line as needLine } from "./sim/voice.js";
 import { lifeLines, memorial } from "./sim/life.js";
 import { legacyOf } from "./sim/legacy.js";
+import { starredNotices } from "./people.js";
+import { buildingAge } from "./sim/building-age.js";
 import { paintPortrait } from "./render.js";
 import { USE, USE_OPTIONS, USE_SPECIES, useName, useShortLabel } from "./sim/use.js";
 
@@ -250,14 +252,14 @@ export function createUI(app) {
   function flash(msg) { flashQ = []; show(msg, FLASH_ONE); }
 
   /** A month's headlines, in order. Before this they overwrote each other. */
-  function flashRun(list) {
+  function flashRun(list, overflow = "R opens the news") {
     if (!list.length) return;
     if (list.length === 1) { flash(list[0]); return; }
     const head = list.slice(0, FLASH_MAX);
     const rest = list.length - head.length;
     flashQ = [];
     for (let i = 1; i < head.length; i++) flashQ.push([`${head[i]}  (${i + 1}/${list.length})`, FLASH_RUN]);
-    if (rest) flashQ.push([`+${rest} more this month — R opens the news`, FLASH_RUN]);
+    if (rest) flashQ.push([`+${rest} more this month — ${overflow}`, FLASH_RUN]);
     show(`${head[0]}  (1/${list.length})`, FLASH_RUN);
   }
 
@@ -437,6 +439,10 @@ export function createUI(app) {
       // A shop of the pool (SPEC §12.2d): its kind by the tile, its keepers by whoever works there now.
       if (rep.shop) lines.push(el("div", "dim", `${rep.shop.title}${rep.shop.keeper ? ` (${rep.shop.keeper})` : ""} — ${rep.shop.blurb}`));
       if (rep.mark) lines.push(el("div", "dim", rep.mark.line));
+      if(t && w.since?.[rep.ty*w.w+rep.tx]) {
+        const age=buildingAge(w,rep.ty*w.w+rep.tx);
+        lines.push(el("div","dim",`${Math.floor(age/12)} years since construction or expansion${age>=300?" · ivy and patched roof":age>=180?" · ivy":""}`));
+      }
       // A landmark (SPEC §3c): the block the species made, named when it rose and kept until it comes apart.
       if (rep.landmark) lines.push(el("div", "dim", `a landmark — the block the ${rep.landmark.species.map(pluralSpecies).join(" and ")} made: ${rep.landmark.blurb}`));
     }
@@ -676,7 +682,19 @@ export function createUI(app) {
       const distinctions = [[kept.native, "native"], [kept.fixed, "fixed"], [kept.centenary, "centenarian"], [kept.recorded, "recorded offence"], [kept.wrongful, "wrongfully arrested"], [kept.exonerated, "exonerated"]].filter(([yes]) => yes).map(([, text]) => text);
       if (distinctions.length) lines.push(el("div", "dim", `distinctions: ${distinctions.join(" · ")}`));
     }
+    if ((c || kept) && app.starIds) lines.push(personActions(id,!!c));
     return lines;
+  }
+
+  function personActions(id,living=true) {
+    const row=el("div","btnrow"),star=el("button","",app.starIds().includes(id)?"★ Starred":"☆ Star");
+    star.setAttribute("aria-pressed",String(app.starIds().includes(id)));
+    star.addEventListener("click",()=>{app.toggleStar(id);updateHover(app.input.hoverInfo());});row.append(star);
+    if(living){
+      const following=app.following===id,button=el("button","",following?"Stop following":"Follow");
+      button.addEventListener("click",()=>{if(following)app.stopFollowing();else app.followCitizen(id);updateHover(app.input.hoverInfo());});row.append(button);
+    }
+    return row;
   }
 
   function cardForWalker(wk) {
@@ -791,6 +809,17 @@ export function createUI(app) {
   }
 
   function renderCensus(body, w) {
+    if(app.starIds){
+      body.append(el("h3","","People"));
+      const ids=app.starIds();
+      if(!ids.length)body.append(el("p","dim","Star a citizen from their Inspect card to keep them here."));
+      for(const id of ids){
+        const c=w.byId.get(id),kept=c?null:legacyOf(w,id),row=el("div","household");
+        row.append(el("b","",c?`${c.name} ${c.surname}`:kept?.name||`Citizen ${id} — not in this save`));
+        const find=el("button","","Find");find.disabled=!c&&!kept;
+        find.addEventListener("click",()=>app.pinCitizen(id));row.append(find,personActions(id,!!c));body.append(row);
+      }
+    }
     const fig = w.last;
     const c = fig && fig.census;
     if (!c) { body.append(el("p", "note", "The first census is taken at the end of the first month.")); return; }
@@ -901,7 +930,8 @@ export function createUI(app) {
     // Not one flash per notice clobbering the last: the whole month's run, in
     // order. Nothing is dropped either way — every line is already in the
     // city's own event log, which is what the News tab and the reader read.
-    flashRun(notices.filter((n) => TICKER_FLASH.test(n)));
+    const personal=starredNotices(world(),app.starIds?.()||[]);
+    flashRun([...personal, ...notices.filter((n) => TICKER_FLASH.test(n))],personal.length?"Inspect starred lives; R opens city news":"R opens the news");
     refresh();
   }
 

@@ -15,7 +15,7 @@ import { refreshLast } from "./tick.js";
 import { migrateLegacyNames } from "./legacy.js";
 import { normalizeUse } from "./use.js";
 
-const TILE_ARRAYS = ["terrain", "road", "zone", "maxTier", "tier", "civic", "civicSize", "burning", "rubble", "variant", "flooded", "wall", "use", "rail", "meat", "big", "theme"];
+const TILE_ARRAYS = ["terrain", "road", "zone", "maxTier", "tier", "civic", "civicSize", "burning", "rubble", "variant", "flooded", "wall", "use", "rail", "meat", "big", "theme", "since"];
 
 // This expanded shape is the pre-Part-B save shape. stateHash deliberately
 // keeps using it: storage compaction must not redefine simulation identity.
@@ -94,6 +94,12 @@ export function fromPlain(o) {
   world.valves = { ...world.valves, ...o.valves }; // an old save without M keeps the default 0
   world.festivalBonus = o.festivalBonus;
   for (const k of TILE_ARRAYS) if (o[k] && k !== "use") world[k].set(o[k]); // an old save without walls keeps its zeros
+  // Old exports have no construction dates: begin observation now, never
+  // invent decades of wear. Reject future/wrapped dates before typed coercion.
+  for(let i=0;i<world.since.length;i++) {
+    const n=o.since?.[i];
+    world.since[i]=world.tier[i] ? (Number.isInteger(n)&&n>=0&&n<=world.tick+1?n:world.tick+1) : 0;
+  }
   // Validate BEFORE Uint16 assignment: typed-array coercion would otherwise
   // turn an impossible imported 70000 into the plausible mask 4464.
   if (o.use) for (let i = 0; i < world.use.length && i < o.use.length; i++) world.use[i] = normalizeUse(o.use[i]);

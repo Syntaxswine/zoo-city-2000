@@ -62,6 +62,15 @@ arrows only pan. `Backspace` or `Ctrl+Z` undoes; `Ctrl+S` opens save-as and
 `L` opens the saves list. The generated help line in the game carries the
 remaining pause, speed, overlay, news, zoom, new-city and menu keys.
 
+Inspect a citizen and use **Star** to keep them in Census → People, or **Follow**
+to track their walks and train rides. Stars persist in this browser for that city;
+dragging, panning or selecting a build tool stops following. Personal life-event
+toasts accompany starred citizens' recorded chapters.
+
+Zoned buildings acquire ivy after 15 years and roof repairs after 25 years since
+construction or expansion. Inspect shows the age; old exports begin tracking it
+when first loaded. [People finishing work](docs/HANDOFF-PEOPLE-EXTRAS-2026-09-05.md).
+
 ## The rules are the game
 
 Every equation the sim runs is printed live in the **Rules** tab with the

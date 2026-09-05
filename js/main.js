@@ -31,6 +31,7 @@ import { createPalette } from "./palette.js";
 import { createTitle } from "./title.js";
 import { createNews } from "./news.js";
 import { pinAndCentre } from "./person-link.js";
+import { installPeople } from "./people.js";
 import { KNOBS } from "./sim/rules.js";
 import { listSlots, listAllSlots, writeSlot, readSlot, deleteSlot, bytesUsed, migrate } from "./slots.js";
 
@@ -81,6 +82,7 @@ app.prefs = {
   get() { try { return JSON.parse(store.get(PREF) || "{}") || {}; } catch { return {}; } },
   set(patch) { const p = { ...app.prefs.get(), ...patch }; store.set(PREF, JSON.stringify(p)); return p; },
 };
+installPeople(app);
 app.cheat = () => {
   if (!app.prefs.get().cheat) { app.ui.flash("Cheats are off — Options (Esc) turns them on."); return { ok: false }; }
   const res = app.doOp({ kind: "cheat", amount: KNOBS.CHEAT_CASH });
@@ -101,6 +103,7 @@ app.pinCitizen = (id) => {
 };
 
 function adopt(world, name, { paused = false } = {}) {
+  app.stopFollowing();
   app.world = world;
   app.cityName = name;
   app.entered = true;
@@ -335,6 +338,9 @@ function frameBody(now) {
   if (!app.title.isOpen()) { // the painting covers the map; nothing to draw under it
     const wdt = app.paused ? 0 : dt * Math.min(app.speed, 3);
     app.walkers.update(wdt, app.renderer.viewportTiles());
+    app.updateFollowing(!app.paused && !app.ui.modalOpen() ? dt : 0);
+    clampCamera();
+    app.input.syncCamera();
     app.renderer.draw(app.camera, app.input.hover(), app.walkers, app.overlays, dt);
     if (now - hoverAt > 90) { hoverAt = now; app.ui.updateHover(app.input.hoverInfo()); }
   }

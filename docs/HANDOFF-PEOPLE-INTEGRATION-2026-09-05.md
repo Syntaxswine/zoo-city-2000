@@ -3,8 +3,10 @@
 Core integration is complete. The owner's `docs/fixtures/control-city.json`
 has not arrived: its regression and measurements remain deferred, explicitly.
 The legacy fixture and scripted towns below are not substitutes for that city.
-Browser favourites and automatic camera-follow remain C stretch; saved building
-age, ivy and roof patches remain E stretch. These are not silently marked shipped.
+**Subsequently completed:** browser favourites/follow and saved building age,
+ivy and roof repairs shipped in [the finishing handoff](HANDOFF-PEOPLE-EXTRAS-2026-09-05.md).
+The measurements below describe the historical G revision; the new age array
+changes full saved-state hashes without changing the underlying simulation.
 
 ## Changes and regression fixes
 

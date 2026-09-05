@@ -59,26 +59,34 @@ export function socketsFor(boxes) {
 
 export const lightLevel = (fill) => Math.max(0, Math.min(3, Math.floor(4 * fill)));
 const CACHE = new WeakMap();
-export function characterSprite(base, { lit = 0, majority = 0, seed = 0 } = {}) {
+export function characterSprite(base, { lit = 0, majority = 0, seed = 0, wear = 0 } = {}) {
   const source = RECIPES.get(base);
   if (!source?.boxes) return base;
   lit = Math.max(0, Math.min(3, lit | 0));
+  wear = Math.max(0,Math.min(2,wear|0));
   const species = SPECIES[majority - 1]?.id;
   const phase = ((Math.imul(seed | 0, 0x45d9f3b) >>> 8) & 3);
-  if (!lit && !species) return base;
-  const key = `${lit}:${species || "none"}:${phase}`;
+  if (!lit && !species && !wear) return base;
+  const key = `${lit}:${species || "none"}:${phase}:${wear}`;
   let cache = CACHE.get(base);
   if (!cache) CACHE.set(base, cache = new Map());
   if (cache.has(key)) return cache.get(key);
   const boxes = source.boxes.map(b => ({ ...b, faces: Object.fromEntries(Object.entries(b.faces).map(([face, fn]) => {
     // Explicit glass keys supplied by a skin; structural blue awnings have no
     // glazing metadata. The pattern uses world cells, so 1× and 2× agree.
-    if (!b.faces.glazing || !["top", "side", "end"].includes(face) || typeof fn !== "function") return [face, fn];
+    if (!["top", "side", "end"].includes(face) || typeof fn !== "function") return [face, fn];
     return [face, (u, k, x, y) => {
       const ink = fn(u, k, x, y);
+      // Recolour only existing solid surface cells: wear never grows outside
+      // the footprint or paints over glass or species stamps.
+      // Low platforms, lawns, paths and furniture are not building roofs.
+      if(wear && ink && ink!=="." && !["=","H","-","+"].includes(ink)) {
+        if(face!=="top" && k<Math.min(12,b.c1-b.c0-1) && ((Math.floor(u)+phase)%13===2 || (Math.floor(u)+phase)%13===3 && Math.floor(k)%3!==0)) return Math.floor(k)%3===0?"c":"e";
+        if(wear===2 && face==="top" && b.c1>8 && Math.floor(u)%11>=3 && Math.floor(u)%11<=6 && Math.floor(k)%9>=2 && Math.floor(k)%9<=4)return (Math.floor(u)+Math.floor(k))%3===0?"&":"*";
+      }
       const cell = (Math.floor(u / 2) * 3 + Math.floor(k / 3) + phase) & 3;
       const glass = typeof b.faces.glazing === "function" ? b.faces.glazing(face, u, k) : true;
-      return glass && (ink === "=" || ink === "H") && cell < lit ? "-" : ink;
+      return b.faces.glazing && glass && (ink === "=" || ink === "H") && cell < lit ? "-" : ink;
     }];
   })) }));
   const sockets = source.sockets || socketsFor(source.boxes);

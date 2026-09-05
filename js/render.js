@@ -32,6 +32,7 @@
 // the buildings. S below is that factor: 1 at zoom 1, 2 at zoom 2.
 
 import { lightLevel } from "./art/building-character.js";
+import { buildingAge, wearLevel } from "./sim/building-age.js";
 import { toScreen, toWorld, pickTile, HALF_H, HALF_W, TILE_W, TILE_H } from "./iso/iso.js";
 import { paintScene, Z_BUILDING } from "./iso/painter.js";
 import { rasterize } from "./art/format.js";
@@ -511,7 +512,7 @@ export function createRenderer(canvas, initialWorld, art) {
           if (!isPart(world, i)) {
             const fill = (world.zone[i] === ZONE.R ? world.occupants[i] : world.staff[i]) / (capacityOf(world, i) || 1);
             standing = art.building(world.zone[i], world.tier[i], world.variant[i], sideOf(world, i), world.theme[i],
-              { lit: lightLevel(fill), majority: world.majority[i], seed: i });
+              { lit: lightLevel(fill), majority: world.majority[i], seed: i, wear: wearLevel(buildingAge(world,i)) });
           }
         } else if (world.civic[i] === CIVIC.PARK) standing = art.civic("park", civicSideOf(world, i));
         else if (world.civic[i] === CIVIC.LARGE_PARK) standing = art.civic("largePark", civicSideOf(world, i));
