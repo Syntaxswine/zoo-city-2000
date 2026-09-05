@@ -111,7 +111,8 @@ function scratch(world) {
  * Every tile within reach R of `i` — the source first, at d = 0 — as
  * fn(j, d). With no walls in the city this is the Chebyshev square; with
  * walls it is the flood, which agrees with the square wherever no wall
- * intervenes.
+ * intervenes. For a thing that stands on MORE than one tile — a 3×3 campus —
+ * use forEachWithinAll, or the halo hangs off one corner of the building.
  */
 export function forEachWithin(world, i, R, fn) {
   if (world.wallsDirty) computeOcclusion(world);
@@ -131,16 +132,85 @@ export function forEachWithin(world, i, R, fn) {
     return;
   }
   scratch(world);
+  const gen = ++world._reachGen;
+  world._reachStamp[i] = gen;
+  world._reachDist[i] = 0;
+  world._reachQueue[0] = i;
+  flood(world, gen, 1, R, fn);
+}
+
+/**
+ * Every tile within reach R of ANY tile of a FOOTPRINT — a 2×2 or 3×3 campus,
+ * a block — as fn(j, d), each tile ONCE, d the distance to the NEAREST
+ * footprint tile (0 on the footprint itself). With one tile this IS
+ * forEachWithin. On open ground d is the Chebyshev distance to the footprint,
+ * so a 3×3 at radius R reaches a (3 + 2R)² square centred on the building;
+ * with walls it is the same flood seeded from every footprint tile at once,
+ * which is the union of the single-tile floods with the smaller distance
+ * winning — check.mjs proves both against the definitions.
+ *
+ * WHY THIS EXISTS: until session 17 every 3×3 campus flooded from its ANCHOR
+ * (the top-left tile) alone, because a campus's other eight tiles are
+ * CIVIC.PART and no halo rule looked through them. A police station's cover
+ * was a 13×13 square hung off one corner — six tiles of reach to the
+ * north-west, four to the south-east (tools/haloprobe.mjs measured it: 169
+ * covered tiles where the footprint gives 225). The knowledge-and-culture
+ * proposal's coverage rule ("seeded from every footprint tile at distance
+ * zero") is the right convention, so it is built once, here, for everyone.
+ */
+export function forEachWithinAll(world, tiles, R, fn) {
+  if (tiles.length === 1) { forEachWithin(world, tiles[0], R, fn); return; }
+  if (world.wallsDirty) computeOcclusion(world);
+  const { w, h } = world;
+  if (!world.wallCount) {
+    // The footprint's bounding box grown by R; each tile at its distance to the nearest footprint tile.
+    let x0 = w, x1 = -1, y0 = h, y1 = -1;
+    for (const i of tiles) {
+      const tx = i % w;
+      const ty = (i / w) | 0;
+      if (tx < x0) x0 = tx;
+      if (tx > x1) x1 = tx;
+      if (ty < y0) y0 = ty;
+      if (ty > y1) y1 = ty;
+    }
+    const ya = Math.max(0, y0 - R), yb = Math.min(h - 1, y1 + R);
+    const xa = Math.max(0, x0 - R), xb = Math.min(w - 1, x1 + R);
+    for (let yy = ya; yy <= yb; yy++) {
+      for (let xx = xa; xx <= xb; xx++) {
+        let d = R + 1;
+        for (const i of tiles) {
+          const dd = Math.max(Math.abs(xx - (i % w)), Math.abs(yy - ((i / w) | 0)));
+          if (dd < d) d = dd;
+        }
+        if (d <= R) fn(yy * w + xx, d);
+      }
+    }
+    return;
+  }
+  scratch(world);
+  const gen = ++world._reachGen;
+  let tail = 0;
+  for (const i of tiles) {
+    if (world._reachStamp[i] === gen) continue;
+    world._reachStamp[i] = gen;
+    world._reachDist[i] = 0;
+    world._reachQueue[tail++] = i;
+  }
+  flood(world, gen, tail, R, fn);
+}
+
+/**
+ * The flood itself, from whatever the caller has already queued at d = 0 —
+ * ONE BFS body for a single source and for a footprint, so the two can never
+ * disagree about what a wall, a tunnel or a corner does.
+ */
+function flood(world, gen, tail, R, fn) {
+  const { w, h } = world;
   const occl = world.occl;
   const stamp = world._reachStamp;
   const dist = world._reachDist;
   const queue = world._reachQueue;
-  const gen = ++world._reachGen;
   let head = 0;
-  let tail = 0;
-  stamp[i] = gen;
-  dist[i] = 0;
-  queue[tail++] = i;
   while (head < tail) {
     const cur = queue[head++];
     const d = dist[cur];

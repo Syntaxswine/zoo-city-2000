@@ -1018,10 +1018,15 @@ export function moodTerms(world, c, context = moodContext(world)) {
       const yy = ty + dy;
       if (!inBounds(world, xx, yy)) continue;
       const civ = world.civic[yy * w + xx];
-      // Recreation reaches four tiles from any part of a park, measured
-      // at home. Generic civic parts must resolve to a Large Park, not a Zoo.
-      if (civ === CIVIC.PARK || (civ && world.civic[civicAnchorOf(world, yy * w + xx)] === CIVIC.LARGE_PARK)) park = true;
-      else if (civ === CIVIC.CENTRE) van = true;
+      if (!civ) continue;
+      // Recreation reaches four tiles from any part of a park, measured at
+      // home — and the centre's van from any part of the centre. A campus
+      // part answers for its anchor (a Zoo's part is a Zoo's, and counts for
+      // nothing here); until session 17 only the park branch resolved parts,
+      // so a home beside a centre's far corner never felt the van.
+      const owner = world.civic[civicAnchorOf(world, yy * w + xx)];
+      if (owner === CIVIC.PARK || owner === CIVIC.LARGE_PARK) park = true;
+      else if (owner === CIVIC.CENTRE) van = true;
     }
     if (park) terms.push({ code: "PARK", value: 10 });
     // The meat hall's dread: herbivores mind it (halved with a carnivore friend); carnivores like the smell.

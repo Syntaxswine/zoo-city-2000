@@ -5,9 +5,9 @@
 // radius²)); 4,096 tiles is microseconds.
 
 import { KNOBS } from "./rules.js";
-import { TERRAIN, ROAD, ZONE, CIVIC, idx, inBounds, N4, isStation, isCivicEmployer, absent, occAt, anchorOf, footprintOf, siteTiles, civicAnchorOf } from "./world.js";
+import { TERRAIN, ROAD, ZONE, CIVIC, idx, inBounds, N4, isStation, isCivicEmployer, absent, occAt, anchorOf, footprintOf, siteTiles, civicAnchorOf, civicTiles } from "./world.js";
 import { SPECIES_BY_ID, DIET_OF, admits } from "./species.js";
-import { forEachWithin, computeOcclusion, isBarrier, crossable } from "./reach.js";
+import { forEachWithin, forEachWithinAll, computeOcclusion, isBarrier, crossable } from "./reach.js";
 
 const NO_ROAD = 255;
 
@@ -287,7 +287,8 @@ export function computeLandValue(world) {
     if (c === CIVIC.CENTRE && !served(world, i)) continue;
     const r = c === CIVIC.PARK ? KNOBS.LV_PARK_RADIUS : c === CIVIC.LARGE_PARK ? KNOBS.LV_LARGE_PARK_RADIUS : KNOBS.LV_VAN_RADIUS;
     const mask = c === CIVIC.PARK ? nearPark : c === CIVIC.LARGE_PARK ? nearZoo : nearVan;
-    forEachWithin(world, i, r, (j) => { mask[j] = 1; }); // round a wall, not through it
+    // From EVERY tile of the campus (reach.forEachWithinAll), round a wall, not through it. A 1×1 park is the plain flood.
+    forEachWithinAll(world, civicTiles(world, i), r, (j) => { mask[j] = 1; });
   }
   const cent = world.events.centenaries; // [{tile, radius, bonus}]
   const plaque = world._plaque || (world._plaque = new Float32Array(n));
@@ -329,7 +330,10 @@ export function computeCoverage(world) {
     const c = world.civic[i];
     if (!isStation(c) || !served(world, i)) continue;
     const R = c === CIVIC.FIRE ? KNOBS.FIRE_RADIUS : KNOBS.POLICE_RADIUS;
-    forEachWithin(world, i, R, (j, d) => { // a patrol goes round a wall and through a tunnel
+    // Seeded from the WHOLE campus, so a 3×3 station covers (3 + 2R)² tiles centred on itself. Until session 17 this
+    // flooded from the anchor alone and a station covered six tiles to its north-west and four to its south-east
+    // (tools/haloprobe.mjs). A legacy 1×1 station is the same single-tile flood it always was.
+    forEachWithinAll(world, civicTiles(world, i), R, (j, d) => { // a patrol goes round a wall and through a tunnel
       if (c === CIVIC.FIRE) world.fireCov[j] = 1;
       else {
         const eff = d <= KNOBS.POLICE_NEAR ? KNOBS.POLICE_EFFECT : KNOBS.POLICE_EFFECT / 2;

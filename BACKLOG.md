@@ -11,6 +11,7 @@ could ship whole.
 ## Knowledge and culture — specified, not implemented
 
 - [ ] **University (3×3), Amphitheater (3×3), Library (2×2), Gallery (2×2):** [proposal and acceptance criteria](docs/PROPOSAL-KNOWLEDGE-CULTURE-2026-09-05.md). Knowledge supports city capacity; culture adds local mood. Building sizes and coverage are owner requirements: University half the map tiles, Amphitheater one eighth, Library/Gallery five-tile range. Mechanics and balance values are proposed. The historical school/accelerated-adulthood idea remains deferred.
+- [ ] **Reviewed 2026-09-05** — [REVIEW-KNOWLEDGE-CULTURE-2026-09-05.md](docs/REVIEW-KNOWLEDGE-CULTURE-2026-09-05.md): knowledge → cap is the right channel (measure the K-mean bust into camping first); culture as a mood term is a measured no-op (three readers, none fires in a growing town) — pick a channel; found in passing and FIXED in the same commit: every 3×3 campus halo was seeded from its ANCHOR tile (`node tools/haloprobe.mjs`: 169 covered tiles, now 225) — `reach.forEachWithinAll` is the one flood for a footprint and the new buildings must seed through it. Three owner decisions listed at the end.
 
 ## Owner-reported follow-ups — 2026-09-05
 

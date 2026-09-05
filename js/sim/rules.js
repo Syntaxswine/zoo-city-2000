@@ -74,7 +74,7 @@ export const KNOBS = {
   MESS: { pig: 1.5, skunk: 1.0 },  // mess/stink per animal at home, over 1 tile — a full tenement of pigs is a small factory
   MESS_RADIUS: 1,
   // services (the owner: "police and fire is noticeably absent")
-  FIRE_RADIUS: 6,           // a fire station covers Chebyshev 6: fires burn one month and spread at 0.1 instead of 0.3
+  FIRE_RADIUS: 6,           // a fire station covers Chebyshev 6 from EVERY tile of its 3×3 (a 15×15 square): fires burn one month and spread at 0.1 instead of 0.3
   FIRE_SPREAD: 0.3,
   FIRE_SPREAD_COVERED: 0.1,
   FIRE_START_COVERED: 1 / 6, // a covered lot is picked as a fire's origin at one-sixth the weight: unlikely, never impossible
@@ -83,7 +83,7 @@ export const KNOBS = {
                             // one — serviceprobe measured 1.00 buildings lost per fire at 0%, 28%, 71% and 100% cover.
   RUBBLE_MONTHS: 6,         // rubble clears ITSELF after this long and the plot is eligible again (the owner: "it just takes
                             // a few months before its eligible again"). The bulldozer is now a way to be impatient, not a tax.
-  POLICE_RADIUS: 6,         // full effect within 3, half effect to 6 (Micropolis: an 8x8 cell smoothed three times)
+  POLICE_RADIUS: 6,         // full effect within 3, half effect to 6, measured from every tile of the campus (Micropolis: an 8x8 cell smoothed three times)
   POLICE_NEAR: 3,
   POLICE_EFFECT: 60,
   // THE CAMERA NETWORK (SPEC §9d, docs/PROPOSAL-CAMERAS.md). A camera watches
@@ -114,7 +114,7 @@ export const KNOBS = {
   LV_PARK: 12,
   LV_PARK_RADIUS: 4,
   LV_LARGE_PARK: 6,
-  LV_LARGE_PARK_RADIUS: 5,
+  LV_LARGE_PARK_RADIUS: 5,  // from every tile of the park (reach.forEachWithinAll); the centre's van shadow the same
   LV_POL: 0.6,
   COMMUTE_MAX: 40,
   // citizens

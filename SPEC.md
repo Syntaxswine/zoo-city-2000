@@ -286,6 +286,8 @@ Pol    = Σ over sources of amount·(1 − d/(radius+1)) within Chebyshev radius
 dC     = Chebyshev distance to the centroid of built lots (all lots if none built)
 LV     = clamp(35 + 40·max(0, 1 − dC/24) + 3·nature8 + 12·[park within 4] + 6·[zoo within 5] − 0.6·Pol, 0, 100)  −10 where crime > 60
          nature8 = water or tree tiles among the 8 neighbours
+         "within" is measured from EVERY tile of a 3×3 Large Park or centre (reach.forEachWithinAll, session 17) —
+         until then each campus flooded from its anchor and its halo hung off the north-west corner
 traffic(road tile) = number of commuter paths through it (readout only)
 ```
 Commutes: a citizen's job must be reachable by a road path ≤ 40 road tiles
@@ -881,7 +883,9 @@ each, §400/yr each, four C-type jobs each, effective only where `served`
 other rule in the game.
 
 ```
-fireCov(i)   = 1 within Chebyshev 6 of a fire station
+fireCov(i)   = 1 within Chebyshev 6 of ANY TILE of a fire station — a 3×3 covers a 15×15 square centred on itself
+               (session 17; before, the flood ran from the anchor alone and covered 13×13 hung off the north-west corner:
+               six tiles of reach one way, four the other — tools/haloprobe.mjs)
 exposure     = mean over BUILT lots of (fireCov ? 1/6 : 1)      — fields.fireExposure()
                THE FIRE CARD'S ROSTER WEIGHT IS w3 × season × exposure, so covering the town makes
                a fire RARER and not merely differently placed: ×1 uncovered, ×1/6 covered end to end.
@@ -892,7 +896,7 @@ exposure     = mean over BUILT lots of (fireCov ? 1/6 : 1)      — fields.fireE
                ground, not rubble). Off a beat, or on the unlucky 0.3, the lot goes to rubble.
                The month's outcome is published on world.fires {saved, razed}: per-tick, never saved,
                never hashed (a fire that is put out leaves no mark to count).
-policeCov(i) = 60 within 3 of a police station, 30 within 6 (max over stations)
+policeCov(i) = 60 within 3 of any tile of a police station, 30 within 6 (max over stations)
 crime(i)     = clamp(40 − 0.5·LV + 0.4·animals in the 3×3 + 40·(U/W) + file stains (capped at
                FILE_CRIME_MAX 25 — a street where three things happened is a bad street, not three
                bad streets) − policeCov, 0, 100)

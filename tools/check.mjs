@@ -181,10 +181,17 @@ check("tick cost is not catastrophic (the printed number is the instrument; this
 // not a canary. Civic campuses and crime-specific sentencing reset 385 to 326
 // (2026-09-05); explicit destinations change custody and growth.
 // Economic camps retain households after departure/decay (326 to 368).
-// 350-386 is +/-5%: a change that moves the town further than
+// Footprint-seeded campus halos (session 17: a 3×3 station covers 15×15
+// centred on itself, not 13×13 off its corner) reset 368 to 290 — an RNG
+// CASCADE, not a mechanism: of eleven seeds of this very city six are
+// byte-identical, three move by under ten animals, and seed 7 alone loses
+// 78 to a year-12 fire it never had before and the receivership it brings
+// (tools/haloprobe.mjs; handoff §30). The town is in receivership at year
+// 15 now, and the cheat check below reads the mayor's OWN rates because of it.
+// 275-305 is +/-5%: a change that moves the town further than
 // that is a FINDING, and re-baselining this line is a deliberate act with a
 // number in the commit message, not a nuisance to be widened away.
-check("the scripted city is still a town", world.citizens.length > 350 && world.citizens.length < 386, `${world.citizens.length} citizens after ${YEARS} years (the band is 350-386, \u00b15% of 368; moving it is a finding, and re-baselining is a decision)`);
+check("the scripted city is still a town", world.citizens.length > 275 && world.citizens.length < 305, `${world.citizens.length} citizens after ${YEARS} years (the band is 275-305, \u00b15% of 290; moving it is a finding, and re-baselining is a decision)`);
 
 // ledger
 let sum = 0;
@@ -558,7 +565,11 @@ check("determinism: same seed + same inputs ⇒ same hash", stateHash(A.world) =
   const inIt = w4.flags.receivership;
   const rc = apply(w4, { kind: "cheat", amount: KNOBS.CHEAT_CASH });
   check("cheat: lifts receivership the moment cash ≥ 0", inIt && rc.ok && !w4.flags.receivership && w4.cash >= 0 && typeof rc.notice === "string", `in ${inIt}, after ${w4.flags.receivership}, cash ${w4.cash}`);
-  check("cheat: the mayor's own rates come back with the books", w4.rates.R === A.world.rates.R && w4.rates.C === A.world.rates.C && w4.rates.I === A.world.rates.I, `${w4.rates.R}/${w4.rates.C}/${w4.rates.I} vs ${A.world.rates.R}/${A.world.rates.C}/${A.world.rates.I}`);
+  // The mayor's OWN rates: what the county hands back. If the fixture is already
+  // in receivership at year YEARS (it is, since session 17's halo fix), those
+  // are flags.ownRates and A.world.rates are the county's forced ones.
+  const own = A.world.flags.receivership && A.world.flags.ownRates ? A.world.flags.ownRates : A.world.rates;
+  check("cheat: the mayor's own rates come back with the books", w4.rates.R === own.R && w4.rates.C === own.C && w4.rates.I === own.I, `${w4.rates.R}/${w4.rates.C}/${w4.rates.I} vs ${own.R}/${own.C}/${own.I}${A.world.flags.receivership ? " (the fixture is in receivership; its own rates are flags.ownRates)" : ""}`);
 }
 
 // save → load → continue
@@ -1276,6 +1287,41 @@ function cameraJusticeWorld(){
   for (let t = 0; t < 24; t++) { tick(F); tick(G); }
   check("walls: save → load → 24 ticks with walls hash-equals", stateHash(F) === stateHash(G), `${stateHash(F)} vs ${stateHash(G)}`);
   check("walls: the census counts them", F.last.census.walls === 11 && F.last.census.tunnels === 1, `walls ${F.last.census.walls} · tunnels ${F.last.census.tunnels}`);
+
+  // ---- a footprint's reach (reach.forEachWithinAll; session 17) ------------------------------
+  // The three definitions, proved on F (eleven wall tiles and a tunnel still standing): one tile
+  // IS forEachWithin; with walls a footprint's flood is the union of its tiles' floods with the
+  // nearer distance winning; on open ground it is the Chebyshev distance to the footprint. Every
+  // 3×3 campus halo (station cover, the Large Park's and the centre's land value) rides on this.
+  {
+    const { forEachWithinAll } = await import("../js/sim/reach.js");
+    const { forEachWithin } = await import("../js/sim/reach.js");
+    const R = 6;
+    const list = (run) => { const out = new Map(); run((j, d) => { if (out.has(j)) throw new Error(`reach: tile ${j} visited twice`); out.set(j, d); }); return out; };
+    const same = (a, b) => a.size === b.size && [...a].every(([j, d]) => b.get(j) === d);
+    const one = same(list((fn) => forEachWithinAll(F, [works], R, fn)), list((fn) => forEachWithin(F, works, R, fn)))
+      && same(list((fn) => forEachWithinAll(F, [probe], R, fn)), list((fn) => forEachWithin(F, probe, R, fn)));
+    check("reach: a one-tile footprint IS forEachWithin, walls and tunnel included", one, "");
+    const foot = []; // a 3×3 just south of the wall row, its west column under the tunnel's road
+    for (let dy = 0; dy < 3; dy++) for (let dx = 0; dx < 3; dx++) foot.push(at(px + 5 + dx, py + 3 + dy));
+    const union = new Map();
+    for (const t of foot) forEachWithin(F, t, R, (j, d) => { if (!union.has(j) || union.get(j) > d) union.set(j, d); });
+    const all = list((fn) => forEachWithinAll(F, foot, R, fn));
+    check("reach: a footprint's flood is the union of its tiles' floods, the nearer distance winning, walls in the way",
+      same(all, union) && all.size > 0 && all.size < (3 + 2 * R) ** 2, `${all.size} tiles vs union ${union.size}; the square would be ${(3 + 2 * R) ** 2}`);
+    const O = createWorld({ seed: SEED }); // no walls: the square
+    const oat = (x, y) => y * O.w + x;
+    const ofoot = [];
+    for (let dy = 0; dy < 3; dy++) for (let dx = 0; dx < 3; dx++) ofoot.push(oat(20 + dx, 20 + dy));
+    const open = list((fn) => forEachWithinAll(O, ofoot, R, fn));
+    let okOpen = open.size === (3 + 2 * R) ** 2;
+    for (const [j, d] of open) {
+      const x = j % O.w, y = (j / O.w) | 0;
+      const dd = Math.max(Math.max(20 - x, 0, x - 22), Math.max(20 - y, 0, y - 22));
+      if (dd !== d) { okOpen = false; break; }
+    }
+    check("reach: on open ground a 3×3 footprint reaches the (3 + 2R)² square, each tile at its Chebyshev distance to the building", okOpen, `${open.size} tiles`);
+  }
 }
 
 // ---- use-zoning and trespass (docs/PROPOSAL-ZONING-RAIL-WALLS.md §2; SPEC §7.8, §9c) ----

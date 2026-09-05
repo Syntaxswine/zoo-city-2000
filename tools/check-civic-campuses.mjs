@@ -4,7 +4,7 @@ import { save, load, stateHash } from '../js/sim/save.js';
 import { computeFields, served } from '../js/sim/fields.js';
 import { lotReport } from '../js/sim/lots.js';
 import { census } from '../js/sim/census.js';
-import { createHousehold, placeHousehold } from '../js/sim/citizens.js';
+import { createHousehold, placeHousehold, moodTerms } from '../js/sim/citizens.js';
 import { arrest, custodyTick, bedsAt } from '../js/sim/justice.js';
 import { KNOBS } from '../js/sim/rules.js';
 
@@ -114,4 +114,34 @@ export function checkCivicCampuses(check) {
   check('occupied prison: demolition releases inmates and cannot undo people',demo.ok && !demo.undoable && petty.held===0 && petty.heldAt===-1 && !undo(j).ok);
   const rail=empty(); apply(rail,{kind:'rail',tiles:[at(rail,5,5)]}); apply(rail,{kind:'station',tx:5,ty:5});
   check('platform: a wall cannot silently replace the building with a tunnel',!apply(rail,{kind:'wall',tiles:[at(rail,5,5)]}).ok && rail.rail[at(rail,5,5)]===2 && !rail.wall[at(rail,5,5)]);
+
+  // ---- a campus's halo is seeded from EVERY tile of it (reach.forEachWithinAll; session 17) ----
+  // Until then each 3×3 flooded from its anchor alone: a police station covered 13×13 hung off its
+  // north-west corner, a Large Park's land value and a centre's van the same, and the van's mood
+  // term saw only the anchor tile within four of home (tools/haloprobe.mjs has the numbers).
+  {
+    const R=KNOBS.POLICE_RADIUS, side=3+2*R, near=KNOBS.POLICE_NEAR;
+    const h=empty(); road(h,9,10);
+    const placed=apply(h,{kind:'police',tx:10,ty:10}); computeFields(h);
+    let covered=0; for(let i=0;i<h.w*h.h;i++) if(h.policeCov[i]) covered++;
+    const nw=h.policeCov[at(h,10-R,10-R)], se=h.policeCov[at(h,12+R,12+R)], nwNear=h.policeCov[at(h,10-near,10-near)], seNear=h.policeCov[at(h,12+near,12+near)];
+    check('police: cover is seeded from every tile of the campus — a (3+2R)² square whose far corner reaches as far as its anchor',
+      placed.ok && served(h,at(h,10,10)) && covered===side*side && nw===KNOBS.POLICE_EFFECT/2 && se===KNOBS.POLICE_EFFECT/2 && nwNear===KNOBS.POLICE_EFFECT && seNear===KNOBS.POLICE_EFFECT,
+      `covered ${covered} of ${side*side} · NW ${nw} SE ${se} · near NW ${nwNear} SE ${seNear}`);
+    const g=empty(); computeFields(g);
+    const RL=KNOBS.LV_LARGE_PARK_RADIUS, corners=[at(g,12+RL,10-RL),at(g,10-RL,12+RL),at(g,12+RL,12+RL),at(g,10-RL,10-RL)];
+    const lv0=corners.map(i=>g.lv[i]);
+    apply(g,{kind:'largePark',tx:10,ty:10}); computeFields(g);
+    const dlv=corners.map((i,k)=>g.lv[i]-lv0[k]);
+    check('large park: the land-value halo reaches LV_LARGE_PARK_RADIUS from every tile, all four far corners alike',
+      dlv.every(d=>d===KNOBS.LV_LARGE_PARK), `Δlv at the four far corners ${dlv.join(',')} (expected ${KNOBS.LV_LARGE_PARK})`);
+    const v=empty(); road(v,9,10); apply(v,{kind:'centre',tx:10,ty:10});
+    const home=at(v,16,16); v.zone[home]=ZONE.R; v.tier[home]=3; // four from the far corner (12,12), six from the anchor
+    const hh=createHousehold(v,'wolf',2); placeHousehold(v,hh,home);
+    computeFields(v);
+    const wolf=v.byId.get(hh.members[0]);
+    const van=moodTerms(v,wolf).find(t=>t.code==='VAN');
+    check('centre: the van is felt four tiles from the far corner of the campus, six from its anchor',
+      served(v,at(v,10,10)) && !!van && van.value===-KNOBS.VAN_MOOD, van?`VAN ${van.value}`:'no VAN term');
+  }
 }

@@ -2311,3 +2311,87 @@ capacity law. Anything town-wide that gets added next will hit this wall.
 - **Nothing asserts the camera's own card TEXT.** The card was verified by
   looking at it in the browser, not by a check; the panel's prose is still the
   game's biggest untested surface (BACKLOG says so).
+
+
+## 30. Every campus halo hung off its anchor tile — 2026-09-05 (session 17)
+
+Found while reviewing the knowledge-and-culture proposal
+(`docs/REVIEW-KNOWLEDGE-CULTURE-2026-09-05.md` §F3), whose coverage rule reads
+"seeded from every footprint tile at distance zero". Asked whether the five
+EXISTING campuses did that, and they did not. Fixed on the owner's standing
+instruction to fix bugs when seen.
+
+**What the picture looks like (symptom-keyed).** A police campus's cover
+overlay is a square that is NOT centred on the building: two more rows and
+columns of blue to its north-west than to its south-east. A Large Park's land
+value the same. A home four tiles from a centre's far corner never says VAN.
+
+**The class.** `computeCoverage`, `computeLandValue` (the Large Park's and
+the centre's masks) and the centre branch of `moodTerms` all looked for the
+civic id on a tile, and a campus's other eight tiles are `CIVIC.PART`, so the
+flood ran from the top-left tile alone. Only the park branch of `moodTerms`
+and the Large Park wish resolved parts. `3eb65d6` made the campuses 3×3 and
+nobody revisited the seeding; `KNOBS` still said "covers Chebyshev 6" from the
+1×1 days.
+
+**The fix, one place.** `reach.forEachWithinAll(world, tiles, R, fn)`: every
+tile within R of ANY footprint tile, once, at its distance to the nearest
+footprint tile. One tile delegates to `forEachWithin` (so legacy 1×1 stations
+and 1×1 parks are byte-identical); open ground is the Chebyshev distance to
+the footprint's box; with walls it is the single-source flood seeded from all
+footprint tiles at once — the BFS body is shared (`flood`), so the two can
+never disagree about a wall, a tunnel or a corner. The three halo sites call
+it with `civicTiles(world, i)`; the mood term resolves the tile's owner.
+
+```
+node tools/haloprobe.mjs          (flat grass, a police campus at x 30..32 × y 30..32)
+before:  computeCoverage : 169 tiles, x 24..36, y 24..36   → SE frontage 4 tiles of reach, NW 6
+after :  computeCoverage : 225 tiles, x 24..38, y 24..38   → 6 on every side
+```
+
+**Checks: 793 → 799.** In `check.mjs`'s walls block: one tile IS
+`forEachWithin` (walls and tunnel standing); a footprint's flood is the union
+of its tiles' floods with the nearer distance winning; open ground is the
+(3 + 2R)² square at Chebyshev distance. In the campus suite: police cover is
+225 tiles with the far corner reaching as far as the anchor; a Large Park's LV
+rises by exactly `LV_LARGE_PARK` at all four far corners; a wolf four from a
+centre's far corner (six from its anchor) carries VAN. Five mutants — anchor
+seeding put back in cover, in LV, in the mood branch; the walled flood seeded
+from the first tile only; the open-ground distance taken to the first tile —
+5/5 caught, each by the check written for it.
+
+**What moved, measured on the six published 30-year mayor rigs:**
+
+| rig (`--years 30 --quiet`) | before | after |
+|---|---|---|
+| balanced | `c055aba5` · 1,674 | same |
+| dormitory | `882a48c7` · 65 | same |
+| millbelt | `ecb5a902` · 1,740 | same |
+| estate | `2ced10f8` · 1,337 | same |
+| estate `--zoo 12` | `46520f05` · 1,235 | same (the prison has no halo) |
+| balanced `--stations --zoo 12` | `164ec959` · 1,703 | **`461784c9` · 1,714** |
+
+**The canary, and why it is re-baselined 368 → 290.** The suite's canonical
+15-year city (seed 7; a police campus, a centre and a prison at year 4) came
+out 290 where the band was 350–386. Run the same city on eleven seeds under
+both codes (`scratchpad div.mjs`, an op-for-op copy of `buildCity`):
+
+| seed | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| anchor-seeded (HEAD) | 288 | 283 | 347 | 220 | 391 | 336 | **368** | 349 | 347 | 317 | 340 |
+| footprint-seeded | 288 | 290 | 339 | 220 | 391 | 336 | **290** | 349 | 347 | 317 | 340 |
+
+Six seeds byte-identical, three within ten animals, and seed 7 alone down 78:
+its year-by-year trace is identical through year 7, drifts by two animals at
+year 8, and at year 12 has a FIRE the other run never had — 86 campers,
+receivership at year 14, rates forced to 11/11/11. A fire here is
+supercritical (§15's rig lesson: a town loses a block or none), so ONE seed
+cannot say which way a field change pushes a town; eleven can, and they say
+"not at all, except by cascade". The band is 275–305 now, and the cheat check
+that compared the restored rates against `A.world.rates` compares against
+`flags.ownRates` when the fixture is already in receivership — which it is.
+
+**For the knowledge-and-culture build.** Step 0 of the reframed order is
+done: `knowledgeCov` / `cultureCov` should seed through `forEachWithinAll`
+with the campus's tiles, and a budget-limited flood for the University and
+the Amphitheater can be the same BFS with a count instead of a radius.
