@@ -1,6 +1,6 @@
 // buildings.js — every built thing in the city is BOXES. SPEC §12.2.
 //
-// Twelve families (4 zones × 3 tiers) × 2 variants, the five civics, and the
+// Twelve families (4 zones × 3 tiers) × 4 variants, the five civics, and the
 // overlays. Nothing in this file draws a face. Each family is a list of
 // `box()`es in world units (1 tile = 16 along a and b, c in pixels) handed to
 // `solid.render`, which rasterises per screen pixel through a z-buffer — so a
@@ -14,7 +14,7 @@
 // roofs and trim, in the same order. Glass '=' is cut into a wall by the
 // skin returning it instead of the wall key — never by subtracting solid.
 //
-// VARIANTS. Variant 1 of every family is variant 0 with the plan mirrored
+// VARIANTS. Plans 2 and 3 are authored in building-plans.js. Variant 1 of every family is variant 0 with the plan mirrored
 // across a = b: the chimney, the awning, the tank swap arms. The door stays
 // on the side face because the skin is not mirrored — which is what SPEC
 // means by "mirrored offsets".
@@ -32,6 +32,8 @@ import { box, render, litSkin, flatSkin, A_STEP, TO_X, TO_Y, RECIPES } from "./s
 import { defineSprite, part, toRows, T } from "./format.js";
 import { keysOf } from "./palette.js";
 import { TREE_ROUND, TREE_TALL, TREE_WILLOW, RUBBLE, groundSprite, hash } from "./terrain.js";
+import { extraPlans } from "./building-plans.js";
+import { characterSprite, socketsFor } from "./building-character.js";
 import { shopKind } from "../sim/shops.js";
 
 const BRICK = keysOf("brick"); // ! @ # $
@@ -93,6 +95,7 @@ function walled(base, height, { storey = 8, sill = 3, winH = 3, period = 4, winW
     return gg >= sill && gg < sill + winH && uu >= from && uu < from + winW;
   };
   return {
+    glazing: true,
     top: base.top,
     side: (a, k, x, y) => {
       const g = height - k;
@@ -126,7 +129,7 @@ const flipPlan = (boxes) => boxes.map((bx) => box(bx.b0, bx.b1, bx.a0, bx.a1, bx
  * Now a plan that stamps anything declares how tall the stamps reach.
  */
 export function solidSprite(name, boxes, { hub = A_STEP / 2, footprint = [1, 1], tags = [], extent = [], stamps = [] } = {}) {
-  const recipe = { name, boxes, hub, footprint, extent, stamps };
+  const recipe = { name, boxes, hub, footprint, extent, stamps, sockets: socketsFor(boxes) };
   const r = renderRecipe(recipe, 1);
   PLANS.push({ name, footprint, boxes });
   const sprite = defineSprite({ name, rows: toRows(r.grid), anchor: r.anchor, footprint, tags });
@@ -260,6 +263,7 @@ function shop() {
   const H = 10;
   const base = litSkin(CONC_WALL, { height: H });
   const skin = {
+    glazing: true,
     top: base.top,
     side: (a, k, x, y) => {
       const g = H - k;
@@ -302,7 +306,7 @@ function tower() {
     // The rooftop stack is a 2×2-unit concrete box: at 1.2 units in slate
     // its top was the same '?' as the cap it stood on and it vanished into a
     // 2-px near-black slit beside the AC unit (round 2). Now it has a top.
-    box(11, 13, 11, 13, H + 1, H + 11, litSkin(CONC, { height: 10 })),
+    box(10, 12, 11, 13, H + 1, H + 11, litSkin(CONC, { height: 10 })),
   ];
 }
 
@@ -326,6 +330,7 @@ function factory() {
   // there the brightest pixels on the factory sat on its darkest face and
   // the teeth read as glazing strips lying flat on the roof.
   const tooth = {
+    glazing: true,
     top: () => SLATE[2],
     side: () => SLATE[1],
     end: (b, k) => (k < 2.5 ? END_GLASS : SLATE[0]),
@@ -431,6 +436,7 @@ function stall() {
   const H = 8;
   const base = litSkin(BRICK, { grain: brickGrain, height: H });
   const skin = {
+    glazing: true,
     top: base.top,
     side: (a, k, x, y) => {
       const g = H - k;
@@ -476,6 +482,7 @@ function meatHall() {
   // k is depth below the box top; the brick band is its own 8-unit wall
   // and shades from ITS top (c = 8), so it is handed k − (H − 8).
   const skin = {
+    glazing: true,
     top: slate.top,
     side: (a, k, x, y) => {
       const g = H - k;
@@ -526,6 +533,7 @@ function coldStore() {
   const H = 20;
   const base = litSkin(CONC_WALL, { height: H });
   const skin = {
+    glazing: true,
     top: base.top,
     side: (a, k, x, y) => {
       const g = H - k;
@@ -570,28 +578,35 @@ const FAMILY = {
 };
 const ZONE_LETTER = { 1: "R", 2: "C", 3: "I", 4: "M" };
 
-/** BUILDINGS[zone][tier][variant] — 24 sprites. */
+/** BUILDINGS[zone][tier][variant] — 48 sprites. */
 export const BUILDINGS = {};
 for (const zone of [1, 2, 3, 4]) {
   BUILDINGS[zone] = {};
   for (const tier of [1, 2, 3]) {
     const [name, make] = FAMILY[zone][tier];
     const boxes = make();
+    const additions = extraPlans(zone, tier, { walled, doorAt, BRICK, CONC_WALL, RUST, SLATE_SKIN, C_ROOF, TIMBER, AWNING, AWNING_M, HOOK, STEP: flatSkin(CONC[4], CONC[3], CONC[2]), GRASS });
     BUILDINGS[zone][tier] = [
       solidSprite(`${ZONE_LETTER[zone]}${tier}-${name}-0`, boxes, { tags: ["building", ZONE_LETTER[zone]] }),
       solidSprite(`${ZONE_LETTER[zone]}${tier}-${name}-1`, flipPlan(boxes), { tags: ["building", ZONE_LETTER[zone]] }),
+      ...additions.map((plan, n) => solidSprite(`${ZONE_LETTER[zone]}${tier}-${name}-${n + 2}`, plan, { tags: ["building", ZONE_LETTER[zone]] })),
     ];
   }
 }
 
-export function buildingSprite(zone, tier, variant = 0, side = 1, theme = 0) {
+export function buildingSprite(zone, tier, variant = 0, side = 1, theme = 0, character = null) {
+  const base = baseBuildingSprite(zone, tier, variant, side, theme);
+  return character ? characterSprite(base, character) : base;
+}
+function baseBuildingSprite(zone, tier, variant = 0, side = 1, theme = 0) {
   const z = typeof zone === "string" ? { R: 1, C: 2, I: 3, M: 4 }[zone] : zone;
   if (side > 1) return blockSprite(z, side, variant, theme);
-  // The shop pool (SPEC §12.2d, js/art/shops.js): a tier-1 C lot is one of eleven, by the whole variant byte — `>> 1` the kind, `& 1` the mirror.
-  if (z === 2 && tier === 1 && SHOP_ART) return SHOP_ART[shopKind(variant)][variant & 1];
+  // The shop pool keeps its existing kind mapping. The corner shop has four
+  // plans by & 3; each specialist retains its & 1 mirrored pair.
+  if (z === 2 && tier === 1 && SHOP_ART) return SHOP_ART[shopKind(variant)][variant & (shopKind(variant) === 0 ? 3 : 1)];
   const fam = BUILDINGS[z] && BUILDINGS[z][tier];
   if (!fam) throw new Error(`buildingSprite: no family for zone ${zone} tier ${tier}`);
-  return fam[variant & 1];
+  return fam[variant & 3];
 }
 
 /**

@@ -1306,9 +1306,10 @@ Glades law, kept.
 | I (rust) | shed 14×11×8 + chimney 2×2×14 | factory 14×14×14 + 2 chimneys + sawtooth | works 15×15×20 + chimney 3×3×34 + tank |
 Civics: park (low plinth 16×16×1 + 2 tree stamps + bench box), zoo 2×2
 (fence boxes on 4 sides, gate box, 3 canopy clumps, a hut box). Overlays:
-scaffold (1), fire (2 frames), flood (1), rubble (earth-ramp ground). Two
-variants per family by mirrored offsets. A species skin (majority occupant)
-is a ramp swap at compose time — L1.
+scaffold (1), fire (2 frames), flood (1), rubble (earth-ramp ground). Four
+plans per original family: the first mirrored pair plus two authored plans
+(§12.2e). Occupancy lights and majority-species stamps identify the people
+in the building without changing its zone ramp.
 
 ### 12.2b The blocks — box solids per zone × side (`js/art/blocks.js`; 2×2 plans a, b ∈ [0, 32], 3×3 [0, 48])
 | zone | 2×2 | 3×3 |
@@ -1351,11 +1352,11 @@ The owner: *"unique low density shops would be a good target."* A Low C
 lot stays at tier 1 for good, and every one drew the corner shop. Now the
 KIND is a function of the tile's `variant` byte — the per-tile random the
 world was founded with, already saved and hashed: `variant & 1` is the
-mirror it always was, `variant >> 1` (0..127) picks the kind, so a street
+mirror of each specialist shop, `variant >> 1` (0..127) picks the kind, so a street
 of low shops is a bakery, a bookshop, a barber, a florist, a pub … the same
 ones every time the town is loaded, and NOTHING in the sim changes — no
-state, no RNG, every town hashes as it did. Kind 0 is the corner shop the
-tier drew before: an old save keeps about one shop in eleven unchanged and
+state, no RNG, every town hashes as it did. Kind 0 is the corner shop, now four plans by `variant & 3` (§12.2e);
+the first two are the shop the tier drew before: an old save keeps about one shop in eleven unchanged and
 the rest become what they were always going to be. (SimCity 2000's low
 commercial: one lot, many small businesses, the pick by position.)
 
@@ -1384,6 +1385,48 @@ state either: `shops.shopOf` reads `world.majority` (the staff's plurality
 species, derived every tick) and the card reads *"tier 1 bookshop — the
 Slyfields' bookshop (fox) — tall and narrow, …"*, or *"a bookshop,
 nobody's yet"*. `sheet-shops.png` is the contact sheet.
+
+### 12.2e Building character — People E (2026-09-05)
+
+The twelve original R/C/I/M tier families have four pairwise-distinct plans.
+Variants 2 and 3 are authored box arrangements in `building-plans.js`, not
+mirrors: porches, bays, mansards, balconies and roof gardens; kiosks, clock
+fronts, arcades and stepped/twin towers; open sheds, kilns, conveyors, cooling
+towers and gantries; hook rails, tiled fronts and chimney halls. The old C3
+mirror pair was accidentally symmetric; its roof stack now stands off-axis.
+The existing saved variant byte selects `& 3`. The specialist shop-kind
+mapping is unchanged: only kind 0 uses four plans, the other ten keep their
+mirrored pair. Blocks and landmarks retain their authored paired plans.
+
+All 106 unique building/retail/block/landmark sprites share occupancy lighting
+and species marks through `art.building(..., {lit, majority, seed})`.
+R fill is occupants/capacity; C/I/M fill is staff/jobs. The renderer reads
+the simulation's existing counts and capacities, clamps `floor(4 * fill)`
+to 0..3, and never writes them. Each explicitly tagged glass skin changes a
+stable subset of its window cells to palette key `-`. Four stable phases
+derive from the tile index; the pattern uses world coordinates at both
+resolutions. Increasing fill never extinguishes an already lit window.
+Painted blue awnings, ice, water and the fishmonger's blue tiles stay unlit.
+
+`art.mark(species)` returns one unique 6×6 stamp for each of the fourteen
+species. Each solid recipe records its own wall and roof socket after
+mirroring. Socket selection tests candidate wall/roof points against the
+solid's depth buffer, so a porch or bay cannot conceal the stamp. R uses
+the wall socket and C/I/M the roof; the existing derived `world.majority`
+selects residents or staff. Empty lots have no mark. The same description
+reaches Inspect through `lotReport.mark`: “a warren door — rabbits live here”.
+The marks are small fixtures, not lettering or a replacement of zone colours.
+
+Appearance recipes are cached by base plan, light level, species and phase,
+then rerasterised by the existing hi-res path at zoom 2. They are dynamic
+building sprites; no ground invalidation or save-format change is needed.
+The canonical suite checks all plans at both resolutions, mark visibility
+and bounds, monotone glass pixels, cache identity, vacancy and resident/staff
+descriptions, and thirty-year display-on/off simulation equality. The sheets
+are `sheet-buildings.png`, `sheet-marks.png`, `sheet-building-lights.png`;
+`people-e-before.png` / `people-e-after.png` show the same seed-7 June 2020.
+Age-based ivy and patched roofs remain optional future work: no `since`
+array or save migration ships in E.
 
 ### 12.3 Citizens — hand-authored kit, the organic exception
 12×20 px adults, 8×12 cubs; facings SE and NE authored, SW/NW mirrored and

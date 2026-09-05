@@ -4,6 +4,17 @@ Open work, ranked. The design record is `SPEC.md`; the numbers are in
 `js/sim/rules.js` (KNOBS). Later layers were labelled at design time so v1
 could ship whole.
 
+## Building character — People E core shipped 2026-09-05
+
+The twelve original families now have four distinct plans. The same occupancy
+lights and fourteen species stamps also decorate shops, 2×2/3×3 blocks and
+landmarks. Inspect names the current residents' or staff's mark; empty lots
+have none. The shop-kind mapping and all simulation/save rules are unchanged.
+SPEC §12.2e; handoff §25; before/after frames and contact sheets in docs/shots.
+
+Remaining E stretch: saved building age, ivy after 15 years and roof patches
+after 25. This pass deliberately adds no age array or save migration.
+
 ## The People — IN PROGRESS 2026-09-03 (`docs/PLAN-THE-PEOPLE-2026-09-02.md`); Parts K, A, C, D, F, H, P and S shipped
 
 **Part F SHIPPED 2026-09-03:** the paper now selects permanent-id people

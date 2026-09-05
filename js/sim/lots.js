@@ -4,6 +4,7 @@
 // code. There is no second implementation of "why not": the card can only
 // ever say what the rule did (SPEC §0.6).
 
+import { buildingMark } from "./building-marks.js";
 import { KNOBS } from "./rules.js";
 import { ZONE, CIVIC, idx, inBounds, capacityOf, jobsOf, isPart, anchorOf, footprintOf, sideOf, occAt, carnAtOf } from "./world.js";
 import { served, siteRoadDist, doorsOf, nearestRoad } from "./fields.js";
@@ -234,6 +235,7 @@ export function lotReport(world, at) {
     part: at !== i,
     side: sideOf(world, i),
     theme: world.theme[i],
+    mark: buildingMark(world, i),
     landmark: landmarkOf(world.theme[i]), // the roster row a 3×3 rose as, or null (SPEC §3c)
     shop: shopOf(world, i), // a tier-1 C lot's kind and keeper, or null (SPEC §12.2d)
     zone: z,

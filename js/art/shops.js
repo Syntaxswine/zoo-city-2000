@@ -52,10 +52,11 @@ const framed = (H) => ({
   end: (b, k) => (Math.floor(b) % 4 === 0 || k < 1 ? EARTH[0] : CONC[2]),
 });
 /** Glass: a conservatory box — glass on every face, the top too. */
-const GLASS = { top: () => "=", side: () => "=", end: () => END_GLASS };
+const GLASS = { glazing: true, top: () => "=", side: () => "=", end: () => END_GLASS };
 /** A shopfront skin: a plain body with a glass front on the side face, a door at `doorMid`, END glass on the end. */
 function front(base, H, { glass = [1, 8], gH = [2, 7], doorMid = 10.5, endGlass = [2, 9] } = {}) {
   return {
+    glazing: true,
     top: base.top,
     side: (a, k, x, y) => { const g = H - k; if (a >= doorMid - 1 && a < doorMid + 1 && g < 6.5) return "+"; if (a >= glass[0] && a < glass[1] && g >= gH[0] && g < gH[1]) return "="; return base.side(a, k, x, y); },
     end: (b, k, x, y) => { const g = H - k; if (b >= endGlass[0] && b < endGlass[1] && g >= gH[0] && g < gH[1]) return END_GLASS; return base.end(b, k, x, y); },
@@ -69,6 +70,7 @@ function bakery() {
   const H = 9;
   const base = litSkin(BRICK, { grain: brickGrain, height: H });
   const skin = {
+    glazing: true,
     top: base.top,
     side: (a, k, x, y) => { const g = H - k; if (a >= 9.5 && a < 11.5 && g < 6.5) return "+"; if (inRound(a, g, 4.5, 4.5, 2.3)) return "="; return base.side(a, k, x, y); },
     end: (b, k, x, y) => { const g = H - k; if (b >= 3 && b < 8 && g >= 2.5 && g < 6) return END_GLASS; return base.end(b, k, x, y); },
@@ -104,6 +106,7 @@ function fishmonger() {
   const base = white(H);
   const skin = front(base, H, { glass: [1, 8], gH: [2.5, 6.5], doorMid: 10.5 });
   const tiled = {
+    glazing: (face, u, k) => H - k >= 2, // blue floor tiles are paint, not glass
     top: skin.top,
     side: (a, k, x, y) => (H - k < 2 && !(a >= 9.5 && a < 11.5) ? (Math.floor(a) % 2 ? "J" : "I") : skin.side(a, k, x, y)),
     end: (b, k, x, y) => (H - k < 2 ? (Math.floor(b) % 2 ? "H" : "G") : skin.end(b, k, x, y)),
@@ -123,13 +126,14 @@ function bookshop() {
   const H = 14;
   const brick = walled(litSkin(BRICK, { grain: brickGrain, height: H }), H, { storey: 7, sill: 9, winH: 3, period: 4, winW: 2, from: 1 });
   const skin = {
+    glazing: true,
     top: brick.top,
     side: (a, k, x, y) => { const g = H - k; if (g < 7) { if (a >= 9.5 && a < 11.5 && g < 6.5) return "+"; if (a >= 1.5 && a < 8 && g >= 1.5 && g < 6) return "="; return g >= 6 || Math.floor(a) % 8 === 0 ? EARTH[1] : EARTH[2]; } return brick.side(a, k, x, y); },
     end: (b, k, x, y) => { const g = H - k; if (g < 7) { if (b >= 3 && b < 8 && g >= 1.5 && g < 6) return END_GLASS; return EARTH[0]; } return brick.end(b, k, x, y); },
   };
   return [
     box(3, 13, 2.5, 13.5, 0, H, skin),
-    box(3.5, 8.5, 13.5, 14.5, 1, 6, { top: () => EARTH[3], side: () => "=", end: () => END_GLASS }), // the bay window
+    box(3.5, 8.5, 13.5, 14.5, 1, 6, { glazing: true, top: () => EARTH[3], side: () => "=", end: () => END_GLASS }), // the bay window
     box(3, 9, 13.5, 15, 6, 6.8, TIMBER),
     ...hipRoof(3, 13, 2.5, 13.5, H, 3, 1.4),
     chimney(4, 3.5, H + 6, 2),
@@ -181,7 +185,7 @@ function teaRoom() {
     box(1.5, 12.5, 2.5, 11, 0, H, brick),
     ...hipRoof(1.5, 12.5, 2.5, 11, H, 3, 1.4),
     chimney(2.5, 3.5, H + 6, 2),
-    box(2.5, 7, 11, 12, 1, 5.5, { top: () => EARTH[3], side: () => "=", end: () => END_GLASS }), // the bay
+    box(2.5, 7, 11, 12, 1, 5.5, { glazing: true, top: () => EARTH[3], side: () => "=", end: () => END_GLASS }), // the bay
     box(2, 7.5, 11, 12.5, 5.5, 6.3, TIMBER),
     box(8.5, 12.5, 11, 14, 6, 7, SLATE_SKIN), // the porch roof
     box(8.7, 9.5, 13, 13.8, 0, 6, litSkin(EARTH, { height: 6 })), box(11.5, 12.3, 13, 13.8, 0, 6, litSkin(EARTH, { height: 6 })),
@@ -196,6 +200,7 @@ function pub() {
   const brick = walled(litSkin(BRICK, { grain: brickGrain, height: H1 }), H1, { storey: 8, sill: 2.5, winH: 3.5, period: 4, winW: 2, from: 1, door: doorAt(10, 6.5, 1.3) });
   const upper = framed(H2);
   const skin = {
+    glazing: true,
     top: upper.top,
     side: (a, k, x, y) => (H - k < H1 ? brick.side(a, k - H2, x, y) : (H - k >= H1 + 2 && H - k < H1 + 5 && Math.floor(a) % 4 === 2 ? "=" : upper.side(a, k, x, y))),
     end: (b, k, x, y) => (H - k < H1 ? brick.end(b, k - H2, x, y) : (H - k >= H1 + 2 && H - k < H1 + 5 && Math.floor(b) % 4 === 2 ? END_GLASS : upper.end(b, k, x, y))),

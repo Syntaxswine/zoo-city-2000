@@ -428,6 +428,7 @@ export function createUI(app) {
       if (rep.part) lines.push(el("div", "dim", `part of the block at (${tx},${ty}) — one building on ${rep.side * rep.side} tiles; its animals are counted there`));
       // A shop of the pool (SPEC §12.2d): its kind by the tile, its keepers by whoever works there now.
       if (rep.shop) lines.push(el("div", "dim", `${rep.shop.title}${rep.shop.keeper ? ` (${rep.shop.keeper})` : ""} — ${rep.shop.blurb}`));
+      if (rep.mark) lines.push(el("div", "dim", rep.mark.line));
       // A landmark (SPEC §3c): the block the species made, named when it rose and kept until it comes apart.
       if (rep.landmark) lines.push(el("div", "dim", `a landmark — the block the ${rep.landmark.species.map(pluralSpecies).join(" and ")} made: ${rep.landmark.blurb}`));
     }

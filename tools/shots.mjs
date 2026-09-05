@@ -20,6 +20,7 @@ import { fileURLToPath } from "node:url";
 import { installCanvas, createCanvas, encodePNG, zoom as zoomCanvas } from "./headless-canvas.mjs";
 import { rasterize } from "../js/art/format.js";
 import { art } from "../js/art/index.js";
+import { MARKS, characterSprite } from "../js/art/building-character.js";
 import { BUILDINGS, PARK, ZOO, FIRE_STATION, POLICE_STATION, PACIFICATION_CENTRE, OVERLAYS } from "../js/art/buildings.js";
 import { BLOCKS } from "../js/art/blocks.js";
 import { LANDMARK_ART } from "../js/art/landmarks.js";
@@ -108,10 +109,17 @@ function sheet(name, cells, { cols, cellW, cellH, groundY, z }) {
 
 function sheets(z) {
   const out = [];
-  // Buildings: 4 zones × 3 tiers × 2 variants (a row per zone: R, C, I, M), then civics and overlays.
+  // Buildings: 4 zones × 3 tiers × 4 variants (a row per family), then civics and overlays.
   const b = [];
-  for (const zone of [1, 2, 3, 4]) for (const tier of [1, 2, 3]) for (const v of [0, 1]) b.push({ sprite: BUILDINGS[zone][tier][v], label: BUILDINGS[zone][tier][v].name, onTile: true });
-  out.push(sheet("sheet-buildings.png", b, { cols: 6, cellW: 80, cellH: 100, groundY: 84, z }));
+  for (const zone of [1, 2, 3, 4]) for (const tier of [1, 2, 3]) for (const v of [0, 1, 2, 3]) b.push({ sprite: BUILDINGS[zone][tier][v], label: BUILDINGS[zone][tier][v].name, onTile: true });
+  out.push(sheet("sheet-buildings.png", b, { cols: 4, cellW: 80, cellH: 100, groundY: 84, z }));
+
+  out.push(sheet("sheet-marks.png", Object.entries(MARKS).flatMap(([species, sprite], n) => [
+    { sprite, label: species },
+    { sprite: characterSprite(BUILDINGS[1][2][n % 4], { majority: n + 1, lit: 2 }), label: `${species}-home`, onTile: true },
+    { sprite: characterSprite(BUILDINGS[2][2][n % 4], { majority: n + 1, lit: 2 }), label: `${species}-work`, onTile: true },
+  ]), { cols: 6, cellW: 80, cellH: 100, groundY: 84, z }));
+  out.push(sheet("sheet-building-lights.png", [1, 2, 3, 4].flatMap(zone => [0, 1, 2, 3].map(lit => ({ sprite: characterSprite(BUILDINGS[zone][3][2], { lit }), label: `${zone}-lit-${lit}`, onTile: true }))), { cols: 4, cellW: 80, cellH: 110, groundY: 94, z }));
 
   // The hi-res set (js/art/hires.js): a 1× sprite scaled ×2 beside its 2× twin, at zoom 1 so the sheet IS the comparison.
   {

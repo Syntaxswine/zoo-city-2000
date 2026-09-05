@@ -1,7 +1,8 @@
 // index.js — the registry the renderer calls. SPEC §16.
 //
-//   art.building(zone, tier, variant, side, theme)   zone 1|2|3|4 or 'R'|'C'|'I'|'M', tier 1..3; side 2 | 3 → the zone's block (blocks.js), tier ignored;
-//                                       variant is the tile's whole byte: & 1 the mirror; for C tier 1, >> 1 picks the shop of the pool (shops.js)
+//   art.building(zone, tier, variant, side, theme, character)   zone 1|2|3|4 or 'R'|'C'|'I'|'M', tier 1..3; side 2 | 3 → the zone's block (blocks.js), tier ignored;
+//                                       variant is the whole tile byte; original families use & 3; the shop kind still uses >> 1
+//                                       character = {lit:0..3, majority:species index+1, seed:tile index}; omitted for previews
 //                                       theme > 0 with side 3 → that landmark (landmarks.js; ids per js/sim/landmarks.js)
 //   art.civic(kind)                     'park' | 'zoo' | 'fire' | 'police' | 'centre'
 //   art.road(mask, busy)                4-bit mask N=1 E=2 S=4 W=8
@@ -24,7 +25,7 @@
 //   art.hires(sprite)                   the sprite's 2× twin from its recipe (hires.js), or null for a hand-drawn one; the renderer uses it at zoom 2
 //   art.bubble(w, h)                    reserved for Part A
 //   art.portrait(species, opts)         16×16 face; opts.age/look/expression
-//   art.mark(species)                   reserved for Part E
+//   art.mark(species)                   6×6 stamp for the majority residents/staff
 //   art.look(id)                        stable { shade, mark } citizen look
 //   art.crossing(roadMask, railMask, busy)  a level crossing: the road's mask, the line's mask (rail.js)
 //   allSprites()                        [{ name, sprite }] for the audit
@@ -36,6 +37,7 @@ import { buildingSprite, civicSprite, overlaySprite, allBuildings } from "./buil
 import { allBlocks } from "./blocks.js"; // registers the 2×2 and 3×3 families with buildings.js at load
 import { allLandmarks } from "./landmarks.js"; // registers the eleven landmarks (SPEC §3c)
 import { allShops } from "./shops.js"; // registers the shop pool (SPEC §12.2d)
+import { markSprite, MARKS } from "./building-character.js";
 import { hires } from "./hires.js";
 import { roadSprite, bridgeSprite, allRoads } from "./roads.js";
 import { wallSprite, tunnelSprite, allWalls } from "./walls.js";
@@ -97,7 +99,7 @@ function notBuilt(name) {
 
 export const bubble = bubbleSprite;
 export const portrait = portraitSprite;
-export function mark(_species) { return notBuilt("mark"); }
+export const mark = markSprite;
 export function look(id) {
   if (!Number.isFinite(id)) throw new Error("art.look: id must be a finite number");
   let h = Math.imul(id | 0, 0x9e3779b1) >>> 0;
@@ -136,7 +138,7 @@ export const art = Object.freeze({
 
 /** Every sprite the registry can hand out, named — the check.mjs audit walks this. */
 export function allSprites() {
-  const out = [...allBuildings(), ...allBlocks(), ...allLandmarks(), ...allShops(), ...allRoads(), ...allWalls(), ...allRail(), ...allTerrain(), ...allCitizens(), ...BUBBLE_SAMPLES.map((sprite) => ({ name: sprite.name, sprite }))];
+  const out = [...Object.values(MARKS).map(sprite => ({ name: sprite.name, sprite })), ...allBuildings(), ...allBlocks(), ...allLandmarks(), ...allShops(), ...allRoads(), ...allWalls(), ...allRail(), ...allTerrain(), ...allCitizens(), ...BUBBLE_SAMPLES.map((sprite) => ({ name: sprite.name, sprite }))];
   const seen = new Set();
   return out.filter(({ name }) => (seen.has(name) ? false : (seen.add(name), true)));
 }

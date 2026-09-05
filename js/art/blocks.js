@@ -75,7 +75,7 @@ function pen(a0, a1, b0, b1, gateAt = null) {
 
 /** A sawtooth roof along `a` over [a0, a1] × [b0, b1] from height h: teeth `pitch` apart, glazed on the +tx face (END_GLASS, the shaded face — never day glass on the dark side). */
 function sawtooth(a0, a1, b0, b1, h, pitch = 5) {
-  const tooth = { top: () => SLATE[2], side: () => SLATE[1], end: (b, k) => (k < 2.5 ? END_GLASS : SLATE[0]) };
+  const tooth = { glazing: true, top: () => SLATE[2], side: () => SLATE[1], end: (b, k) => (k < 2.5 ? END_GLASS : SLATE[0]) };
   const out = [];
   for (let a = a0; a + pitch * 0.8 <= a1 + 0.01; a += pitch) out.push(box(a, Math.min(a1, a + pitch * 0.8), b0, b1, h, h + 3.5, tooth));
   return out;
@@ -216,6 +216,7 @@ function arcade() {
   const H = 18;
   const base = litSkin(CONC_WALL, { height: H });
   const skin = {
+    glazing: true,
     top: base.top,
     side: (a, k, x, y) => {
       const g = H - k;
@@ -233,7 +234,7 @@ function arcade() {
   // The clock: a 3-unit white face with a dark centre on both near faces of the tower box.
   const face = (u, k) => (u >= 1 && u < 4 && k >= 1.5 && k < 4.5 ? (u >= 2 && u < 3 && k >= 2.5 && k < 3.5 ? "+" : CONC[4]) : null);
   const clock = { top: () => CONC[3], side: (a, k) => face(a, k) || CONC[2], end: (b, k) => face(b, k) || CONC[1] };
-  const lantern = { top: () => SLATE[2], side: (a, k) => (k >= 1 && k < 4 ? "=" : SLATE[1]), end: (b, k) => (k >= 1 && k < 4 ? END_GLASS : SLATE[0]) };
+  const lantern = { glazing: true, top: () => SLATE[2], side: (a, k) => (k >= 1 && k < 4 ? "=" : SLATE[1]), end: (b, k) => (k >= 1 && k < 4 ? END_GLASS : SLATE[0]) };
   const boxes = [
     box(1, 31, 1, 24, 0, H, skin),
     box(0.5, 31.5, 0.5, 24.5, H, H + 1, C_ROOF),
@@ -263,6 +264,7 @@ function emporium() {
   const H1 = 16, H2 = 14, H3 = 12;
   const base = litSkin(CONC_WALL, { height: H1 });
   const ground = {
+    glazing: true,
     top: base.top,
     side: (a, k, x, y) => { const g = H1 - k; if (g >= 1 && g < 9 && Math.floor(a) % 7 !== 6) return a >= 30 && a < 34 && g < 7 ? "+" : "="; if (g >= 11.5 && g < 14.5 && Math.floor(a) % 3 === 1) return "="; return base.side(a, k, x, y); },
     end: (b, k, x, y) => { const g = H1 - k; if (g >= 1 && g < 9 && Math.floor(b) % 7 !== 6) return END_GLASS; if (g >= 11.5 && g < 14.5 && Math.floor(b) % 3 === 1) return END_GLASS; return base.end(b, k, x, y); },
@@ -333,7 +335,7 @@ function foundry() {
   const HA = 16, HB = 20;
   const wallA = walled(litSkin(RUST, { grain: ribGrain, height: HA }), HA, { storey: 16, sill: 8, winH: 3, period: 5, winW: 3, from: 1, door: doorAt(8, 8, 3) });
   const wallB = walled(litSkin(RUST, { grain: ribGrain, height: HB }), HB, { storey: 10, sill: 5, winH: 3, period: 4, winW: 2, from: 1, door: doorAt(10, 8, 3) });
-  const lantern = { top: () => SLATE[2], side: (a, k) => (k >= 1 && k < 3 ? "=" : SLATE[1]), end: (b, k) => (k >= 1 && k < 3 ? END_GLASS : SLATE[0]) };
+  const lantern = { glazing: true, top: () => SLATE[2], side: (a, k) => (k >= 1 && k < 3 ? "=" : SLATE[1]), end: (b, k) => (k >= 1 && k < 3 ? END_GLASS : SLATE[0]) };
   const coal = flatSkin(SLATE[1], SLATE[0], SLATE[0]);
   const boxes = [
     box(1, 22, 1, 30, 0, HA, wallA),
@@ -372,6 +374,7 @@ function abattoir() {
   const brick = litSkin(BRICK, { grain: brickGrain, height: BRICK_TO });
   const slate = litSkin(SLATE, { height: H - BRICK_TO });
   const hall = {
+    glazing: true,
     top: slate.top,
     side: (a, k, x, y) => { const g = H - k; if (a >= 9 && a < 12 && g < 6) return "+"; if (g >= 10 && g < 12 && Math.floor(a) % 3 === 1) return "="; return g < BRICK_TO ? brick.side(a, k - (H - BRICK_TO), x, y) : slate.side(a, k, x, y); },
     end: (b, k, x, y) => { const g = H - k; if (g >= 10 && g < 12 && Math.floor(b) % 3 === 1) return END_GLASS; return g < BRICK_TO ? brick.end(b, k - (H - BRICK_TO), x, y) : slate.end(b, k, x, y); },
@@ -412,11 +415,12 @@ function meatExchange() {
   const brick = litSkin(BRICK, { grain: brickGrain, height: BRICK_TO });
   const slate = litSkin(SLATE, { height: H - BRICK_TO });
   const hall = {
+    glazing: true,
     top: slate.top,
     side: (a, k, x, y) => { const g = H - k; if (a >= 17 && a < 21 && g < 7) return "+"; if (g >= 13 && g < 15.5 && Math.floor(a) % 3 === 1) return "="; if (g >= 3 && g < 6 && Math.floor(a) % 6 === 2) return "="; return g < BRICK_TO ? brick.side(a, k - (H - BRICK_TO), x, y) : slate.side(a, k, x, y); },
     end: (b, k, x, y) => { const g = H - k; if (g >= 13 && g < 15.5 && Math.floor(b) % 3 === 1) return END_GLASS; if (g >= 3 && g < 6 && Math.floor(b) % 6 === 2) return END_GLASS; return g < BRICK_TO ? brick.end(b, k - (H - BRICK_TO), x, y) : slate.end(b, k, x, y); },
   };
-  const lantern = { top: () => SLATE[2], side: (a, k) => (k >= 1 && k < 3.5 ? "=" : SLATE[1]), end: (b, k) => (k >= 1 && k < 3.5 ? END_GLASS : SLATE[0]) };
+  const lantern = { glazing: true, top: () => SLATE[2], side: (a, k) => (k >= 1 && k < 3.5 ? "=" : SLATE[1]), end: (b, k) => (k >= 1 && k < 3.5 ? END_GLASS : SLATE[0]) };
   const coldBase = litSkin(SLATE, { height: 12 });
   const cold = { top: coldBase.top, side: (a, k, x, y) => (a >= 1.5 && a < 2.5 && ((12 - k >= 4 && 12 - k < 6) || (12 - k >= 9 && 12 - k < 11)) ? "+" : coldBase.side(a, k, x, y)), end: coldBase.end };
   const sign = { top: () => SLATE[2], side: (a, k) => (a >= 2 && a < 2.5 && k >= 1 && k < 2 ? BRICK[3] : SLATE[1]), end: (b, k) => (b >= 2 && b < 2.5 && k >= 1 && k < 2 ? BRICK[3] : SLATE[0]) };

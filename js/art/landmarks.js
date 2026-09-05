@@ -64,6 +64,7 @@ function logSkin(H, { door = null, win = null, dark = false } = {}) {
   const course = (g) => Math.floor(g) % 3 === 2;
   const d = dark ? 1 : 0; // the great lodge one rung darker throughout: at the top rung it read as a pale sand pyramid
   return {
+    glazing: true,
     top: () => EARTH[4 - d],
     side: (a, k) => { const g = H - k; if (door && door(a, g)) return "+"; if (win && win(a, g)) return "="; return course(g) ? EARTH[1 - d] : EARTH[3 - d]; },
     end: (b, k) => { const g = H - k; if (win && win(b, g)) return END_GLASS; return course(g) ? EARTH[0] : EARTH[2 - d]; },
@@ -74,6 +75,7 @@ function logSkin(H, { door = null, win = null, dark = false } = {}) {
 function framed(H, { storey = 8, door = null, win = null } = {}) {
   const stud = (u, g) => Math.floor(u) % 5 === 0 || Math.floor(g) % storey === storey - 1;
   return {
+    glazing: true,
     top: () => CONC[4],
     side: (a, k) => { const g = H - k; if (door && door(a, g)) return "+"; if (win && win(a, g)) return "="; return stud(a, g) ? EARTH[1] : CONC[3]; },
     end: (b, k) => { const g = H - k; if (win && win(b, g)) return END_GLASS; return stud(b, g) ? EARTH[0] : CONC[2]; },
@@ -124,6 +126,7 @@ function warrenTowers() {
     const base = litSkin(BRICK, { grain: brickGrain, height: H });
     const hole = (u, g) => { const s = Math.floor(g / 8); const gg = g - 8 * s; return g > 1 && inRound(((u + (s & 1 ? 3 : 0)) % 6), gg, 3, 4.5, 1.6); };
     return {
+      glazing: true,
       top: base.top,
       side: (a, k, x, y) => { const g = H - k; if (doorMid != null && g < 5 && (g < 2.5 ? Math.abs(a - doorMid) < 2.2 : inRound(a, g, doorMid, 2.5, 2.2))) return "+"; return hole(a, g) ? "=" : base.side(a, k, x, y); },
       end: (b, k, x, y) => { const g = H - k; return hole(b, g) ? END_GLASS : base.end(b, k, x, y); },
@@ -198,7 +201,7 @@ function theRoost() {
     for (const [da, db] of [[0, 0], [s - 1.2, 0], [0, s - 1.2], [s - 1.2, s - 1.2]]) out.push(box(a + da, a + da + 1.2, b + db, b + db + 1.2, 0, legs, litSkin(EARTH, { height: legs })));
     out.push(box(a - 0.5, a + s + 0.5, b - 0.5, b + s + 0.5, legs, legs + 1, TIMBER)); // the deck
     const body = litSkin(EARTH, { grain: ribGrain, height: H });
-    const skin = { top: body.top, side: (aa, k, x, y) => (perchWin(H)(aa, H - k) ? "=" : body.side(aa, k, x, y)), end: (bb, k, x, y) => (perchWin(H)(bb, H - k) ? END_GLASS : body.end(bb, k, x, y)) };
+    const skin = { glazing: true, top: body.top, side: (aa, k, x, y) => (perchWin(H)(aa, H - k) ? "=" : body.side(aa, k, x, y)), end: (bb, k, x, y) => (perchWin(H)(bb, H - k) ? END_GLASS : body.end(bb, k, x, y)) };
     out.push(box(a, a + s, b, b + s, legs + 1, legs + 1 + H, skin));
     out.push(...pyramid(a, a + s, b, b + s, legs + 1 + H, 4));
     return out;
@@ -295,7 +298,8 @@ function foxAndCat() {
   const range = (arch) => {
     const brick = walled(litSkin(BRICK, { grain: brickGrain, height: H1 }), H1, { storey: 9, sill: 3, winH: 3, period: 5, winW: 2, from: 2, door: arch });
     return {
-      top: upper.top,
+      glazing: true,
+    top: upper.top,
       side: (a, k, x, y) => { const g = H - k; return g < H1 ? brick.side(a, k - H2, x, y) : upper.side(a, k, x, y); },
       end: (b, k, x, y) => { const g = H - k; return g < H1 ? brick.end(b, k - H2, x, y) : upper.end(b, k, x, y); },
     };
@@ -344,6 +348,7 @@ function nightMarket() {
   const H = 16;
   const base = litSkin(CONC_WALL, { height: H });
   const hall = {
+    glazing: true,
     top: base.top,
     side: (a, k, x, y) => { const g = H - k; if (g >= 1 && g < 7 && Math.floor(a) % 7 !== 6) return a >= 20 && a < 26 && g < 6 ? "+" : "="; if (g >= 10 && g < 13 && Math.floor(a) % 3 === 1) return "-"; return base.side(a, k, x, y); },
     end: (b, k, x, y) => { const g = H - k; if (g >= 1 && g < 7 && Math.floor(b) % 7 !== 6) return END_GLASS; if (g >= 10 && g < 13 && Math.floor(b) % 3 === 1) return "-"; return base.end(b, k, x, y); },
@@ -393,7 +398,7 @@ function theDairy() {
     box(1, 47, 1, 47, 0, 0.5, SAWDUST), // the yard
     box(1, 29, 1, 22, 0, H, wall), // the churn hall
     ...hipRoof(1, 29, 1, 22, H, 2, 1.5),
-    box(8, 22, 8, 15, H + 2, H + 5.5, { top: () => SLATE[2], side: (a, k) => (k >= 0.8 && k < 2.8 ? "=" : SLATE[1]), end: (b, k) => (k >= 0.8 && k < 2.8 ? END_GLASS : SLATE[0]) }), // the clerestory
+    box(8, 22, 8, 15, H + 2, H + 5.5, { glazing: true, top: () => SLATE[2], side: (a, k) => (k >= 0.8 && k < 2.8 ? "=" : SLATE[1]), end: (b, k) => (k >= 0.8 && k < 2.8 ? END_GLASS : SLATE[0]) }), // the clerestory
     box(7.5, 22.5, 7.5, 15.5, H + 5.5, H + 6.5, SLATE_SKIN),
     chimney(2, 2, H + 10, 2.2),
     ...silo(32, 3, 34), ...silo(40, 3, 30),
@@ -414,7 +419,7 @@ function theDairy() {
 function truffleWorks() {
   const H = 12;
   const shed = walled(litSkin(RUST, { grain: ribGrain, height: H }), H, { storey: 12, sill: 6, winH: 3, period: 5, winW: 3, from: 1, door: doorAt(8, 7.5, 3) });
-  const lantern = { top: () => SLATE[2], side: (a, k) => (k >= 1 && k < 3 ? "=" : SLATE[1]), end: (b, k) => (k >= 1 && k < 3 ? END_GLASS : SLATE[0]) };
+  const lantern = { glazing: true, top: () => SLATE[2], side: (a, k) => (k >= 1 && k < 3 ? "=" : SLATE[1]), end: (b, k) => (k >= 1 && k < 3 ? END_GLASS : SLATE[0]) };
   return [
     box(1, 47, 1, 47, 0, 0.5, MUD),
     box(1, 22, 1, 18, 0, H, shed),
@@ -442,6 +447,7 @@ function honeyWorks() {
   const win = winsOf({ storey: 13, sill: 5, winH: 3, period: 5, winW: 2, from: 2 });
   const body = litSkin(EARTH, { grain: ribGrain, height: H });
   const hall = {
+    glazing: true,
     top: body.top,
     side: (a, k, x, y) => { const g = H - k; if (g < 6 && (g < 3 ? Math.abs(a - 10) < 2.8 : inRound(a, g, 10, 3, 2.8))) return "+"; return win(a, g) ? "=" : body.side(a, k, x, y); },
     end: (b, k, x, y) => (win(b, H - k) ? END_GLASS : body.end(b, k, x, y)),
@@ -479,7 +485,7 @@ function theSawmill() {
     box(1, 27, 1, 3, 0, H, back),
     post(1, 3), post(13, 3), post(25.5, 3), post(1, 16), post(13, 16), post(25.5, 16),
     box(0.5, 27.5, 0.5, 17.5, H, H + 1.2, SLATE_SKIN),
-    box(3, 25, 2, 8, H + 1.2, H + 3.6, { top: () => SLATE[2], side: (a, k) => (k >= 0.6 && k < 2 ? "=" : SLATE[1]), end: (b, k) => (k >= 0.6 && k < 2 ? END_GLASS : SLATE[0]) }),
+    box(3, 25, 2, 8, H + 1.2, H + 3.6, { glazing: true, top: () => SLATE[2], side: (a, k) => (k >= 0.6 && k < 2 ? "=" : SLATE[1]), end: (b, k) => (k >= 0.6 && k < 2 ? END_GLASS : SLATE[0]) }),
     box(2.5, 25.5, 1.5, 8.5, H + 3.6, H + 4.4, SLATE_SKIN),
     box(6, 22, 8, 12, 0, 3, TIMBER), // the saw bench
     box(13.5, 14.5, 7, 13, 3, 6, { top: () => "+", side: () => SLATE[1], end: () => SLATE[0] }), // the blade

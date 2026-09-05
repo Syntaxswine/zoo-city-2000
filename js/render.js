@@ -31,10 +31,11 @@
 // ground layer is built at 2× too, so the roads and the grass sharpen with
 // the buildings. S below is that factor: 1 at zoom 1, 2 at zoom 2.
 
+import { lightLevel } from "./art/building-character.js";
 import { toScreen, toWorld, pickTile, HALF_H, HALF_W, TILE_W, TILE_H } from "./iso/iso.js";
 import { paintScene, Z_BUILDING } from "./iso/painter.js";
 import { rasterize } from "./art/format.js";
-import { ZONE, CIVIC, TERRAIN, ROAD, isPart, anchorOf, sideOf } from "./sim/world.js";
+import { ZONE, CIVIC, TERRAIN, ROAD, capacityOf, isPart, anchorOf, sideOf } from "./sim/world.js";
 import { DECK_TOP } from "./art/roads.js";
 import { lotScore, REASON } from "./sim/lots.js";
 import { siteRoadDist, asksAccess, served } from "./sim/fields.js";
@@ -511,7 +512,11 @@ export function createRenderer(canvas, initialWorld, art) {
           standing = art.tree(nearWater && v & 1 ? "willow" : v % 3 === 2 ? "tall" : "round");
         } else if (world.tier[i] > 0 && world.zone[i] !== ZONE.NONE) {
           // A block stands on its anchor and its parts stand for nothing (the sprite's footprint keys it; painter.js).
-          if (!isPart(world, i)) standing = art.building(world.zone[i], world.tier[i], world.variant[i], sideOf(world, i), world.theme[i]); // the whole variant byte: & 1 the mirror, >> 1 the shop of the pool for C tier 1 (SPEC §12.2d); a 3×3 with a theme draws its landmark (§3c)
+          if (!isPart(world, i)) {
+            const fill = (world.zone[i] === ZONE.R ? world.occupants[i] : world.staff[i]) / (capacityOf(world, i) || 1);
+            standing = art.building(world.zone[i], world.tier[i], world.variant[i], sideOf(world, i), world.theme[i],
+              { lit: lightLevel(fill), majority: world.majority[i], seed: i });
+          }
         } else if (world.civic[i] === CIVIC.PARK) standing = art.civic("park");
         else if (world.civic[i] === CIVIC.ZOO) standing = art.civic("zoo");
         else if (world.civic[i] === CIVIC.FIRE) standing = art.civic("fire");

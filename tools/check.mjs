@@ -26,7 +26,8 @@
 import { readFileSync, readdirSync, statSync, existsSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { createWorld, ZONE, ROAD, capacityOf, jobsOf } from "../js/sim/world.js";
+import { lightLevel } from "../js/art/building-character.js";
+import { createWorld, ZONE, ROAD, capacityOf, jobsOf, isPart, sideOf } from "../js/sim/world.js";
 import { tick } from "../js/sim/tick.js";
 import { apply, replay, undo, costOf as costOfOp } from "../js/sim/ops.js";
 import { save, load, stateHash, stateHashNoNews, toPlain } from "../js/sim/save.js";
@@ -6029,11 +6030,11 @@ function costOfBulldoze(w, x, y) { return (0, costOfOp)(w, { kind: "bulldoze", x
   for (let v = 0; v < 256; v++) {
     const s = art.building(2, 1, v);
     const k = shopKind(v);
-    const want = k ? `C1-${SHOPS[k].key}-${v & 1}` : `C1-shop-${v & 1}`;
-    if (s !== SHOP_ART[k][v & 1] || s.name !== want || s.footprint[0] !== 1 || s.footprint[1] !== 1) wrong.push(`${v}:${s.name}`);
+    const want = k ? `C1-${SHOPS[k].key}-${v & 1}` : `C1-shop-${v & 3}`;
+    if (s !== SHOP_ART[k][v & (k === 0 ? 3 : 1)] || s.name !== want || s.footprint[0] !== 1 || s.footprint[1] !== 1) wrong.push(`${v}:${s.name}`);
   }
-  check("shops: art.building(2, 1, variant) is the pool's sprite for every byte — the kind by >> 1, the mirror by & 1 — on a 1×1 footprint", wrong.length === 0, wrong.slice(0, 5).join(" "));
-  check("shops: variants 0 and 1 are still the corner shop, and no other tier or zone reads the high bits",
+  check("shops: art.building(2, 1, variant) is the pool's sprite for every byte — the existing kind, four corner-shop plans and paired specialist shops — on a 1×1 footprint", wrong.length === 0, wrong.slice(0, 5).join(" "));
+  check("shops: variants 0 and 1 are still the corner shop, and other one-tile families read only the low two bits",
     art.building(2, 1, 0).name === "C1-shop-0" && art.building(2, 1, 1).name === "C1-shop-1" && art.building(2, 2, 37).name === "C2-store-1" && art.building(1, 1, 37).name === "R1-cottage-1" && art.building(3, 1, 200).name === "I1-shed-0");
   check("shops: every kind but the corner shop is its own pair of solids in the registry, tagged shop, with a hi-res twin",
     SHOPS.slice(1).every((s) => SHOP_ART[s.kind].length === 2 && SHOP_ART[s.kind].every((sp) => sp.tags.includes("shop") && art.hires(sp))));
@@ -6751,6 +6752,9 @@ if (existsSync(walkersPath)) {
     walkers.setCursor([sx + (t % 3) - 1, sy + ((t / 3) % 3 | 0) - 1]);
     walkers.update(0.05, viewport);
     walkers.list();
+    for (let i = 0; i < w2.tier.length; i++) if (w2.tier[i] && !isPart(w2, i)) {
+      art.building(w2.zone[i], w2.tier[i], w2.variant[i], sideOf(w2, i), w2.theme[i], { lit: lightLevel((w2.zone[i] === ZONE.R ? w2.occupants[i] : w2.staff[i]) / (capacityOf(w2, i) || 1)), majority: w2.majority[i], seed: i });
+    }
   }
   KNOBS.KILL_P = savePD;
   const paired = firstPred && firstRecs ? firstRecs.find((r) => r.killer === firstPred.citizen) : null;
@@ -6759,12 +6763,15 @@ if (existsSync(walkersPath)) {
     rec ? (firstPred ? `walker ${firstPred.citizen} carrying "${firstPred.preyName}" · ${firstRecs.length} record(s), matched ${paired ? `"${paired.victim.name}"` : "none"}` : "no predation walker") : "no killing landed in 30 forced months");
   check("the sack falls, is tied at the door, goes home over the shoulder, and the walker finishes", sawFall && sawTied && stoodAtDoor && sawCarry && gone, `fall ${sawFall} tied ${sawTied} door ${stoodAtDoor} carry ${sawCarry} gone ${gone}`);
   check("walkers standing longer than one second select the species idle frame", sawIdle);
-  check("walkers never write the sim: 30 years with Inspect needs on and off hash-equal", stateHash(w1) === stateHash(w2), `${stateHash(w1)} vs ${stateHash(w2)}`);
+  check("walkers never write the sim: 30 years with Inspect needs and building character on and off hash-equal", stateHash(w1) === stateHash(w2), `${stateHash(w1)} vs ${stateHash(w2)}`);
   const list = walkers.list();
   console.log(`walkers: ${list.length} active after 360 ticks`);
 } else {
   console.log("walkers: js/walkers.js not present yet — Part D skipped");
 }
+
+// ---- Part E: building character ----------------------------------------------
+{ const { checkBuildingCharacter } = await import("./check-building-character.mjs"); checkBuildingCharacter(check); }
 
 // ---- verdict ----------------------------------------------------------------------
 console.log(`${checks} checks, ${failures.length} failures`);

@@ -2153,3 +2153,64 @@ gets one and the honest reproduction besides.
 | a fix pinned at a counter | pin it at the READER. Gating `cen.policeStations` did nothing for `justice`'s force, one line away |
 | a check that reads a readout with `\|\| 0` | a missing field reads as compliance, and a mutant can delete both together |
 | a fixture that cannot make its case | `need-stress` asserts "no walked tile is un-walkable" in a world with no rail: there is nothing to walk that is not a road |
+
+## 25. People E — the people show on their buildings (2026-09-05)
+
+The owner's instruction was to take section E while another agent finished R.
+R's 4b46204 landed during this work; it was fast-forwarded into the checkout,
+E reapplied cleanly, and the combined suite and before/after comparison rerun.
+No access or simulation rule is changed by E.
+
+The twelve original zone/tier families now have four distinct plans (48 total).
+The additional plans are authored solids in `js/art/building-plans.js` through
+the existing rasterizer. The commercial tower's original mirrored plans were
+identical because both roof features sat on the diagonal; its stack is now
+off-axis. The specialist shop pool keeps the same business-kind mapping.
+Only the corner-shop kind takes four plans; the other ten shops keep two.
+
+`building-character.js` decorates all 106 unique lots, shops, blocks and
+landmarks with four occupancy-light levels and fourteen species stamps. Glass
+skins declare glazing; blue paint, water, ice and fishmonger floor tiles do
+not light. R reads occupants/capacity; C/I/M read staff/jobs. Marks read the
+existing majority array, and `lotReport.mark` feeds the Inspect sentence.
+The cache is keyed by base plan, light level, species and one of four stable
+tile phases. Both normal and hi-res rendering use the decorated solid recipe.
+
+The first sheet hid marks behind bays and roof structures. Socket selection
+now uses the building's depth buffer, with a separate socket pair recorded
+for each mirrored plan. A second visual pass caught residential marks being
+placed on chimneys; residential candidates are now glazed facades, verified
+explicitly by the suite. Staff marks use a visible roof point. Every changed
+mark pixel stays in its 6×6 socket and the building's footprint prism at both
+resolutions. This was a local PNG/code review, not an independent critic panel.
+
+Verification:
+
+- Canonical suite: 547 checks, zero failures after R integration; the final
+  facade restriction is covered by the same visibility/bounds check.
+- Part E checks 106 plans, 111,513 glass-pixel transitions and 19,697 changed
+  mark pixels at 1× and 2×. All twelve four-plan families differ pairwise;
+  all fourteen stamps are unique. Increasing occupancy only adds lit glass.
+- The existing 30-year display-on/off test now queries building appearances
+  every month as well as walkers and needs; the simulation hashes agree.
+- Independent seed-7 30-year mayor runs on R's baseline and R+E both end at
+  hash `92b2a0d2`, 1,659 citizens, 1,009 households and 277 events.
+- The real play renderer, seed 7 at June 2020, gives the same 1,512 citizens,
+  §33,139 and crime 37 before and after. Committed `people-e-before.png` and
+  `people-e-after.png` differ visually; the lots and simulation are unchanged.
+- Generated and read the buildings, marks, lights and hi-res contact sheets.
+  The live browser loaded the 1,512-citizen city and drew both zooms with no
+  warning/error logs. A 30-frame warm sample of the industrial view measured
+  1.32 ms at zoom 1 and 0.51 ms at zoom 2 on this host; this is a view-specific
+  warm-cache measurement, not a cold-start or whole-city performance claim.
+
+| symptom | where to look |
+|---|---|
+| a blue structure starts glowing | its skin was incorrectly tagged `glazing`; fishmonger tiles need their height predicate |
+| a mark disappears at one zoom | socket visibility and `stampAtWorld` depth; test both resolutions |
+| a residential mark sits on a chimney | wall candidates must be facade skins, not arbitrary tall boxes |
+| a new plan never appears on commercial tier 1 | the shop kind owns the high variant bits; keep its mapping intact |
+| every lit window rerasterizes every frame | preserve appearance-cache identity; the renderer raster cache is sprite-based |
+
+SPEC §12.2e is the current contract. Age-based ivy and patched roofs remain
+E's optional stretch. No saved age array or save migration was introduced.
