@@ -11,7 +11,12 @@ could ship whole.
 ## Knowledge and culture — specified, not implemented
 
 - [ ] **University (3×3), Amphitheater (3×3), Library (2×2), Gallery (2×2):** [proposal and acceptance criteria](docs/PROPOSAL-KNOWLEDGE-CULTURE-2026-09-05.md). Knowledge supports city capacity; culture adds local mood. Building sizes and coverage are owner requirements: University half the map tiles, Amphitheater one eighth, Library/Gallery five-tile range. Mechanics and balance values are proposed. The historical school/accelerated-adulthood idea remains deferred.
+- [ ] **Culture's channel RULED 2026-09-05** (the owner: *"a boon to both happiness as well as property desirability"*, later *"a prerequisite to more affluent housing"*) → the mood term AND a land-value halo through `reach.forEachWithinAll`; culture and knowledge as per-tile strength fields. Appended to the proposal as an owner ruling. Still open: the University's +600·K vs the Large Park's +500; the keys.
 - [ ] **Reviewed 2026-09-05** — [REVIEW-KNOWLEDGE-CULTURE-2026-09-05.md](docs/REVIEW-KNOWLEDGE-CULTURE-2026-09-05.md): knowledge → cap is the right channel (measure the K-mean bust into camping first); culture as a mood term is a measured no-op (three readers, none fires in a growing town) — pick a channel; found in passing and FIXED in the same commit: every 3×3 campus halo was seeded from its ANCHOR tile (`node tools/haloprobe.mjs`: 169 covered tiles, now 225) — `reach.forEachWithinAll` is the one flood for a footprint and the new buildings must seed through it. Three owner decisions listed at the end.
+
+## Wealth and class — PROPOSED 2026-09-05, nothing built
+
+- [ ] **The ultrawealthy, their mansions, and whose burglary gets worked first:** [PROPOSAL-WEALTH-AND-CLASS-2026-09-05.md](docs/PROPOSAL-WEALTH-AND-CLASS-2026-09-05.md). The owner's sketch verbatim in §0 (*"the ultrawealthy want to have a 3x3 plot next to everything, they will need their own sprites too for their mansions. any theft from the ultrawealthy gets priority policing and one step harsher punishment."*). Class on the HOUSEHOLD, decided by the lot at arrival; a prerequisite ladder (`attainableClass` with an unmet list the card prints); a player-placed 3×3 Estate plot that sprouts a mansion of capacity 8 only when the rungs are met; `victimClass` on the file → `ARREST_PRIORITY` + a longer case + `+1` on the theft counter. Sequenced AFTER knowledge-and-culture (culture is the first rung). Eight owner decisions in §8; the estate-quarter fixture is the instrument.
 
 ## Owner-reported follow-ups — 2026-09-05
 

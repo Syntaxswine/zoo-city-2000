@@ -106,3 +106,27 @@ Put all proposed constants in KNOBS. Add independent headless probe scenarios be
 Required regressions include every footprint edge and corner; invalid placement and occupied camps; far-edge road access; disconnection/reconnection; walls and tunnels; joined-home coverage; five-tile radius and radius+1 for small buildings; exact half-map/eighth-map tile budgets on square, rectangular and odd-area maps; deterministic final-layer ties; edge compensation for large catchments; underfilled sealed regions; overlap union versus nominal summed area; maximum-source overlap; all Library/University mixtures; culture and park independence; campus fire/flood/demolition/undo; job cleanup; old-save compatibility; save/load/continuation; exact annual budget; unchanged no-building baselines; and UI/card/wish agreement immediately after edits.
 
 Probe zero buildings, each type alone, both small types, both large types, overlapping duplicates and separated coverage, using the same seeds and starting towns. Record population, K, cap, approval, jobs, cash and upkeep at 5, 15 and 30 years. Require the intended local effects and no duplicate-source stacking; do not assume that a cap increase must produce population growth. Measure tick cost at a dense campus count. Numerical tuning must cite these results rather than overwrite golden baselines merely to pass tests.
+
+
+## Owner ruling — 2026-09-05, on the culture channel
+
+The review ([REVIEW-KNOWLEDGE-CULTURE-2026-09-05.md](REVIEW-KNOWLEDGE-CULTURE-2026-09-05.md) §F1)
+found that a mood term alone is a measured no-op in a growing town and asked
+which channel culture should have. The owner, verbatim:
+
+> culture will be a boon to both happiness as well as property desirability,
+> but later when we start getting into wealth/class it will be a prerequisite
+> to more affluent housing.
+
+So the culture section above is settled as BOTH: keep the +4 / +8 CULTURE
+mood term (the animal can say it) AND add a land-value halo over the same
+catchment — `LV_CULTURE` per strength, alongside `LV_PARK` and
+`LV_LARGE_PARK` in `computeLandValue`, seeded through
+`reach.forEachWithinAll` with the campus's tiles like every other halo. Land
+value enters growth and crime, so the Gallery is measurable: the A/B in the
+acceptance probe names the LV and growth columns that moved. Represent
+culture (and knowledge) as **per-tile strength fields**, derived and never
+saved, so the later housing gate reads a tile — that is the only thing the
+wealth arc asks of this build ([PROPOSAL-WEALTH-AND-CLASS-2026-09-05.md](PROPOSAL-WEALTH-AND-CLASS-2026-09-05.md) §5).
+Still open from the review: the University's +600·K against the Large Park's
++500, and the keys.

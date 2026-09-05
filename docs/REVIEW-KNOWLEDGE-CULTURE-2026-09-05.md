@@ -19,7 +19,18 @@ defect turned up in passing and is fixed here, so the build's step 0 is done
 
 ## Findings, ranked
 
-### F1 — Culture's +4 / +8 mood does nothing measurable
+### F1 — Culture's +4 / +8 mood does nothing measurable — RULED 2026-09-05
+
+**The owner's ruling, verbatim:** *"culture will be a boon to both happiness
+as well as property desirability, but later when we start getting into
+wealth/class it will be a prerequisite to more affluent housing."* So (a) AND
+(c) below: the mood term stays as the sayable half and a land-value halo is
+the measurable half, seeded through `reach.forEachWithinAll` like every other
+campus halo; culture becomes a per-tile strength field so a later housing gate
+can read it. The meetings-into-H idea (b) was not taken. The wealth arc it
+points at is scouted in
+[PROPOSAL-WEALTH-AND-CLASS-2026-09-05.md](PROPOSAL-WEALTH-AND-CLASS-2026-09-05.md).
+The finding as it stood:
 
 `c.mood` has three readers at HEAD:
 
@@ -221,8 +232,9 @@ The proposal's four steps hold. Two adjustments and one insertion:
 
 ## Three decisions for the owner
 
-1. **Culture's channel:** meetings → H (b), a land-value halo (c), or a
-   labelled characterisation with no mechanical claim (a).
+1. ~~**Culture's channel**~~ — RULED 2026-09-05: happiness AND property
+   desirability, i.e. the mood term and a land-value halo; later a
+   prerequisite for affluent housing (see F1).
 2. **The University vs the Large Park:** +600·K for §1,200/yr against +500
    for §1,500/yr — intended dominance, or reprice?
 3. **Keys:** `K Y T M` from the free set `C J K M Q T X Y`, or another pick.
