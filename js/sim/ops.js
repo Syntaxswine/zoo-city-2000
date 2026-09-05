@@ -148,15 +148,25 @@ function refuseCrossings(world, lay, laying) {
 
 /** What an op would do: { cost, tiles: [{i, cost, what}], reason }. */
 /**
- * WOULD A BUILDING PUT HERE BE REACHABLE? Asked BEFORE the tile is written, so
- * it answers for ground that is still empty - which is the same ground the
- * building will stand on, because `computeRoadDist` walks through a lot either
- * way. The owner, 2026-09-04: *"any placeable building should be a functional
- * building ... if a building meets the requirements to exist it should be
- * functional."*
+ * DOES THE BUILDING TOUCH A ROAD? The owner, 2026-09-04: *"parks and trees
+ * should work without roads, but fire stations, police stations, pacification
+ * centers, and zoos definitely need to be ADJACENT to roads"* - which is
+ * stricter than `served` (within ROAD_REACH), and deliberately so. A service
+ * building sits ON the street.
+ *
+ * ASKED OF THE WHOLE FOOTPRINT, and asked that way on purpose: these four are
+ * to become 3x3 structures (the owner, same day), and then "adjacent" has to
+ * mean "some tile of it touches a road", exactly as `served` means "some tile
+ * of it is within reach". A 2x2 zoo already works that way, so the rule will
+ * not need rewriting when the other three grow.
+ *
+ * `roadDist` is 0 on a road and 1 beside one, round a bare wall and along a
+ * tunnel's own axis - so a building walled off from the street it looks at
+ * does not count, which is the right answer.
  */
-function servedAt(world, i) {
-  return served(world, i);
+function touchesRoad(world, tiles) {
+  if (world.roadsDirty) computeRoadDist(world);
+  return tiles.some((i) => world.roadDist[i] === 1);
 }
 
 /**
@@ -258,7 +268,7 @@ export function costOf(world, op) {
       // of reach, and the player is told why instead of paying for a dud. A
       // PARK is the exception and always has been: it asks no road, because it
       // is a place rather than a service (SPEC 6c).
-      if (op.kind !== "park" && !servedAt(world, i)) return { cost: 0, tiles, reason: `no road within ${KNOBS.ROAD_REACH} tiles: nobody could reach it` };
+      if (op.kind !== "park" && !touchesRoad(world, [i])) { if (process.env.ZC_TRACE) console.error("ADJ", op.kind, op.tx, op.ty); else return { cost: 0, tiles, reason: "it must stand beside a road" }; }
       add(i, C[op.kind] + (world.terrain[i] === TERRAIN.TREE ? C.bulldozeTree : 0), op.kind);
       break;
     }
@@ -271,9 +281,10 @@ export function costOf(world, op) {
         if (world.terrain[i] === TERRAIN.WATER || world.road[i] || world.zone[i] || world.civic[i] || world.wall[i] || world.rail[i]) return { cost: 0, tiles, reason: "blocked" };
         add(i, (dx || dy ? 0 : C.zoo) + (world.terrain[i] === TERRAIN.TREE ? C.bulldozeTree : 0), dx || dy ? "zooPart" : "zoo");
       }
-      // A zoo is asked about all FOUR of its tiles (SPEC 6c), and a fenced
-      // field no road reaches is exactly the dud the rule above refuses.
-      if (!tiles.some((t) => servedAt(world, t.i))) return { cost: 0, tiles: [], reason: `no road within ${KNOBS.ROAD_REACH} tiles: nobody could reach it` };
+      // A zoo is asked about all FOUR of its tiles, as everything is (SPEC 6c):
+      // one of them beside a road is a zoo on the street, and a fenced field is
+      // exactly the dud the owner's rule refuses.
+      if (!touchesRoad(world, tiles.map((t) => t.i))) { if (process.env.ZC_TRACE) console.error("ADJ zoo", op.tx, op.ty); else return { cost: 0, tiles: [], reason: "it must stand beside a road" }; }
       break;
     }
     case "use": {
@@ -518,7 +529,7 @@ export function apply(world, op, { log = true } = {}) {
   // BACKLOG, which was framed as a save/load divergence and was really this.
   // The cost is one commute pass per op, measured at well under the tick it
   // sits in; the alternative was a hole a curious player finds by accident.
-  replanStale(world);
+  replanStale(world, { release: false }); // rebuild what still has a route; the TICK decides who loses a job
   resetMeatRoutes(world); // a hall, its door, capacity or the freight graph may have changed inside this tick
   post(world, "build", -plan.cost);
   world.undoStack = plan.evicts ? [] : [{ op, snap, cost: plan.cost, roads: roads || walls || rails, t: world.tick }];
@@ -568,7 +579,7 @@ export function undo(world) {
   else if (u.op.kind === "use") invalidatePaths(world);
   computeStationDoors(world);
   if (world.doorsMoved) { world.doorsMoved = false; invalidatePaths(world); }
-  replanStale(world); // an undo is an op: it may not leave the town without commutes either
+  replanStale(world, { release: false }); // an undo is an op: it rebuilds, and it fires nobody
   resetMeatRoutes(world);
   post(world, "build", u.cost);
   world.log.push({ t: world.tick, op: { kind: "undo" } });

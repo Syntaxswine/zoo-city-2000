@@ -70,7 +70,14 @@ function buildCity(seed, years, { withSave = null } = {}) {
   let saved = null;
   for (let t = 0; t < years * 12; t++) {
     if (t === 36) apply(world, { kind: "park", tx: sx - 5, ty: sy - 5 });
-    if (t === 48) { apply(world, { kind: "police", tx: sx + 5, ty: sy - 5 }); apply(world, { kind: "centre", tx: sx - 5, ty: sy + 5 }); }
+    // BESIDE AN ARM of the ring, not off its corner. A service building must
+    // stand next to a road now (the owner, 2026-09-04: "fire stations, police
+    // stations, pacification centers, and zoos definitely need to be adjacent
+    // to roads"), and a corner-diagonal tile is two steps from one. Laying a
+    // spur to the old spots instead perturbed this thirty-year city more, so
+    // the buildings move and the checks that sampled the old town are
+    // re-baselined below with their numbers.
+    if (t === 48) { apply(world, { kind: "police", tx: sx + 5, ty: sy - 2 }); apply(world, { kind: "centre", tx: sx - 5, ty: sy + 2 }); }
     if (t === 60) apply(world, { kind: "rate", zone: "R", value: 10 });
     if (t === 84) apply(world, { kind: "rate", zone: "R", value: 7 });
     if (t === 100) apply(world, { kind: "tree", x0: sx + 5, y0: sy + 5, x1: sx + 7, y1: sy + 7 });
