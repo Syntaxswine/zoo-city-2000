@@ -54,6 +54,7 @@ export function createWorld({ seed = "zoo", w = 64, h = 64 } = {}) {
     rail: new Uint8Array(n), // 0 none · 1 rail · 2 station (SPEC §7.9); served from road within ROAD_REACH across a walked forecourt
     meat: new Uint16Array(n), // units on hand at a meat hall; Part H supplies the flows
     big: new Uint8Array(n), // a BLOCK (SPEC §3b, sim/blocks.js): 0 a lot of its own · 2 | 3 the anchor of a 2×2 | 3×3 · PART | dx | dy << 2 a part pointing at its anchor
+    cam: new Uint8Array(n), // a security CAMERA on this road tile (SPEC §9d, docs/PROPOSAL-CAMERAS.md): 0 none · 1 a camera
     theme: new Uint8Array(n), // a LANDMARK (SPEC §3c, sim/landmarks.js): on a 3×3's anchor, the id of the species' landmark it rose as; 0 the plain block
     // derived
     roadDist: new Uint8Array(n),
@@ -63,6 +64,8 @@ export function createWorld({ seed = "zoo", w = 64, h = 64 } = {}) {
     crime: new Uint8Array(n),
     fireCov: new Uint8Array(n),
     policeCov: new Uint8Array(n),
+    camCov: new Uint8Array(n),
+    _camGen: 0, // the camera walk’s visited-set generation (fields.computeCamCover)
     dread: new Uint8Array(n),
     carnAt: new Uint16Array(n), // Uint16 since the blocks: a 3×3 R block keeps 270 animals on its anchor
     occupants: new Uint16Array(n),

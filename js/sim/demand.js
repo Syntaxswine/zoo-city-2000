@@ -31,8 +31,24 @@ export function externalMarket(world, c) {
   return cycle * roads * ev;
 }
 
+/**
+ * THE CAMERA NETWORK'S ONLY BRAKE is the CAM_CAP term, and it is here rather
+ * than in mood, in the home score or in a rehome because those three are all
+ * COMPARATIVE and a camera network is GLOBAL. Measured, all three are no-ops
+ * under a blanket: a flat mood penalty leaves population, land value, crime
+ * and cash byte-identical (the only consumer of c.mood is a departure roll
+ * gated on V_R <= 0, which is true on 0 of 1,440 ticks in a balanced town);
+ * bestHome is a pure argmax, so a uniform penalty cancels; and a rehome that
+ * wants somewhere less watched finds nowhere when everywhere is watched.
+ * Dread's seams work because a meat hall is local and few. A global nuisance
+ * needs an ABSOLUTE brake.
+ *
+ * The shape is the right one thematically too: parks and zoos raise the cap
+ * because animals want to live near them, and a camera network lowers it for
+ * the same reason, backwards.
+ */
 export function capacityLaw(world, c) {
-  return (KNOBS.CAP_BASE + KNOBS.CAP_PARK * c.parks + KNOBS.CAP_LARGE_PARK * c.largeParks + world.festivalBonus) * (1 + KNOBS.CAP_H_GAIN * c.H);
+  return (KNOBS.CAP_BASE + KNOBS.CAP_PARK * c.parks + KNOBS.CAP_LARGE_PARK * c.largeParks + world.festivalBonus - KNOBS.CAM_CAP * (c.watchedShare || 0)) * (1 + KNOBS.CAP_H_GAIN * c.H);
 }
 
 /** The breakdown for the current state WITHOUT advancing the valves (a loaded city, a rate change while paused). */

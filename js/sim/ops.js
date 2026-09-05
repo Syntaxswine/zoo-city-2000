@@ -15,7 +15,7 @@ import { clearLot, invalidatePaths, releaseJob, replanStale } from "./citizens.j
 import { resolveChoice } from "./events.js";
 import { refreshLast } from "./tick.js";
 import { computeOcclusion } from "./reach.js";
-import { computeRoadDist, computeStationDoors, touchesRoad } from "./fields.js";
+import { computeRoadDist, computeStationDoors, touchesRoad, computeCamCover } from "./fields.js";
 import { closeHall, hallStock, resetMeatRoutes } from "./meat.js";
 import { clampUse } from "./use.js";
 
@@ -205,6 +205,7 @@ export function costOf(world, op) {
       for (const i of rect(world, op)) {
         if (taken.has(i)) continue;
         if (world.terrain[i] === TERRAIN.WATER && !world.road[i] && !world.rail[i]) continue;
+        if (world.cam[i]) { add(i, C.bulldoze, "camera"); continue; } // the camera comes off before the road it stands on
         if (world.wall[i]) { add(i, C.bulldoze, "wall"); continue; } // a tunnel's wall comes down first; the road stays
         if (world.rail[i]) { add(i, C.bulldoze, world.rail[i] === 2 ? "station" : "rail"); continue; }
         if (world.road[i]) { add(i, C.bulldoze, "road"); continue; }
@@ -277,7 +278,7 @@ export function costOf(world, op) {
       const line = (op.tiles || []).filter((i) => i >= 0 && i < world.w * world.h);
       const lay = new Set();
       for (const i of line) {
-        if (world.rail[i] || world.civic[i] || world.zone[i] || isBuilt(world, i)) continue;
+        if (world.cam[i] || world.rail[i] || world.civic[i] || world.zone[i] || isBuilt(world, i)) continue;
         if (world.road[i] && !crossable(world, i)) continue;
         lay.add(i);
       }
@@ -312,13 +313,31 @@ export function costOf(world, op) {
       let walled = 0;
       for (const i of op.tiles || []) {
         if (!(i >= 0 && i < world.w * world.h)) continue;
-        if (world.wall[i] || world.rail[i] === 2 || world.terrain[i] === TERRAIN.WATER || world.civic[i] || world.zone[i] || isBuilt(world, i)) continue;
+        if (world.cam[i] || world.wall[i] || world.rail[i] === 2 || world.terrain[i] === TERRAIN.WATER || world.civic[i] || world.zone[i] || isBuilt(world, i)) continue;
         if (world.road[i] && world.rail[i]) { walled++; continue; }
         let c = C.wall;
         if (world.terrain[i] === TERRAIN.TREE) c += C.bulldozeTree;
         add(i, c, world.road[i] || (world.rail && world.rail[i]) ? "tunnel" : "wall");
       }
       if (!tiles.length && walled) return { cost: 0, tiles, reason: "a tunnel is open along one axis — a level crossing has two" };
+      break;
+    }
+    case "camera": {
+      // A camera is a drag along a street, like a road (SPEC §9d). It stands
+      // ON a plain road tile and does not replace it: never a bridge (nothing
+      // to watch and nowhere to stand), never the rail half of a level
+      // crossing, never a tunnel's road — a camera under a wall sees the wall.
+      // Idempotent on a tile that already has one.
+      let refused = 0;
+      for (const i of op.tiles || []) {
+        if (!(i >= 0 && i < world.w * world.h)) continue;
+        if (world.cam[i]) continue;
+        if (world.road[i] !== ROAD.ROAD || world.rail[i] || world.wall[i]) { refused++; continue; }
+        add(i, C.camera, "camera");
+      }
+      // Only a WHOLLY refused drag gets a sentence; a drag that crosses a road
+      // and then a field must go through at the road tiles and stay quiet.
+      if (!tiles.length && refused) return { cost: 0, tiles, reason: "a camera stands on a street — not a bridge, a crossing or a tunnel" };
       break;
     }
     default:
@@ -335,7 +354,7 @@ function snapshot(world, tiles) {
     i,
     since: world.since[i],
     terrain: world.terrain[i], road: world.road[i], zone: world.zone[i], maxTier: world.maxTier[i],
-    tier: world.tier[i], civic: world.civic[i], civicSize: world.civicSize[i], rubble: world.rubble[i], wall: world.wall[i], use: world.use[i], rail: world.rail[i], big: world.big[i], theme: world.theme[i],
+    tier: world.tier[i], civic: world.civic[i], civicSize: world.civicSize[i], rubble: world.rubble[i], wall: world.wall[i], use: world.use[i], rail: world.rail[i], big: world.big[i], theme: world.theme[i], cam: world.cam[i],
   }));
 }
 
@@ -390,6 +409,7 @@ function applyOperation(world, op, { log = true } = {}) {
   let walls = false;
   let lines = false; // a use repaint: every commute may prefer another way now
   let rails = false;
+  let cams = false;
   for (const { i, what } of plan.tiles) {
     switch (op.kind) {
       case "zone":
@@ -406,7 +426,12 @@ function applyOperation(world, op, { log = true } = {}) {
         roads = true;
         break;
       case "bulldoze":
-        if (what === "road") { world.road[i] = ROAD.NONE; roads = true; }
+        if (what === "camera") world.cam[i] = 0;
+        // A road going takes its camera with it. Once the ladder row above
+        // exists this is unreachable (a camera'd tile yields "camera", never
+        // "road"), and it stays because it is what makes "no camera without a
+        // road under it" true by construction instead of by argument.
+        else if (what === "road") { world.road[i] = ROAD.NONE; world.cam[i] = 0; roads = true; }
         else if (what === "wall") { world.wall[i] = 0; walls = true; }
         else if (what === "rail" || what === "station") { world.rail[i] = 0; rails = true; }
         else if (what === "civic") removeCivic(world, i);
@@ -453,6 +478,10 @@ function applyOperation(world, op, { log = true } = {}) {
         world.rail[i] = 2;
         rails = true;
         break;
+      case "camera":
+        world.cam[i] = 1;
+        cams = true;
+        break;
       default:
         break;
     }
@@ -487,6 +516,10 @@ function applyOperation(world, op, { log = true } = {}) {
   // The cost is one commute pass per op, measured at well under the tick it
   // sits in; the alternative was a hole a curious player finds by accident.
   replanStale(world, { release: false }); // rebuild what still has a route; the TICK decides who loses a job
+  // A camera moves nothing and reaches nothing, so it never joins the flag
+  // above: that would re-run four O(tiles) passes for no reason AND make the
+  // op look like a road change to undo's `u.roads`. Its own field, only.
+  if (cams || roads || walls || rails) computeCamCover(world);
   resetMeatRoutes(world); // a hall, its door, capacity or the freight graph may have changed inside this tick
   post(world, "build", -plan.cost);
   world.undoStack = plan.evicts ? [] : [{ op, snap, cost: plan.cost, roads: roads || walls || rails, t: world.tick }];
@@ -521,13 +554,14 @@ export function undo(world) {
     if (world.tier[s.i] > 0 && s.tier === 0) continue; // something grew here since; leave it
     world.since[s.i] = s.since || 0;
     world.terrain[s.i] = s.terrain; world.road[s.i] = s.road; world.zone[s.i] = s.zone; world.maxTier[s.i] = s.maxTier;
-    world.tier[s.i] = s.tier; world.civic[s.i] = s.civic; world.civicSize[s.i] = s.civicSize; world.rubble[s.i] = s.rubble; world.wall[s.i] = s.wall; world.use[s.i] = s.use; world.rail[s.i] = s.rail; world.big[s.i] = s.big; world.theme[s.i] = s.theme;
+    world.tier[s.i] = s.tier; world.civic[s.i] = s.civic; world.civicSize[s.i] = s.civicSize; world.rubble[s.i] = s.rubble; world.wall[s.i] = s.wall; world.use[s.i] = s.use; world.rail[s.i] = s.rail; world.big[s.i] = s.big; world.theme[s.i] = s.theme; world.cam[s.i] = s.cam;
   }
   if (u.roads) { world.roadsDirty = true; invalidatePaths(world); computeOcclusion(world); computeRoadDist(world); computeStationDoors(world); } // live, as apply does
   else if (u.op.kind === "use") invalidatePaths(world);
   computeStationDoors(world);
   if (world.doorsMoved) { world.doorsMoved = false; invalidatePaths(world); }
   replanStale(world, { release: false }); // an undo is an op: it rebuilds, and it fires nobody
+  computeCamCover(world);
   resetMeatRoutes(world);
   post(world, "build", u.cost);
   world.log.push({ t: world.tick, op: { kind: "undo" } });

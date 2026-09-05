@@ -26,7 +26,7 @@
 // Every line names the animals and uses no pronoun — the sim has no sex.
 
 import { KNOBS } from "./rules.js";
-import { ZONE, CIVIC, inBounds, absent } from "./world.js";
+import { ZONE, CIVIC, inBounds, absent, anchorOf } from "./world.js";
 import { useName } from "./use.js";
 import { DIET_OF, isPredatorOf } from "./species.js";
 import { post } from "./budget.js";
@@ -225,8 +225,42 @@ export function burglaryTick(world, cen, notices) {
   // sergeant. Whether anyone WORKS it is filesTick's question.
   const line = `BURGLARY — ${nameOf(thief)} ${where}. ${cen.policeStations ? "A file is open for six months." : "There is no station in town; the street remembers it and nobody comes looking."}`;
   openFile(world, { tile: lot, culpritId: thief.id, cause: "burglary", line });
+  markBurgled(world, lot);
   world.events.log.push({ t: world.tick, id: "burglary", line, links: [thief.id] });
   notices.push(line);
+}
+
+/**
+ * Everyone who lives at the address that was broken into is a victim, for good.
+ *
+ * Until now a burglary had no victim at all: it moved the treasury and named a
+ * thief, and the animals whose door was forced were not told. The flag is
+ * permanent and SAVED rather than read back off the life ring, because
+ * `remember` keeps the first two events and a rolling last ten (life.js
+ * LIFE_MAX) — a burglary at thirty is evicted by an ordinary life and the
+ * victim would quietly stop being one.
+ *
+ * Scope is the ADDRESS, not the block. Marking every adult on the burgled
+ * BLOCK reaches 44-53% of the town's living adults, which is most of it. This
+ * rule — everyone living at the lot that was broken into — reaches
+ * 9.5-12.5% (measured on THIS rule, 3 seeds x 30y with stations: 135/1364,
+ * 158/1261, 125/1322). The proposal quoted 5.3-6.5%, but that was a different
+ * rule: ONE household per burglary, picked from the block by (tick + lot) % n.
+ * A tier-3 lot holds several households and all of them had their door forced,
+ * so picking one of them by arithmetic is a fiction; the address is the fact.
+ * Nobody is skipped for
+ * being in the cells — a house is burgled whether or not its animals are home.
+ * A shop, works or hall has nobody living there and marks nobody, so this asks
+ * who lives here rather than checking the zone.
+ */
+function markBurgled(world, lot) {
+  lot = anchorOf(world, lot);
+  for (const c of world.citizens) {
+    if (c.dead || c.home !== lot || c.burgled) continue;
+    if (ageYears(world, c) < KNOBS.ADULT_AGE) continue;
+    c.burgled = true;
+    remember(world, c, KIND.BURGLED, lot);
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -259,6 +293,32 @@ function custodyWithBed(world, from, kind) {
     if (d < bestD) { bestD = d; best = i; }
   }
   return best;
+}
+
+/** The camera nearest this scene, or -1: the one the IDENTIFIED line names. Deterministic, no draw — the first at the smallest Chebyshev distance. */
+function nearestCamera(world, tile) {
+  const reach = KNOBS.CAM_REACH + KNOBS.ROAD_REACH;
+  const tx = tile % world.w;
+  const ty = (tile / world.w) | 0;
+  for (let r = 0; r <= reach; r++) {
+    for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) {
+      if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
+      const xx = tx + dx;
+      const yy = ty + dy;
+      if (!inBounds(world, xx, yy)) continue;
+      const j = yy * world.w + xx;
+      if (world.cam[j]) return j;
+    }
+  }
+  return -1;
+}
+
+/** The wrongful arrest still standing for this file, if there is one: same culprit, same scene, same cause, not yet put right. */
+function standingWrongful(world, f) {
+  for (const a of world.events.arrests) {
+    if (a.wrongful && !a.exonerated && a.culpritId === f.culpritId && a.tile === f.tile && a.cause === f.cause) return a;
+  }
+  return null;
 }
 
 function exonerate(world, culprit, notices) {
@@ -315,7 +375,7 @@ export function arrest(world, f, c, wrongful, notices, opts = {}) {
     }
     return null;
   }
-  f.closed = true;
+  if (!wrongful) f.closed = true;
   delete f.waitingFor;
   const culprit = world.byId.get(f.culpritId);
   c.record = (c.record || 0) + 1;
@@ -376,9 +436,18 @@ export function filesTick(world, cen, notices) {
       // and concluded, correctly, that nothing was being done. The line does
       // not start with a flashing prefix, so it lands in the reader and not
       // over the map.
-      const line = f.cause === "killing"
-        ? `COLD — the file on the ${f.cause} at ${at(world, f.tile)} closed without an arrest. ${nameOf(culprit)} is still at ${at(world, culprit.home)}.`
-        : `The file on the ${f.cause} at ${at(world, f.tile)} closed after ${KNOBS.CASE_MONTHS} months. ${nameOf(culprit)} was never charged.`;
+      // "closed without an arrest" was true only while a wrongful arrest closed
+      // the file. Now that one does not, a file can go cold with somebody
+      // already serving its sentence, and the line has to say so. Derived from
+      // the arrest record rather than flagged on the file, so it cannot go stale.
+      const wrong = standingWrongful(world, f);
+      const line = wrong
+        ? (f.cause === "killing"
+          ? `COLD — the file on the ${f.cause} at ${at(world, f.tile)} closed after ${KNOBS.CASE_MONTHS} months. ${wrong.name} was wrongly convicted for it. ${nameOf(culprit)} is still at ${at(world, culprit.home)}.`
+          : `The file on the ${f.cause} at ${at(world, f.tile)} closed after ${KNOBS.CASE_MONTHS} months. ${wrong.name} was wrongly convicted for it and ${nameOf(culprit)} was never charged.`)
+        : (f.cause === "killing"
+          ? `COLD — the file on the ${f.cause} at ${at(world, f.tile)} closed without an arrest. ${nameOf(culprit)} is still at ${at(world, culprit.home)}.`
+          : `The file on the ${f.cause} at ${at(world, f.tile)} closed after ${KNOBS.CASE_MONTHS} months. ${nameOf(culprit)} was never charged.`);
       ev.log.push({ t: tick, id: "cold", line, links: [culprit.id] });
       notices.push(line);
       continue;
@@ -392,14 +461,33 @@ export function filesTick(world, cen, notices) {
     // police are not (97.4% of scenes dark at one station, 44.8% at four).
     const force = Math.min(1, cen.policeStations / KNOBS.ARREST_FORCE_N);
     if (force <= 0) continue;
-    const p = KNOBS.ARREST_BASE + KNOBS.ARREST_FORCE * force + KNOBS.ARREST_COVER * world.policeCov[f.tile] / KNOBS.POLICE_EFFECT + KNOBS.ARREST_PRIOR * (culprit.record || 0);
+    // THE CAMERA'S WHOLE EFFECT IS THIS ONE TERM, and it is here and nowhere
+    // else. It is not in computeCrime, in land value, in the burglary rate, in
+    // the killing weight or in a hall's dread — a camera SOLVES and never
+    // deters, which is the owner's ruling and, as it happens, what the
+    // evidence on real ALPR says. The `force` gate above is untouched: with no
+    // station there is no roll at all, so a network without a police force
+    // does exactly nothing, however much of the town it covers.
+    const cov = world.camCov[f.tile] / KNOBS.CAM_EFFECT;
+    const p = KNOBS.ARREST_BASE + KNOBS.ARREST_FORCE * force + KNOBS.ARREST_COVER * world.policeCov[f.tile] / KNOBS.POLICE_EFFECT + KNOBS.CAM_ARREST * cov + KNOBS.ARREST_PRIOR * (culprit.record || 0);
     if (!world.rng.chance(Math.min(0.95, p))) continue;
-    let wrongful = world.rng.chance(KNOBS.WRONGFUL_P);
+    // The same single draw it always was — the knob moves the threshold, not
+    // the number of times the die is thrown.
+    let wrongful = world.rng.chance(KNOBS.WRONGFUL_P + KNOBS.CAM_WRONGFUL * cov);
     let target = culprit;
     if (wrongful) {
       const t = pickWrongful(world, f, culprit);
       if (t) target = t;
       else wrongful = false;
+    }
+    if (cov > 0) {
+      const eye = nearestCamera(world, f.tile);
+      const months = tick - f.opened;
+      // It does not say "closed": a wrongful arrest leaves the file open, and
+      // the town does not know which kind it has just made.
+      const line = `IDENTIFIED — the camera${eye >= 0 ? ` at ${at(world, eye)}` : ""} puts ${nameOf(target)} at the ${f.cause} at ${at(world, f.tile)}, ${months} month${months === 1 ? "" : "s"} after it happened.`;
+      ev.log.push({ t: tick, id: "identified", line, links: [target.id] });
+      notices.push(line);
     }
     arrest(world, f, target, wrongful, notices);
   }

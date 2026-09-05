@@ -50,6 +50,7 @@ const CASES = Object.freeze({
   FLIGHT: ["rabbit", ({ world, home }) => { const h = createHousehold(world, "wolf", 1); placeHousehold(world, h, home + 1); }],
   DREAD: ["rabbit", ({ world, home }) => { world.dread[home] = 100; }],
   CRIME: ["tortoise", ({ world, home }) => { world.crime[home] = 100; }],
+  WATCHED: ["tortoise", ({ world, home }) => { world.camCov[home] = 60; }],
   VAN: ["fox", ({ world, home }) => { world.lv[home] = 60; world.civic[35] = CIVIC.CENTRE; }],
   WATER: ["beaver"],
   TREES: ["owl"],
@@ -63,6 +64,9 @@ const CASES = Object.freeze({
   NO_DEMAND: ["tortoise", ({ world, home }) => { world.tier[home] = 0; world.lv[home] = 0; world.valves.R = 0; }],
   TAX: ["tortoise", ({ world }) => { world.rates.R = 12; }],
 });
+
+/** Every code the voice table can act on, so a new one cannot be added without a fixture that proves it WINS. */
+export const TRUTH_CODES = Object.freeze(Object.keys(CASES));
 
 export function needTruthResults() {
   return Object.entries(CASES).map(([expected, [species, edit]]) => {

@@ -15,7 +15,7 @@
 import { idx } from "./sim/world.js";
 import { costOf, roadL } from "./sim/ops.js";
 import { pinTarget } from "./follow.js";
-import { TOOL_BY_ID, TOOL_BY_KEY, PLACE_TOOLS, labelForOp } from "./tools.js";
+import { TOOL_BY_ID, TOOL_BY_KEY, PLACE_TOOLS, GHOST_TOOLS, labelForOp } from "./tools.js";
 import { clampUse, useBrushLabel } from "./sim/use.js";
 const PAN_SPEED = 700; // projection px per second
 
@@ -105,6 +105,8 @@ export function createInput(canvas, app) {
         return { kind: "wall", tiles: roadL(w, d.ax, d.ay, d.bx, d.by, d.shift) };
       case "rail":
         return { kind: "rail", tiles: roadL(w, d.ax, d.ay, d.bx, d.by, d.shift) };
+      case "camera":
+        return { kind: "camera", tiles: roadL(w, d.ax, d.ay, d.bx, d.by, d.shift) };
       default:
         return null;
     }
@@ -115,13 +117,24 @@ export function createInput(canvas, app) {
     return null;
   }
 
+  /**
+   * The op a HOVER should be costed as — which is not the same question as
+   * what a click would do. A drag tool that draws a GHOST needs a plan under
+   * the cursor as well, or `ok` is false on every tile and the ghost renders
+   * refused-red even on ground that would take it. Flat drags (road, wall,
+   * rail) still get nothing, exactly as before, because they have no ghost.
+   */
+  function hoverOp(tx, ty) {
+    return clickOp(tx, ty) || (GHOST_TOOLS.includes(state.tool) ? previewOp(state.tool, tx, ty) : null);
+  }
+
   function previewOp(id, tx, ty) {
     const tool = TOOL_BY_ID[id];
     if (!tool || tool.op.kind === "inspect") return null;
     const kind = tool.op.kind;
     if (PLACE_TOOLS.includes(id)) return { kind, tx, ty };
     if (kind === "zone") return { kind, zone: tool.op.zone, x0: tx, y0: ty, x1: tx, y1: ty, density: state.density };
-    if (kind === "road" || kind === "wall" || kind === "rail") return { kind, tiles: [idx(world(), tx, ty)] };
+    if (kind === "road" || kind === "wall" || kind === "rail" || kind === "camera") return { kind, tiles: [idx(world(), tx, ty)] };
     return { kind, x0: tx, y0: ty, x1: tx, y1: ty };
   }
 
@@ -148,7 +161,7 @@ export function createInput(canvas, app) {
   }
 
   function refreshCost() {
-    const op = state.drag ? dragOp() : state.hover && clickOp(state.hover[0], state.hover[1]);
+    const op = state.drag ? dragOp() : state.hover && hoverOp(state.hover[0], state.hover[1]);
     if (!op) { state.cost = null; app.ui.setCost(""); return; }
     const plan = costOf(world(), op);
     const refused = !!plan.reason || (plan.tiles.length > 0 && !affordable(plan.cost));
@@ -236,7 +249,7 @@ export function createInput(canvas, app) {
         state.drag.by = Math.max(0, Math.min(w.h - 1, state.drag.by));
       }
       refreshCost();
-    } else if (changed || PLACE_TOOLS.includes(state.tool)) refreshCost();
+    } else if (changed || GHOST_TOOLS.includes(state.tool)) refreshCost();
   }
 
   function onUp(e) {
@@ -415,11 +428,17 @@ export function createInput(canvas, app) {
     if (state.pinned != null) { h.tx = state.pinned % w.w; h.ty = (state.pinned / w.w) | 0; h.pinned = true; }
     else if (state.hover) { h.tx = state.hover[0]; h.ty = state.hover[1]; }
     if (state.drag && state.cost) h.drag = { tiles: state.cost.tiles, refused: state.cost.refused };
-    if (!state.drag && state.hover && PLACE_TOOLS.includes(state.tool) && state.mouse.inside) {
+    if (!state.drag && state.hover && GHOST_TOOLS.includes(state.tool) && state.mouse.inside) {
       const [tx, ty] = state.hover;
       const size = ["largePark", "zoo", "fire", "police", "centre"].includes(state.tool) ? 3 : 1;
       const ok = !!state.cost && !state.cost.refused && state.cost.tiles.length > 0;
-      h.ghost = { tx, ty, w: size, h: size, ok, sprite: state.tool === "station" ? app.art.station("ns") : app.art.civic(state.tool, size) };
+      // The camera gets the ghost DIAMOND and the cost, and no translucent
+      // standing sprite: the owner looked at both and the diamond reads fine
+      // on a street, where a 5-px mast at 0.55 alpha over asphalt does not.
+      const sprite = state.tool === "camera" ? null
+        : state.tool === "station" ? app.art.station("ns")
+        : app.art.civic(state.tool, size);
+      h.ghost = { tx, ty, w: size, h: size, ok, sprite };
     }
     return h;
   }

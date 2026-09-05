@@ -76,6 +76,7 @@ export function citizenDefaults() {
     wrongful: false,
     wrongedBy: 0,
     exonerated: false,
+    burgled: false,
     moodPenalty: 0,
     moodPenaltyUntil: 0,
   };
@@ -1038,6 +1039,12 @@ export function moodTerms(world, c, context = moodContext(world)) {
   terms.push({ code: "FRIENDS", value: 5 * c.friends.length });
   terms.push({ code: "FLIGHT", arg: flightSpecies, value: -Math.min(20, flight) });
   if (c.home >= 0) terms.push({ code: "CRIME", value: -KNOBS.CRIME_MOOD * Math.max(0, world.crime[c.home] - KNOBS.CRIME_MOOD_FROM) });
+  // WATCHED is CHARACTERISATION, not the brake — the brake is CAM_CAP in the
+  // capacity law, because mood is a dead end in a growing town (demand.js
+  // capacityLaw says why). This term exists so an animal can SAY what is
+  // wrong on its Inspect card. The waiver is the owner's ruling: an animal
+  // whose own door has been forced does not mind the camera on its street.
+  if (c.home >= 0 && world.camCov[c.home] && !c.burgled) terms.push({ code: "WATCHED", value: -KNOBS.CAM_MOOD * (world.camCov[c.home] / KNOBS.CAM_EFFECT) });
   for (const e of world.events.active) {
     const value = e.moodBySpecies && e.moodBySpecies[c.species];
     if (value) terms.push({ code: "EVENT", arg: e.id, value });

@@ -15,7 +15,7 @@ import { refreshLast } from "./tick.js";
 import { migrateLegacyNames } from "./legacy.js";
 import { normalizeUse } from "./use.js";
 
-const TILE_ARRAYS = ["terrain", "road", "zone", "maxTier", "tier", "civic", "civicSize", "burning", "rubble", "variant", "flooded", "wall", "use", "rail", "meat", "big", "theme", "since"];
+const TILE_ARRAYS = ["terrain", "road", "zone", "maxTier", "tier", "civic", "civicSize", "burning", "rubble", "variant", "flooded", "wall", "use", "rail", "meat", "big", "theme", "since", "cam"];
 
 // This expanded shape is the pre-Part-B save shape. stateHash deliberately
 // keeps using it: storage compaction must not redefine simulation identity.
@@ -33,6 +33,7 @@ function canonicalCitizen(c) {
   // ordinary citizens retain the exact pre-H canonical shape.
   if (c.thefts) out.thefts = c.thefts;
   if (c.pen) { out.pen = true; out.penSince = c.penSince || 0; }
+  if (c.burgled) out.burgled = true;
   return out;
 }
 
@@ -188,6 +189,7 @@ export function stateHash(world, { news = true } = {}) {
   }
   if (o.big.every((n) => n === 0)) delete o.big; // a town with no block yet hashes as it did before the blocks
   if (o.theme.every((n) => n === 0)) delete o.theme; // and one with no landmark as it did before the landmarks (SPEC §3c)
+  if (o.cam.every((n) => n === 0)) delete o.cam; // and one with no camera as it did before the network (SPEC §9d)
 
   for (const c of o.citizens) if (!c.life?.length) delete c.life;
   const s = JSON.stringify(o);

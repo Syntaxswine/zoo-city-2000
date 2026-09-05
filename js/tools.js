@@ -27,11 +27,25 @@ export const TOOLS = Object.freeze([
   row(15, "inspect", "I", "Inspect", { kind: "inspect" }, { kind: "overlay", args: ["cursor"] }, "pin a lot or citizen; left-drag pans"),
   row(16, "bulldoze", "B", "Bulldoze", { kind: "bulldoze" }, { kind: "ground", args: ["rubble"] }, "clear (drag); occupied lots cannot be undone"),
   row(17, "largePark", "G", "Large park", { kind: "largePark" }, { kind: "civic", args: ["largePark", 3] }, "place a 3×3 large park; no road required"),
+  row(18, "camera", "E", "Camera", { kind: "camera" }, { kind: "camera", args: [0] }, "L-drag along a street; needs a police station to do anything, and watches the lots the street serves"),
 ]);
 
 export const TOOL_BY_ID = Object.freeze(Object.fromEntries(TOOLS.map((tool) => [tool.id, tool])));
 export const TOOL_BY_KEY = Object.freeze(Object.fromEntries(TOOLS.map((tool) => [tool.key.toUpperCase(), tool])));
 export const PLACE_TOOLS = Object.freeze(TOOLS.filter((tool) => ["station", "park", "largePark", "zoo", "centre", "police", "fire"].includes(tool.op.kind)).map((tool) => tool.id));
+/**
+ * Tools that get a GHOST under the cursor — the ground diamond
+ * (`art.overlay("ghost")`), green where the tile will take the thing and red
+ * where it will not, plus a costed plan so the strip can price it.
+ *
+ * This is NOT PLACE_TOOLS, which was doing two unrelated jobs: "this tool is
+ * a click, not a drag" and "this tool has a ghost". The camera is the only
+ * tool that is a DRAG and still wants a ghost, so the two lists part company
+ * here. Without it `refreshCost` costs nothing on hover, `ok` is false on
+ * every tile, and the camera's diamond renders refused-red even on a street
+ * that would take it. A flat drag (road, wall, rail) still gets neither.
+ */
+export const GHOST_TOOLS = Object.freeze([...PLACE_TOOLS, "camera"]);
 
 /** Resolve a concrete op back to the registry row that names it. */
 export function toolForOp(op) {

@@ -17,7 +17,8 @@
 //   art.chalk(zone, high)               the same, spelled out
 //   art.tree(kind)                      'round' | 'tall' | 'willow' or 0..2
 //   art.citizen(species, facing, frame, age, opts)   opts.look, opts.hat, opts.carry 'sack'
-//   art.overlay(kind, frame)            'scaffold' | 'fire' 0..1 | 'flood' | 'rubble'
+//   art.camera(yaw)                     a security camera, yaw 0 | 1 (which drawn face wears the lens)
+//   art.overlay(kind, frame)            'scaffold' | 'fire' 0..1 | 'flood' | 'rubble' | 'camera' 0..1
 //                                       | 'tent' | 'hat' | 'meeting' | 'plaza' | 'cursor' | 'ghost'
 //                                       | 'sack' 0 open (falling) | 1 tied | 2 tied, wriggling
 //   art.zot(kind)                       'noroad' | 'smog' | 'nojob' | 'nodemand'
@@ -88,6 +89,11 @@ export function overlay(kind, frame = 0) {
   return overlaySprite(kind, frame);
 }
 
+/** A security camera, by yaw: which of the two drawn faces wears the lens (SPEC §9d). */
+export function cameraSprite(yaw = 0) {
+  return overlaySprite("camera", ((yaw % 2) + 2) % 2);
+}
+
 export function zot(kind) {
   const s = ZOTS[kind];
   if (!s) throw new Error(`art.zot: unknown kind '${kind}'`);
@@ -122,6 +128,7 @@ export const art = Object.freeze({
   rail: railSprite,
   railBridge: railBridgeSprite,
   station: stationSprite,
+  camera: cameraSprite,
   ground,
   chalk,
   tree,

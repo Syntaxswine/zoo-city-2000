@@ -377,6 +377,7 @@ export function createRenderer(canvas, initialWorld, art) {
         else if (mode === "pol") fill = world.pol[i] > 2 ? `rgba(128,72,40,${(world.pol[i] / 100) * 0.75})` : null;
         else if (mode === "crime") fill = world.crime[i] > 5 ? `rgba(150,50,70,${(world.crime[i] / 100) * 0.75})` : world.policeCov[i] ? "rgba(60,110,138,0.18)" : null;
         else if (mode === "dread") fill = world.dread[i] > 2 ? `rgba(110,40,70,${(world.dread[i] / 100) * 0.7})` : null;
+        else if (mode === "watch") fill = world.camCov[i] ? `rgba(70,120,150,${(world.camCov[i] / 100) * 0.75})` : null;
         else if (mode === "use") fill = world.use[i] && (world.zone[i] !== ZONE.NONE || world.road[i] !== ROAD.NONE) ? useTint(world.use[i]) : null; // exact category is named on the card; each saved code has one stable tint
         else if (mode === "access") {
           // The number the RULE reads, not the tile's own: fields.siteRoadDist
@@ -405,6 +406,21 @@ export function createRenderer(canvas, initialWorld, art) {
         ctx.fillStyle = fill;
         diamond(sx, sy);
         ctx.fill();
+      }
+    }
+    // The camera itself is a ring, not a brighter blue — the same rule the
+    // open-file ring below follows: signal by SHAPE, so the tile a camera
+    // stands on is findable inside its own blanket of cover.
+    if (mode === "watch") {
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = "rgba(220,240,255,0.9)";
+      for (let ty = range.y0; ty <= range.y1; ty++) {
+        for (let tx = range.x0; tx <= range.x1; tx++) {
+          if (!world.cam[ty * world.w + tx]) continue;
+          const [sx, sy] = toScreen(tx, ty);
+          diamond(sx, sy);
+          ctx.stroke();
+        }
       }
     }
     // An open file is a ring, not a brighter red — signal by shape, so it reads on a hot tenement row too.
@@ -524,6 +540,13 @@ export function createRenderer(canvas, initialWorld, art) {
         else if (world.wall[i]) standing = world.road[i] !== ROAD.NONE || world.rail[i] ? art.tunnel(tunnelAxis(world, i)) : art.wall(wallMask(tx, ty)); // a wall stands; a tunnel stands over its road or rail
         else if (world.rail[i] === 2) standing = art.station(railAxis(tx, ty)); // the platform and shelter stand over the track
         if (standing) items.push({ sprite: standing, tx, ty, kind: "building" });
+        // A camera is a SECOND push, never a link in the chain above: it stands
+        // over a plain road (where no branch fires) and can also share a tile
+        // with nothing else the chain draws. Plain `kind: "building"` with no
+        // `z` — an explicit z would lift it over every walker unconditionally
+        // and throw away the depth result the east-corner mast was designed
+        // for. Equal keys fall to paintScene's stable insertion order.
+        if (world.cam[i]) items.push({ sprite: art.camera(world.variant[i] & 1), tx, ty, kind: "building" });
         if (world.burning[i]) items.push({ sprite: fire, tx, ty, kind: "building", z: Z_BUILDING + 1, dy: -6 });
         if (i === plazaTile) items.push({ sprite: art.overlay("plaza"), tx, ty, kind: "ground", z: 3, dy: -2 });
         const zk = zots.get(i);

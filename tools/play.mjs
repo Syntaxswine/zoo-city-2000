@@ -41,7 +41,8 @@ import { installCanvas, createCanvas, encodePNG, zoom as zoomCanvas } from "./he
 
 installCanvas();
 
-const { createWorld } = await import("../js/sim/world.js");
+const { createWorld, ROAD } = await import("../js/sim/world.js");
+const { apply } = await import("../js/sim/ops.js");
 const { tick, dateOf } = await import("../js/sim/tick.js");
 const { createMayor } = await import("./mayor.mjs");
 const { createRenderer } = await import("../js/render.js");
@@ -80,6 +81,12 @@ const KEEP = flag("--keep");
 const WATCH_TILE = arg("--watch", null) ? arg("--watch", "").split(",").map(Number) : null;
 if (!Number.isInteger(EVERY) || EVERY < 0 || AFTER.some(n=>!Number.isInteger(n)||n<0) || AT.some(s=>!/^\d{4}-(0[1-9]|1[0-2])$/.test(s))) throw Error("invalid shutter month or interval");
 const re = WHEN ? new RegExp(WHEN) : null;
+// --cameras N puts N security cameras along the town's streets, in a stable
+// order at a fixed stride, once the mayor has laid enough road to hold them.
+// The scripted mayor does not build them, and this is the only instrument that
+// can photograph one standing next to a walking animal.
+const CAMERAS = num("--cameras", 0);
+const CAM_YEAR = num("--cameras-year", 4);
 
 // ---- the town ---------------------------------------------------------------
 const SAVED = probeSave(argv, ["--seed","--layout","--rates","--parks","--markets","--pacify","--stations","--disasters","--zoo","--recession"]);
@@ -208,6 +215,19 @@ for (let t = 0; t < total; t++) {
   // near its margin, so without this a run photographed from a fixed camera
   // shows the town as it was when the layer was last built: the first draft
   // of this file missed it, and a burnt lot went on standing for six months.
+  if (CAMERAS && t === CAM_YEAR * 12) {
+    const roads = [];
+    for (let i = 0; i < world.w * world.h; i++) if (world.road[i] === ROAD.ROAD && !world.rail[i] && !world.wall[i]) roads.push(i);
+    const stride = Math.max(1, Math.floor(roads.length / CAMERAS));
+    let up = 0;
+    for (let k = 0; k < roads.length && up < CAMERAS; k += stride) {
+      world.cash = Math.max(world.cash, 5000);
+      if (apply(world, { kind: "camera", tiles: [roads[k]] }).ok) up++;
+    }
+    const where = [];
+    for (let i = 0; i < world.w * world.h; i++) if (world.cam[i]) where.push(`${i % world.w},${(i / world.w) | 0}`);
+    console.log(`  ${up} camera${up === 1 ? "" : "s"} up along ${roads.length} road tiles — at ${where.join(" ")}`);
+  }
   const { notices } = tick(world);
   renderer.invalidate();
   walkers.notify();

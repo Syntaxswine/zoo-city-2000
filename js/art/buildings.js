@@ -945,7 +945,72 @@ export const FLOOD = groundSprite({ name: "flood", anchor: [32, 16], tags: ["ove
   return h < 0.08 ? "K" : h < 0.5 ? "I" : "H";
 });
 
-export const OVERLAYS = { scaffold: [SCAFFOLD], fire: FIRE, flood: [FLOOD], rubble: [RUBBLE] };
+/**
+ * The security camera: a mast on the tile's EAST corner with the housing on
+ * its top face and a glass lens on one drawn side. SPEC: docs/PROPOSAL-CAMERAS.md §7.
+ *
+ * THREE THINGS HERE ARE CORRECTNESS, NOT TASTE.
+ *
+ * 1. THE MAST STANDS AT THE EAST CORNER AND NOWHERE ELSE. The depth census
+ *    counted mis-ordered pixels against walkers on the road it stands on:
+ *    east 0, west 26, north 3,980, south 4,016, dead centre 1,118. Every
+ *    other corner clips the animals walking past it.
+ * 2. THE HOUSING SITS ON THE MAST'S TOP FACE, never on an arm reaching back
+ *    over the road. `render` rasterises exactly three faces — the top, the
+ *    +a end and the +b side. The -a and -b faces are NEVER DRAWN, so an arm
+ *    reaching back is a -a shape and the camera would render headless.
+ *    The lens rides whichever of the two drawn faces the yaw picks, which is
+ *    why there are two sprites and not one mirrored plan: flipPlan mirrors
+ *    across a = b and would move the mast to the WEST corner.
+ * 3. THE EXTENT BOX IS LOAD-BEARING. It paints nothing. `render` sizes its
+ *    grid from the boxes, and a lone mast in one corner makes a grid that
+ *    does not contain the tile's ground centre — so `defineSprite` would get
+ *    an anchor outside its own sprite. It reaches from the tile centre to
+ *    the east corner, which is the least that keeps the anchor in.
+ *
+ * Height 20 units, and height is a correctness parameter too: the housing has
+ * to clear the walkers' 19-px head band. At 1x the sprite reads as a 5-px
+ * slate vertical under a 9-px pale head — the police lamp set the house rule
+ * that a signature is 8 px wide, and a 4-px head reads as a lamp post with a
+ * one-pixel lens.
+ */
+const CAM_MAST = flatSkin(SLATE[0], SLATE[1], SLATE[2]);
+const CAM_H = 15;
+const CAM_BODY_H = 5;
+const CAM_BODY_A = 4;   // 8 px wide at 1x on the +b side face
+const CAM_BODY_B = 2;   // 4 px wide at 1x on the +a end face
+/**
+ * The lens is the SIGNATURE and it is a solid glass block, not a ring with a
+ * core: the head is 8 px wide and 5 px tall at 1x, so a lens with an outline
+ * is three pixels of mud. The police station settled this rule first — its
+ * signature is a flat 8-px blue lamp, not a detailed lantern.
+ *
+ * The body is TALL for its plan (4 x 2 x 5 units) on purpose. A box in this
+ * projection shows a top face of area da x db and near faces of height dc, so
+ * a squat head is all roof and the lens has nowhere to sit. An earlier draft
+ * wore a pale cap that OVERHUNG the body, which hid the near faces behind it
+ * and read as a table lamp.
+ */
+const camBody = (lensOnSide) => {
+  const base = flatSkin(SLATE[1], SLATE[0], SLATE[0]);
+  // A face skin is called with coordinates LOCAL to its own box — `side` gets
+  // (a - a0, c1 - c) and `end` gets (b - b0, c1 - c), not world a/b/c. The
+  // first draft wrote the lens in world units and it painted nothing at all,
+  // silently: a skin that returns null everywhere just shows the base.
+  const glass = (u, half, g) => (Math.abs(u - half) <= half * 0.55 && g >= 1.5 && g <= 3.5 ? "=" : null);
+  return {
+    top: base.top,
+    side: (a, k) => (lensOnSide ? glass(a, CAM_BODY_A / 2, CAM_BODY_H - k) : null) || base.side(a, k),
+    end: (b, k) => (lensOnSide ? null : glass(b, CAM_BODY_B / 2, CAM_BODY_H - k)) || base.end(b, k),
+  };
+};
+const cameraSprite = (yaw) => solidSprite(`camera-${yaw}`, [
+  box(13.5, 14.75, 1.5, 2.75, 0, CAM_H, CAM_MAST),
+  box(15.5 - CAM_BODY_A, 15.5, 1, 1 + CAM_BODY_B, CAM_H, CAM_H + CAM_BODY_H, camBody(yaw === 0)),
+], { tags: ["overlay"], extent: [box(8, 16, 0, 8, 0, 0, {})] });
+export const CAMERAS = [cameraSprite(0), cameraSprite(1)];
+
+export const OVERLAYS = { scaffold: [SCAFFOLD], fire: FIRE, flood: [FLOOD], rubble: [RUBBLE], camera: CAMERAS };
 
 export function overlaySprite(kind, frame = 0) {
   const list = OVERLAYS[kind];

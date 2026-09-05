@@ -592,6 +592,633 @@ check("determinism: same seed + same inputs ⇒ same hash", stateHash(A.world) =
   check("input-log replay hash-equals the run", stateHash(w2) === stateHash(A.world), `${stateHash(w2)} vs ${stateHash(A.world)}`);
 }
 
+// ---- VICTIMS: a burglary has a victim, and the victim stays one (docs/PROPOSAL-CAMERAS.md §4f) ----
+// Until this landed a burglary moved the treasury and named a thief; the
+// animals whose door was forced were never told. Everything below is written
+// so that deleting markBurgled, or narrowing it to the block, or reading the
+// flag back off the life ring instead of saving it, turns one of these red.
+{
+  const { KIND, remember, lifeLines } = await import("../js/sim/life.js");
+  const { ageYears } = await import("../js/sim/census.js");
+  const adultsAt = (w, lot) => w.citizens.filter((c) => !c.dead && c.home === lot && ageYears(w, c) >= KNOBS.ADULT_AGE);
+
+  // Force burglaries on a clone until one lands on an address with residents,
+  // then read the law off that one. The loop is bounded and the rig asserts it
+  // ARRIVED: without that, an empty candidate set would pass every line below.
+  const B = load(A.saved);
+  const saveP = KNOBS.BURGLARY_P;
+  const saveMax = KNOBS.BURGLARY_MAX;
+  let lot = -1, before = null, marked = null, tries = 0, withResidents = 0, burglaries = 0;
+  KNOBS.BURGLARY_P = 1;
+  KNOBS.BURGLARY_MAX = 1;
+  while (tries++ < 24 && lot < 0) {
+    const seen = new Set(B.events.files.map((f) => f));
+    const was = new Set(B.citizens.filter((c) => c.burgled).map((c) => c.id));
+    tick(B);
+    const fresh = B.events.files.filter((f) => !seen.has(f) && f.cause === "burglary");
+    if (!fresh.length) continue;
+    burglaries++;
+    const t = fresh[fresh.length - 1].tile;
+    const res = adultsAt(B, t);
+    if (!res.length) continue;
+    withResidents++;
+    // A hot lot can be picked twice; the second time its animals are already
+    // marked and there is no fresh mark to read the law off. Keep looking.
+    if (!res.some((c) => !was.has(c.id))) continue;
+    lot = t;
+    before = was;
+    marked = B.citizens.filter((c) => c.burgled && !was.has(c.id));
+  }
+  KNOBS.BURGLARY_P = saveP;
+  KNOBS.BURGLARY_MAX = saveMax;
+  check("VICTIMS rig: forcing BURGLARY_P reaches an address with adult residents", lot >= 0 && burglaries > 0, `${burglaries} burglaries in ${tries} months, ${withResidents} with residents`);
+
+  if (lot >= 0) {
+    const want = adultsAt(B, lot).filter((c) => !before.has(c.id));
+    const gotIds = new Set(marked.map((c) => c.id));
+    const wantIds = new Set(want.map((c) => c.id));
+    check("a burglary marks every adult living at the address", want.length > 0 && want.every((c) => gotIds.has(c.id)), `${want.length} at the address, ${marked.length} marked`);
+    check("a burglary marks NOBODY who lives elsewhere", marked.every((c) => wantIds.has(c.id)), `${marked.filter((c) => !wantIds.has(c.id)).length} strays`);
+    // Scope: the ADDRESS, not the block. If markBurgled ever widens to the
+    // 3×3, this catches it — the burgled block reaches 44-53% of the town's
+    // adults (measured, 4 seeds x 30y) against 5.3-6.5% for the lot.
+    const W = B.w;
+    const block = B.citizens.filter((c) => !c.dead && c.home >= 0 && c.home !== lot && Math.max(Math.abs((c.home % W) - (lot % W)), Math.abs(((c.home / W) | 0) - ((lot / W) | 0))) <= 1);
+    check("the mark does not spread to the neighbours", block.every((c) => !gotIds.has(c.id)), `${block.filter((c) => gotIds.has(c.id)).length} of ${block.length} neighbours marked`);
+    // Every line below reports rather than throws: a suite that crashes names
+    // no invariant and runs none of the checks after it.
+    const victim = marked[0] || null;
+    check("the burglary produced at least one fresh victim to read", !!victim, `${marked.length} marked`);
+    check("the victim carries a BURGLED life event naming the address", !!victim && (victim.life || []).some((e) => e[1] === KIND.BURGLED && e[2] === lot), victim ? "no BURGLED event" : "no victim");
+    check("the BURGLED event has a sentence", !!victim && lifeLines(B, victim).some((l) => /^Burgled at /.test(l)), victim ? "no line" : "no victim");
+
+    // THE POINT OF THE SAVED FLAG. remember() keeps the first two events and a
+    // rolling last ten, so a burglary at thirty is evicted by an ordinary life.
+    // Read the waiver off the life ring and the victim silently stops being
+    // one; this is the check that says so.
+    const V = load(save(B));
+    const v = victim ? V.byId.get(victim.id) : null;
+    check("the flag survives save and load", !!v && v.burgled === true, v ? `${v.burgled}` : "no victim");
+    if (v) for (let i = 0; i < 14; i++) remember(V, v, KIND.RETIRED);
+    check("the life ring evicts the BURGLED event", !!v && !(v.life || []).some((e) => e[1] === KIND.BURGLED), v ? "still in the ring" : "no victim");
+    check("but the victim is still burgled", !!v && v.burgled === true, v ? "the flag went with the line" : "no victim");
+  }
+
+  // The optional-field shape: a town where nobody has been broken into hashes
+  // and saves exactly as it did before victims existed (the `pen` precedent).
+  const clean = load(A.saved);
+  for (const c of clean.citizens) c.burgled = false;
+  const plain = toPlain(clean);
+  check("a never-burgled citizen carries no burgled key in the save", plain.citizens.every((c) => !("burgled" in c)), `${plain.citizens.filter((c) => "burgled" in c).length} carry it`);
+  const one = clean.citizens.find((c) => !c.dead);
+  const h0 = stateHash(clean);
+  one.burgled = true;
+  check("marking one citizen moves the hash", stateHash(clean) !== h0, "burgled is not in the canonical shape");
+  one.burgled = false;
+  check("and clearing it restores the hash exactly", stateHash(clean) === h0, "the shape is not reversible");
+}
+
+// Camera justice fixtures predate the Zoo prison. Supply real reachable
+// campuses so these tests exercise evidence, rather than missing-bed refusal.
+function cameraJusticeWorld(){
+  const w=load(A.saved);w.cash=1000000;
+  for(const kind of ['zoo','zoo','zoo','zoo','centre','centre','centre','centre']){
+    let placed=false;
+    for(let y=2;y<w.h-4&&!placed;y+=4)for(let x=2;x<w.w-4&&!placed;x+=4){
+      let clear=true;for(let dy=0;dy<3;dy++)for(let dx=-1;dx<3;dx++){
+        const i=(y+dy)*w.w+x+dx;if(w.terrain[i]===1||w.road[i]||w.rail[i]||w.zone[i]||w.tier[i]||w.civic[i]||w.wall[i])clear=false;
+      }
+      if(!clear)continue;
+      apply(w,{kind:'road',tiles:[y*w.w+x-1]});placed=apply(w,{kind,tx:x,ty:y}).ok;
+    }
+    if(!placed)throw Error('Camera fixture could not place '+kind);
+  }
+  return w;
+}
+// ---- THE FILE STAYS OPEN: a wrongful arrest does not close the case (docs/PROPOSAL-CAMERAS.md §4d; BACKLOG:369-371) ----
+// Until this landed, taking in the wrong animal SHUT the file, so no detective
+// ever looked at that street again and exonerate() — which needs the real
+// culprit arrested for the SAME file — could not fire. Measured on the rig in
+// tools/camprobe.mjs, 4 seeds x 30y at four stations: exonerations 0.0 -> 1.3,
+// wrongful arrests 1.0 -> 2.3 (an open file can catch a SECOND wrong animal),
+// solved 54.6% -> 60.7%, and 1.0 file a run now goes cold with somebody
+// already serving its sentence.
+{
+  const JU = await import("../js/sim/justice.js");
+  const O = cameraJusticeWorld();
+  const pool = O.citizens.filter((c) => !c.dead && c.home >= 0 && !c.fixed && (!c.held || c.held <= O.tick));
+  check("THE FILE rig: two free animals to play the culprit and the wronged", pool.length >= 2, `${pool.length}`);
+  if (pool.length >= 2) {
+    const [culprit, wronged] = pool;
+    const mk = (cause = "burglary") => JU.openFile(O, { tile: wronged.home, culpritId: culprit.id, cause });
+
+    const fw = mk();
+    JU.arrest(O, fw, wronged, true, []);
+    check("a WRONGFUL arrest leaves the file open", fw.closed === false, "the wrong animal closed the case");
+
+    const fr = mk();
+    JU.arrest(O, fr, culprit, false, []);
+    check("a RIGHT arrest closes the file", fr.closed === true, "the case stayed open");
+
+    // The payoff the open file buys: the real culprit taken in for the same
+    // file exonerates the animal serving for it. This is the line BACKLOG
+    // asked for, and it was unreachable before.
+    const ex0 = O.events.justice.exonerated;
+    const fx = mk();
+    JU.arrest(O, fx, wronged, true, []);
+    const wrongedArrest = O.events.arrests[O.events.arrests.length - 1];
+    JU.arrest(O, fx, culprit, false, []);
+    check("arresting the real culprit for an open file exonerates the animal serving for it", O.events.justice.exonerated > ex0, `${ex0} -> ${O.events.justice.exonerated}`);
+    check("and the arrest record is marked put right", wrongedArrest.exonerated === true, "the record still reads unexonerated");
+
+    // A file CAN still go cold with somebody serving, and when it does the
+    // line has to say so: "closed without an arrest" was true only while a
+    // wrongful arrest closed the case.
+    const P = cameraJusticeWorld();
+    const pc = P.citizens.filter((c) => !c.dead && c.home >= 0 && !c.fixed && (!c.held || c.held <= P.tick));
+    if (pc.length >= 2) {
+      for (const cause of ["burglary", "killing"]) {
+        const fc = JU.openFile(P, { tile: pc[1].home, culpritId: pc[0].id, cause });
+        JU.arrest(P, fc, pc[1], true, []);
+        const serving = P.events.arrests[P.events.arrests.length - 1].name;
+        fc.opened = P.tick - KNOBS.CASE_MONTHS; // age it past the investigation, not past FILE_MONTHS
+        const said = [];
+        JU.filesTick(P, census(P), said);
+        const cold = said.find((l) => new RegExp(`file on the ${cause}`).test(l));
+        check(`a ${cause} file going cold with somebody serving says so`, !!cold && /was wrongly convicted/.test(cold), cold || "no cold line");
+        check(`and it names the animal serving for the ${cause}`, !!cold && cold.includes(serving), cold || "no cold line");
+        check(`and the ${cause} line does not also claim nobody was arrested`, !!cold && !/closed without an arrest/.test(cold), cold || "no cold line");
+      }
+      // The other half of the same law: with NO wrongful arrest standing, the
+      // old line is still the one that prints. A DIFFERENT culprit and scene,
+      // because standingWrongful matches on culprit + scene + cause and the
+      // two files above have already put a wrongful arrest on record for
+      // pc[0] — and pc[1] no longer has a home to name, the arrest took it.
+      const quietCulprit = P.citizens.find((c) => !c.dead && c.home >= 0 && c.id !== pc[0].id && c.id !== pc[1].id);
+      check("THE FILE rig: a third animal with a home for the quiet case", !!quietCulprit, "none free");
+      const fq = JU.openFile(P, { tile: quietCulprit ? quietCulprit.home : 0, culpritId: quietCulprit ? quietCulprit.id : pc[0].id, cause: "killing" });
+      fq.opened = P.tick - KNOBS.CASE_MONTHS;
+      const quiet = [];
+      JU.filesTick(P, census(P), quiet);
+      const q = quiet.find((l) => /^COLD/.test(l));
+      check("a killing that nobody was arrested for still closes without an arrest", !!q && /closed without an arrest/.test(q) && !/was wrongly convicted/.test(q), q || "no COLD line");
+    }
+  }
+  // Trespass always passes wrongful = false, so the minor path is untouched:
+  // its file closes on the spot as it always did.
+  const T = cameraJusticeWorld();
+  const tc = T.citizens.find((c) => !c.dead && c.home >= 0);
+  if (tc) {
+    const ft = JU.openFile(T, { tile: tc.home, culpritId: tc.id, cause: "trespass", crime: KNOBS.TRESPASS_CRIME, radius: 1 });
+    JU.arrest(T, ft, tc, false, [], { minor: true });
+    check("a trespass file still closes on the spot", ft.closed === true, "the minor path changed");
+  }
+}
+
+// ---- CAMERAS: the array, the op, the sight-line, the bill (docs/PROPOSAL-CAMERAS.md §4a-4b, §7) ----
+// The camera EXISTS in this section and does nothing to crime, mood or the
+// capacity law — that is commits 4 and 5. What is asserted here is that it
+// goes only where a camera can stand, comes off before the road under it,
+// paints the street it watches, and costs what it says.
+{
+  const { computeCamCover } = await import("../js/sim/fields.js");
+  const { yearlyFigures } = await import("../js/sim/budget.js");
+  const { TOOLS, TOOL_BY_ID, PLACE_TOOLS } = await import("../js/tools.js");
+  const { TERRAIN: TERR } = await import("../js/sim/world.js");
+
+  const town = () => {
+    const w = createWorld({ seed: "7" });
+    w.cash = 200000;
+    const sx = w.start.tx, sy = w.start.ty;
+    const line = [];
+    for (let x = sx - 5; x <= sx + 5; x++) line.push(x + sy * w.w);
+    apply(w, { kind: "road", tiles: line });
+    return { w, sx, sy, at: sx + sy * w.w };
+  };
+
+  // ---- placement -----------------------------------------------------------
+  {
+    const { w, sx, sy, at } = town();
+    const cash0 = w.cash;
+    const r = apply(w, { kind: "camera", tiles: [at] });
+    check("a camera goes up on a street", r.ok === true && w.cam[at] === 1, JSON.stringify(r));
+    check("and costs COST.camera", cash0 - w.cash === KNOBS.COST.camera, `${cash0 - w.cash} vs ${KNOBS.COST.camera}`);
+    check("a camera does not replace the road it stands on", w.road[at] === ROAD.ROAD, `${w.road[at]}`);
+    const again = apply(w, { kind: "camera", tiles: [at] });
+    check("a second camera on the same tile is refused, not charged twice", again.ok === false && w.cam[at] === 1, JSON.stringify(again));
+
+    // Every refusal, each on a tile that is genuinely that thing. The bare
+    // tile is SEARCHED for rather than guessed: the first draft used (sx, sy-3)
+    // and that is part of the starting road, so the refusal check was passing
+    // a road tile to an op that accepts road tiles.
+    let grass = -1;
+    for (let i = 0; i < w.w * w.h && grass < 0; i++) if (w.road[i] === ROAD.NONE && w.terrain[i] !== TERR.WATER && !w.wall[i]) grass = i;
+    check("CAMERA rig: the refusal tile really is bare ground", grass >= 0 && w.road[grass] === ROAD.NONE && !w.cam[grass], `${grass} road ${grass >= 0 ? w.road[grass] : "-"}`);
+    const off = apply(w, { kind: "camera", tiles: [grass] });
+    check("a camera is refused off the road, with a sentence", off.ok === false && /street/.test(off.reason || ""), JSON.stringify(off));
+    check("and nothing was placed", w.cam[grass] === 0, "a camera stands on grass");
+
+    // A drag that crosses road AND field must go through at the road tiles and
+    // stay silent — the rule every other drag op follows.
+    const mixed = [sx + 1 + sy * w.w, grass];
+    const m = apply(w, { kind: "camera", tiles: mixed });
+    check("a drag that crosses a street and a field takes the street and says nothing", m.ok === true && !m.reason && w.cam[mixed[0]] === 1 && w.cam[mixed[1]] === 0, JSON.stringify(m));
+
+    // A tunnel: a camera under a wall would see the wall.
+    const tun = sx + 2 + sy * w.w;
+    apply(w, { kind: "wall", tiles: [tun] });
+    check("CAMERA rig: the tunnel tile really is a road under a wall", w.road[tun] !== ROAD.NONE && w.wall[tun] === 1, `road ${w.road[tun]} wall ${w.wall[tun]}`);
+    check("a camera is refused on a tunnel", apply(w, { kind: "camera", tiles: [tun] }).ok === false && w.cam[tun] === 0, "a camera stands in a tunnel");
+  }
+
+  // ---- the bulldozer, and the invariant it protects -------------------------
+  {
+    const { w, at } = town();
+    apply(w, { kind: "camera", tiles: [at] });
+    const plan = costOfOp(w, { kind: "bulldoze", x0: at % w.w, y0: (at / w.w) | 0, x1: at % w.w, y1: (at / w.w) | 0 });
+    check("the bulldozer takes the camera before the road under it", plan.tiles.length === 1 && plan.tiles[0].what === "camera", JSON.stringify(plan.tiles));
+    apply(w, { kind: "bulldoze", x0: at % w.w, y0: (at / w.w) | 0, x1: at % w.w, y1: (at / w.w) | 0 });
+    check("one press takes the camera and leaves the road", w.cam[at] === 0 && w.road[at] === ROAD.ROAD, `cam ${w.cam[at]} road ${w.road[at]}`);
+  }
+  {
+    // The reviewer's scenario in the proposal: sweep the bulldozer down a
+    // camera'd avenue twice and the cameras must not be left hanging over
+    // bare grass. Two presses, because the camera is a layer above the road.
+    const { w, sx, sy } = town();
+    const line = [];
+    for (let x = sx - 5; x <= sx + 5; x++) line.push(x + sy * w.w);
+    apply(w, { kind: "camera", tiles: line });
+    const rect = { x0: sx - 5, y0: sy, x1: sx + 5, y1: sy };
+    apply(w, { kind: "bulldoze", ...rect });
+    apply(w, { kind: "bulldoze", ...rect });
+    let hanging = 0;
+    for (const i of line) if (w.cam[i] && w.road[i] === ROAD.NONE) hanging++;
+    check("no camera is left hanging over bare grass", hanging === 0, `${hanging} of ${line.length}`);
+  }
+
+  // ---- undo ----------------------------------------------------------------
+  {
+    const { w, at } = town();
+    const cash0 = w.cash;
+    apply(w, { kind: "camera", tiles: [at] });
+    const u = undo(w);
+    check("undo takes the camera down", u.ok === true && w.cam[at] === 0, JSON.stringify(u));
+    check("and refunds the cash", w.cash === cash0, `${w.cash} vs ${cash0}`);
+    check("and the cover goes with it", w.camCov[at] === 0, `${w.camCov[at]}`);
+  }
+
+  // ---- the sight-line ------------------------------------------------------
+  {
+    const { w, sx, sy, at } = town();
+    apply(w, { kind: "camera", tiles: [at] });
+    const painted = () => { let k = 0; for (let i = 0; i < w.w * w.h; i++) if (w.camCov[i]) k++; return k; };
+    // THE BUG THIS CATCHES: the walk keeps a visited set that outlives the
+    // call. Stamped with anything that repeats — the source tile, say — the
+    // first pass marks the neighbours and every later pass refuses to expand,
+    // so the field is right once and is one tile's halo for ever after.
+    const runs = [painted()];
+    for (let k = 0; k < 3; k++) { computeCamCover(w); runs.push(painted()); }
+    check("the camera field is IDEMPOTENT — recomputing it does not shrink it", runs.every((v) => v === runs[0]) && runs[0] > 0, runs.join(" → "));
+
+    check("a camera paints its own tile at full effect", w.camCov[at] === KNOBS.CAM_EFFECT, `${w.camCov[at]}`);
+    // The walk runs along the STREET, so a tile CAM_REACH road-steps away is
+    // covered and one further along is not — that is what makes it a
+    // sight-line rather than a circle.
+    const far = sx + KNOBS.CAM_REACH + KNOBS.ROAD_REACH + sy * w.w;
+    const beyond = sx + KNOBS.CAM_REACH + KNOBS.ROAD_REACH + 1 + sy * w.w;
+    check("the sight-line reaches CAM_REACH road-steps plus the frontages that street serves", w.camCov[far] > 0, `${w.camCov[far]} at +${KNOBS.CAM_REACH + KNOBS.ROAD_REACH}`);
+    check("and stops there", w.camCov[beyond] === 0, `${w.camCov[beyond]} at +${KNOBS.CAM_REACH + KNOBS.ROAD_REACH + 1}`);
+    // Graded: full within CAM_NEAR road-steps, half beyond.
+    const seenEff = new Set();
+    for (let i = 0; i < w.w * w.h; i++) if (w.camCov[i]) seenEff.add(w.camCov[i]);
+    check("the field is graded, not flat", seenEff.has(KNOBS.CAM_EFFECT) && seenEff.has(KNOBS.CAM_EFFECT / 2), [...seenEff].join(","));
+  }
+  {
+    // A wall across the street breaks the sight-line. The one piece of
+    // counterplay the network has, and it costs §8.
+    const { w, sx, sy, at } = town();
+    apply(w, { kind: "camera", tiles: [at] });
+    const far = sx + KNOBS.CAM_REACH + KNOBS.ROAD_REACH + sy * w.w;
+    const before = w.camCov[far];
+    apply(w, { kind: "wall", tiles: [sx + 1 + sy * w.w] });
+    computeCamCover(w);
+    check("CAMERA rig: the wall really went up across the street", w.wall[sx + 1 + sy * w.w] === 1, "no wall");
+    check("a wall across the street breaks the sight-line", before > 0 && w.camCov[far] === 0, `${before} → ${w.camCov[far]}`);
+  }
+
+  // ---- storage: saved, hashed, and elided while the town has none ----------
+  {
+    const { w, at } = town();
+    const clean = stateHash(w);
+    const plainNone = toPlain(w);
+    check("cam is saved", Array.isArray(plainNone.cam) && plainNone.cam.length === w.w * w.h, `${plainNone.cam && plainNone.cam.length}`);
+    apply(w, { kind: "camera", tiles: [at] });
+    check("placing a camera moves the hash", stateHash(w) !== clean, "cam is not in the canonical shape");
+    const back = load(save(w));
+    check("and it survives save and load", back.cam[at] === 1 && stateHash(back) === stateHash(w), `${back.cam[at]}`);
+    check("camCov is DERIVED — never saved", !("camCov" in toPlain(w)), "camCov is in the save");
+    // The elision: an all-zero cam array is dropped from the hashed shape, so
+    // a town that never buys a camera keeps the identity it had before the
+    // network existed. Reversibility is the observable half of that.
+    // Written straight into the array, not through the op: the op also spends
+    // §100 and cash is hashed, so an op-based test would be measuring the
+    // treasury and calling it the elision.
+    const E = load(save(town().w));
+    const eClean = stateHash(E);
+    E.cam[at] = 1;
+    check("the elision is not a blanket — a camera in the array moves the hash", stateHash(E) !== eClean, "cam is elided even when set");
+    E.cam[at] = 0;
+    check("and an all-zero cam array hashes exactly as it did before the network existed", stateHash(E) === eClean, "the all-zero elision is not reversible");
+    // The reload rebuilds the field rather than carrying it: a loaded city
+    // opens paused, and the card and the overlay read it before the first tick.
+    computeFields(back);
+    check("a reloaded city rebuilds the same cover", back.camCov[at] === w.camCov[at], `${back.camCov[at]} vs ${w.camCov[at]}`);
+  }
+
+  // ---- the bill ------------------------------------------------------------
+  {
+    const { w, sx, sy } = town();
+    const before = yearlyFigures(w).upkeepYr;
+    apply(w, { kind: "camera", tiles: [sx + sy * w.w] });
+    const one = yearlyFigures(w);
+    check("one camera adds the whole network fee", one.upkeepYr - before === KNOBS.UPKEEP_CAM_NET, `${one.upkeepYr - before} vs ${KNOBS.UPKEEP_CAM_NET}`);
+    check("and the figures carry the count", one.cams === 1, `${one.cams}`);
+    const rest = [];
+    for (let x = sx - 5; x <= sx + 5; x++) if (x !== sx) rest.push(x + sy * w.w);
+    apply(w, { kind: "camera", tiles: rest });
+    const many = yearlyFigures(w);
+    check("THE FEE IS FLAT: eleven cameras cost the same a year as one", many.upkeepYr === one.upkeepYr && many.cams === rest.length + 1, `${many.cams} cameras, §${many.upkeepYr} vs §${one.upkeepYr}`);
+    check("the network fee is not charged when there is no camera", before === yearlyFigures(load(save(town().w))).upkeepYr, "a camera-free town pays the fee");
+  }
+
+  // ---- the tool ------------------------------------------------------------
+  {
+    const tool = TOOL_BY_ID.camera;
+    check("the camera is a tool on key E", !!tool && tool.key === "E" && tool.op.kind === "camera", JSON.stringify(tool && { key: tool.key, kind: tool.op.kind }));
+    // NOT in PLACE_TOOLS: that is the click set, and the camera is a drag.
+    check("and it is a drag, not a click", !PLACE_TOOLS.includes("camera"), "camera is in PLACE_TOOLS");
+    // PLACE_TOOLS was doing two jobs: "this is a click tool" and "this tool
+    // has a ghost". The camera is the only tool that is a DRAG and still wants
+    // one, so the lists part company — and a flat drag still gets neither.
+    const { GHOST_TOOLS } = await import("../js/tools.js");
+    check("but it still shows a ghost under the cursor", GHOST_TOOLS.includes("camera"), "camera has no ghost");
+    check("every click tool keeps its ghost", PLACE_TOOLS.every((t) => GHOST_TOOLS.includes(t)), PLACE_TOOLS.filter((t) => !GHOST_TOOLS.includes(t)).join(", "));
+    check("and the flat drags still have none", !GHOST_TOOLS.includes("road") && !GHOST_TOOLS.includes("wall") && !GHOST_TOOLS.includes("rail"), GHOST_TOOLS.join(", "));
+    check("every tool id is still unique", new Set(TOOLS.map((t) => t.id)).size === TOOLS.length, `${TOOLS.length}`);
+  }
+
+  // ---- the overlay is registered in BOTH places main.js needs --------------
+  {
+    const mainSrc = readFileSync(path.join(ROOT, "js", "main.js"), "utf8");
+    check("the watch overlay is in the cycle", /const OVERLAYS = \[[^\]]*"watch"/.test(mainSrc), "not in OVERLAYS");
+    check("and in cycleOverlay's flash-label map, which is a SECOND edit", /watch:\s*"Overlay: camera cover/.test(mainSrc), "no flash label");
+    const renderSrc = readFileSync(path.join(ROOT, "js", "render.js"), "utf8");
+    check("and drawOverlay knows the mode", /mode === "watch"/.test(renderSrc), "drawOverlay has no watch branch");
+  }
+}
+
+// ---- CLEARANCE: the camera solves, and never deters (docs/PROPOSAL-CAMERAS.md §4c-4d) ----
+// Measured on tools/camprobe.mjs, 4 seeds x 30y at ONE station. Solved% by
+// camera count: 0 → 20.5, 1 → 34.2, 2 → 41.5, 4 → 49.2, 8 → 67.3, 10 → 85.3,
+// 20 → 90.4, 40 → 90.5. Mean crime over the same sweep: 39.34, —, —, —, —,
+// 39.36, 39.88, 39.23. The town clears four times as many files and its crime
+// number does not move; that is the whole design and these checks pin it.
+{
+  const JU = await import("../js/sim/justice.js");
+  const { TICKER_FLASH } = await import("../js/sim/events.js");
+  const fieldsSrc = readFileSync(path.join(ROOT, "js", "sim", "fields.js"), "utf8");
+
+  // THE ANTI-CLAIM, enforced on the source. A camera term anywhere in the
+  // crime field or in land value would make cameras DETER, which is the one
+  // thing the design forbids. The old grep guard allow-listed fields.js
+  // wholesale — and computeCrime and computeLandValue both live in it.
+  const bodyOf = (name) => {
+    const from = fieldsSrc.indexOf(`export function ${name}(`);
+    if (from < 0) return null;
+    let depth = 0;
+    for (let i = fieldsSrc.indexOf("{", from); i < fieldsSrc.length; i++) {
+      if (fieldsSrc[i] === "{") depth++;
+      else if (fieldsSrc[i] === "}" && --depth === 0) return fieldsSrc.slice(from, i + 1);
+    }
+    return null;
+  };
+  for (const fn of ["computeCrime", "computeLandValue", "computeDread"]) {
+    const body = bodyOf(fn);
+    check(`CLEARANCE rig: ${fn} was found in fields.js to read`, !!body && body.length > 200, `${body && body.length}`);
+    check(`${fn} has no camera term — a camera SOLVES and never deters`, !!body && !/\bcam\b|camCov|CAM_/.test(body), (body || "").split("\n").filter((l) => /cam/i.test(l)).join(" / ") || "not found");
+  }
+  const justiceSrc = readFileSync(path.join(ROOT, "js", "sim", "justice.js"), "utf8");
+  check("the camera reaches the sim through exactly one arrest term", (justiceSrc.match(/KNOBS\.CAM_ARREST/g) || []).length === 1, `${(justiceSrc.match(/KNOBS\.CAM_ARREST/g) || []).length} uses`);
+  check("and one wrongful term", (justiceSrc.match(/KNOBS\.CAM_WRONGFUL/g) || []).length === 1, `${(justiceSrc.match(/KNOBS\.CAM_WRONGFUL/g) || []).length} uses`);
+
+  // ---- what the term is worth, run through the real filesTick -------------
+  // Not a re-derivation of the formula: 120 real files in one world, half at
+  // covered scenes and half dark, rolled by the shipped code.
+  const trial = (cover, stations) => {
+    const W = cameraJusticeWorld();
+    const pool = W.citizens.filter((c) => !c.dead && c.home >= 0 && !c.fixed && (!c.held || c.held <= W.tick));
+    const lots = [];
+    for (let i = 0; i < W.w * W.h && lots.length < 60; i++) if (W.tier[i] > 0 && !W.rubble[i]) lots.push(i);
+    const files = [];
+    for (let k = 0; k < Math.min(60, pool.length, lots.length); k++) {
+      const f = JU.openFile(W, { tile: lots[k], culpritId: pool[k].id, cause: "burglary" });
+      f.opened = W.tick - 1; // past the opening month, so filesTick rolls it
+      files.push(f);
+      W.camCov[lots[k]] = cover;
+      W.policeCov[lots[k]] = 0;
+    }
+    const cen = census(W);
+    cen.policeStations = stations;
+    JU.filesTick(W, cen, []);
+    return { n: files.length, closed: files.filter((f) => f.closed).length, arrests: W.events.arrests.length };
+  };
+  const dark = trial(0, 1);
+  const lit = trial(KNOBS.CAM_EFFECT, 1);
+  check("CLEARANCE rig: the same number of real files at built lots in both arms", dark.n === lit.n && dark.n >= 30, `${dark.n} vs ${lit.n}`);
+  check("a covered scene clears far more often than a dark one", lit.closed > dark.closed * 3 && dark.closed >= 0, `dark ${dark.closed}/${dark.n} · covered ${lit.closed}/${lit.n}`);
+
+  // THE GATE THE OWNER ASKED FOR: no station, no roll, however much of the
+  // town is watched. A network without a police force does exactly nothing.
+  const unpoliced = trial(KNOBS.CAM_EFFECT, 0);
+  check("with NO police station a blanket of cameras solves nothing at all", unpoliced.closed === 0 && unpoliced.arrests === 0, `${unpoliced.closed} closed, ${unpoliced.arrests} arrests`);
+
+  // ---- the wrongful term ---------------------------------------------------
+  {
+    // The same single draw, at a higher threshold: WRONGFUL_P 0.05 alone
+    // against 0.05 + CAM_WRONGFUL 0.10 at full cover. Read off the shipped
+    // path rather than recomputed, by forcing every arrest and counting.
+    // ROUNDS, because one month of one town is forty draws and the term moves
+    // the threshold by ten points: forty draws cannot tell 5% from 15% (the
+    // first draft measured 3 against 3 and would have called that a pass).
+    // Ten rounds is ~400 arrests, where the two arms cannot overlap by luck.
+    const ROUNDS = 10;
+    const run = (cover) => {
+      const W = cameraJusticeWorld();
+      const lots = [];
+      for (let i = 0; i < W.w * W.h && lots.length < 60; i++) if (W.tier[i] > 0 && !W.rubble[i]) lots.push(i);
+      const saveBase = KNOBS.ARREST_BASE;
+      const saveHeld = KNOBS.HOLD_MONTHS;
+      KNOBS.ARREST_BASE = 1; // every file is worked, so the only thing varying is the wrongful roll
+      let arrests = 0;
+      for (let round = 0; round < ROUNDS; round++) {
+        // Fresh culprits each round: an animal taken last round is in custody
+        // and adultsWithin skips it, so reusing the pool would thin the arms
+        // unevenly.
+        const pool = W.citizens.filter((c) => !c.dead && c.home >= 0 && !c.fixed && (!c.held || c.held <= W.tick));
+        for (let k = 0; k < Math.min(lots.length, pool.length); k++) {
+          const f = JU.openFile(W, { tile: lots[k], culpritId: pool[k].id, cause: "burglary" });
+          f.opened = W.tick - 1;
+          W.camCov[lots[k]] = cover;
+        }
+        const cen = census(W);
+        cen.policeStations = 1;
+        const before = W.events.arrests.length;
+        JU.filesTick(W, cen, []);
+        arrests += W.events.arrests.length - before;
+        W.tick++;
+      }
+      KNOBS.ARREST_BASE = saveBase;
+      KNOBS.HOLD_MONTHS = saveHeld;
+      return { wrongful: W.events.justice.wrongful, arrests };
+    };
+    const plain = run(0);
+    const watched = run(KNOBS.CAM_EFFECT);
+    check("CLEARANCE rig: both wrongful arms made enough arrests to tell 5% from 15%", plain.arrests >= 150 && watched.arrests >= 150, `dark ${plain.arrests} · watched ${watched.arrests}`);
+    check("a camera-carried arrest names the wrong animal more often", watched.wrongful > plain.wrongful * 1.5, `${plain.wrongful}/${plain.arrests} dark · ${watched.wrongful}/${watched.arrests} watched`);
+  }
+
+  // ---- the line ------------------------------------------------------------
+  {
+    const W = cameraJusticeWorld();
+    const pool = W.citizens.filter((c) => !c.dead && c.home >= 0 && !c.fixed && (!c.held || c.held <= W.tick));
+    let lot = -1;
+    for (let i = 0; i < W.w * W.h && lot < 0; i++) if (W.tier[i] > 0 && !W.rubble[i]) lot = i;
+    let road = -1;
+    for (let i = 0; i < W.w * W.h && road < 0; i++) if (W.road[i] === ROAD.ROAD && !W.rail[i] && !W.wall[i]) road = i;
+    W.cash = 100000;
+    apply(W, { kind: "camera", tiles: [road] });
+    const f = JU.openFile(W, { tile: lot, culpritId: pool[0].id, cause: "burglary" });
+    f.opened = W.tick - 3;
+    W.camCov[lot] = KNOBS.CAM_EFFECT;
+    const saveBase = KNOBS.ARREST_BASE;
+    KNOBS.ARREST_BASE = 1;
+    const said = [];
+    const cen = census(W);
+    cen.policeStations = 1;
+    JU.filesTick(W, cen, said);
+    KNOBS.ARREST_BASE = saveBase;
+    const id = said.find((l) => /^IDENTIFIED/.test(l));
+    check("a camera-carried arrest prints IDENTIFIED", !!id, said.join(" | ").slice(0, 160) || "nothing said");
+    check("and it names the camera's own tile", !!id && new RegExp(`the camera at \\(${road % W.w},${(road / W.w) | 0}\\)`).test(id), id || "no line");
+    check("and says how long the file had been open, never that it is closed", !!id && /3 months after it happened\.$/.test(id), id || "no line");
+    check("IDENTIFIED flashes over the map", TICKER_FLASH.test(id || ""), id || "no line");
+    // A DARK scene must print nothing: the line is the camera's, not the arrest's.
+    const D = cameraJusticeWorld();
+    const dpool = D.citizens.filter((c) => !c.dead && c.home >= 0 && !c.fixed && (!c.held || c.held <= D.tick));
+    const df = JU.openFile(D, { tile: lot, culpritId: dpool[0].id, cause: "burglary" });
+    df.opened = D.tick - 3;
+    KNOBS.ARREST_BASE = 1;
+    const quiet = [];
+    const dcen = census(D);
+    dcen.policeStations = 1;
+    JU.filesTick(D, dcen, quiet);
+    KNOBS.ARREST_BASE = saveBase;
+    check("an arrest with no camera on it prints no IDENTIFIED", !quiet.some((l) => /^IDENTIFIED/.test(l)) && quiet.length > 0, quiet.join(" | ").slice(0, 160) || "nothing said at all");
+  }
+}
+
+// ---- WATCHED: the brake, the mood, the waiver (docs/PROPOSAL-CAMERAS.md §4e) ----
+// The brake is ONE TERM IN THE CAPACITY LAW and it is the only one. Two earlier
+// drafts put it in mood, in the home score and in a rehome, and all three
+// measured as no-ops under a blanket — mood has no sim consumer while V_R > 0,
+// bestHome is a pure argmax so a uniform penalty cancels, and a rehome wanting
+// somewhere less watched finds nowhere when everywhere is watched. A global
+// nuisance needs an ABSOLUTE brake.
+//
+// A/B'd on tools/camprobe.mjs (4 seeds x 30y, one station, --cap 0 against 400):
+//   10 cameras  pop 1204 → 1053 · R valve 0.30 → 0.24 · 93.4% of homes watched
+//   40 cameras  pop 1325 → 1047 · R valve 0.28 → 0.18 · 98.7% watched
+{
+  const { capacityLaw } = await import("../js/sim/demand.js");
+  const { moodTerms } = await import("../js/sim/citizens.js");
+
+  // ---- the brake is absolute -----------------------------------------------
+  {
+    const W = load(A.saved);
+    const base = census(W);
+    const cap0 = capacityLaw(W, { ...base, watchedShare: 0 });
+    const capHalf = capacityLaw(W, { ...base, watchedShare: 0.5 });
+    const capAll = capacityLaw(W, { ...base, watchedShare: 1 });
+    check("CAM_CAP takes capacity off in proportion to the watched share", cap0 > capHalf && capHalf > capAll, `${cap0.toFixed(0)} / ${capHalf.toFixed(0)} / ${capAll.toFixed(0)}`);
+    // ABSOLUTE, not comparative: the whole point. A fully watched town loses
+    // CAM_CAP scaled by the same H gain every other term gets.
+    const want = KNOBS.CAM_CAP * (1 + KNOBS.CAP_H_GAIN * base.H);
+    check("a fully watched town loses exactly CAM_CAP of capacity", Math.abs((cap0 - capAll) - want) < 1e-6, `${(cap0 - capAll).toFixed(3)} vs ${want.toFixed(3)}`);
+    check("CAM_CAP sits between a park and a zoo, so the loss is legible against them", KNOBS.CAP_PARK < KNOBS.CAM_CAP && KNOBS.CAM_CAP < KNOBS.CAP_LARGE_PARK, `${KNOBS.CAP_PARK} < ${KNOBS.CAM_CAP} < ${KNOBS.CAP_LARGE_PARK}`);
+    // With the knob at 0 the law is exactly what it was before the network.
+    const saved = KNOBS.CAM_CAP;
+    KNOBS.CAM_CAP = 0;
+    check("at CAM_CAP 0 the capacity law is the one that shipped before cameras", capacityLaw(W, { ...base, watchedShare: 1 }) === cap0, "the brake leaks when switched off");
+    KNOBS.CAM_CAP = saved;
+  }
+
+  // ---- what the share counts -----------------------------------------------
+  {
+    // OCCUPIED HOMES, not tiles: a camera pointed at a field costs nothing.
+    const W = load(A.saved);
+    const before = census(W).watchedShare;
+    check("an unwatched town has a watched share of zero", before === 0, `${before}`);
+    let empties = 0;
+    for (let i = 0; i < W.w * W.h; i++) if (!W.occupants[i]) { W.camCov[i] = KNOBS.CAM_EFFECT; empties++; }
+    check("WATCHED rig: there are empty tiles to watch", empties > 100, `${empties}`);
+    check("watching every EMPTY tile in the town costs nothing", census(W).watchedShare === 0, `${census(W).watchedShare}`);
+    let homes = 0;
+    for (let i = 0; i < W.w * W.h; i++) if (W.occupants[i]) { W.camCov[i] = KNOBS.CAM_EFFECT; homes++; }
+    check("WATCHED rig: there are occupied homes to watch", homes >= 10, `${homes}`);
+    check("watching every home makes the share one", Math.abs(census(W).watchedShare - 1) < 1e-9, `${census(W).watchedShare}`);
+    // Half cover still counts — CAM_EFFECT/2 is the threshold, so a street's
+    // far frontages are watched too.
+    for (let i = 0; i < W.w * W.h; i++) if (W.occupants[i]) W.camCov[i] = KNOBS.CAM_EFFECT / 2;
+    check("half cover is still watched", Math.abs(census(W).watchedShare - 1) < 1e-9, `${census(W).watchedShare}`);
+    for (let i = 0; i < W.w * W.h; i++) if (W.occupants[i]) W.camCov[i] = KNOBS.CAM_EFFECT / 2 - 1;
+    check("and a hair under it is not", census(W).watchedShare === 0, `${census(W).watchedShare}`);
+  }
+
+  // ---- the mood term and the owner's waiver --------------------------------
+  {
+    const W = load(A.saved);
+    const c = W.citizens.find((x) => !x.dead && x.home >= 0 && !x.burgled);
+    check("WATCHED rig: an un-burgled animal with a home", !!c, "none found");
+    if (c) {
+      const termOf = (w, cit) => (moodTerms(w, cit).find((t) => t.code === "WATCHED") || { value: 0 }).value;
+      check("an unwatched street costs no mood", termOf(W, c) === 0, `${termOf(W, c)}`);
+      W.camCov[c.home] = KNOBS.CAM_EFFECT;
+      const full = termOf(W, c);
+      check("a watched street costs CAM_MOOD", Math.abs(full + KNOBS.CAM_MOOD) < 1e-9, `${full}`);
+      W.camCov[c.home] = KNOBS.CAM_EFFECT / 2;
+      check("and half cover costs half of it", Math.abs(termOf(W, c) + KNOBS.CAM_MOOD / 2) < 1e-9, `${termOf(W, c)}`);
+      // THE OWNER'S RULING: "folks who have been robbed before do not feel
+      // that negative feeling."
+      W.camCov[c.home] = KNOBS.CAM_EFFECT;
+      c.burgled = true;
+      check("an animal whose own door has been forced does not mind the camera", termOf(W, c) === 0, `${termOf(W, c)}`);
+      c.burgled = false;
+      check("and its unburgled neighbours still do", termOf(W, c) !== 0, `${termOf(W, c)}`);
+    }
+  }
+
+  // ---- the animal can SAY it -----------------------------------------------
+  {
+    // Without a needs code the mood term is invisible to the player and might
+    // as well not exist. needTruthResults proves WATCHED WINS on a watched
+    // street; this checks the remedy names the thing to bulldoze.
+    const { ACT, line } = await import("../js/sim/voice.js");
+    check("WATCHED has a remedy a player can act on", typeof ACT.WATCHED === "string" && /camera/.test(ACT.WATCHED), ACT.WATCHED);
+    const said = line(null, { id: 1, species: "tortoise" }, { code: "WATCHED" });
+    check("and a voice line, inside the 30-character rule", typeof said === "string" && said.length > 0 && said.length <= 30, `${said} (${said && said.length})`);
+  }
+}
+
 // ---- walls (docs/PROPOSAL-ZONING-RAIL-WALLS.md §1; SPEC §6b) ----------------------
 // The flood must reproduce the square before it is allowed to differ from it.
 {
@@ -4131,7 +4758,7 @@ check("no Math.random under js/", mathRandom.length === 0, mathRandom.join(", ")
   const { refreshLast } = await import("../js/sim/tick.js");
   const { createWalkers } = await import("../js/walkers.js");
   const { art } = await import("../js/art/index.js");
-  const { needFixture, needTruthResults } = await import("./need-fixtures.mjs");
+  const { needFixture, needTruthResults, TRUTH_CODES } = await import("./need-fixtures.mjs");
   const { COHERENT_STRESS_CODES, coherentStressFacts, coherentStressFixture } = await import("./need-stress.mjs");
 
   const lineCodes = Object.keys(LINES).sort();
@@ -4153,6 +4780,15 @@ check("no Math.random under js/", mathRandom.length === 0, mathRandom.join(", ")
   }
   check("needs: signed visual hashes still resolve every species/code voice", unresolvedVoices === 0, `${unresolvedVoices}`);
 
+  // The check below iterates the fixture TABLE, so a code with no fixture is
+  // not tested — it is skipped, and the check's name ("every need code") is
+  // false without this line. WATCHED was added to the voice table and to
+  // ACTIONABLE_MOOD and the suite stayed green with nothing exercising it.
+  {
+    const { ACT } = await import("../js/sim/voice.js");
+    const uncovered = Object.keys(ACT).filter((code) => !TRUTH_CODES.includes(code));
+    check("needs: every code the voice table can act on HAS a truth fixture", uncovered.length === 0, uncovered.join(", "));
+  }
   const truthResults = needTruthResults();
   const wrongCases = truthResults.filter((r) => r.expected !== r.actual);
   check("needs: every need code wins a focused truth fixture", wrongCases.length === 0,
@@ -4963,16 +5599,16 @@ check("no Math.random under js/", mathRandom.length === 0, mathRandom.join(", ")
   const HC = await import("./headless-canvas.mjs");
   HC.installCanvas();
 
-  const ids = ["R", "C", "I", "M", "road", "wall", "rail", "station", "tree", "park", "zoo", "centre", "police", "fire", "inspect", "bulldoze", "largePark"];
-  const keys = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "Z", "V", "P", "F", "I", "B", "G"];
-  const orders = Array.from({ length: 17 }, (_, i) => i + 1);
-  check("palette: the canonical registry has the owner's exact seventeen tools, order and unique keys",
+  const ids = ["R", "C", "I", "M", "road", "wall", "rail", "station", "tree", "park", "zoo", "centre", "police", "fire", "inspect", "bulldoze", "largePark", "camera"];
+  const keys = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "Z", "V", "P", "F", "I", "B", "G", "E"];
+  const orders = Array.from({ length: 18 }, (_, i) => i + 1);
+  check("palette: the canonical registry has the owner's exact eighteen tools, order and unique keys",
     JSON.stringify(TOOLS.map((t) => t.id)) === JSON.stringify(ids)
       && JSON.stringify(TOOLS.map((t) => t.key)) === JSON.stringify(keys)
       && JSON.stringify(TOOLS.map((t) => t.order)) === JSON.stringify(orders)
-      && new Set(TOOLS.map((t) => t.key.toUpperCase())).size === 17
+      && new Set(TOOLS.map((t) => t.key.toUpperCase())).size === 18
       && TOOLS.every((t) => TOOL_BY_ID[t.id] === t && TOOL_BY_KEY[t.key.toUpperCase()] === t));
-  const expectedKinds = ["zone", "zone", "zone", "zone", "road", "wall", "rail", "station", "tree", "park", "zoo", "centre", "police", "fire", "inspect", "bulldoze", "largePark"];
+  const expectedKinds = ["zone", "zone", "zone", "zone", "road", "wall", "rail", "station", "tree", "park", "zoo", "centre", "police", "fire", "inspect", "bulldoze", "largePark", "camera"];
   check("palette: every ordered row carries its exact operation and the four zones keep R/C/I/M identity",
     JSON.stringify(TOOLS.map((t) => t.op.kind)) === JSON.stringify(expectedKinds)
       && JSON.stringify(TOOLS.slice(0, 4).map((t) => t.op.zone)) === JSON.stringify([ZONE.R, ZONE.C, ZONE.I, ZONE.M])
@@ -5005,7 +5641,7 @@ check("no Math.random under js/", mathRandom.length === 0, mathRandom.join(", ")
       iconRows.push(`${tool.id}:${sprite.name}`);
     } catch (e) { spriteFailures++; iconRows.push(`${tool.id}:ERROR ${e.message}`); }
   }
-  const expectedSprites = ["R1-cottage-0", "C1-shop-0", "I1-shed-0", "M1-stall-0", "road-5", "wall-5", "rail-5", "station-ns", "tree-round", "park", "civic-zoo-3x3", "civic-centre-3x3", "civic-police-3x3", "civic-fire-3x3", "cursor", "rubble", "civic-largePark-3x3"];
+  const expectedSprites = ["R1-cottage-0", "C1-shop-0", "I1-shed-0", "M1-stall-0", "road-5", "wall-5", "rail-5", "station-ns", "tree-round", "park", "civic-zoo-3x3", "civic-centre-3x3", "civic-police-3x3", "civic-fire-3x3", "cursor", "rubble", "civic-largePark-3x3", "camera-0"];
   const scaled = HC.createCanvas(1, 1);
   const scaledSprite = spriteForTool(art, "R");
   paintSprite(scaled, scaledSprite, 2);
@@ -5017,7 +5653,7 @@ check("no Math.random under js/", mathRandom.length === 0, mathRandom.join(", ")
       for (let c = 0; c < 4; c++) if (scaled._data[p + c] !== scaled._data[q + c]) nearest = false;
     }
   }
-  check("palette: all seventeen representative sprites resolve, paint nonblank once, and scale nearest-neighbour",
+  check("palette: all eighteen representative sprites resolve, paint nonblank once, and scale nearest-neighbour",
     spriteFailures === 0 && nearest && JSON.stringify(iconRows.map((row) => row.slice(row.indexOf(":") + 1))) === JSON.stringify(expectedSprites), iconRows.join(" · "));
 
   // A deliberately small DOM proves creation, click/focus parity and ARIA
@@ -5051,7 +5687,7 @@ check("no Math.random under js/", mathRandom.length === 0, mathRandom.join(", ")
   const { createPalette } = await import("../js/palette.js");
   const palette = createPalette({ input: fakeInput, ui: { setCost: (text, refused) => costs.push(`${text}:${refused}`) }, art });
   paletteRef = palette;
-  let clickParity = palette.buttons.size === 17;
+  let clickParity = palette.buttons.size === 18;
   for (const tool of TOOLS) {
     const button = palette.buttons.get(tool.id);
     button.events.pointerenter();
@@ -5082,9 +5718,9 @@ check("no Math.random under js/", mathRandom.length === 0, mathRandom.join(", ")
     && palette.buttons.get("bulldoze").classList.contains("on")
     && [...palette.buttons].filter(([, b]) => b.attributes["aria-pressed"] === "true").length === 1;
   globalThis.document = priorDocument;
-  check("palette: seventeen accessible buttons paint once; pointer, click, cost preview and active state stay synchronized",
-    clickParity && semanticActive && focusHoverStable && made.filter((e) => e.tagName === "CANVAS").length === 17
-      && costs.some((x) => x === "cost:bulldoze:true") && costs.filter((x) => x === "restore").length === 19,
+  check("palette: eighteen accessible buttons paint once; pointer, click, cost preview and active state stay synchronized",
+    clickParity && semanticActive && focusHoverStable && made.filter((e) => e.tagName === "CANVAS").length === 18
+      && costs.some((x) => x === "cost:bulldoze:true") && costs.filter((x) => x === "restore").length === 20,
     JSON.stringify({ buttons: palette.buttons.size, canvases: made.filter((e) => e.tagName === "CANVAS").length, selected, costs: costs.length, semanticActive, focusHoverStable }));
 
   const html = readFileSync(path.join(ROOT, "index.html"), "utf8");
@@ -5129,7 +5765,7 @@ check("no Math.random under js/", mathRandom.length === 0, mathRandom.join(", ")
   check("palette: input, palette and generated footer all read the one registry; build buttons are gone from the strip",
     /from "\.\/tools\.js"/.test(inputSrc) && /labelForOp\(op\)/.test(inputSrc)
       && /toolHelp\(\)/.test(uiSrc) && !/for \(const t of TOOLS\)/.test(uiSrc)
-      && /id="help"/.test(html) && toolHelp().split(" · ").length === 17);
+      && /id="help"/.test(html) && toolHelp().split(" · ").length === 18);
   check("palette: WASD has no command or news binding; S/D tap timing is gone; undo/save use their modifiers",
     !/case "Key[WASD]"/.test(newsSrc) && /case "ArrowRight"/.test(newsSrc)
       && !/TAP_MS|downAt|promoteHolds/.test(inputSrc) && /case "Backspace"/.test(inputSrc)
@@ -5255,6 +5891,14 @@ if (existsSync(artIndex)) {
       const oblongs = [];
       for (const { sprite } of allSprites()) { const [fw, fh] = sprite.footprint || [1, 1]; if (fw * fh > 1 && RECIPES.has(sprite)) oblongs.push(sprite); }
       oblongs.push(await probeSolid(3, 48), await probeSolid(2, 48));
+      // The CAMERA is 1x1 and still belongs in this audit, which is why the
+      // footprint filter above cannot find it: every other 1x1 solid stands on
+      // a LOT, and walkers do not cross lots. A camera stands on a ROAD, in the
+      // lane the animals actually walk, so it is the one 1x1 whose depth
+      // against a walker is a live question. Measured 0 mis-ordered over 132
+      // positions and 2,552 overlapping pixels — the police station's score.
+      const { CAMERAS } = await import("../js/art/buildings.js");
+      oblongs.push(...CAMERAS);
       const audited = [];
       const misordered = [];
       for (const sprite of oblongs) {
@@ -5262,7 +5906,7 @@ if (existsSync(artIndex)) {
         audited.push(`${sprite.name} ${res.overlaps}px`);
         if (res.bad) misordered.push(`${sprite.name}: ${res.bad} px at (${res.worst.wx.toFixed(2)}, ${res.worst.wy.toFixed(2)})`);
       }
-      check("painter: the ray audit — no oblong paints a pixel on the wrong side of a walker on its roads", oblongs.length >= 3 && misordered.length === 0, misordered.join("; ") || audited.join(", "));
+      check("painter: the ray audit — no oblong, and no camera in the road, paints a pixel on the wrong side of a walker", oblongs.length >= 3 && audited.some((a) => a.startsWith("camera-")) && misordered.length === 0, misordered.join("; ") || audited.join(", "));
       // painter.js FOOTPRINTS: back ∈ (s − 1.75, s − 0.44), kept at the zoo's margins by 0.7 + (s − 2).
       check("painter: the pull-back is 0 for a 1×1, 0.7 for a 2×2, 1.7 for a 3×3", pullbackOf(1) === 0 && pullbackOf(2) === 0.7 && Math.abs(pullbackOf(3) - 1.7) < 1e-9);
       // The 3×3 band, the 2×2 band's shape on the walkers' own convention (a
@@ -6847,6 +7491,7 @@ if (existsSync(path.join(ROOT,"docs/fixtures/control-city.json"))) {
   catch(e) { check("integration: owner control city twelve-month baseline",false,e.message); }
 } else console.log("DEFERRED: owner control-city.json has not arrived; no owner-city regression claimed.");
 { const {checkRailBridges} = await import("./check-rail-bridges.mjs"); checkRailBridges(check); }
+{ const {checkCameraIntegration} = await import("./check-camera-integration.mjs"); checkCameraIntegration(check); }
 console.log(`${checks} checks, ${failures.length} failures`);
 for (const f of failures) console.log(`  FAIL ${f}`);
 process.exit(failures.length ? 1 : 0);

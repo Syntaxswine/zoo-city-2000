@@ -112,6 +112,11 @@ export function createUI(app) {
       ["pacification centres", KNOBS.UPKEEP_CENTRE * (fig.centres || 0)], ["licence inspectors", fig.licence ? KNOBS.UPKEEP_LICENCE * (fig.markets || 0) : 0],
       ["walls", KNOBS.UPKEEP_WALL * (fig.walls || 0)],
       ["rail", KNOBS.UPKEEP_RAIL * ((fig.rails || 0) - (fig.railBridges || 0))], ["rail bridges", KNOBS.UPKEEP_RAIL_BRIDGE * (fig.railBridges || 0)], ["stations", KNOBS.UPKEEP_STATION_RAIL * (fig.stations || 0)],
+      // FLAT, and the only row here that is: the network is billed once while
+      // any camera stands, so the first camera costs §2,000 and the fiftieth
+      // costs §100. budget.js charges it the same way; the two must agree or
+      // the reconciliation below silently hides the difference in "animals".
+      ["camera network", fig.cams > 0 ? KNOBS.UPKEEP_CAM_NET : 0],
     ];
     const lines = raw.filter(([, v]) => v > 0).map(([name, v]) => [name, Math.round(v * k)]);
     const sum = lines.reduce((s, l) => s + l[1], 0);
@@ -158,7 +163,7 @@ export function createUI(app) {
     mk("btnUndo", "⌫", "undo", "Backspace or Ctrl+Z: undo the last op (this month only)", () => app.undo());
     mk("btnSave", "Ctrl+S", "save", "Ctrl+S: open named saves with the save-as name focused", () => app.save());
     mk("btnLoad", "L", "load", "L: open named saves on the slot list", () => app.load());
-    mk("btnOverlay", "O", "overlay", "O: cycle land value / pollution / crime / dread / use / road access / lot score overlays", () => app.cycleOverlay());
+    mk("btnOverlay", "O", "overlay", "O: cycle land value / pollution / crime / dread / use / road access / lot score / camera cover overlays", () => app.cycleOverlay());
     mk("btnNews", "R", "news", "R: the news — every dispatch this city ever made, oldest first; ← → step one at a time", () => app.news.toggle());
     mk("btnZoom", "+", "zoom", "+ / −: zoom ×1 / ×2", () => app.zoomAt(app.camera.zoom === 1 ? 1 : -1));
     sep();
@@ -404,7 +409,8 @@ export function createUI(app) {
     const lines = [];
     const head = el("div", "head");
     let what;
-    if (w.wall[i]) what = w.road[i] !== ROAD.NONE || w.rail[i] ? "Tunnel" : "Wall";
+    if (w.cam[i]) what = "Camera";
+    else if (w.wall[i]) what = w.road[i] !== ROAD.NONE || w.rail[i] ? "Tunnel" : "Wall";
     else if (w.rail[i] === 2) what = "Station";
     else if (w.rail[i]) what = w.road[i] !== ROAD.NONE ? "Level crossing" : "Rail"; // the head names BOTH layers, the way a road under a wall reads "Tunnel"
     else if (w.road[i] === ROAD.BRIDGE) what = "Bridge";
@@ -542,6 +548,8 @@ export function createUI(app) {
         ? `a station: riders board from ${rep.doors.length === 1 ? "the road at" : `${rep.doors.length} sides,`} ${rep.doors.slice(0, 4).map((t) => `(${t % w.w},${(t / w.w) | 0})`).join(" ")}${court > 0 ? `, crossing ${court} tile${court === 1 ? "" : "s"} of forecourt on foot` : ""}; a citizen's ride costs ${railShare()} of a walk (×${rideFactor()} speed), while a hall cart's ride is free distance; neither changes property-value distance`
         : "a station nobody can board: with no door on it the line runs straight past, and no commute may use it"));
     } else if (w.rail[i]) lines.push(el("div", "dim", w.road[i] !== ROAD.NONE ? "a level crossing: the road and the line share this tile square-on — animals walk across it, anything on the line passes straight through without stopping, and the city maintains both" : `rail: citizen commutes price it at ${railShare()} of a walk (×${rideFactor()} speed); hall logistics count it as free travel; it never shortens property-value distance`));
+    if (w.cam[i]) lines.push(el("div", "dim", `a camera: it watches this street for ${KNOBS.CAM_REACH} blocks and the lots the street serves. It solves crimes — it does not prevent them, and it needs a police station to do anything at all`));
+    if (w.camCov[i]) lines.push(el("div", "dim", `watched: ${w.camCov[i]}/${KNOBS.CAM_EFFECT}${w.policeCov[i] ? ` · police cover ${w.policeCov[i]}/${KNOBS.POLICE_EFFECT}` : " · no police cover, so the pictures go nowhere"}`));
     if (w.wall[i]) lines.push(el("div", "dim", w.road[i] !== ROAD.NONE ? "a tunnel: the road runs through the wall; smells, dread and cover pass along it and nowhere else" : "a wall: smells, dread, cover and land-value halos go round it, and a killer's reach stops at it; a road through it is a tunnel"));
     if (rep.dread) lines.push(el("div", "dim", `dread ${rep.dread}: herbivores −${Math.min(KNOBS.DREAD_MOOD_CAP, Math.round(KNOBS.DREAD_MOOD_HERB * rep.dread))} mood and −${Math.round(KNOBS.DREAD_HOME_HERB * rep.dread)} on the home score; LV −${Math.round(KNOBS.LV_DREAD * rep.dread)}; carnivores do not mind`));
     for (const f of w.events.files) {
@@ -642,6 +650,7 @@ export function createUI(app) {
       else if ((c.held || 0) > w.tick) status.push(`${w.civic[c.heldAt] === CIVIC.ZOO ? "in the Zoo prison" : c.heldAt >= 0 ? "at the Pacification Centre" : "in legacy cells"} until ${dateOf(w, c.held).label}`);
       if (c.fixed) status.push(`fixed${c.wrongful ? " — the wrong animal" : ""}${c.exonerated ? ", exonerated" : ""}`);
       if (c.record) status.push(`record ${c.record}`);
+      if (c.burgled) status.push("burgled");
       if (status.length) lines.push(el("div", "warn", status.join(" · ")));
       const targetLine = target?.line || (wk ? doingOf(wk) : "between walks");
       lines.push(el("div", "doing", `${target?.state || "walking"}: ${targetLine}${wk ? ` · ${doingOf(wk)}` : ""}${c.centenary ? " · wears the centenary hat" : ""}`));

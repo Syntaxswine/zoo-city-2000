@@ -340,6 +340,78 @@ export function computeCoverage(world) {
 }
 
 /** Every lot with a building on it: not rubble, not alight. */
+/**
+ * THE CAMERA NETWORK's cover (SPEC §9d; docs/PROPOSAL-CAMERAS.md §4b). Derived,
+ * rebuilt every tick, never saved.
+ *
+ * A camera watches the STREET, not a circle. From the tile it stands on it
+ * walks CONNECTED ROAD TILES up to CAM_REACH steps, and paints every tile
+ * within ROAD_REACH of each road tile it reaches — the frontages that street
+ * serves. Full CAM_EFFECT within CAM_NEAR road-steps, half beyond; the maximum
+ * where two cameras overlap, exactly as computeCoverage does.
+ *
+ * THE PAINT RADIUS IS ROAD_REACH AND THAT IS NOT A TASTE CALL. A crime scene
+ * is NEVER a road tile: burglaryTick builds its candidates from tier > 0 and a
+ * road tile has tier 0, and a killing's scene is the victim's home. A camera
+ * that marked only its own road tile would read zero at every scene and the
+ * whole clearance lever would be a dead knob. Measured over seeds 7/3/5:
+ * 0 of 254 scenes on a road; radius 1 reaches 46.7% of them, 2 reaches 86.7%,
+ * ROAD_REACH 3 reaches all of them. It is also the game's own definition of
+ * "served by this road", so the camera sees the lots the street serves.
+ *
+ * A TUNNEL STOPS THE WALK. A road under a wall is a tunnel, and a camera
+ * cannot see through one — so a wall across a street breaks the sight-line
+ * for nothing, which is the one piece of counterplay the network has.
+ */
+export function computeCamCover(world) {
+  const { w, h } = world;
+  const n = w * h;
+  world.camCov.fill(0);
+  let cams = 0;
+  for (let i = 0; i < n; i++) if (world.cam[i]) cams++;
+  if (!cams) return;
+  // The visited set is scratch that OUTLIVES the call, so it is stamped with a
+  // generation and never with anything that can repeat. Stamping it with the
+  // source tile looked right and was wrong in a way nothing here would notice:
+  // the first walk marked its neighbours with `src`, and every later call for
+  // the same camera found them already marked and refused to expand, so the
+  // field was correct once and then a single tile's halo for ever after
+  // (measured 91 tiles, then 49, then 49). One generation PER CAMERA, not per
+  // call — two cameras sharing a set would under-paint the second one, whose
+  // near tiles can be the first one's far tiles. reach.js does the same.
+  const seen = world._camSeen || (world._camSeen = new Int32Array(n));
+  const queue = world._camQueue || (world._camQueue = new Int32Array(n));
+  const dist = world._camDist || (world._camDist = new Uint8Array(n));
+  for (let src = 0; src < n; src++) {
+    if (!world.cam[src] || world.road[src] !== ROAD.ROAD || world.wall[src] || world.rail[src]) continue;
+    const gen = ++world._camGen;
+    let head = 0;
+    let tail = 0;
+    seen[src] = gen;
+    dist[src] = 0;
+    queue[tail++] = src;
+    while (head < tail) {
+      const cur = queue[head++];
+      const d = dist[cur];
+      const eff = d <= KNOBS.CAM_NEAR ? KNOBS.CAM_EFFECT : KNOBS.CAM_EFFECT / 2;
+      forEachWithin(world, cur, KNOBS.ROAD_REACH, (j) => { if (eff > world.camCov[j]) world.camCov[j] = eff; });
+      if (d >= KNOBS.CAM_REACH) continue;
+      const cx = cur % w;
+      const cy = (cur / w) | 0;
+      for (const [dx, dy] of N4) {
+        const xx = cx + dx;
+        const yy = cy + dy;
+        if (!inBounds(world, xx, yy)) continue;
+        const j = yy * w + xx;
+        if (seen[j] === gen || world.road[j] === ROAD.NONE || world.wall[j]) continue; // a tunnel is not a sight-line
+        seen[j] = gen;
+        dist[j] = d + 1;
+        queue[tail++] = j;
+      }
+    }
+  }
+}
+
 export function builtLots(world) {
   const out = [];
   for (let i = 0; i < world.w * world.h; i++) if (world.tier[i] > 0 && !world.rubble[i] && !world.burning[i]) out.push(i);
@@ -439,6 +511,7 @@ export function computeFields(world) {
   if (world.roadsDirty) computeRoadDist(world);
   computeStationDoors(world);
   computeCoverage(world);
+  computeCamCover(world);
   computeTraffic(world);
   computePollution(world);
   computeDread(world);

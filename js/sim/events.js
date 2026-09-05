@@ -394,6 +394,7 @@ const NEWS_EXTRA = Object.freeze([
   ["sold", "SOLD", "bad", true], ["cells", "CELLS", "bad", true], ["takenIn", "TAKEN IN", "bad", true],
   ["home", "HOME", "good", true], ["released", "RELEASED", "good", true], ["exonerated", "EXONERATED", "good", true],
   ["cold", "COLD", "bad", true], ["saved", "SAVED", "good", true], ["landmark", "LANDMARK", "good", true],
+  ["identified", "IDENTIFIED", "good", true],
   ["emptyHooks", "EMPTY HOOKS", "bad", true], ["market", "THE MARKET", "good", false],
   ["bought", "BOUGHT", "bad", false], ["pen", "THE PEN", "bad", false], ["trespass", "TRESPASS", "bad", false],
   ["cold-file", "The file", "bad", false],

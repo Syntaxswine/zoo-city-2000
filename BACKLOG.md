@@ -23,11 +23,7 @@ could ship whole.
   §16/tile/year. Commuters and freight use them; stations and road crossings
   remain off water. Twenty checks cover both axes, routes, costs, upkeep,
   demolition/undo, saves/continuation, artwork and beaver-pond protection.
-- [ ] **Flock cameras on the remote:** restore/expose the flock camera controls
-  in the remote-control UI. Check existing camera functionality and bindings,
-  and verify that the controls remain accessible at narrow window sizes.
-  No existing Flock implementation found; awaiting whether this means placeable
-  surveillance cameras or views that follow citizen groups.
+- [x] **Flock cameras on the remote:** recovered the unmerged `origin/cameras` branch (bf659ec), including road cameras, E shortcut, coverage overlay, police investigations, wrongful arrests and watched-home effects. Browser-verified placement, cost, undo and the remote at 390px. Reconciled with current 3×3 campuses, sentencing, camping and rail bridges. See [closure evidence](docs/HANDOFF-BACKLOG-CLOSURE-2026-09-05.md).
 
 ## Building character — People E core shipped 2026-09-05
 
@@ -1141,9 +1137,17 @@ size-aware pull-back. What is left:
   term only bites in dormitory / over-taxed towns (measured: one killing per
   ~7 years in a jobless town of 80). If the owner wants the hungry-wolf line
   in a healthy town, `KILL_HUNGRY` and the unemployment advisor are the knobs.
-- **The wrongful 5% is rarely seen** at 4–9 arrests per 30 years (0–1 per
+- ~~**The wrongful 5% is rarely seen** at 4–9 arrests per 30 years (0–1 per
   run). `WRONGFUL_P` is the owner's number; the lever for visibility is the
-  arrest volume (police cover, `ARREST_COVER`).
+  arrest volume (police cover, `ARREST_COVER`).~~ **CLOSED by the camera
+  network (SPEC §9d).** The lever turned out to be the camera, not
+  `ARREST_COVER`: at one station 96.3% of crime scenes sit at ZERO police
+  cover, because a burglary picks a lot with crime above `CRIME_HIGH` and
+  crime is high exactly where the police are not. Measured, 4 seeds × 30y:
+  wrongful arrests 1.5 → 15.3 and exonerations **0.0 → 8.8**. The
+  exonerations needed a second fix of their own — a wrongful arrest used to
+  CLOSE its file, so nobody ever looked for the real culprit and
+  `exonerate()` could not fire at all. Both are shipped.
 - **Customer walkers** to the hall (walkers.js `isShop` could include M);
   a "sold" departure walker. Part H shipped named staff handcarts for supply,
   not individual meal customers.

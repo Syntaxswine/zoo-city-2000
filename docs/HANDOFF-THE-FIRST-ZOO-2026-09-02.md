@@ -2251,3 +2251,63 @@ contains the combined §16 probe results, symptom traps, citizen recording,
 regressions fixed here. The owner's control-city export and its measurements
 remain deferred; favourites/camera-follow and building-age decoration remain
 explicit stretch work.
+
+## Camera branch history (integrated 2026-09-05): the camera network — clearance without deterrence (session 16, 2026-09-04)
+
+Six commits on `cameras`, off `cf3c286`. `docs/PROPOSAL-CAMERAS.md` is the
+design and carries a **BUILT** note at the top listing every place the built
+thing disagrees with it. `SPEC.md §9d` is what shipped. 480 → 585 checks.
+
+    78875fb  VICTIMS          a burglary has a victim now, permanently
+    b51647e  CAMPROBE         the instrument BEFORE the change
+    a2aaf39  THE FILE STAYS OPEN   a wrongful arrest stops closing the case
+    f84ed91  CAMERA ART       built and LOOKED AT before any sim code
+    5a9f890  CAMERAS          the array, the op, the field, the tool, the bill
+    b7dc46d  CLEARANCE        CAM_ARREST, CAM_WRONGFUL, IDENTIFIED
+    7caf5ac  WATCHED          the brake, the mood, the waiver
+
+**THE ONE SENTENCE.** A camera SOLVES and never DETERS: `computeCrime` has no
+camera term, and the whole feature is `+ CAM_ARREST 0.30 · camCov/60` in
+`filesTick`. The town clears 20.5% of its files at nothing and 90% blanketed,
+takes in ten times as many innocent animals, and pays for it with a fifth of
+its population.
+
+**THE GENERALISED LESSON, and it will outlive this feature.** Dread's seams —
+a mood term, a home-score term, a rehome — all work because a meat hall is
+LOCAL AND FEW: there is always somewhere less dreadful to go. A camera network
+is GLOBAL, and every one of those seams is built on a COMPARISON, so all three
+cancel under a blanket. Two drafts of this feature died there. **A global
+nuisance needs an ABSOLUTE brake**, which is why the only one is a term in the
+capacity law. Anything town-wide that gets added next will hit this wall.
+
+### The traps, keyed by what the failure LOOKS like
+
+| what you see | what it is |
+|---|---|
+| a field is right the first frame and a single tile's halo for ever after | a persistent scratch visited-set stamped with something that REPEATS (the source tile). `computeCamCover` measured 91 tiles then 49 then 49. Generations, one per camera — and per CAMERA, not per call, or the second camera under-paints |
+| a skin paints nothing at all and nothing errors | a face skin gets coordinates LOCAL to its own box — `side(a - a0, c1 - c)`, `end(b - b0, c1 - c)` — not world a/b/c. A predicate written in world units is simply never true |
+| a lone sprite in one tile corner throws on `defineSprite` | `render` sizes the grid from the boxes, so the tile-centre anchor falls outside it. A no-faces `extent` box fixes it and is load-bearing, not decoration |
+| a head on a pole reads as a table lamp | a cap that OVERHANGS the body hides both near faces. And a squat head is all roof: a box shows a top of area `da × db` and near faces of height `dc`, so a lens needs a TALL body (4 × 2 × 5), not a wide one |
+| the browser shows sixteen tools when the suite says seventeen | the preview server is bound to a different tree. `preview_start` resolves `.claude/launch.json` from the SESSION root, not the worktree; check with `fetch('/js/tools.js')` before believing anything you see |
+| the whole suite crashes at one line and 300 checks never run | a check that indexes `marked[0]` instead of reporting. Every check must refuse cleanly — a crash names no invariant |
+| a check comparing two arms passes with 3 against 3 | too few draws. One month of one town is ~40 arrest rolls, and 40 rolls cannot tell 5% from 15%. Assert the rig's SIZE before comparing the arms |
+| a "every X" check is green and X is untested | it iterates a TABLE. `needTruthResults` skips any code with no fixture; the fix is a check that the table covers the registry |
+| an op is charged, logged, snapshotted and does nothing | `ops.js` has TWO switches on `op.kind` — `costOf` plans, `apply` mutates. A kind in one and not the other is silent |
+| a camera hangs over bare grass | the bulldoze ladder is top-down, first match wins, so the camera row goes ABOVE the road row; and the road-clearing arm zeroes `cam` too, so the invariant is true by construction |
+
+### What is left
+
+- **The land-value term** §4e argues against is still unbuilt: dread takes
+  `−0.8·dread` off LV and the symmetry is tempting, but `computeCrime` reads
+  `− CRIME_LV 0.5·lv`, so cameras would RAISE the crime they are sold against.
+  One knob and one line if the owner wants that joke instead.
+- **A camera has no ghost sprite under the cursor.** It is deliberately out of
+  `PLACE_TOOLS` (that is the click set, and the camera is a drag), and the
+  ghost-sprite branch in `input.js` is gated on that list, so a drag shows
+  ground diamonds. Widening the condition is the fix if it is wanted.
+- **`docs/shots/sheet-bubbles.png` is stale** in the tree — it regenerates
+  byte-differently from current code, deterministically. Not this arc's
+  business; flagged, not touched.
+- **Nothing asserts the camera's own card TEXT.** The card was verified by
+  looking at it in the browser, not by a check; the panel's prose is still the
+  game's biggest untested surface (BACKLOG says so).
