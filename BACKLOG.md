@@ -8,6 +8,10 @@ Open work, ranked. The design record is `SPEC.md`; the numbers are in
 `js/sim/rules.js` (KNOBS). Later layers were labelled at design time so v1
 could ship whole.
 
+## Knowledge and culture — specified, not implemented
+
+- [ ] **University (3×3), Amphitheater (3×3), Library (2×2), Gallery (2×2):** [proposal and acceptance criteria](docs/PROPOSAL-KNOWLEDGE-CULTURE-2026-09-05.md). Knowledge supports city capacity; culture adds local mood. Building sizes are owner requirements; mechanics and balance values are proposed. The historical school/accelerated-adulthood idea remains deferred.
+
 ## Owner-reported follow-ups — 2026-09-05
 
 - [x] **New-game actions:** Back shares the Found the City row at the far right;
