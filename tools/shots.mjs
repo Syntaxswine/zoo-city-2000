@@ -21,6 +21,7 @@ import { installCanvas, createCanvas, encodePNG, zoom as zoomCanvas } from "./he
 import { rasterize } from "../js/art/format.js";
 import { art } from "../js/art/index.js";
 import { MARKS, characterSprite } from "../js/art/building-character.js";
+import { LARGE_CIVICS } from "../js/art/civics-large.js";
 import { BUILDINGS, PARK, ZOO, FIRE_STATION, POLICE_STATION, PACIFICATION_CENTRE, OVERLAYS } from "../js/art/buildings.js";
 import { BLOCKS } from "../js/art/blocks.js";
 import { LANDMARK_ART } from "../js/art/landmarks.js";
@@ -120,6 +121,9 @@ function sheets(z) {
     { sprite: characterSprite(BUILDINGS[2][2][n % 4], { majority: n + 1, lit: 2 }), label: `${species}-work`, onTile: true },
   ]), { cols: 6, cellW: 80, cellH: 100, groundY: 84, z }));
   out.push(sheet("sheet-building-lights.png", [1, 2, 3, 4].flatMap(zone => [0, 1, 2, 3].map(lit => ({ sprite: characterSprite(BUILDINGS[zone][3][2], { lit }), label: `${zone}-lit-${lit}`, onTile: true }))), { cols: 4, cellW: 80, cellH: 110, groundY: 94, z }));
+
+  out.push(sheet("sheet-civics-large.png", Object.entries(LARGE_CIVICS).map(([kind, sprite]) => ({ sprite, label: `${kind} 3x3` })), { cols: 2, cellW: 224, cellH: 198, groundY: 139, z }));
+  out.push(sheet("sheet-civics-large-hires.png", Object.entries(LARGE_CIVICS).map(([kind, sprite]) => ({ sprite: art.hires(sprite), label: `${kind} 3x3 hires` })), { cols: 2, cellW: 448, cellH: 396, groundY: 278, z: 1 }));
 
   // The hi-res set (js/art/hires.js): a 1× sprite scaled ×2 beside its 2× twin, at zoom 1 so the sheet IS the comparison.
   {

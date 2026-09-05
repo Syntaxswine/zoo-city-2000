@@ -6774,6 +6774,17 @@ if (existsSync(walkersPath)) {
 { const { checkBuildingCharacter } = await import("./check-building-character.mjs"); checkBuildingCharacter(check); }
 
 // ---- verdict ----------------------------------------------------------------------
+{
+  const { art } = await import("../js/art/index.js");
+  const kinds = ["fire", "police", "centre", "zoo"];
+  check("large civics: explicit 3×3 selection and its hi-res twin occupy nine tiles",
+    kinds.every(kind => [art.civic(kind, 3), art.hires(art.civic(kind, 3))]
+      .every(sprite => sprite && sprite.footprint[0] === 3 && sprite.footprint[1] === 3)));
+  check("large civics: legacy callers keep their existing footprint until placement integration",
+    kinds.every(kind => art.civic(kind).footprint.every(side => side === (kind === "zoo" ? 2 : 1))) &&
+    art.civic("park", 3) === art.civic("park"));
+}
+
 console.log(`${checks} checks, ${failures.length} failures`);
 for (const f of failures) console.log(`  FAIL ${f}`);
 process.exit(failures.length ? 1 : 0);

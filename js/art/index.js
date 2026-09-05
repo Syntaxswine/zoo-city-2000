@@ -4,7 +4,7 @@
 //                                       variant is the whole tile byte; original families use & 3; the shop kind still uses >> 1
 //                                       character = {lit:0..3, majority:species index+1, seed:tile index}; omitted for previews
 //                                       theme > 0 with side 3 → that landmark (landmarks.js; ids per js/sim/landmarks.js)
-//   art.civic(kind)                     'park' | 'zoo' | 'fire' | 'police' | 'centre'
+//   art.civic(kind, side)               'park' | 'zoo' | 'fire' | 'police' | 'centre'; side 3 selects new civic campuses, omitted preserves legacy footprint
 //   art.road(mask, busy)                4-bit mask N=1 E=2 S=4 W=8
 //   art.bridge(mask)
 //   art.wall(mask)                      the same mask; a standing sprite (walls.js)
@@ -34,6 +34,7 @@
 // text, rasterised lazily by whoever owns a canvas.
 
 import { buildingSprite, civicSprite, overlaySprite, allBuildings } from "./buildings.js";
+import { allLargeCivics } from "./civics-large.js";
 import { allBlocks } from "./blocks.js"; // registers the 2×2 and 3×3 families with buildings.js at load
 import { allLandmarks } from "./landmarks.js"; // registers the eleven landmarks (SPEC §3c)
 import { allShops } from "./shops.js"; // registers the shop pool (SPEC §12.2d)
@@ -138,7 +139,7 @@ export const art = Object.freeze({
 
 /** Every sprite the registry can hand out, named — the check.mjs audit walks this. */
 export function allSprites() {
-  const out = [...Object.values(MARKS).map(sprite => ({ name: sprite.name, sprite })), ...allBuildings(), ...allBlocks(), ...allLandmarks(), ...allShops(), ...allRoads(), ...allWalls(), ...allRail(), ...allTerrain(), ...allCitizens(), ...BUBBLE_SAMPLES.map((sprite) => ({ name: sprite.name, sprite }))];
+  const out = [...Object.values(MARKS).map(sprite => ({ name: sprite.name, sprite })), ...allBuildings(), ...allLargeCivics(), ...allBlocks(), ...allLandmarks(), ...allShops(), ...allRoads(), ...allWalls(), ...allRail(), ...allTerrain(), ...allCitizens(), ...BUBBLE_SAMPLES.map((sprite) => ({ name: sprite.name, sprite }))];
   const seen = new Set();
   return out.filter(({ name }) => (seen.has(name) ? false : (seen.add(name), true)));
 }

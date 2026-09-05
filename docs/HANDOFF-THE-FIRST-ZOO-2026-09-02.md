@@ -2214,3 +2214,22 @@ Verification:
 
 SPEC §12.2e is the current contract. Age-based ivy and patched roofs remain
 E's optional stretch. No saved age array or save migration was introduced.
+
+## 26. Four larger civic campuses (2026-09-05)
+
+The owner asked for improved art for 3×3 fire stations, police stations,
+pacification centres and zoos while another agent handles placement. The
+four new solid recipes live in `js/art/civics-large.js`. The firehouse has
+three bays and a hose tower; police has a blue portico and patrol yard;
+the centre surrounds a fountain courtyard; the zoo has a paw gate, pond
+overlook and shelters. Both resolutions are shown in the new civic sheets.
+
+Integration is explicit: call `art.civic(kind, 3)` for a nine-tile lot.
+Omitting the side still returns legacy art. The park is unchanged. This
+commit does not allocate lots, change service radii or migrate saves.
+The placement agent needs to wire both the world sprite and build preview
+to the allocated side. See `docs/ART-CIVICS-3X3.md` and SPEC §12.2f.
+
+Every new recipe participates in the existing palette, footprint, hi-res
+and pedestrian depth audits through `allSprites()`. The canonical suite
+also checks explicit selection and legacy footprint compatibility.

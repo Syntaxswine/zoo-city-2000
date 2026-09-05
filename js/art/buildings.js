@@ -845,7 +845,10 @@ export const PACIFICATION_CENTRE = (() => {
 })();
 
 export const CIVICS = { park: PARK, zoo: ZOO, fire: FIRE_STATION, police: POLICE_STATION, centre: PACIFICATION_CENTRE };
-export function civicSprite(kind) {
+let LARGE_CIVICS = null;
+export function registerLargeCivics(table) { LARGE_CIVICS = table; }
+export function civicSprite(kind, side = null) {
+  if (side === 3 && LARGE_CIVICS?.[kind]) return LARGE_CIVICS[kind];
   const s = CIVICS[kind];
   if (!s) throw new Error(`civicSprite: unknown kind '${kind}'`);
   return s;

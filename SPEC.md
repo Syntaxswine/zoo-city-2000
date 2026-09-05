@@ -1428,6 +1428,15 @@ are `sheet-buildings.png`, `sheet-marks.png`, `sheet-building-lights.png`;
 Age-based ivy and patched roofs remain optional future work: no `since`
 array or save migration ships in E.
 
+### 12.2f Larger civic artwork
+
+`js/art/civics-large.js` supplies four original 3×3 campuses selected with
+`art.civic(kind, 3)`: firehouse, police station, pacification centre and zoo.
+Each uses a 48×48-unit recipe, hub 24, footprint `[3,3]`, and the existing
+hi-res and painter paths. The default civic selector retains legacy sizes
+until placement/save integration lands. The park is unchanged. See
+`docs/ART-CIVICS-3X3.md` for the designs, previews and integration contract.
+
 ### 12.3 Citizens — hand-authored kit, the organic exception
 12×20 px adults, 8×12 cubs; facings SE and NE authored, SW/NW mirrored and
 re-lit; 2 walk frames + 1 stand. Kit = shared body rows (2 facings × 3
