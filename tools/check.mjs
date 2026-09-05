@@ -36,6 +36,7 @@ import { doorOf, doorsOf, served, computeFields, commuteTime } from "../js/sim/f
 import { census } from "../js/sim/census.js";
 import { CIVIC } from "../js/sim/world.js";
 import { listSlots, listAllSlots, writeSlot, readSlot, deleteSlot, bytesUsed, migrate } from "../js/slots.js";
+import { USE, USE_BIT_OF, USE_MASK, USE_OPTIONS, USE_SPECIES, useName, useTint } from "../js/sim/use.js";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const argv = process.argv.slice(2);
@@ -580,8 +581,33 @@ check("determinism: same seed + same inputs ⇒ same hash", stateHash(A.world) =
 
 // ---- use-zoning and trespass (docs/PROPOSAL-ZONING-RAIL-WALLS.md §2; SPEC §7.8, §9c) ----
 {
-  const { admits } = await import("../js/sim/species.js");
+  const { admits, DIET_OF, SPECIES } = await import("../js/sim/species.js");
   const { commutePath, roadPath, exposure } = await import("../js/sim/fields.js");
+  const bits = USE_OPTIONS.map((o) => o.bit);
+  const powers = bits.every((bit) => bit > 0 && (bit & (bit - 1)) === 0);
+  const exactRoster = USE_SPECIES.join(",") === SPECIES.map((s) => s.id).join(",");
+  check("use: the old 1/2 save values remain predator/prey and all fourteen roster species have one unique stable bit in the 16-bit mask",
+    USE.PRED === 1 && USE.PREY === 2 && bits.length === 16 && new Set(bits).size === 16
+      && powers && Math.max(...bits) === 32768 && USE_MASK === 65535 && exactRoster
+      && createWorld({ seed: "use-word", w: 4, h: 4 }).use instanceof Uint16Array,
+    `${bits.join(",")} · ${USE_SPECIES.join(",")}`);
+  let admissionMatrix = true;
+  for (const s of SPECIES) {
+    admissionMatrix &&= SPECIES.every((other) => admits(USE_BIT_OF[s.id], other.id) === (other.id === s.id));
+    admissionMatrix &&= admits(USE.PRED, s.id) === (DIET_OF[s.id] === "carn");
+    admissionMatrix &&= admits(USE.PREY, s.id) === (DIET_OF[s.id] !== "carn");
+  }
+  const unionMask = USE.PRED | USE.BEAR | USE.RACCOON;
+  const unionOpen = SPECIES.filter((s) => admits(unionMask, s.id)).map((s) => s.id);
+  check("use: every species-only bit admits exactly that species, while multiple checks are OR — predators + bear + raccoon admits precisely those seven species",
+    admissionMatrix && SPECIES.every((s) => admits(USE.MIXED, s.id))
+      && unionOpen.join(",") === "fox,owl,bear,raccoon,wolf,cat,hawk"
+      && useName(unionMask) === "predator + bear + raccoon",
+    unionOpen.join(","));
+  check("use: all sixteen checkbox tints are stable and visibly nonblank; a combined selection has a deterministic blended tint",
+    new Set(bits.map((bit) => useTint(bit))).size === 16 && bits.every((bit) => /^rgba\(/.test(useTint(bit)))
+      && useTint(unionMask) === useTint(unionMask) && useTint(USE.MIXED) === null,
+    bits.map((bit) => useTint(bit)).join(" · "));
   // Frame: with no use-zoning the weighted search IS the BFS — every commuter's stored path is roadPath's, tile for tile.
   let pathDiff = 0, paths = 0;
   for (const c of A.world.citizens) {
@@ -611,6 +637,30 @@ check("determinism: same seed + same inputs ⇒ same hash", stateHash(A.world) =
   check("use: painting five road tiles predator-only costs §1 a tile and is undoable", ru.ok && ru.cost === 5 * KNOBS.COST.use && ru.undoable === true, `${ru.cost}`);
   check("use: a rabbit takes the legal way round (11 tiles), a fox the short predator-only way (7)", !!rabbit && !!fox && rabbit.path.length === 11 && fox.path.length === 7, `rabbit ${rabbit && rabbit.path.length} · fox ${fox && fox.path.length}`);
   check("use: the rabbit's way has no forbidden tile; the fox's cost is the plain walk", !!rabbit && !!fox && Array.from(rabbit.path).every((t) => admits(F.use[t], "rabbit")) && fox.cost === 6 * KNOBS.WALK, `${fox && fox.cost}`);
+  const rabbitFox = USE.RABBIT | USE.FOX;
+  const combo = apply(F, { kind: "use", use: rabbitFox, x0: px + 1, y0: py, x1: px + 5, y1: py });
+  computeFields(F);
+  const rabbit2 = commutePath(F, "rabbit", a, b), fox2 = commutePath(F, "fox", a, b), mouse2 = commutePath(F, "mouse", a, b);
+  const useCensus = census(F);
+  check("use: a real combined rabbit + fox road admits both along the short side, sends a mouse around, and Census counts both checked species",
+    combo.ok && combo.cost === 5 * KNOBS.COST.use && F.use[at(px + 2, py)] === rabbitFox
+      && rabbit2?.path.length === 7 && fox2?.path.length === 7 && mouse2?.path.length === 11
+      && useCensus.useSpecies.rabbit === 5 && useCensus.useSpecies.fox === 5
+      && useCensus.usePred === 0 && useCensus.usePrey === 0,
+    `mask ${F.use[at(px + 2, py)]} · paths ${rabbit2?.path.length}/${fox2?.path.length}/${mouse2?.path.length} · census ${useCensus.useSpecies.rabbit}/${useCensus.useSpecies.fox}`);
+  const word = createWorld({ seed: "use-word-save", w: 4, h: 4 });
+  word.terrain[5] = 0;
+  word.road[5] = ROAD.ROAD;
+  const wordPaint = apply(word, { kind: "use", use: USE.PRED | USE.SKUNK, x0: 1, y0: 1, x1: 1, y1: 1 });
+  const wordPlain = toPlain(word);
+  const wordLoaded = load(JSON.stringify(wordPlain));
+  wordPlain.use[5] = 70000;
+  const corruptLoaded = load(JSON.stringify(wordPlain));
+  check("use: a high species bit and a combined mask survive save/load in Uint16, while an impossible imported value safely becomes mixed",
+    wordPaint.ok && wordPaint.cost === KNOBS.COST.use && USE.SKUNK === 32768 && wordLoaded.use instanceof Uint16Array
+      && wordLoaded.use[5] === (USE.PRED | USE.SKUNK) && stateHash(word) === stateHash(wordLoaded)
+      && corruptLoaded.use[5] === USE.MIXED,
+    `${word.use[5]} → ${wordLoaded.use[5]} · corrupt → ${corruptLoaded.use[5]}`);
   // The gate, the notice and the stop on the scripted city: R prey-only, C predator-only, the ring's north row and east column predator-only.
   const G = load(save(A.world));
   const sx = G.start.tx, sy = G.start.ty;
@@ -3409,11 +3459,19 @@ check("determinism: same seed + same inputs ⇒ same hash", stateHash(A.world) =
       const got = renderer.pick(px, py);
       return got && got[0] === tx && got[1] === ty ? (py * canvas.width + px) * 4 : -1;
     };
+    O.use[oat(10, 7)] = USE.RABBIT | USE.FOX;
     const off = shot("off");
     const acc = shot("access");
+    const useLayer = shot("use");
     const colour = (buf, o) => (buf[o] << 16) | (buf[o + 1] << 8) | buf[o + 2];
     const bands = [1, 2, 3, 4].map((d) => pixelOf(10, 6 + d));
     const onRoad = pixelOf(10, 6);
+    const useSpot = pixelOf(10, 7), mixedSpot = pixelOf(10, 8);
+    check("use: the real renderer paints a combined species mask and leaves the neighbouring mixed lot untinted",
+      useSpot >= 0 && mixedSpot >= 0
+        && colour(useLayer, useSpot) !== colour(off, useSpot)
+        && colour(useLayer, mixedSpot) === colour(off, mixedSpot),
+      `combined ${useSpot >= 0 ? colour(off, useSpot).toString(16) + "→" + colour(useLayer, useSpot).toString(16) : "no pixel"} · mixed ${mixedSpot >= 0 ? colour(off, mixedSpot).toString(16) + "→" + colour(useLayer, mixedSpot).toString(16) : "no pixel"}`);
     check("access: the overlay is REAL — the renderer paints four different bands for one, two, three tiles and out of reach, and leaves the road itself untinted",
       bands.every((o) => o >= 0) && onRoad >= 0
         && new Set(bands.map((o) => colour(acc, o))).size === 4
@@ -4026,8 +4084,12 @@ check("no Math.random under js/", mathRandom.length === 0, mathRandom.join(", ")
   const densityBeforeH = input.density;
   windowEvents.keydown(keyEvent("h", "KeyH"));
   windowEvents.keydown(keyEvent("u", "KeyU"));
+  input.setUse(USE.PRED | USE.BEAR | USE.RACCOON);
+  const selectedUseMask = input.state.use;
+  windowEvents.keydown(keyEvent("u", "KeyU")); // reopens/retains; U no longer destroys a checkbox selection
   const commandsMoved = undos === 2 && saves === save0 + 1 && loads === 1 && backspace.prevented
-    && input.density !== densityBeforeH && input.tool === "use";
+    && input.density !== densityBeforeH && input.tool === "use"
+    && selectedUseMask === (USE.PRED | USE.BEAR | USE.RACCOON) && input.state.use === selectedUseMask;
   const focusedButton = { tagName: "BUTTON" };
   const focusedCamera = { ...inputApp.camera };
   const buttonW = keyEvent("w", "KeyW", { target: focusedButton });
@@ -4051,9 +4113,18 @@ check("no Math.random under js/", mathRandom.length === 0, mathRandom.join(", ")
   windowEvents.keydown(buttonBack);
   windowEvents.keydown(textUndo);
   windowEvents.keydown(textSave);
+  const checkTarget = { tagName: "INPUT", type: "checkbox" };
+  const checkCamera = { ...inputApp.camera };
+  const checkW = keyEvent("w", "KeyW", { target: checkTarget });
+  const checkSpace = keyEvent(" ", "Space", { target: checkTarget });
+  windowEvents.keydown(checkW);
+  input.update(0.05);
+  windowEvents.keyup(checkW);
+  windowEvents.keydown(checkSpace);
+  const checkboxControlSafe = inputApp.camera.y !== checkCamera.y && !checkSpace.prevented && pauses === 0;
   const focusedControlsSafe = focusedWasd && focusedTool && focusedSave.prevented && pauses === 0 && undos === 2
     && repeatUndo.prevented && repeatSave.prevented && !buttonSpace.prevented && buttonBack.prevented
-    && !textUndo.prevented && textSave.prevented && saves === save0 + 2;
+    && !textUndo.prevented && textSave.prevented && saves === save0 + 2 && checkboxControlSafe;
   const repeatTool = input.tool;
   windowEvents.keydown(keyEvent("z", "KeyZ", { repeat: true }));
   const repeatIgnored = input.tool === repeatTool;
@@ -4144,7 +4215,7 @@ check("no Math.random under js/", mathRandom.length === 0, mathRandom.join(", ")
     JSON.stringify({ pinAttached, panelBubbleKept, escapeCleared, dragRepicked, keyRepicked, zoomRepicked, clampRepicked, costRepicked, roadCleared, citizenPinKept, epitaphKept, linkRepinned, explicitUnpinCleared }));
   check("palette input: all sixteen keys match their tools; WASD only pans; new command bindings are unambiguous",
     keyParity && previewParity && wasdOnlyMoved && commandsMoved && focusedControlsSafe && repeatIgnored && newsWasdIdle && modalBackSafe && keyNeutral,
-    JSON.stringify({ keyParity, previewParity, wasdOnlyMoved, commandsMoved, focusedControlsSafe, repeatIgnored, newsWasdIdle, mouseOpenedReaderStopsPan, modalBackSafe, keyNeutral, undos, saves, loads, pauses, newsKeys }));
+    JSON.stringify({ keyParity, previewParity, wasdOnlyMoved, commandsMoved, selectedUseMask, focusedControlsSafe, checkboxControlSafe, repeatIgnored, newsWasdIdle, mouseOpenedReaderStopsPan, modalBackSafe, keyNeutral, undos, saves, loads, pauses, newsKeys }));
   check("palette input: every build family emits its exact registry op through real pointer events",
     pointerOpsExact && stationaryGhostReady && densityDragRefresh,
     JSON.stringify({ stationaryGhostReady, densityDragRefresh, lastCost, ops: madeOps.map((op) => ({ kind: op.kind, zone: op.zone })) }));
@@ -6147,7 +6218,44 @@ function costOfBulldoze(w, x, y) { return (0, costOfOp)(w, { kind: "bulldoze", x
   if (spare.length) { const i = spare.pop(); U.zone[i] = ZONE.C; U.tier[i] = 2; U.burning[i] = 2; }
   if (spare.length) { const i = spare.pop(); U.zone[i] = ZONE.I; U.tier[i] = 1; U.flooded[i] = 1; }
 
-  const ui = createUI(stubApp(U));
+  const panelApp = stubApp(U);
+  const ui = createUI(panelApp);
+  panelApp.input.setTool = (id) => { panelApp.input.state.tool = id; ui.setTool(id, 3); };
+  panelApp.input.setUse = (mask) => { panelApp.input.state.use = mask; panelApp.input.state.tool = "use"; ui.setTool("use", 3); };
+  const pickerHash = stateHash(U);
+  const useButton = document.querySelector("#btnUse");
+  useButton.dispatch("click");
+  const picker = document.getElementById("usePicker");
+  const boxes = picker.querySelectorAll("input");
+  const predBox = boxes.find((b) => Number(b.value) === USE.PRED);
+  const bearBox = boxes.find((b) => Number(b.value) === USE.BEAR);
+  predBox.checked = true;
+  bearBox.checked = true;
+  bearBox.dispatch("change");
+  const combinedMask = USE.PRED | USE.BEAR;
+  const combinedShown = panelApp.input.state.use === combinedMask
+    && predBox.checked && bearBox.checked && !picker.hidden
+    && /2 checked/.test(textOf(useButton)) && useButton.getAttribute("aria-expanded") === "true";
+  const pickerButtons = picker.querySelectorAll("button");
+  pickerButtons.find((b) => /done/i.test(b.textContent)).dispatch("click");
+  const doneClosed = picker.hidden && useButton.getAttribute("aria-expanded") === "false";
+  useButton.dispatch("click");
+  pickerButtons.find((b) => /mixed/i.test(b.textContent)).dispatch("click");
+  const mixedCleared = boxes.every((b) => !b.checked);
+  check("panel: U opens a real sixteen-checkbox list; choices combine by OR, Done closes it, and no checks restores mixed without touching the city",
+    boxes.length === 16 && new Set(boxes.map((b) => b.getAttribute("aria-label"))).size === 16
+      && combinedShown && doneClosed && panelApp.input.state.use === USE.MIXED && mixedCleared
+      && !picker.hidden && stateHash(U) === pickerHash,
+    `${boxes.length} boxes · combined ${combinedShown} · done ${doneClosed} · mixed ${mixedCleared} · final ${panelApp.input.state.use} · hash ${pickerHash}/${stateHash(U)}`);
+  const useCardTile = empties[0].i;
+  U.use[useCardTile] = combinedMask;
+  ui.updateHover({ tile: useCardTile, pinned: true });
+  const useCard = textOf(document.getElementById("card"));
+  check("panel: a combined tile card names every checked use and the exact union it admits",
+    /use: predator \+ bear/.test(useCard)
+      && /admits fox, owl, bear, wolf, cat, hawk/.test(useCard)
+      && !/rabbit/.test((useCard.match(/use:.*$/) || [""])[0]),
+    useCard);
   const stateKey = (i) => [U.zone[i], U.tier[i], U.big[i], U.civic[i], U.road[i], U.rail[i], U.wall[i], U.terrain[i], U.rubble[i] > 0 ? 1 : 0, U.burning[i] > 0 ? 1 : 0, U.flooded[i] > 0 ? 1 : 0, U.theme[i] > 0 ? 1 : 0, U.use[i], U.maxTier[i]].join("/");
   const seen = new Map();
   const throwsAt = [];

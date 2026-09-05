@@ -8,7 +8,8 @@
 
 import { KNOBS } from "./rules.js";
 import { SPECIES, SPECIES_BY_ID, NAME_PARTS, affinity, ARRIVING, PREY_OF, DIET_OF, isPredatorOf, admits } from "./species.js";
-import { ZONE, CIVIC, TERRAIN, ROAD, idx, inBounds, capacityOf, jobsOf, jobZone, absent, USE_NAME } from "./world.js";
+import { ZONE, CIVIC, TERRAIN, ROAD, idx, inBounds, capacityOf, jobsOf, jobZone, absent } from "./world.js";
+import { useName } from "./use.js";
 import { doorsOf, edgeRoads, commutePath, dial, WALK, nodePath, commuteTime } from "./fields.js";
 import { ageYears, ageMonths, isWorker } from "./census.js";
 import { DEATHS_MAX, KIND, remember } from "./life.js";
@@ -569,7 +570,7 @@ export function citizensTick(world, cen, dem) {
       out.left += n;
       out.zonedOut += n;
       world.departures.push({ species: moving.species, surname: moving.surname, n, from });
-      out.zonedOutLines.push(`ZONED OUT — the ${moving.surname}s (${n === 1 ? moving.species : `${n} ${moving.species}s`}) left (${from % world.w},${(from / world.w) | 0}): the lot is ${USE_NAME[world.use[from]]}-only land now, and nothing within twelve road tiles would have them.`);
+      out.zonedOutLines.push(`ZONED OUT — the ${moving.surname}s (${n === 1 ? moving.species : `${n} ${moving.species}s`}) left (${from % world.w},${(from / world.w) | 0}): the lot is ${useName(world.use[from])} use-zoned land now, and nothing within twelve road tiles would have them.`);
       removeHousehold(world, moving, "zonedOut", from);
     }
   }

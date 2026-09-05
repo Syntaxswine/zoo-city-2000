@@ -38,6 +38,7 @@ import { ZONE, CIVIC, TERRAIN, ROAD, isPart, anchorOf, sideOf } from "./sim/worl
 import { DECK_TOP } from "./art/roads.js";
 import { lotScore, REASON } from "./sim/lots.js";
 import { siteRoadDist, asksAccess } from "./sim/fields.js";
+import { useTint } from "./sim/use.js";
 import { KNOBS } from "./sim/rules.js";
 import { tunnelAxis } from "./sim/reach.js";
 import { isWorker } from "./sim/census.js";
@@ -361,7 +362,7 @@ export function createRenderer(canvas, initialWorld, art) {
         else if (mode === "pol") fill = world.pol[i] > 2 ? `rgba(128,72,40,${(world.pol[i] / 100) * 0.75})` : null;
         else if (mode === "crime") fill = world.crime[i] > 5 ? `rgba(150,50,70,${(world.crime[i] / 100) * 0.75})` : world.policeCov[i] ? "rgba(60,110,138,0.18)" : null;
         else if (mode === "dread") fill = world.dread[i] > 2 ? `rgba(110,40,70,${(world.dread[i] / 100) * 0.7})` : null;
-        else if (mode === "use") fill = world.use[i] && (world.zone[i] !== ZONE.NONE || world.road[i] !== ROAD.NONE) ? (world.use[i] === 1 ? "rgba(160,70,40,0.55)" : "rgba(40,120,130,0.55)") : null; // the player's line: rust predator-only, teal prey-only
+        else if (mode === "use") fill = world.use[i] && (world.zone[i] !== ZONE.NONE || world.road[i] !== ROAD.NONE) ? useTint(world.use[i]) : null; // exact category is named on the card; each saved code has one stable tint
         else if (mode === "access") {
           // The number the RULE reads, not the tile's own: fields.siteRoadDist
           // asks the whole footprint, so every tile of a block paints the one

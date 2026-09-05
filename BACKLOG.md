@@ -915,7 +915,7 @@ threshold. The integration review with Part R also caught the station-door
 signature recording endpoints but not the exact forecourt chain: an equally
 short reroute to the same door left live paths walking through a new building.
 The chain is now signed, invalidated, replanned and save/continued in the
-regression. The integrated canonical suite is 497 checks.
+regression. The integrated canonical suite is 534 checks.
 
 Left:
 - Rail bridges (a deck sprite with rails) — still not built.
@@ -1025,7 +1025,9 @@ size-aware pull-back. What is left:
 - Phase A walls SHIPPED (SPEC §6b): the reach law, the tunnel, the art.
   Left: a walls sheet in `tools/shots.mjs`; a wall's own ambient sound of
   nothing (a walled block is quiet — the mood does not know yet).
-- Phase B use-zoning + trespass SHIPPED (SPEC §7.8, §9d). Left: the trespass
+- Phase B use-zoning + trespass SHIPPED (SPEC §7.8, §9d); extended 2026-09-04
+  from the compatible predator/prey byte to a 16-bit checkbox mask for any
+  union of those groups and all 14 species. Left: the trespass
   zot (a commuter's card says it; the map does not); a "stopped" walker
   glyph; per-species stop counts.
 - Phase C rail SHIPPED (SPEC §7.9); **level crossings SHIPPED 2026-09-03**

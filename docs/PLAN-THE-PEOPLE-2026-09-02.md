@@ -1230,7 +1230,7 @@ exactly ×6; the no-rail path tree remains tile-equal to BFS. The focused probe 
 moves from 11 to 8 felt steps, its exact comfort threshold. H's separate
 `MEAT_RAIL_COST` stays zero and land value never reads either route.
 
-Evidence: 497 integrated canonical checks. Against the Part R parent, seed-7
+Evidence: 534 integrated canonical checks. Against the Part R parent, seed-7
 balanced 30 y remains `8707f655`, and the actual estate rail layout remains
 `df5631eb` (38 rail tiles, two rail stations; freight rides it, with no citizen
 rider at year 30). The mayor's misleadingly named `--stations` option builds
@@ -1494,8 +1494,10 @@ X+A, then H+E, then B+D, then C+F; K before A/B/H.
    below are mnemonic letters, density moves to `H`, undo to `Backspace`,
    the saves menu to `L`, and WASD pans and does nothing else anywhere.
 7. ~~**Use-zoning (`U`)**~~ Decided under the same ruling: it stays on the
-   top strip beside density as a modifier, on `U`. A seventeenth button
-   is a one-row change to `TOOLS` if the owner wants it later.
+   top strip beside density as a modifier, on `U`. **Extended 2026-09-04:**
+   the owner asked for checkboxes and multiple simultaneous uses. `U` now
+   opens predator, prey and all 14 species checks; no checks is mixed and
+   every other mask admits the union.
 8. ~~**"50% faster" than what?**~~ **Ruled 2026-09-04:** a reasonable whole
    percentage around fifty, applied to the former ride speed. The shipped
    choice is 50%: ×3 → ×4.5, with the reciprocal commute cost 2/9.

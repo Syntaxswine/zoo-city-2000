@@ -16,13 +16,14 @@ import { idx } from "./sim/world.js";
 import { costOf, roadL } from "./sim/ops.js";
 import { pinTarget } from "./follow.js";
 import { TOOL_BY_ID, TOOL_BY_KEY, PLACE_TOOLS, labelForOp } from "./tools.js";
+import { clampUse, useBrushLabel } from "./sim/use.js";
 const PAN_SPEED = 700; // projection px per second
 
 export function createInput(canvas, app) {
   const state = {
     tool: "R",
     density: 3, // 3 High, 1 Low
-    use: 0, // the Use brush: 0 mixed · 1 predator-only · 2 prey-only
+    use: 0, // 16-bit checkbox union; zero is mixed (stable bits in sim/use.js)
     hover: null, // [tx, ty] | null
     lastHover: null, // last map tile, retained only for palette cost previews
     pinned: null, // tile index | null
@@ -36,7 +37,6 @@ export function createInput(canvas, app) {
 
   const world = () => app.world;
 
-  const USE_LABEL = ["mixed — everyone", "predator-only — the hunters", "prey-only — everyone but a hunter"];
   function syncThoughts(tile = state.hover) {
     const inspecting = state.tool === "inspect";
     app.walkers.setCursor(inspecting && state.mouse.inside ? tile : null, inspecting ? state.pinnedCitizen : null);
@@ -55,7 +55,6 @@ export function createInput(canvas, app) {
     syncThoughts();
   }
   function setTool(id) {
-    if (id === "use" && state.tool === "use") { state.use = (state.use + 1) % 3; app.ui.flash(`Use brush: ${USE_LABEL[state.use]}.`); }
     if (id !== "use" && !TOOL_BY_ID[id]) throw new Error(`input: unknown tool '${id}'`);
     state.tool = id;
     state.drag = null;
@@ -68,6 +67,14 @@ export function createInput(canvas, app) {
       const preview = previewTool(id);
       if (preview.text) app.ui.setCost(preview.text, preview.refused);
     }
+  }
+
+  function setUse(mask) {
+    state.use = clampUse(mask);
+    if (state.tool !== "use") setTool("use");
+    else app.ui.setTool("use", state.density);
+    app.ui.flash(`Use brush: ${useBrushLabel(state.use)}.`);
+    refreshCost(); // a checkbox changed while a rectangle may already be down
   }
 
   function screenXY(e) {
@@ -124,7 +131,7 @@ export function createInput(canvas, app) {
 
   function costLabel(op, plan) {
     const n = plan.tiles.length;
-    const name = op.kind === "use" ? `Use ${["mixed", "predator-only", "prey-only"][op.use]}` : labelForOp(op);
+    const name = op.kind === "use" ? `Use ${useBrushLabel(op.use).split(" — ")[0]}` : labelForOp(op);
     if (plan.reason) return `${name}: ${plan.reason}`; // the old reasons ARE the word "blocked"; a rule with something to say (the level crossing, SPEC §7.9) says it here
     if (!n) return `${name}: nothing to do`;
     const bridges = plan.tiles.filter((t) => t.what === "bridge").length;
@@ -279,9 +286,13 @@ export function createInput(canvas, app) {
   // ---- keyboard -------------------------------------------------------------------------------
   const editing = (e) => {
     const t = e.target;
-    return t && (["INPUT", "TEXTAREA", "SELECT"].includes(t.tagName) || t.isContentEditable);
+    if (!t) return false;
+    if (t.isContentEditable || t.tagName === "TEXTAREA" || t.tagName === "SELECT") return true;
+    if (t.tagName !== "INPUT") return false;
+    return !["checkbox", "radio", "button", "submit", "reset"].includes(String(t.type || "text").toLowerCase());
   };
-  const activating = (e) => e.target && ["BUTTON", "A"].includes(e.target.tagName);
+  const activating = (e) => e.target && (["BUTTON", "A"].includes(e.target.tagName)
+    || (e.target.tagName === "INPUT" && ["checkbox", "radio", "button", "submit", "reset"].includes(String(e.target.type || "").toLowerCase())));
   const PAN_KEYS = { KeyW: [0, -1], KeyA: [-1, 0], KeyS: [0, 1], KeyD: [1, 0], ArrowUp: [0, -1], ArrowLeft: [-1, 0], ArrowDown: [0, 1], ArrowRight: [1, 0] };
   function command(k, e) {
     const tool = TOOL_BY_KEY[String(k).toUpperCase()];
@@ -442,6 +453,7 @@ export function createInput(canvas, app) {
   return {
     state,
     setTool,
+    setUse,
     update,
     syncCamera: repickAfterCameraMove,
     hover: hoverForRenderer,

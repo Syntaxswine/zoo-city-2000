@@ -617,6 +617,12 @@ Suite 80 → 91.
 
 **Phase B — use-zoning and trespass (SPEC §7.8, §9d; `species.admits`,
 `fields.dial / commutePath / exposure`, `justice.trespassTick`).**
+- **Checkbox extension, 2026-09-04.** The old values remain exact bits
+  (`1` predator, `2` prey); `use` is now `Uint16`, with one stable bit for
+  each of the 14 species. `U` opens sixteen checkboxes, no checks is mixed,
+  and `admits` ORs every selection. Combined masks are carried through
+  routing, homes/jobs, trespass, block merging, undo, Census, cards, overlay,
+  save/load and the input log.
 - **The gate is the player's, not the species'.** `admits(use, species)` in
   `vacantLots` and `searchJob`; nothing else in the roster changed. The
   suite: two years after painting R prey-only and C predator-only, nobody
@@ -1669,7 +1675,7 @@ what the suite spends walking them.
   re-prices every segment crossed by a large frame and synchronizes exact
   walk/rail boundary poses; felt commute sums integer costs before dividing,
   so an exact comfort threshold stays exact. Focused motion, threshold,
-  H-free-rail and rail-less-hash checks are in the 497-check suite; PLAN §4-X
+  H-free-rail and rail-less-hash checks are in the 534-check suite; PLAN §4-X
   records the evidence.
 - A crossing has no gate, no lights and no bell. It is one ground tile; a
   barrier that drops when a train passes wants the walker layer and the

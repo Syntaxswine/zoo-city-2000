@@ -6,6 +6,9 @@
 
 import { makeRng, seedFromString, hash01 } from "./rng.js";
 import { KNOBS } from "./rules.js";
+import { USE } from "./use.js";
+
+export { USE } from "./use.js";
 
 export const TERRAIN = Object.freeze({ GRASS: 0, WATER: 1, TREE: 2 });
 export const ROAD = Object.freeze({ NONE: 0, ROAD: 1, BRIDGE: 2 });
@@ -14,9 +17,7 @@ export const CIVIC = Object.freeze({ NONE: 0, PARK: 1, ZOO: 2, ZOO_PART: 3, FIRE
 export const isStation = (c) => c === CIVIC.FIRE || c === CIVIC.POLICE; // coverage
 export const isCivicEmployer = (c) => isStation(c) || c === CIVIC.CENTRE; // jobs
 export const ZONE_NAME = ["none", "R", "C", "I", "M"];
-/** Use-zoning: who a lot or a road admits. Mixed is the default; the other two are the player's line, not the species' (species.js admits). */
-export const USE = Object.freeze({ MIXED: 0, PRED: 1, PREY: 2 });
-export const USE_NAME = ["mixed", "predator", "prey"];
+/** Use-zoning: who a lot or road admits. Stable 16-bit codes live in use.js; species.js applies them. */
 /** In custody or a market pen: not working, socialising, breeding, hunting or on the street. */
 export const absent = (world, c) => !!c.pen || (c.held || 0) > world.tick;
 
@@ -47,7 +48,7 @@ export function createWorld({ seed = "zoo", w = 64, h = 64 } = {}) {
     variant: new Uint8Array(n),
     flooded: new Uint8Array(n),
     wall: new Uint8Array(n), // a wall tile; with a road or rail on it, a tunnel (SPEC §6b, sim/reach.js)
-    use: new Uint8Array(n), // the player's line: 0 mixed · 1 predator-only · 2 prey-only, on lots AND roads (SPEC §7.8)
+    use: new Uint16Array(n), // bitmask: mixed (0), predator/prey, and any combination of 14 species (SPEC §7.8)
     rail: new Uint8Array(n), // 0 none · 1 rail · 2 station (SPEC §7.9); served from road within ROAD_REACH across a walked forecourt
     meat: new Uint16Array(n), // units on hand at a meat hall; Part H supplies the flows
     big: new Uint8Array(n), // a BLOCK (SPEC §3b, sim/blocks.js): 0 a lot of its own · 2 | 3 the anchor of a 2×2 | 3×3 · PART | dx | dy << 2 a part pointing at its anchor

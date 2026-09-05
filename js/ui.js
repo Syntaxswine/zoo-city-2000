@@ -19,14 +19,14 @@
 //   createUI(app) → { refresh, onTick, setTool, setCost, flash, updateHover,
 //                     showChoice, hideChoice, openNewCity, closeModals, modalOpen, setWorld }
 
-import { ZONE, CIVIC, TERRAIN, ROAD, ZONE_NAME, USE_NAME, anchorOf } from "./sim/world.js";
+import { ZONE, CIVIC, TERRAIN, ROAD, ZONE_NAME, anchorOf } from "./sim/world.js";
 import { dateOf, characterLine } from "./sim/tick.js";
 import { eventTitle, TICKER_FLASH } from "./sim/events.js";
 import { lotReport, REASON } from "./sim/lots.js";
 import { exposure, asksAccess, nearReach } from "./sim/fields.js";
 import { RULES, KNOBS } from "./sim/rules.js";
 import { yearlyFigures } from "./sim/budget.js";
-import { SPECIES, SPECIES_BY_ID } from "./sim/species.js";
+import { SPECIES, SPECIES_BY_ID, admits } from "./sim/species.js";
 import { pluralSpecies } from "./sim/landmarks.js";
 import { ageYears, isWorker } from "./sim/census.js";
 import { toolHelp } from "./tools.js";
@@ -37,6 +37,7 @@ import { ACT, line as needLine } from "./sim/voice.js";
 import { lifeLines, memorial } from "./sim/life.js";
 import { legacyOf } from "./sim/legacy.js";
 import { paintPortrait } from "./render.js";
+import { USE, USE_OPTIONS, USE_SPECIES, useName, useShortLabel } from "./sim/use.js";
 
 const $ = (sel, root = document) => root.querySelector(sel);
 const el = (tag, cls, text) => {
@@ -59,6 +60,7 @@ export function createUI(app) {
   const dom = {
     strip: $("#strip"),
     tools: $("#tools"),
+    usePicker: $("#usePicker"),
     cost: $("#cost"),
     clock: $("#clock"),
     flash: $("#flash"),
@@ -130,8 +132,9 @@ export function createUI(app) {
     dom.tools.append(dens);
     const use = el("button", "tool", "");
     use.id = "btnUse";
-    use.title = "U: paint lots and roads mixed / predator-only / prey-only; press again to cycle";
-    use.setAttribute("aria-label", "Use zoning, key U. Cycle mixed, predator-only or prey-only");
+    use.title = "U: choose any combination of predator, prey and individual species, then paint lots and roads";
+    use.setAttribute("aria-label", "Use zoning, key U. Open the predator, prey and species checkboxes");
+    use.setAttribute("aria-controls", "usePicker");
     use.addEventListener("click", () => app.input.setTool("use"));
     dom.tools.append(use);
     const sep = () => dom.tools.append(el("span", "sep", "·"));
@@ -159,7 +162,43 @@ export function createUI(app) {
     sep();
     mk("btnNew", "N", "new city", "N: found a new city / load a saved one", () => openNewCity());
     mk("btnMenu", "Esc", "menu", "Esc: the title screen — new game, continue, load, save, options", () => app.title.open());
-    dom.help.textContent = `${toolHelp()} · H density · U use · Space pause · , . speed · Backspace/Ctrl+Z undo · Ctrl+S save · L load · O overlays · R news · +/− zoom · arrows/WASD/right-drag pan · N new city · Esc menu`;
+    dom.help.textContent = `${toolHelp()} · H density · U use checkboxes · Space pause · , . speed · Backspace/Ctrl+Z undo · Ctrl+S save · L load · O overlays · R news · +/− zoom · arrows/WASD/right-drag pan · N new city · Esc menu`;
+  }
+
+  const useChecks = [];
+  function syncUsePicker(mask) {
+    for (const [box, bit] of useChecks) box.checked = (mask & bit) !== 0;
+  }
+  function buildUsePicker() {
+    dom.usePicker.innerHTML = "";
+    const head = el("div", "use-head");
+    head.append(el("b", "", "Who may use it"));
+    const mixed = el("button", "", "mixed / clear all");
+    mixed.title = "Clear every check: mixed use admits everyone";
+    mixed.addEventListener("click", () => app.input.setUse(USE.MIXED));
+    const done = el("button", "", "done");
+    done.addEventListener("click", () => { dom.usePicker.hidden = true; const b = $("#btnUse"); if (b) { b.setAttribute("aria-expanded", "false"); b.focus(); } });
+    head.append(mixed, done);
+    dom.usePicker.append(head, el("div", "use-note", "No boxes = mixed (everyone). Any animal matching at least one checked box may live, work or walk there."));
+    const grid = el("div", "use-grid");
+    const groups = el("div", "use-groups");
+    grid.append(groups);
+    for (const option of USE_OPTIONS) {
+      const row = el("label");
+      const box = el("input");
+      box.type = "checkbox";
+      box.value = String(option.bit);
+      box.setAttribute("aria-label", `admit ${option.label}`);
+      box.addEventListener("change", () => {
+        let mask = 0;
+        for (const [other, bit] of useChecks) if (other.checked) mask |= bit;
+        app.input.setUse(mask);
+      });
+      useChecks.push([box, option.bit]);
+      row.append(box, el("span", "", option.label));
+      (option.bit <= USE.PREY ? groups : grid).append(row);
+    }
+    dom.usePicker.append(grid);
   }
 
   function setTool(id, density) {
@@ -174,9 +213,15 @@ export function createUI(app) {
     const ub = $("#btnUse");
     if (ub) {
       ub.innerHTML = "";
-      ub.append(el("span", "key", "U"), " ", el("span", "", `Use: ${app.input ? ["mixed", "pred", "prey"][app.input.state.use] : "mixed"}`));
+      ub.append(el("span", "key", "U"), " ", el("span", "", `Use: ${app.input ? useShortLabel(app.input.state.use) : "mixed"}`));
       ub.classList.toggle("on", id === "use");
       ub.setAttribute("aria-pressed", String(id === "use"));
+      ub.setAttribute("aria-expanded", String(id === "use" && !dom.usePicker.hidden));
+    }
+    if (dom.usePicker) {
+      dom.usePicker.hidden = id !== "use";
+      if (id === "use") syncUsePicker(app.input ? app.input.state.use : 0);
+      if (ub) ub.setAttribute("aria-expanded", String(id === "use"));
     }
   }
 
@@ -460,7 +505,11 @@ export function createUI(app) {
     env.textContent = `LV ${rep.lv}  Pol ${rep.pol}  crime ${rep.crime}  road ${rep.roadDist > KNOBS.ROAD_REACH ? "—" : rep.roadDist}` + (w.road[i] ? `  traffic ${rep.traffic}` : "")
       + (rep.dread ? `  dread ${rep.dread}` : "") + (rep.fireCov ? "  · fire cover" : "") + (rep.policeCov ? `  · police cover −${rep.policeCov}` : "");
     lines.push(env);
-    if (w.use[i] && (rep.zone !== ZONE.NONE || w.road[i] !== ROAD.NONE)) lines.push(el("div", "warn", `use: ${USE_NAME[w.use[i]]}-only — ${w.use[i] === 1 ? "the hunters (fox, owl, wolf, cat, hawk) may live, work and walk here; nobody else" : "everyone but a hunter may live, work and walk here"}; the rest are stopped under police cover`));
+    if (w.use[i] && (rep.zone !== ZONE.NONE || w.road[i] !== ROAD.NONE || w.rail[i])) {
+      const code = w.use[i];
+      const open = SPECIES.filter((s) => admits(code, s.id)).map((s) => s.id);
+      lines.push(el("div", "warn", `use: ${useName(code)} — admits ${open.join(", ")}; every animal matching any checked box may live, work and walk here, and the rest are stopped under police cover`));
+    }
     if (w.rail[i] === 2) {
       // A platform is served like a lot: riders reach it from ANY of its doors,
       // and the forecourt between costs them a walk a tile (SPEC 6c, 7.9).
@@ -754,7 +803,9 @@ export function createUI(app) {
       if (c.penned) tr("in market pens", `${c.penned}`);
     }
     { const j = w.events.justice || {}; const open = (w.events.files || []).filter((f) => !f.closed).length;
-      if (c.usePred || c.usePrey) tr("use-zoned tiles (predator · prey)", `${c.usePred} · ${c.usePrey}`);
+      if (c.usePred || c.usePrey) tr("use tile selections (predator · prey)", `${c.usePred} · ${c.usePrey}`);
+      { const rows = USE_SPECIES.filter((id) => c.useSpecies?.[id]).map((id) => `${id} ${c.useSpecies[id]}`);
+        if (rows.length) tr("species checkbox selections", rows.join(" · ")); }
       if (fig.zonedOut) tr("zoned out last month", `${fig.zonedOut}`);
       if (j.trespass) tr("trespass stops since founding", `${j.trespass}`);
       if (w.events.killings || j.takenIn || j.cells || j.sold) {
@@ -1061,6 +1112,7 @@ export function createUI(app) {
   }
 
   buildStrip();
+  buildUsePicker();
   buildBars();
   buildTabs();
   setTool("R", 3);

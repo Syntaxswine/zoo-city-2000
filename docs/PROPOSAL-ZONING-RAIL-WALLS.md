@@ -119,23 +119,31 @@ wall first; (4) a killer's victim search does not cross a full wall; (5) save
 
 ---
 
-## 2. Use-zoning (predator / prey / mixed) and the trespass arrest
+## 2. Use-zoning (checkbox unions) and the trespass arrest
 
-**Tile.** `use[i]` ∈ {0 mixed, 1 predator, 2 prey}, saved. Meaningful on
-zoned lots (R, C, I — and M, ruling: a hall in a prey zone is refused staff
-like any C lot) and on **road, rail and station tiles**. Default 0
-everywhere; a city that never touches the tool plays exactly as today.
+**Tile.** `use[i]` is a saved `Uint16` bitmask. Zero is mixed. Bit 0 is
+predator and bit 1 prey, deliberately preserving the shipped save values
+`1` and `2`; bits 2–15 are the stable rabbit, mouse, fox, beaver, owl, bear,
+tortoise, raccoon, pig, cow, wolf, cat, hawk and skunk assignments. It is
+meaningful on zoned lots (including M) and on **road, rail and station
+tiles**. Default 0 everywhere; a city that never touches the tool plays
+exactly as before. Moving from one byte to two costs 4,096 bytes of runtime
+map memory on a 64×64 city; an untouched JSON save remains byte-identical
+because both representations serialize to the same array of zeros.
 
 **Who is what.** Predator = `diet === "carn"` (`HUNTERS`: fox, owl, wolf,
-cat, hawk). Prey = everyone else, omnivores included (ruling: a bear is
-nobody's hunter in `PREY_OF`; the skunk is nobody's prey and lives on the
-prey side). `admits(use, species)`: mixed admits all; predator admits
-hunters; prey admits non-hunters.
+cat, hawk). Prey = everyone else, omnivores included. `admits(mask,
+species)`: zero admits all; otherwise the tests are ORed — predator admits
+hunters, prey admits non-hunters, and each species bit admits that exact
+species. Predator + bear therefore admits the five hunters and bears;
+rabbit + fox admits precisely rabbits and foxes.
 
-**Tool.** `U` Use — a rectangle brush like the zones; the button cycles
-MIXED → PREDATOR → PREY (press `U` again, or click the button, as `D` does
-for density). §1 a tile (ruling: a repaint, not a build); one undo step;
-paints every zoned lot and road/rail tile in the rectangle, skips the rest.
+**Tool.** `U` Use opens a non-modal list of sixteen native checkboxes, so it
+can remain visible while the player paints. No checks is labelled mixed;
+any combination is legal. The button reports the one selected name or
+"N checked." The rectangle brush costs §1 a changed tile (a repaint, not a
+build), is one undo step, paints every zoned lot and road/rail tile in the
+rectangle, and skips the rest.
 
 **The gate.**
 - Homes: `vacantLots` skips lots that do not admit the species; arrivals,
@@ -183,19 +191,24 @@ the centre, prey or the fixed to the hall) — this is where the owner's
 habitual trespasser. The ticker: *"TRESPASS — Rufus Slyfield was stopped on
 prey-only road at (23,41) on the way to work. One month in the cells."*
 
-**Overlay.** A seventh `O` mode, "use": predator tiles in rust, prey tiles in
-teal, on lots and roads alike; mixed untinted. **Hover:** "use: predator /
-prey / mixed" on every tile; a pinned citizen's card prints its exposure
-("commutes through 4 prey-only tiles — 8 % a month under this cover").
-**Census:** trespass arrests, zoned-out departures, tiles by use.
+**Overlay.** The `O` use mode keeps predator rust and prey teal, assigns one
+stable colour to every species bit, and averages the selected colours for a
+combined mask; mixed is untinted. **Hover:** the tile card names every
+checked box and enumerates the admitted species; a pinned citizen's card
+prints its exposure. **Census:** trespass arrests, zoned-out departures,
+predator/prey selections and per-species selected-tile counts.
 
-**Suite.** (1) after 24 ticks no hunter lives or works on a prey tile and no
-non-hunter on a predator tile (the gate); (2) a repainted lot empties inside
+**Suite.** (1) all sixteen bits are unique, every exact-species bit admits
+only that species, and combinations are OR; after 24 ticks nobody lives or
+works where the mask forbids; (2) a repainted lot empties inside
 four months and its household is rehomed or gone, ids clean; (3) a forced
 trespass (`TRESPASS_P = 1/E` on one commuter) lands one animal in the cells
 with `record 1`; a third forced conviction goes to the table; (4) a commute
 prefers the legal detour when one exists within the ratio; (5) `use` round-
-trips; an old save loads with zeros.
+trips; old `1`/`2` saves keep their predator/prey meaning, the high skunk bit
+and combined masks round-trip in `Uint16`, and malformed oversized masks
+become mixed before typed-array coercion; (6) the real checkbox handlers,
+combined tile card, Census and blended tints are exercised.
 
 ---
 

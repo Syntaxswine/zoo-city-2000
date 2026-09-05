@@ -5,6 +5,8 @@
 //
 // Ages are in YEARS here; the sim keeps age in months (tick − born).
 
+import { USE, USE_BIT_OF, USE_SPECIES } from "./use.js";
+
 export const SPECIES = Object.freeze([
   //  id        life litter fertile   retire  jobC jobI  polTol homePref   commute  surname      fur       affinity notes
   { id: "rabbit", diet: "herb",   life: 40,  litter: 3, fertile: [16, 30], retire: 35,  jobC: 0.5, jobI: 0.5, polTol: 40, homePref: "any",   commute: 24, surname: "Burrowes",   fur: "furWarm", furShift: 1 },
@@ -66,10 +68,23 @@ export const HUNTERS = new Set(SPECIES.filter((s) => s.diet === "carn").map((s) 
  * Use-zoning (SPEC §7.8): does a tile painted `use` admit this species?
  * Mixed (0) admits all; predator-only (1) admits the hunters (diet carn);
  * prey-only (2) admits everyone else — omnivores are nobody's hunter in
- * PREY_OF and live on the prey side (the build's ruling). A GATE, on
- * purpose: it is the player's line, not the species' preference.
+ * PREY_OF and live on the prey side. The remaining fourteen bits admit their
+ * named species, and multiple checked bits are an OR: matching any one is
+ * enough. A GATE, on purpose: it is the player's line, not the species'
+ * preference.
  */
-export const admits = (use, species) => use === 0 || (use === 1) === (DIET_OF[species] === "carn");
+export const admits = (use, species) => {
+  if (use === USE.MIXED) return true;
+  if ((use & USE.PRED) && DIET_OF[species] === "carn") return true;
+  if ((use & USE.PREY) && !!DIET_OF[species] && DIET_OF[species] !== "carn") return true;
+  return !!USE_BIT_OF[species] && (use & USE_BIT_OF[species]) !== 0;
+};
+
+// Every current species gets one permanent Use code. Keep this near admits:
+// adding a roster row without a code is a simulation bug, not UI polish.
+if (USE_SPECIES.length !== SPECIES.length || SPECIES.some((s) => !USE_BIT_OF[s.id])) {
+  throw new Error("use zoning: stable species codes do not match the roster");
+}
 
 // Affinity for friendship rolls: 1.0 same or allied, 0.7 neutral, 0.4 wary.
 // Raccoon 1.2 with everyone — the glue species (SPEC §7.5).

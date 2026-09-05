@@ -7,6 +7,7 @@ import { ZONE, CIVIC, ROAD, jobsOf, jobZone, absent, capacityOf, isPart } from "
 import { served, edgeRoads , commuteTime, rides, fireExposure } from "./fields.js";
 import { landmarkOf } from "./landmarks.js";
 import { needOf, needsContext } from "./needs.js";
+import { USE, USE_BIT_OF, USE_SPECIES } from "./use.js";
 
 export const ageMonths = (world, c) => world.tick - c.born;
 export const ageYears = (world, c) => Math.floor((world.tick - c.born) / 12);
@@ -167,6 +168,7 @@ export function census(world) {
   let tunnels = 0;
   let usePred = 0;
   let usePrey = 0;
+  const useBySpecies = Object.fromEntries(USE_SPECIES.map((id) => [id, 0]));
   let railTiles = 0;
   let stations = 0;
   let fireStations = 0;
@@ -232,7 +234,11 @@ export function census(world) {
     if (world.rail[i] === 1) railTiles++;
     else if (world.rail[i] === 2) stations++;
     if (world.wall[i]) { walls++; if (world.road[i] !== ROAD.NONE) tunnels++; }
-    if (world.use[i] && (world.zone[i] !== ZONE.NONE || world.road[i] !== ROAD.NONE)) { if (world.use[i] === 1) usePred++; else usePrey++; }
+    if (world.use[i] && (world.zone[i] !== ZONE.NONE || world.road[i] !== ROAD.NONE || world.rail[i])) {
+      if (world.use[i] & USE.PRED) usePred++;
+      if (world.use[i] & USE.PREY) usePrey++;
+      for (const id of USE_SPECIES) if (world.use[i] & USE_BIT_OF[id]) useBySpecies[id]++;
+    }
     lvSum += world.lv[i];
     polSum += world.pol[i];
     if (world.pol[i] > maxPol) maxPol = world.pol[i];
@@ -263,7 +269,7 @@ export function census(world) {
     meatSlaughtered: (world.meatStats?.yearly?.slaughtered || 0) * KNOBS.PEN_YIELD,
     approval: P ? moodSum / P : 50,
     native: P ? native / P : 0,
-    parks, zoos, zoosNoRoad, fireStationsNoRoad, policeStationsNoRoad, centresNoRoad, lots, roads, walls, tunnels, usePred, usePrey, railTiles, stations, riders, commuteN, meanCommute: commuteN ? commuteSum / commuteN : 0, lotsNoRoad,
+    parks, zoos, zoosNoRoad, fireStationsNoRoad, policeStationsNoRoad, centresNoRoad, lots, roads, walls, tunnels, usePred, usePrey, useSpecies: useBySpecies, railTiles, stations, riders, commuteN, meanCommute: commuteN ? commuteSum / commuteN : 0, lotsNoRoad,
     fireStations, policeStations, burning,
     blocks2, blocks3, // the 2×2 and 3×3 blocks standing (anchors; SPEC §3b)
     landmarks, landmarkCounts, // the 3×3s that rose as a species' landmark, and which by name (SPEC §3c)

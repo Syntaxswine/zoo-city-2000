@@ -74,8 +74,9 @@ so tuning changes one file.
   (ticks left), `rubble` (MONTHS LEFT, counting down — every `if (world.rubble[i])` still
   reads "there is rubble here", and no new tile array joins the save),
   `variant` (art seed byte), `wall` (0/1 —
-  with a road or rail on the tile, a tunnel; §6b), `use` (0 mixed, 1
-  predator-only, 2 prey-only — the player's line on lots and roads; §7.8),
+  with a road or rail on the tile, a tunnel; §6b), `use` (`Uint16`: 0 mixed,
+  otherwise a checkbox mask for predator, prey and all 14 species — the
+  player's line on lots and roads; §7.8),
   `rail` (0 none, 1 rail, 2 station; §7.9).
 - Seeded generation: one river 2–3 tiles wide as a biased random walk from one
   edge to the opposite edge (never straight); 1–2 ponds; tree clumps by seeded
@@ -626,12 +627,16 @@ friendship samples. Target ≤ 3 ms per tick in Node.
 
 The owner: *"zoning allows areas to be designated as being for predators,
 prey, or mixed use. mixed use is the default, but players who want a more
-granular control of their city have the option to control it."* Tool `U`
-(press again to cycle mixed → predator-only → prey-only; a rectangle brush;
-§1 a repainted tile; one undo step) paints **lots and roads**. `admits(use,
-species)`: mixed admits all; predator-only the hunters (diet carn: fox, owl,
-wolf, cat, hawk); prey-only everyone else — omnivores are nobody's hunter
-and live on the prey side. **A gate, on purpose** — it is the player's line,
+granular control of their city have the option to control it"* and, later,
+*"ideally this should be a list of check boxes, so you can have things zoned
+for multiple things at once."* Tool `U` opens sixteen checkboxes: predator,
+prey, rabbit, mouse, fox, beaver, owl, bear, tortoise, raccoon, pig, cow,
+wolf, cat, hawk and skunk. No checks means mixed. Otherwise `admits(use,
+species)` is an **OR**: a citizen matching any checked group or exact species
+is admitted. Predator means the hunters (diet carn: fox, owl, wolf, cat,
+hawk); prey means everyone else — omnivores are nobody's hunter and live on
+the prey side. A rectangle brush paints the selected 16-bit mask on lots and
+roads (§1 a changed tile; one undo step). **A gate, on purpose** — it is the player's line,
 not the species' preference (§7.6's "weights never gates" is about what
 species want): `vacantLots` and `searchJob` skip what does not admit, so
 every arrival, move-out, rehome and hire goes through it. A lot repainted
@@ -647,7 +652,9 @@ no line every step costs the same and the settle order is the BFS's, so the
 paths — and the traffic — are the ones the BFS made; the suite holds every
 commuter's path tile-equal to `roadPath`. `save.rebuildDerived` uses the
 same search, so a loaded city takes the roads the live one took. The `O`
-overlay's `use` mode tints predator-only rust and prey-only teal.
+overlay's `use` mode retains predator rust and prey teal, gives every species
+a stable tint, and averages checked tints for a combined mask; the card names
+the exact checks and every admitted species.
 
 ### 7.9 Rail (`rail[i]`; `fields.dial` two layers; docs/PROPOSAL-ZONING-RAIL-WALLS.md §3)
 

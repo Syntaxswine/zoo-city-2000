@@ -12,6 +12,7 @@ import { computeFields, recountRosters, commutePath, doorsOf } from "./fields.js
 import { citizenDefaults, rebuildMaps } from "./citizens.js";
 import { refreshLast } from "./tick.js";
 import { migrateLegacyNames } from "./legacy.js";
+import { normalizeUse } from "./use.js";
 
 const TILE_ARRAYS = ["terrain", "road", "zone", "maxTier", "tier", "civic", "burning", "rubble", "variant", "flooded", "wall", "use", "rail", "meat", "big", "theme"];
 
@@ -90,7 +91,10 @@ export function fromPlain(o) {
   world.start = o.start;
   world.valves = { ...world.valves, ...o.valves }; // an old save without M keeps the default 0
   world.festivalBonus = o.festivalBonus;
-  for (const k of TILE_ARRAYS) if (o[k]) world[k].set(o[k]); // an old save without walls keeps its zeros
+  for (const k of TILE_ARRAYS) if (o[k] && k !== "use") world[k].set(o[k]); // an old save without walls keeps its zeros
+  // Validate BEFORE Uint16 assignment: typed-array coercion would otherwise
+  // turn an impossible imported 70000 into the plausible mask 4464.
+  if (o.use) for (let i = 0; i < world.use.length && i < o.use.length; i++) world.use[i] = normalizeUse(o.use[i]);
   world.citizens = (o.citizens || []).map((c) => ({
     ...citizenDefaults(), ...c,
     friends: (c.friends || []).slice(), life: (c.life || []).map((e) => e.slice()), path: null, stale: false,

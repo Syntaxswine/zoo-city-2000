@@ -26,7 +26,8 @@
 // Every line names the animals and uses no pronoun — the sim has no sex.
 
 import { KNOBS } from "./rules.js";
-import { ZONE, CIVIC, inBounds, absent, USE_NAME } from "./world.js";
+import { ZONE, CIVIC, inBounds, absent } from "./world.js";
+import { useName } from "./use.js";
 import { DIET_OF, isPredatorOf } from "./species.js";
 import { post } from "./budget.js";
 import { removeCitizen, holdFuneral, releaseJob } from "./citizens.js";
@@ -311,7 +312,7 @@ export function arrest(world, f, c, wrongful, notices, opts = {}) {
     ev.justice.trespass++;
     const onWay = f.tile !== c.home && f.tile !== c.job;
     const months = KNOBS.TRESPASS_MONTHS === 1 ? "A month" : `${KNOBS.TRESPASS_MONTHS} months`;
-    line = `TRESPASS — ${nameOf(c)} was stopped on ${USE_NAME[world.use[f.tile]]}-only ground at ${at(world, f.tile)}${onWay ? " on the way to work" : ", living where the line forbids"}. ${months} in the cells; offence ${c.record}${c.record === KNOBS.RECORD_HARD - 1 ? " — the next meets the sentence table" : ""}.`;
+    line = `TRESPASS — ${nameOf(c)} was stopped on ${useName(world.use[f.tile])} use-zoned ground at ${at(world, f.tile)}${onWay ? " on the way to work" : ", living where the line forbids"}. ${months} in the cells; offence ${c.record}${c.record === KNOBS.RECORD_HARD - 1 ? " — the next meets the sentence table" : ""}.`;
   } else if (hall >= 0) {
     const hh = world.hhById.get(c.household);
     const family = hh ? hh.members.filter((id) => id !== c.id) : [];

@@ -4,6 +4,8 @@
 // numbers. If a rule is changed here, the game, the panel and the sweep all
 // change together — there is no second copy. SPEC §4–§9.
 
+import { USE_SPECIES } from "./use.js";
+
 export const KNOBS = {
   // cadence
   TICKS_PER_YEAR: 12,
@@ -322,8 +324,8 @@ export const RULES = Object.freeze([
   },
   {
     id: "U1", title: "Use-zoning: the player's line admits",
-    formula: "use ∈ {mixed, predator-only, prey-only} on lots and roads; mixed admits all, predator-only the hunters (fox, owl, wolf, cat, hawk), prey-only everyone else — a GATE on homes and jobs; a repainted household has 3 months to rehome or leaves; a forbidden road step costs ×6 in the commute search",
-    live: (w) => `${w.last.census.usePred || 0} predator-only · ${w.last.census.usePrey || 0} prey-only tiles${w.last.zonedOut ? ` · ${w.last.zonedOut} zoned out last month` : ""}`,
+    formula: `Use is a checkbox mask on lots and roads: predator, prey, ${USE_SPECIES.join(", ")}; no checks is mixed and admits all, otherwise an animal is admitted when it matches ANY checked group or species — a GATE on homes and jobs; a repainted household has 3 months to rehome or leaves; a forbidden road step costs ×6 in the commute search`,
+    live: (w) => { const by = w.last.census.useSpecies || {}; const one = Object.values(by).reduce((n, v) => n + (v || 0), 0); const kinds = Object.values(by).filter(Boolean).length; return `${w.last.census.usePred || 0} predator checks · ${w.last.census.usePrey || 0} prey checks · ${one} species checks (${kinds} kind${kinds === 1 ? "" : "s"})${w.last.zonedOut ? ` · ${w.last.zonedOut} zoned out last month` : ""}`; },
   },
   {
     id: "U2", title: "Trespass",

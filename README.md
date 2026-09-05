@@ -51,7 +51,7 @@ toggles disasters for the current city.
 The build remote on the left is the key: `1` Residential, `2` Commercial,
 `3` Industrial, `4` Meat, `5` Road, `6` Wall, `7` Rail, `8` Station, `9`
 Tree, `0` Park, `Z` Zoo, `V` Pacification, `P` Police, `F` Fire, `I` Inspect
-and `B` Bulldoze. `H` changes density and `U` cycles use-zoning. WASD and the
+and `B` Bulldoze. `H` changes density and `U` opens the use-zoning checklist. WASD and the
 arrows only pan. `Backspace` or `Ctrl+Z` undoes; `Ctrl+S` opens save-as and
 `L` opens the saves list. The generated help line in the game carries the
 remaining pause, speed, overlay, news, zoom, new-city and menu keys.
@@ -77,7 +77,7 @@ them on the real map):
 | pollution | every source spreads linearly over its radius; a lone works stinks next door, pigs and skunks dirty their lot, parks are sinks; no wind |
 | crime | `40 − 0.5·LV + 0.4·density + 3·jobless in the 3×3 + 40·unemployed share + a hall's hill + open files − police`; above 60 it costs land value and shops; it is also the killing's hazard |
 | dread | a meat hall spreads 40/70/105 over 2/3/4 tiles; LV −0.8·dread (twice a works); herbivores mind it, carnivores do not |
-| use-zoning | `U` paints lots and roads predator-only / prey-only / mixed; a gate on homes and jobs (the player's line, not the species'); a forbidden road step costs ×6 in the commute search; a repainted household has 3 months to rehome or leaves |
+| use-zoning | `U` opens predator, prey and all 14 species checkboxes, then paints lots and roads; no checks is mixed, otherwise matching any check is allowed; a gate on homes and jobs; a forbidden road step costs ×6; a repainted household has 3 months to rehome or leaves |
 | trespass | `E` forbidden walking tiles on the commute (+4 for a forbidding home or job); `p = min(0.3, 0.02·E·cover/60)` a month — no police, no stop; the cells for a month and a record; the third offence meets the sentence table |
 | rail | a commute is the cheapest walk-and-ride: a step 1, a ride 2/9 (0.22) between stations served by a road within 3 tiles (the forecourt is walked); riders move at ×4.5, 50% faster than before; traffic and trespass count walking steps only — neutral travel until you step off; a road and a line cross square-on on one tile |
 | walls | every area effect radiates by flood fill; a wall blocks it and receives nothing; a road through it is a tunnel, open along the road; a killer's reach stops at a wall (Glades of Arcadia's law) |
@@ -138,17 +138,19 @@ a walled prey compound is safe from the wolf next door. Lay a road across
 the wall and it is a tunnel: the traffic passes, and so does the smell,
 along the road and nowhere else.
 
-**The player's line.** `U` paints any lot or road *predator-only*,
-*prey-only* or back to *mixed* (the default, which plays exactly as
-before). Hunters cannot live or work on prey-only ground and prey cannot on
-predator-only; a household whose street is repainted against it has three
-months to find a home within twelve road tiles or it leaves. Commutes
+**The player's line.** `U` opens a checklist for *predators*, *prey* and
+each of the 14 species, then paints any lot or road. No checks means *mixed*
+(the default, which plays exactly as before); otherwise an animal is allowed
+when it matches **any** checked box. Thus a district can be fox + rabbit,
+predators + bears, or any other union. A household whose street is repainted
+against it has three months to find a home within twelve road tiles or it leaves. Commutes
 prefer the legal way round — a forbidden road step costs six legal ones in
 the search — but an animal whose only way to work crosses the line walks
 it, and under police cover it is stopped: a month in the cells and a record,
 and the third offence meets the sentence table. Rail is neutral
-travel; only where you step off counts. The `O` overlay shows the line in
-rust and teal.
+travel; only where you step off counts. The `O` overlay keeps rust for
+predators and teal for prey, gives each species a stable colour, and blends
+the checked colours for a combined zone; the tile card names the exact union.
 
 **Rail.** `7` lays track and `8` makes a station of any rail tile a road
 reaches (three tiles is near enough; the animals cross the forecourt on
@@ -194,7 +196,7 @@ mill-town with a fox problem").
 
 - `tools/playtest.mjs --layout balanced|dormitory|millbelt --schedule 15:13,22:7`
   — a scripted mayor on the real map; the SPEC's acceptance targets.
-- `tools/check.mjs` — 497 checks: ledger conservation to the §, valves
+- `tools/check.mjs` — 534 checks: ledger conservation to the §, valves
   bounded, no NaN, the dangling-id law, rosters and capacities, commutes on
   roads, determinism, save → load → continue hash-equal, input-log replay,
   the crime-and-punishment invariants, the walls (the flood reproduces the

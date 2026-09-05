@@ -56,6 +56,28 @@ button.tool.on .key { color: #c8c2ae; }
 #cost.refused { color: var(--bad); }
 #clock { margin-left: auto; flex: none; color: var(--dim); }
 
+/* The Use brush is a union of checkboxes: no boxes means mixed; every checked
+   group/species is admitted. It is a non-modal field palette so the map stays
+   paintable while the choices remain visible. */
+#usePicker {
+  position: fixed; z-index: 9; top: 34px; left: 150px;
+  width: min(390px, calc(100vw - 16px)); max-height: calc(100vh - 42px); overflow: auto;
+  padding: 8px 10px; background: var(--panel); border: 1px solid var(--border);
+  box-shadow: 0 3px 12px rgba(59, 56, 46, 0.22);
+}
+#usePicker .use-head { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+#usePicker .use-head b { flex: 1; letter-spacing: 1px; text-transform: uppercase; }
+#usePicker .use-note { color: var(--dim); margin-bottom: 6px; }
+#usePicker .use-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 3px 10px; }
+#usePicker label { display: flex; align-items: center; gap: 5px; min-width: 0; }
+#usePicker input { margin: 0; accent-color: var(--accent); }
+#usePicker .use-groups { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 3px 10px; padding-bottom: 4px; margin-bottom: 2px; border-bottom: 1px dotted var(--border); }
+@media (max-width: 540px) {
+  #usePicker { left: 8px; }
+  #usePicker .use-grid { grid-template-columns: 1fr; }
+  #usePicker .use-groups { grid-column: 1; grid-template-columns: 1fr; }
+}
+
 /* ---- layout ---- */
 main { flex: 1; display: flex; min-height: 0; }
 #palette {

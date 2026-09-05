@@ -15,6 +15,7 @@ import { refreshLast } from "./tick.js";
 import { computeOcclusion } from "./reach.js";
 import { computeRoadDist, computeStationDoors } from "./fields.js";
 import { closeHall, hallStock, resetMeatRoutes } from "./meat.js";
+import { clampUse } from "./use.js";
 
 const C = KNOBS.COST;
 
@@ -241,9 +242,10 @@ export function costOf(world, op) {
     }
     case "use": {
       // The player's line (SPEC §7.8): a rectangle repaint of lots and roads to
-      // mixed / predator-only / prey-only, §1 a changed tile. Grass, water,
-      // civics and chalk-less ground take no line.
-      const v = Math.max(0, Math.min(2, op.use | 0));
+      // A checkbox mask: mixed / predator / prey / fourteen species in any
+      // combination, §1 a changed tile. Grass, water, civics and chalk-less
+      // ground take no line.
+      const v = clampUse(op.use);
       const painted = new Set();
       for (const i of rect(world, op)) {
         if (painted.has(i)) continue;
@@ -431,7 +433,7 @@ export function apply(world, op, { log = true } = {}) {
         walls = true;
         break;
       case "use":
-        world.use[i] = Math.max(0, Math.min(2, op.use | 0));
+        world.use[i] = clampUse(op.use);
         lines = true;
         break;
       case "rail":
