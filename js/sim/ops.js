@@ -9,7 +9,7 @@
 import { campAt } from "./camps.js";
 import { buildingSnapshot, syncBuildingAge } from "./building-age.js";
 import { KNOBS } from "./rules.js";
-import { TERRAIN, ROAD, ZONE, CIVIC, CIVIC_SIDE, CIVIC_OF_KIND, idx, inBounds, anchorOf, footprintOf, civicAnchorOf, civicTiles } from "./world.js";
+import { TERRAIN, ROAD, ZONE, CIVIC, CIVIC_SIDE, CIVIC_OF_KIND, PART, idx, inBounds, anchorOf, footprintOf, civicAnchorOf, civicTiles } from "./world.js";
 import { post, canSpend, exitReceivership } from "./budget.js";
 import { clearLot, invalidatePaths, releaseJob, replanStale } from "./citizens.js";
 import { resolveChoice } from "./events.js";
@@ -18,6 +18,7 @@ import { computeOcclusion } from "./reach.js";
 import { computeRoadDist, computeStationDoors, touchesRoad, computeCamCover, computeKnowledgeCulture } from "./fields.js";
 import { closeHall, hallStock, resetMeatRoutes } from "./meat.js";
 import { clampUse } from "./use.js";
+import { ESTATE } from "./wealth.js";
 
 const C = KNOBS.COST;
 
@@ -159,8 +160,10 @@ function refuseCrossings(world, lay, laying) {
  */
 export function costOf(world, op) {
   const tiles = [];
-  if (["zone", "road", "rail", "station", "wall", "bulldoze", "tree", "park", "largePark", "zoo", "fire", "police", "centre"].includes(op.kind)) {
-    const side = ["largePark", "zoo", "fire", "police", "centre"].includes(op.kind) ? 3 : 1;
+  // Every footprint a tile op writes — the four knowledge-and-culture kinds and the estate included: until session 18 the list
+  // stopped at the centre, so a Library could be dropped on an occupied tent (found while adding the estate; fixed as seen).
+  if (["zone", "road", "rail", "station", "wall", "bulldoze", "tree", "park", "largePark", "zoo", "fire", "police", "centre", "library", "university", "gallery", "amphitheater", "estate"].includes(op.kind)) {
+    const side = op.kind === "estate" ? 3 : CIVIC_SIDE[op.kind] || 1;
     const requested = op.tiles || (op.x0 != null ? rect(world, op) : Array.from({ length: side * side }, (_, k) => idx(world, op.tx + k % side, op.ty + Math.floor(k / side))));
     if (requested.some(i => campAt(world, i))) return { cost: 0, tiles, reason: "someone is camping here — provide housing before building" };
   }
@@ -174,6 +177,7 @@ export function costOf(world, op) {
       for (const i of rect(world, op)) {
         if (world.terrain[i] === TERRAIN.WATER || world.road[i] || world.civic[i] || world.wall[i] || world.rail[i]) continue;
         if (isBuilt(world, i)) continue;
+        if (world.estate[anchorOf(world, i)]) continue; // an estate's footprint is one thing (SPEC §9f): the bulldozer takes it whole, chalk never repaints it
         if (world.zone[i] === op.zone && world.maxTier[i] === (op.density || 3)) continue;
         let c = zc;
         if (world.terrain[i] === TERRAIN.TREE) c += C.bulldozeTree;
@@ -185,7 +189,7 @@ export function costOf(world, op) {
       const line = (op.tiles || []).filter((i) => i >= 0 && i < world.w * world.h);
       const lay = new Set();
       for (const i of line) {
-        if (world.road[i] || world.civic[i] || isBuilt(world, i)) continue;
+        if (world.road[i] || world.civic[i] || isBuilt(world, i) || world.estate[anchorOf(world, i)]) continue; // (an estate's chalk is not free chalk: the road would cut the footprint)
         if (world.rail[i] && !crossable(world, i)) continue; // a station, a tunnel, a bridge — never a crossing
         lay.add(i);
       }
@@ -250,6 +254,20 @@ export function costOf(world, op) {
         add(i, (dx || dy ? 0 : C[op.kind]) + (world.terrain[i] === TERRAIN.TREE ? C.bulldozeTree : 0), dx || dy ? "civicPart" : op.kind);
       }
       if (op.kind !== "park" && op.kind !== "largePark" && !touchesRoad(world, tiles.map(t => t.i))) return { cost: 0, tiles: [], reason: "the building must be adjacent to a road" };
+      break;
+    }
+    case "estate": {
+      // THE ESTATE (SPEC §9f; wealth.js): a 3×3 residential plot placed like a campus — atomic, clear ground, a road touching —
+      // stored as an R block anchor (big 3, PART parts) with world.estate 1, chalk. It sprouts its mansion in wealth.estatesTick
+      // when the plot's ladder reaches ULTRAWEALTHY, and never by the ordinary growth rule.
+      for (let dy = 0; dy < 3; dy++) for (let dx = 0; dx < 3; dx++) {
+        const tx = op.tx + dx, ty = op.ty + dy;
+        if (!inBounds(world, tx, ty)) return { cost: 0, tiles: [], reason: "the whole footprint must fit on the map" };
+        const i = idx(world, tx, ty);
+        if (world.terrain[i] === TERRAIN.WATER || world.road[i] || world.zone[i] || world.civic[i] || world.wall[i] || world.rail[i] || isBuilt(world, i)) return { cost: 0, tiles: [], reason: "the whole footprint needs clear ground" };
+        add(i, (dx || dy ? 0 : C.estate) + (world.terrain[i] === TERRAIN.TREE ? C.bulldozeTree : 0), dx || dy ? "estatePart" : "estate");
+      }
+      if (!touchesRoad(world, tiles.map((t) => t.i))) return { cost: 0, tiles: [], reason: "the estate must be adjacent to a road" };
       break;
     }
     case "use": {
@@ -354,7 +372,7 @@ function snapshot(world, tiles) {
     i,
     since: world.since[i],
     terrain: world.terrain[i], road: world.road[i], zone: world.zone[i], maxTier: world.maxTier[i],
-    tier: world.tier[i], civic: world.civic[i], civicSize: world.civicSize[i], rubble: world.rubble[i], wall: world.wall[i], use: world.use[i], rail: world.rail[i], big: world.big[i], theme: world.theme[i], cam: world.cam[i],
+    tier: world.tier[i], civic: world.civic[i], civicSize: world.civicSize[i], rubble: world.rubble[i], wall: world.wall[i], use: world.use[i], rail: world.rail[i], big: world.big[i], theme: world.theme[i], cam: world.cam[i], estate: world.estate[i],
   }));
 }
 
@@ -445,7 +463,7 @@ function applyOperation(world, op, { log = true } = {}) {
           const a = anchorOf(world, i);
           const tiles = world.big[i] ? footprintOf(world, a) : [i];
           if (world.zone[a] === ZONE.M) closeHall(world, a); // stock spoils explicitly; penned cubs go home alive
-          for (const j of tiles) { world.tier[j] = 0; world.zone[j] = ZONE.NONE; world.rubble[j] = 0; world.burning[j] = 0; world.maxTier[j] = 3; world.big[j] = 0; world.theme[j] = 0; }
+          for (const j of tiles) { world.tier[j] = 0; world.zone[j] = ZONE.NONE; world.rubble[j] = 0; world.burning[j] = 0; world.maxTier[j] = 3; world.big[j] = 0; world.theme[j] = 0; world.estate[j] = 0; }
           clearLot(world, a);
         }
         else if (what === "unzone") { world.zone[i] = ZONE.NONE; world.maxTier[i] = 3; }
@@ -460,6 +478,14 @@ function applyOperation(world, op, { log = true } = {}) {
         world.civic[i] = i === a ? CIVIC_OF_KIND[op.kind] : CIVIC.PART;
         world.civicSize[i] = i === a ? CIVIC_SIDE[op.kind] : 128 | dx | dy << 2;
         civics = true;
+        break;
+      }
+      case "estate": {
+        world.terrain[i] = TERRAIN.GRASS;
+        const a = idx(world, op.tx, op.ty), dx = i % world.w - op.tx, dy = ((i / world.w) | 0) - op.ty;
+        world.zone[i] = ZONE.R; world.maxTier[i] = 3; world.tier[i] = 0; world.rubble[i] = 0; world.theme[i] = 0;
+        world.big[i] = i === a ? 3 : PART | dx | dy << 2;
+        world.estate[i] = i === a ? ESTATE.PLOT : 0;
         break;
       }
       case "wall":
@@ -560,7 +586,7 @@ export function undo(world) {
     if (world.tier[s.i] > 0 && s.tier === 0) continue; // something grew here since; leave it
     world.since[s.i] = s.since || 0;
     world.terrain[s.i] = s.terrain; world.road[s.i] = s.road; world.zone[s.i] = s.zone; world.maxTier[s.i] = s.maxTier;
-    world.tier[s.i] = s.tier; world.civic[s.i] = s.civic; world.civicSize[s.i] = s.civicSize; world.rubble[s.i] = s.rubble; world.wall[s.i] = s.wall; world.use[s.i] = s.use; world.rail[s.i] = s.rail; world.big[s.i] = s.big; world.theme[s.i] = s.theme; world.cam[s.i] = s.cam;
+    world.tier[s.i] = s.tier; world.civic[s.i] = s.civic; world.civicSize[s.i] = s.civicSize; world.rubble[s.i] = s.rubble; world.wall[s.i] = s.wall; world.use[s.i] = s.use; world.rail[s.i] = s.rail; world.big[s.i] = s.big; world.theme[s.i] = s.theme; world.cam[s.i] = s.cam; world.estate[s.i] = s.estate;
   }
   if (u.roads) { world.roadsDirty = true; invalidatePaths(world); computeOcclusion(world); computeRoadDist(world); computeStationDoors(world); } // live, as apply does
   else if (u.op.kind === "use") invalidatePaths(world);

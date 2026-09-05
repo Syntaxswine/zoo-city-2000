@@ -2483,3 +2483,118 @@ dynamic did not occur on either rig; it stays a control-city question.
 range preview under the ghost; the owner's control city for the K dynamic at
 the owner's scale; the wealth arc's prerequisite reads these fields as they
 are (`docs/PROPOSAL-WEALTH-AND-CLASS-2026-09-05.md` §5).
+
+
+## 32. Wealth and class — the ladder, the estate, the mansion, priority policing (session 18, 2026-09-05)
+
+The owner, back from work, three words: *"lets do the wealth arc."* The
+proposal was mine from the same morning (`docs/PROPOSAL-WEALTH-AND-CLASS-2026-09-05.md`),
+scouted against the code's own seams with eight decisions left to the owner;
+none had been answered, the mandate from the morning stood (*"do as much work
+as you feel comfortable doing solo … i trust you though"*), so every one was
+taken on the proposal's own default and written down in its BUILT note.
+SPEC §9f is the rule.
+
+**What was built, in one commit.** `js/sim/wealth.js` is the module: class on
+the HOUSEHOLD (`hh.wealth` 0/1/2, decided once by the lot at arrival through
+`classForArrival`, inherited by the sixteen-year split, kept for life, saved
+only when non-zero); the ladder as GATES (`attainableClass` → `{ cls, next,
+unmet: [{ rung, want }] }`, nine rungs from `KNOBS.CLASS_*`, every one a field
+the game already computes, read on the anchor); the estate (`ops.js`
+"estate", key Q, §200: an R block anchor with `world.estate` 1 chalk / 2
+mansion — the twentieth tile array, left out of the save and the hash while
+all zero); the sprout (`estatesTick`, tick.js 4a, no RNG: the month the last
+rung is met the plot becomes a mansion of `MANSION_CAP` 8 for ONE household);
+the way down (`blocks.splitLot` on an estate anchor calls `unbuildMansion` —
+chalk again, the block kept, the family evicted through the capacity path;
+`events.saveFromFire` saves a mansion whole; `events.lowerTier` guards the
+Uint8 wrap); who may live there (`citizens.vacantLots`: a new arrival, or a
+household already ultrawealthy, never a second family); the tax
+(`budget.yearlyFigures` × `TAX_CLASS` [1, 2, 5], `taxByClass`); the justice
+(`justice.openFile` records `victimClass` — the richest household at a
+burgled home, or a killing's victim's class; `arrestChance` is the ONE
+formula and adds `ARREST_PRIORITY` [0, 0.05, 0.15]; `CASE_MONTHS_RICH` 12;
+one step up the sentence table for a theft from the ultrawealthy, the hall
+for their murder). The art is `js/art/estate.js`: the mansion (pale stone,
+two wings round a fountain court, a portico, a glasshouse, gate lamps) and
+the plot (the wall, four survey stakes, a board), both variants, lit and
+marked through `characterSprite`, 2× free through hires. The card, the
+Census, the Budget and Rules W1 say the same words as the wish.
+
+**Numbers.** 913 → 916 checks (63 in `tools/check-wealth.mjs`: every rung
+bites one at a time, the op and its undo, the sprout through the tick, who
+may live there, the real arrival path, tax and shares, inheritance, save →
+load → twelve months, fire off and on the beat, dissolve, the file's class,
+the roll, the case length, five sentences, the neutral town). Sixteen mutants
+(the capacity, inheritance, the mansion gate, the tax, the file's class, the
+roll, the case, the step, the sprout rung, the split, undo, the road walk,
+the save, the engine, a rung that never bites, the arrival) — 14 caught on
+the first sweep, and the two survivors were gaps in the SUITE, closed by two
+checks: the "no wealth field" check had saved a town with no households, and
+every arrival in the suite went through a helper that set the class itself.
+16/16 now. The six published mayor rigs byte-identical (`c055aba5` ·
+`882a48c7` · `ecb5a902` · `2ced10f8` · `46520f05` · `461784c9`): the mayor
+places no estate, and with no culture no lot attains a class. One hash moved
+on the way and was put back: the file record had gained `victimClass: 0`,
+which every saved file carries into the hash — written only when non-zero
+now, as `hh.wealth` and `world.estate` are.
+
+**Measured (`tools/wealthprobe.mjs`, which grafts the estate quarter into the
+scripted mayor's town the month it is founded).**
+
+| rig | the ladder's binding rungs (months unmet) | the mansion | class at year 30 |
+|---|---|---|---|
+| `--layout estate`, seed 7 | shops 15 · land value 1 · streets 1 | rose month 15, the Slyfields (4 foxes) took it that month | 56 affluent (6%) carry 12% of the R tax; 4 ultrawealthy carry 2%; year 1 was 24 affluent carrying 63% |
+| `--layout balanced`, seed 7 | culture 360 · air 297 · land value 297 · shops 16 | never rose — no 3×3 of chalk for an Amphitheater in a 5×5 interior; a works opened next door in year 6 | 15 affluent carry 2% |
+| `--justice`, estate, seeds 1–4, station + prison + centre + hall | — | rose on 3 of 4 (months 13–15), taken at once: cats twice, skunks once | see below |
+
+The justice tally, four seeds, thirty years: 221 plain files cleared at 22%,
+81 affluent at 37%, 12 ultrawealthy at 8%. Every one of the twelve was a
+burglary at an HEIR's flat — cubs of the mansion split off at sixteen with
+the class into ordinary tenements, which do get hot — and a mansion was a hot
+lot in 0 mansion-months (crime at most 53). Nine of the eleven cold
+ultrawealthy files had a roll SUCCEED and then wait for a centre bed: the
+harsher step sends a first-time thief to the centre, and the centre's six
+beds are where the ultrawealthy's priority runs out. That is the one finding
+the owner should look at. Wrongful arrests 2, none within four of an estate.
+
+**Found in passing, fixed in the same commit.** `ops.costOf`'s campsite guard
+listed the kinds through the centre and stopped, so a Library or a Gallery
+could land on an occupied tent. `input.hoverForRenderer`'s footprint list
+stopped there too, so the placement ghost under a 2×2 Library or a 3×3
+University was a 1×1 diamond, and for the estate it threw in the render
+frame (`civicSprite: unknown kind 'estate'`) — both read the one table now
+(`CIVIC_SIDE`), and the estate's ghost is the plot.
+
+**Browser (the fixture `docs/fixtures/estate-quarter.json`, imported with
+`zoo.importText`).** The mansion's card: *(11,10) Mansion · 3×3 mansion — the
+Trotter estate · occ 4/8 · a mansion: one household of the ultrawealthy, up
+to 8 · R tax ×5 · Trotter (ultrawealthy): Pording (pig) · …* — the
+ultrawealthy pigs; the plot's card: *(25,10) Estate plot · chalk, waiting for
+its mansion · waiting for: culture at home — a Gallery or an Amphitheater in
+reach · a Park or Large Park within 4 · land value 59 of at least 60*;
+Census *class 128 · 0 · 4 · R tax share 83% · 0% · 17% · estate plots
+waiting · mansions 1 · 1*; Budget *— and the ultrawealthy, ×5 §219*; Rules
+W1 with its live line; both zooms; the palette's twenty-third button; zero
+console messages once the ghost was fixed.
+
+**Symptom-keyed traps, for whoever comes next.**
+
+| what you see | what it is |
+|---|---|
+| an estate plot that never rises though the card lists nothing | it is not SERVED (the card says NO_ROAD), a tile of it is flooded, alight or rubble, or the tick has not run — the sprout is in the tick, the card reads the fields |
+| a mansion whose card says "the street has come down since it rose" | by design: a mansion keeps standing; `attainableClass` is the ladder as the fields stand, `classForArrival` is where a mansion is ultrawealthy by being one |
+| "A first theft from the ultrawealthy" on a burglary at a tenement | an heir lives there: class is on the HOUSEHOLD and the cubs took it with them at sixteen — the probe found every ultrawealthy file was one of these |
+| an ultrawealthy file that goes cold after 12 months with the police force standing | the roll succeeded and the sentence waited for a centre bed (`CASE WAITING`); nine of eleven in the four-seed run |
+| every mayor rig's hash moves after a change to `openFile` | a field on the FILE record is saved under `events` — write it only when non-zero, as `victimClass` is |
+| a test that "saves without a wealth field" passes for a mutant that always writes it | the town it saved had no households; save a modest family first |
+| a hover-ghost check that never fires for the estate | `hoverForRenderer` resolves the sprite by kind; the estate is not a civic — `art.estatePlot`, size 3 |
+| a 1×1 ghost under a Library | the footprint side is `CIVIC_SIDE[tool]`, never a list in input.js |
+
+**Left open, said out loud.** The centre bottleneck above (a fallback to the
+cells, more beds, or a longer wait — the owner's call); `TAX_CLASS` [1, 2, 5]
+as proposed, now visible in the books; `CLASS_LV_MIN` 80 binds only far from
+the centroid; growth-made mansions, the affluent "kept" look, shops as
+victims and a species-skinned mansion set are not built, by the proposal's
+own sequencing; the owner's control city for the class dynamic at the owner's
+scale.

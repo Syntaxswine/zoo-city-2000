@@ -4283,8 +4283,13 @@ function cameraJusticeWorld(){
     //   world.js             worldgen, before a tick has ever run
     //
     // This is a TRIPWIRE, not the proof - the proofs are the behavioural
-    // checks above. It fires when a SIXTH module starts writing that ground,
-    // which is the moment someone has to decide where its settle goes.
+    // checks above. It fires when ANOTHER module starts writing that ground,
+    // which is the moment someone has to decide where its settle goes. The
+    // sixth arrived with wealth and class (SPEC §9f): wealth.js raises a
+    // mansion (tier 0 → 3 on nine tiles) in estatesTick, which tick.js runs
+    // right after lotsTick and BEFORE the first settle - the lots' own window -
+    // and takes one down (unbuildMansion) only through blocks.splitLot, inside
+    // the events window and the op. No fourth settle; the decision is recorded.
     const groundWriters = [];
     const WRITE = /\b\w+\.(?:terrain|tier|civic|wall|rail|road)\s*\[[^\]]*\]\s*(?:=[^=]|\+\+|--|\+=|-=)/;
     for (const f of readdirSync(simDir)) {
@@ -4292,18 +4297,20 @@ function cameraJusticeWorld(){
       const src = readFileSync(path.join(simDir, f), "utf8");
       if (src.split("\n").some((l) => WRITE.test(l) && !/^\s*(\/\/|\*)/.test(l))) groundWriters.push(f);
     }
-    check("access: exactly five modules move the ground a forecourt stands on — lots and blocks inside lotsTick, events inside eventsTick (it razes buildings AND it can open new water), ops at the op, and worldgen before any of it — and the tick settles the door graph after each of the three windows; a sixth writer means a fourth settle to decide on",
-      groundWriters.join(" ") === "blocks.js events.js lots.js ops.js world.js",
+    check("access: exactly six modules move the ground a forecourt stands on — lots and blocks inside lotsTick, wealth's estatesTick in the same window (after lotsTick, before the first settle; its unbuildMansion only through blocks.splitLot), events inside eventsTick (it razes buildings AND it can open new water), ops at the op, and worldgen before any of it — and the tick settles the door graph after each of the three windows; a seventh writer means a fourth settle to decide on",
+      groundWriters.join(" ") === "blocks.js events.js lots.js ops.js wealth.js world.js",
       `${groundWriters.length} write terrain, tier or civic: ${groundWriters.join(" ")}`);
     const anyHasAccess = readdirSync(path.join(ROOT, "js"), { recursive: true })
       .filter((f) => typeof f === "string" && /\.js$/.test(f))
       .some((f) => /hasAccess/.test(readFileSync(path.join(ROOT, "js", f), "utf8")));
-    // FIVE, and the five are NAMED. The name used to say six and the
+    // SIX, and the six are NAMED. The name used to say six and the
     // assertion said ">= 5", so the number in the sentence was untested by
     // construction - and it was wrong. An exact list fails in both directions:
-    // a module that stops asking, and a module that starts.
-    check("access: and the OLD predicate is gone, not merely unused — `hasAccess` is nowhere under js/, and five sim modules import `served`: blocks, census, events, justice and lots; ops uses the shared touchesRoad placement rule",
-      !anyHasAccess && served5.join(" ") === "blocks.js census.js events.js justice.js lots.js" && /touchesRoad/.test(readFileSync(path.join(ROOT,"js/sim/ops.js"),"utf8")),
+    // a module that stops asking, and a module that starts. The sixth is
+    // wealth.js (SPEC §9f): no road, no mansion - estatesTick asks the one
+    // predicate before a plot may sprout.
+    check("access: and the OLD predicate is gone, not merely unused — `hasAccess` is nowhere under js/, and six sim modules import `served`: blocks, census, events, justice, lots and wealth; ops uses the shared touchesRoad placement rule",
+      !anyHasAccess && served5.join(" ") === "blocks.js census.js events.js justice.js lots.js wealth.js" && /touchesRoad/.test(readFileSync(path.join(ROOT,"js/sim/ops.js"),"utf8")),
       `${served5.length} sim modules import served: ${served5.join(" ")}`);
   }
 
@@ -5179,6 +5186,30 @@ check("no Math.random under js/", mathRandom.length === 0, mathRandom.join(", ")
   windowEvents.keydown(keyEvent("0", "Digit0"));
   const stationaryGhostReady = input.state.cost && !input.state.cost.refused
     && input.hover().ghost?.ok === true && /Park/.test(lastCost.text) && !lastCost.refused;
+  // EVERY click tool's ghost is its own footprint, from the one table ops.js builds by (CIVIC_SIDE; the estate 3), and its
+  // sprite resolves. A list in input.js that stopped at the centre drew a 1×1 diamond under a 2×2 Library and a 3×3
+  // University, and for the estate (not a civic) threw civicSprite: unknown kind in the render frame (session 18).
+  {
+    const { CIVIC_SIDE: SIDE } = await import("../js/sim/world.js");
+    const { PLACE_TOOLS: clickTools } = await import("../js/tools.js");
+    const { art: realArt } = await import("../js/art/index.js");
+    const stubArt = inputApp.art;
+    inputApp.art = realArt; // the harness's stub answers null for every kind; this check is about the sprites, so it gets the registry
+    const ghosts = [];
+    for (const id of clickTools) {
+      input.setTool(id);
+      canvasEvents.pointermove(pe(10, 10));
+      let g;
+      try { g = input.hover().ghost; } catch (e) { ghosts.push(`BAD ${id} threw: ${e.message}`); continue; } // a throw here is the render-frame fault, not a crashed suite
+      const want = id === "estate" ? 3 : SIDE[id] || 1;
+      ghosts.push(`${id}:${g ? `${g.w}×${g.h}${g.sprite ? `/${g.sprite.footprint[0]}×${g.sprite.footprint[1]}` : "/none"}` : "no ghost"}`);
+      if (!g || g.w !== want || g.h !== want || !g.sprite || (id !== "station" && (g.sprite.footprint[0] !== want || g.sprite.footprint[1] !== want))) ghosts.push(`BAD ${id} wants ${want}`);
+    }
+    check("palette: every click tool's placement ghost is its footprint from CIVIC_SIDE — the Library 2×2, the University 3×3, the estate 3×3 with the plot's sprite — and every ghost sprite resolves", !ghosts.some((x) => x.startsWith("BAD")), ghosts.join(" "));
+    inputApp.art = stubArt;
+    input.setTool("park");
+    canvasEvents.pointermove(pe(10, 10));
+  }
   // Density is part of the operation, including while the mouse is already
   // down. Start over an already-High lot so the first plan is empty; H must
   // immediately turn it into a Low repaint before pointerup commits it.
@@ -5645,23 +5676,23 @@ check("no Math.random under js/", mathRandom.length === 0, mathRandom.join(", ")
   const HC = await import("./headless-canvas.mjs");
   HC.installCanvas();
 
-  const ids = ["R", "C", "I", "M", "road", "wall", "rail", "station", "tree", "park", "zoo", "centre", "police", "fire", "inspect", "bulldoze", "largePark", "camera", "library", "university", "gallery", "amphitheater"];
-  const keys = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "Z", "V", "P", "F", "I", "B", "G", "E", "K", "Y", "M", "T"];
-  const orders = Array.from({ length: 22 }, (_, i) => i + 1);
-  check("palette: the canonical registry has the owner's exact twenty-two tools, order and unique keys",
+  const ids = ["R", "C", "I", "M", "road", "wall", "rail", "station", "tree", "park", "zoo", "centre", "police", "fire", "inspect", "bulldoze", "largePark", "camera", "library", "university", "gallery", "amphitheater", "estate"];
+  const keys = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "Z", "V", "P", "F", "I", "B", "G", "E", "K", "Y", "M", "T", "Q"];
+  const orders = Array.from({ length: 23 }, (_, i) => i + 1);
+  check("palette: the canonical registry has the owner's exact twenty-three tools, order and unique keys",
     JSON.stringify(TOOLS.map((t) => t.id)) === JSON.stringify(ids)
       && JSON.stringify(TOOLS.map((t) => t.key)) === JSON.stringify(keys)
       && JSON.stringify(TOOLS.map((t) => t.order)) === JSON.stringify(orders)
-      && new Set(TOOLS.map((t) => t.key.toUpperCase())).size === 22
+      && new Set(TOOLS.map((t) => t.key.toUpperCase())).size === 23
       && TOOLS.every((t) => TOOL_BY_ID[t.id] === t && TOOL_BY_KEY[t.key.toUpperCase()] === t));
-  const expectedKinds = ["zone", "zone", "zone", "zone", "road", "wall", "rail", "station", "tree", "park", "zoo", "centre", "police", "fire", "inspect", "bulldoze", "largePark", "camera", "library", "university", "gallery", "amphitheater"];
+  const expectedKinds = ["zone", "zone", "zone", "zone", "road", "wall", "rail", "station", "tree", "park", "zoo", "centre", "police", "fire", "inspect", "bulldoze", "largePark", "camera", "library", "university", "gallery", "amphitheater", "estate"];
   check("palette: every ordered row carries its exact operation and the four zones keep R/C/I/M identity",
     JSON.stringify(TOOLS.map((t) => t.op.kind)) === JSON.stringify(expectedKinds)
       && JSON.stringify(TOOLS.slice(0, 4).map((t) => t.op.zone)) === JSON.stringify([ZONE.R, ZONE.C, ZONE.I, ZONE.M])
       && TOOLS.every((t) => labelForOp(t.op) === t.label));
   check("palette: no build binding is WASD and place-tool classification is derived from the registry",
     TOOLS.every((t) => !["W", "A", "S", "D"].includes(t.key.toUpperCase()))
-      && JSON.stringify(PLACE_TOOLS) === JSON.stringify(["station", "park", "zoo", "centre", "police", "fire", "largePark", "library", "university", "gallery", "amphitheater"]));
+      && JSON.stringify(PLACE_TOOLS) === JSON.stringify(["station", "park", "zoo", "centre", "police", "fire", "largePark", "library", "university", "gallery", "amphitheater", "estate"]));
 
   const opsSrc = readFileSync(path.join(ROOT, "js", "sim", "ops.js"), "utf8");
   const costBody = opsSrc.slice(opsSrc.indexOf("export function costOf"), opsSrc.indexOf("function snapshot"));
@@ -5687,7 +5718,7 @@ check("no Math.random under js/", mathRandom.length === 0, mathRandom.join(", ")
       iconRows.push(`${tool.id}:${sprite.name}`);
     } catch (e) { spriteFailures++; iconRows.push(`${tool.id}:ERROR ${e.message}`); }
   }
-  const expectedSprites = ["R1-cottage-0", "C1-shop-0", "I1-shed-0", "M1-stall-0", "road-5", "wall-5", "rail-5", "station-ns", "tree-round", "park", "civic-zoo-3x3", "civic-centre-3x3", "civic-police-3x3", "civic-fire-3x3", "cursor", "rubble", "civic-largePark-3x3", "camera-0", "civic-library-2x2", "civic-university-3x3", "civic-gallery-2x2", "civic-amphitheater-3x3"];
+  const expectedSprites = ["R1-cottage-0", "C1-shop-0", "I1-shed-0", "M1-stall-0", "road-5", "wall-5", "rail-5", "station-ns", "tree-round", "park", "civic-zoo-3x3", "civic-centre-3x3", "civic-police-3x3", "civic-fire-3x3", "cursor", "rubble", "civic-largePark-3x3", "camera-0", "civic-library-2x2", "civic-university-3x3", "civic-gallery-2x2", "civic-amphitheater-3x3", "R3x3-mansion-0"];
   const scaled = HC.createCanvas(1, 1);
   const scaledSprite = spriteForTool(art, "R");
   paintSprite(scaled, scaledSprite, 2);
@@ -5699,7 +5730,7 @@ check("no Math.random under js/", mathRandom.length === 0, mathRandom.join(", ")
       for (let c = 0; c < 4; c++) if (scaled._data[p + c] !== scaled._data[q + c]) nearest = false;
     }
   }
-  check("palette: all twenty-two representative sprites resolve, paint nonblank once, and scale nearest-neighbour",
+  check("palette: all twenty-three representative sprites resolve, paint nonblank once, and scale nearest-neighbour",
     spriteFailures === 0 && nearest && JSON.stringify(iconRows.map((row) => row.slice(row.indexOf(":") + 1))) === JSON.stringify(expectedSprites), iconRows.join(" · "));
 
   // A deliberately small DOM proves creation, click/focus parity and ARIA
@@ -5733,7 +5764,7 @@ check("no Math.random under js/", mathRandom.length === 0, mathRandom.join(", ")
   const { createPalette } = await import("../js/palette.js");
   const palette = createPalette({ input: fakeInput, ui: { setCost: (text, refused) => costs.push(`${text}:${refused}`) }, art });
   paletteRef = palette;
-  let clickParity = palette.buttons.size === 22;
+  let clickParity = palette.buttons.size === 23;
   for (const tool of TOOLS) {
     const button = palette.buttons.get(tool.id);
     button.events.pointerenter();
@@ -5764,9 +5795,9 @@ check("no Math.random under js/", mathRandom.length === 0, mathRandom.join(", ")
     && palette.buttons.get("bulldoze").classList.contains("on")
     && [...palette.buttons].filter(([, b]) => b.attributes["aria-pressed"] === "true").length === 1;
   globalThis.document = priorDocument;
-  check("palette: twenty-two accessible buttons paint once; pointer, click, cost preview and active state stay synchronized",
-    clickParity && semanticActive && focusHoverStable && made.filter((e) => e.tagName === "CANVAS").length === 22
-      && costs.some((x) => x === "cost:bulldoze:true") && costs.filter((x) => x === "restore").length === 24,
+  check("palette: twenty-three accessible buttons paint once; pointer, click, cost preview and active state stay synchronized",
+    clickParity && semanticActive && focusHoverStable && made.filter((e) => e.tagName === "CANVAS").length === 23
+      && costs.some((x) => x === "cost:bulldoze:true") && costs.filter((x) => x === "restore").length === 25,
     JSON.stringify({ buttons: palette.buttons.size, canvases: made.filter((e) => e.tagName === "CANVAS").length, selected, costs: costs.length, semanticActive, focusHoverStable }));
 
   const html = readFileSync(path.join(ROOT, "index.html"), "utf8");
@@ -5811,7 +5842,7 @@ check("no Math.random under js/", mathRandom.length === 0, mathRandom.join(", ")
   check("palette: input, palette and generated footer all read the one registry; build buttons are gone from the strip",
     /from "\.\/tools\.js"/.test(inputSrc) && /labelForOp\(op\)/.test(inputSrc)
       && /toolHelp\(\)/.test(uiSrc) && !/for \(const t of TOOLS\)/.test(uiSrc)
-      && /id="help"/.test(html) && toolHelp().split(" · ").length === 22);
+      && /id="help"/.test(html) && toolHelp().split(" · ").length === 23);
   check("palette: WASD has no command or news binding; S/D tap timing is gone; undo/save use their modifiers",
     !/case "Key[WASD]"/.test(newsSrc) && /case "ArrowRight"/.test(newsSrc)
       && !/TAP_MS|downAt|promoteHolds/.test(inputSrc) && /case "Backspace"/.test(inputSrc)
@@ -7515,6 +7546,7 @@ if (existsSync(walkersPath)) {
 
 { const { checkCivicCampuses } = await import("./check-civic-campuses.mjs"); checkCivicCampuses(check); }
 { const { checkKnowledgeCulture } = await import("./check-knowledge-culture.mjs"); checkKnowledgeCulture(check); } // SPEC §9e
+{ const { checkWealth } = await import("./check-wealth.mjs"); checkWealth(check); } // SPEC §9f
 
 // ---- verdict ----------------------------------------------------------------------
 {
@@ -7526,6 +7558,9 @@ if (existsSync(walkersPath)) {
   check("small civics: the Library and the Gallery and their hi-res twins occupy four tiles (SPEC §9e)",
     ["library", "gallery"].every(kind => [art.civic(kind, 2), art.hires(art.civic(kind, 2))]
       .every(sprite => sprite && sprite.footprint[0] === 2 && sprite.footprint[1] === 2)));
+  check("the estate: the mansion and the plot, both variants, lit and marked, and their hi-res twins occupy nine tiles (SPEC §9f)",
+    ["mansion", "estatePlot"].every((k) => [art[k](0), art[k](1), art.hires(art[k](0)), art.hires(art[k](1))].every((s) => s && s.footprint[0] === 3 && s.footprint[1] === 3))
+      && art.mansion(0, { lit: 3, majority: 11, seed: 1 }) !== art.mansion(0) && art.mansion(0, { lit: 3, majority: 11, seed: 1 }).footprint[0] === 3);
   check("large civics: legacy callers keep their existing footprint until placement integration",
     kinds.every(kind => art.civic(kind).footprint.every(side => side === (kind === "largePark" ? 2 : kind === "zoo" ? 3 : 1))) &&
     art.civic("park", 3) === art.civic("park"));

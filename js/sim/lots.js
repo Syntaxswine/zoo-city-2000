@@ -12,6 +12,7 @@ import { evictFromLot, fireFromLot } from "./citizens.js";
 import { mergeWindow, windowFill, mergeLots, splitLot } from "./blocks.js";
 import { landmarkOf, landmarkLine } from "./landmarks.js";
 import { shopOf } from "./shops.js";
+import { ESTATE, attainableClass, estateName } from "./wealth.js";
 
 const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
 
@@ -32,6 +33,8 @@ export const REASON = Object.freeze({
   FLOODED: "flooded",
   EMPTY: "zoned, waiting for demand",
   PART: "part of the block",
+  ESTATE: "an estate plot — the mansion rises when every rung of the ladder is met",
+  MANSION: "a mansion — one household of the ultrawealthy; it neither grows nor decays",
 });
 
 /** Citizens housed within Chebyshev 5 (shops want customers); a block's are spread over its footprint. */
@@ -99,6 +102,17 @@ export function lotScore(world, i) {
   if (world.flooded[i]) { out.reason = REASON.FLOODED; return out; }
   const access = served(world, i);
   out.access = access;
+  // An ESTATE (SPEC §9f, wealth.js) never grows, decays or merges by this rule: its mansion sprouts in wealth.estatesTick when
+  // the ladder is met and comes down as a block does (fire, flood, the bulldozer). Unserved it says NO_ROAD like any lot,
+  // because no road means no mansion; otherwise its own reason, p 0, so lotsTick rolls nothing here.
+  if (world.estate[i]) {
+    const cap = capacityOf(world, i);
+    out.maxTier = 3;
+    out.fill = cap ? world.occupants[i] / cap : 0;
+    out.score = 0;
+    out.reason = !access ? REASON.NO_ROAD : world.estate[i] === ESTATE.MANSION ? REASON.MANSION : REASON.ESTATE;
+    return out;
+  }
   const valve = world.valves[z === ZONE.R ? "R" : z === ZONE.C ? "C" : z === ZONE.M ? "M" : "I"];
   const lv = world.lv[i];
   const pol = world.pol[i];
@@ -238,6 +252,9 @@ export function lotReport(world, at) {
     mark: buildingMark(world, i),
     landmark: landmarkOf(world.theme[i]), // the roster row a 3×3 rose as, or null (SPEC §3c)
     shop: shopOf(world, i), // a tier-1 C lot's kind and keeper, or null (SPEC §12.2d)
+    estate: world.estate[i], // WEALTH (SPEC §9f): 0 · 1 an estate plot · 2 a mansion
+    klass: z === ZONE.R ? attainableClass(world, i) : null, // the ladder as it stands: { cls, next, unmet: [{ rung, need }] }
+    estateName: estateName(world, i), // "the Greyback estate" for a mansion with a family, "the empty mansion", or null
     zone: z,
     tier: world.tier[i],
     maxTier: world.maxTier[i],
@@ -269,7 +286,7 @@ export function lotReport(world, at) {
     const hh = new Map();
     for (const c of world.citizens) {
       if (c.home !== i) continue;
-      const h = hh.get(c.household) || { id: c.household, surname: c.surname, members: [] };
+      const h = hh.get(c.household) || { id: c.household, surname: c.surname, wealth: (world.hhById && world.hhById.get(c.household)?.wealth) | 0, members: [] };
       h.members.push(c);
       hh.set(c.household, h);
     }

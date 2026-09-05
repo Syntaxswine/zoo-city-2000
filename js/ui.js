@@ -40,6 +40,7 @@ import { starredNotices } from "./people.js";
 import { buildingAge } from "./sim/building-age.js";
 import { paintPortrait } from "./render.js";
 import { USE, USE_OPTIONS, USE_SPECIES, useName, useShortLabel } from "./sim/use.js";
+import { CLASS_NAME, ESTATE, waitingLine } from "./sim/wealth.js";
 
 const $ = (sel, root = document) => root.querySelector(sel);
 const el = (tag, cls, text) => {
@@ -382,7 +383,7 @@ export function createUI(app) {
 
   function householdPeople(h, w) {
     const box = el("div", "household");
-    box.append(el("span", "dim", `${h.surname}: `));
+    box.append(el("span", "dim", `${h.surname}${h.wealth ? ` (${CLASS_NAME[h.wealth]})` : ""}: `)); // the household's class (SPEC §9f), when it has one
     h.members.forEach((c, k) => {
       if (k) box.append(document.createTextNode(" · "));
       box.append(personLink(c, `${c.name} (${c.species})`));
@@ -427,6 +428,7 @@ export function createUI(app) {
     else if (rep.civic === CIVIC.UNIVERSITY) what = "University";
     else if (rep.civic === CIVIC.GALLERY) what = "Gallery";
     else if (rep.civic === CIVIC.AMPHITHEATER) what = "Amphitheater";
+    else if (rep.estate) what = rep.estate === ESTATE.MANSION ? "Mansion" : "Estate plot"; // wealth and class (SPEC §9f)
     else if (rep.zone === ZONE.M) what = `Meat market ${rep.maxTier === 1 ? "Low" : "High"}`;
     else if (rep.zone !== ZONE.NONE) what = `${ZONE_NAME[rep.zone]} ${rep.maxTier === 1 ? "Low" : "High"}`;
     else if (w.terrain[i] === TERRAIN.WATER) what = "Water";
@@ -441,8 +443,8 @@ export function createUI(app) {
       // const, and from that day hovering a lot you had just zoned threw
       // inside the rAF frame — which never rescheduled, so the whole game
       // froze. See the handoff's trap table.
-      const name = () => (rep.landmark ? `3×3 ${rep.landmark.name}` : rep.side > 1 ? `${rep.side}×${rep.side} ${BLOCK_NAME[rep.side][rep.zone - 1]}` : rep.shop ? `tier 1 ${rep.shop.name}` : `tier ${t} ${TIER_NAME[t][rep.zone - 1]}`);
-      head.append(el("span", "dim", t ? `  ${name()}` : "  zoned, empty"));
+      const name = () => (rep.estate ? `3×3 mansion${rep.estateName ? ` — ${rep.estateName}` : ""}` : rep.landmark ? `3×3 ${rep.landmark.name}` : rep.side > 1 ? `${rep.side}×${rep.side} ${BLOCK_NAME[rep.side][rep.zone - 1]}` : rep.shop ? `tier 1 ${rep.shop.name}` : `tier ${t} ${TIER_NAME[t][rep.zone - 1]}`);
+      head.append(el("span", "dim", t ? `  ${name()}` : rep.estate ? "  3×3 estate plot — chalk, waiting for its mansion" : "  zoned, empty"));
       if (t) {
         const occ = rep.zone === ZONE.R ? `occ ${rep.occupants}/${rep.capacity}` : `jobs ${rep.staff}/${rep.jobs}`;
         head.append(el("span", "", `  ${occ}`));
@@ -457,6 +459,13 @@ export function createUI(app) {
       }
       // A landmark (SPEC §3c): the block the species made, named when it rose and kept until it comes apart.
       if (rep.landmark) lines.push(el("div", "dim", `a landmark — the block the ${rep.landmark.species.map(pluralSpecies).join(" and ")} made: ${rep.landmark.blurb}`));
+      // WEALTH AND CLASS (SPEC §9f): what this address attains and what the next rung wants — the same words as the wish and the Census.
+      if (rep.klass) {
+        const k = rep.klass;
+        if (rep.estate === ESTATE.MANSION) lines.push(el("div", "dim", `a mansion: one household of the ultrawealthy, up to ${KNOBS.MANSION_CAP} · R tax ×${KNOBS.TAX_CLASS[2]}${k.cls < 2 ? ` · the street has come down since it rose: ${waitingLine(k)}` : ""}`));
+        else if (rep.estate) lines.push(el("div", k.cls === 2 ? "dim" : "warn", k.cls === 2 ? "every rung met — the mansion rises this month" : `waiting for: ${waitingLine(k)}`));
+        else lines.push(el("div", "dim", `class here: ${CLASS_NAME[k.cls]}${k.next != null ? ` — ${CLASS_NAME[k.next]} needs ${waitingLine(k)}` : ""}`));
+      }
     }
     if (rep.civic === CIVIC.LARGE_PARK) head.append(el("span", "", `  jobs ${rep.staff}/${rep.jobs}`));
     // Knowledge and culture (SPEC §9e): the building says what it costs, what it reaches on THIS map, and why it is silent.
@@ -667,7 +676,7 @@ export function createUI(app) {
       const homeS = c.home >= 0 ? `(${c.home % w.w},${(c.home / w.w) | 0})` : "none";
       const jobS = c.job >= 0 ? `(${c.job % w.w},${(c.job / w.w) | 0})` : isWorker(w, c) ? `none${c.jobless ? ` — ${c.jobless} months looking` : ""}` : "—";
       const hh = w.hhById?.get(c.household);
-      lines.push(el("div", "", `${hh ? `the ${hh.surname} household · ` : ""}home ${homeS} · job ${jobS} · mood ${Math.round(c.mood)}`));
+      lines.push(el("div", "", `${hh ? `the ${hh.surname} household${hh.wealth ? `, ${CLASS_NAME[hh.wealth]}` : ""} · ` : ""}home ${homeS} · job ${jobS} · mood ${Math.round(c.mood)}`));
       const status = [];
       const camp = w.campers.find(cp => cp.householdId === c.household);
       if (camp) status.push("camping at (" + camp.tile % w.w + "," + Math.floor(camp.tile / w.w) + ") — waiting for housing and economic recovery");
@@ -825,6 +834,10 @@ export function createUI(app) {
     const tr = (k, v, cls) => { const r = el("tr", cls); r.append(el("td", "", k), el("td", "num", v)); table.append(r); };
     tr("INCOME / yr", money(fig.incomeYr), "h");
     tr(`R: ${w.rates.R}% × Σ(0.5 + LV/100)`, money(rInc));
+    if (fig.taxByClass && (fig.taxByClass[1] || fig.taxByClass[2])) { // wealth and class (SPEC §9f): the share the affluent and the ultrawealthy carry
+      tr(`— of which the affluent, ×${KNOBS.TAX_CLASS[1]}`, money(fig.taxByClass[1]));
+      tr(`— and the ultrawealthy, ×${KNOBS.TAX_CLASS[2]}`, money(fig.taxByClass[2]));
+    }
     tr(`C: ${w.rates.C}% × 1.5 × ${fig.fc} jobs`, money(cInc));
     tr(`I: ${w.rates.I}% × 2.0 × ${fig.fi} jobs`, money(iInc));
     if (fig.fm || fig.markets) tr(fig.licence ? `M (licensed): ${w.rates.C}% × 1.5 × ${fig.fm} jobs` : `M cut (grey, untaxed): §${KNOBS.CUT_PER_JOB} × ${fig.fm} jobs`, money(fig.licence ? mInc : fig.cutYr || 0));
@@ -872,6 +885,12 @@ export function createUI(app) {
       tr("knowledge · culture buildings", `${c.libraries} librar${c.libraries === 1 ? "y" : "ies"} · ${c.universities} universit${c.universities === 1 ? "y" : "ies"} · ${c.galleries} galler${c.galleries === 1 ? "y" : "ies"} · ${c.amphitheaters} amphitheater${c.amphitheaters === 1 ? "" : "s"}${(c.knowledgeNoRoad || 0) + (c.cultureNoRoad || 0) ? ` · ${(c.knowledgeNoRoad || 0) + (c.cultureNoRoad || 0)} without a road` : ""}`);
       tr("knowledge access K → capacity", `${(c.K || 0).toFixed(2)} → +${Math.round(KNOBS.CAP_KNOWLEDGE * (c.K || 0))} before the H multiplier`);
       tr("under culture · mean bonus", `${Math.round(100 * (c.cultureShare || 0))}% · +${(c.cultureMean || 0).toFixed(1)} mood`);
+    }
+    // Wealth and class (SPEC §9f): animals by class, the R tax share each class carries, the estates — only once a town has any.
+    if ((c.byClass && (c.byClass[1] || c.byClass[2])) || c.estates || c.mansions) {
+      tr("class (modest · affluent · ultrawealthy)", `${c.byClass[0]} · ${c.byClass[1]} · ${c.byClass[2]}`);
+      tr(`R tax share by class (×${KNOBS.TAX_CLASS.join(" / ")})`, c.taxShareByClass.map((s) => `${Math.round(100 * s)}%`).join(" · "));
+      tr("estate plots waiting · mansions", `${c.estates} · ${c.mansions}`);
     }
     if (c.walls) tr("walls · tunnels", `${c.walls} · ${c.tunnels}`);
     if (c.railTiles || c.stations) tr("rail · stations · riders", `${c.railTiles} · ${c.stations} · ${c.riders}`);

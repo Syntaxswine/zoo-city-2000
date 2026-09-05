@@ -1,6 +1,6 @@
 # Proposal — Wealth and class: the ultrawealthy, their mansions, and whose burglary gets worked first
 
-Status: proposal, 2026-09-05. Nothing built. Written the day the owner sketched
+Status: proposal, 2026-09-05; BUILT 2026-09-05 (session 18) — see the BUILT note at the end. Written the day the owner sketched
 the arc, against HEAD `333408b`, so the seams are the code's own and not
 guessed. The decisions the owner has not made are listed in §6 and nothing
 here is built up toward one answer to them.
@@ -230,3 +230,70 @@ plus the owner's control city when it arrives.
    fixture and its probe.
 4. Justice: `victimClass`, `ARREST_PRIORITY`, `CASE_MONTHS_RICH`, the `+1`
    step, the two ticker lines, the clearance probe.
+
+
+## BUILT — 2026-09-05 (session 18), the eight decisions as taken, and where the built thing differs
+
+The owner, leaving for work the day this was written: *"please do as much
+work as you feel comfortable doing solo … i trust you though."* Then, back:
+*"lets do the wealth arc."* Built in one commit on the defaults below, each
+said out loud here so a decision the owner wants otherwise is one knob or one
+line away. SPEC §9f is the rule; `tools/check-wealth.mjs` the 60 checks;
+`tools/wealthprobe.mjs` the instrument; handoff §32 the account.
+
+| §8 decision | taken |
+|---|---|
+| 1. two classes or three | **three** — modest / affluent / ultrawealthy, as written; the owner's own words name two rungs above modest |
+| 2. class by the lot at arrival | **by the lot**, once, inherited by cubs, kept for life (`hh.wealth`; `wealth.classForArrival`) |
+| 3. how a mansion comes to be | **the player's Estate plot** (Q, §200); growth-made mansions are NOT built |
+| 4. mansion capacity | **8, one household** (`MANSION_CAP`; a second household is refused while one lives there) |
+| 5. tax multipliers | **[1, 2, 5]** as written (`TAX_CLASS`), visible under the R line in the Budget and as shares in the Census; the affluent do NOT shop more in this version |
+| 6. the rungs of §3 | **all hard gates with the numbers of §3**, every one a knob (`CLASS_*`); the shop rung is a ROAD distance from the doors (`wealth.shopWithinRoad`), as the rehoming search walks |
+| 7. affluent art | **not built** — the class is on the card ("the Slyfields (affluent)"); the only new art is the mansion and its plot (`js/art/estate.js`) |
+| 8. scope of "theft from the ultrawealthy" | **the home only**: the richest household at a burgled address (a tenement holds several); shops have no owners yet; **murder of the ultrawealthy goes to the hall**, as proposed |
+
+**Where the built thing differs from §2–§6:**
+
+- §2 says a household's class is decided by the lot's attainable class; the
+  built rule adds one case — a household arriving at a standing MANSION is
+  ultrawealthy by construction, even if the street has since come down
+  (`classForArrival`), because the plot earned it when it sprouted and a
+  building does not un-build.
+- §3's ladder returns `unmet` for the NEXT class only (the card's question).
+  The probe wanted what binds the MANSION when the address is still modest, so
+  it takes the union of both classes' failing rungs (`rungsFor`) — an
+  instrument's need, not a rule.
+- §4 says "stored as an R block anchor (world.big = 3, tier 0) with a class
+  marker" and prefers a tile array to the theme byte's high bits: built as the
+  honest tile array `world.estate` (0 · 1 plot · 2 mansion), the twentieth,
+  omitted from the save and the hash while all zero — so it trips no fixture.
+  The mansion's tiles are tier 3 when it stands (a block is a tier-3 building
+  on every tile) and tier 0 as chalk; `capacityOf` special-cases the estate.
+- §4 did not say what fire does. Built: a mansion burns as a block (every tile),
+  goes to rubble and back to a PLOT that may sprout again; on the beat the
+  engine saves it WHOLE (it has no storey to spare); `events.lowerTier` guards
+  the Uint8 tier wrap a chalk plot would otherwise hit.
+- §6 says "+1 on the counter": built as one step up the SENTENCE table for a
+  theft from the ultrawealthy while `c.thefts` records what happened — so a
+  thief's record stays true and the harshness stays on the sentence. The line
+  reads "A first theft from the ultrawealthy: one step harsher." — not "from an
+  estate", because the probe showed every ultrawealthy file in four seeds was
+  a burglary at an HEIR's flat (cubs of the mansion split off at sixteen with
+  the class); the mansion itself was never a hot lot.
+- §6's `ARREST_PRIORITY` was folded into ONE exported formula,
+  `justice.arrestChance`, so the suite pins the number the roll is made
+  against rather than a copy of it. A file's `victimClass` is written only
+  when non-zero, so towns without class hash as they did.
+- §7's "estate-quarter fixture" is the suite's `quarter()` (flat, controlled)
+  AND the probe's graft into the mayor's town (the rig). The probe found the
+  compact balanced layout cannot hold the quarter (no 3×3 of chalk for the
+  Amphitheater in a 5×5 interior) — a probe number names its rig.
+- Found in passing and fixed: `ops.costOf`'s campsite guard did not list the
+  four knowledge-and-culture kinds, so a Library could land on an occupied tent.
+
+**What the owner might want to change, one line each:** the key (Q, from the
+free set); `COST.estate` 200; `TAX_CLASS`; any `CLASS_*` rung; and the CENTRE
+BOTTLENECK the justice probe measured — a first theft from the ultrawealthy
+needs a centre bed, and 9 of 11 cold ultrawealthy files had a roll succeed and
+wait for one (§7's clearance question, answered: 8% against 22% plain and 37%
+affluent, four seeds, thirty years, one station).

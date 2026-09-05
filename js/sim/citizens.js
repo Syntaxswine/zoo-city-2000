@@ -15,6 +15,8 @@ import { doorsOf, edgeRoads, commutePath, dial, WALK, nodePath, commuteTime } fr
 import { ageYears, ageMonths, isWorker } from "./census.js";
 import { DEATHS_MAX, KIND, remember } from "./life.js";
 import { archiveCitizen } from "./legacy.js";
+import { CLASS, ESTATE, classForArrival, wealthOf } from "./wealth.js";
+import { pluralSpecies } from "./landmarks.js";
 
 const SURNAMES = {
   rabbit: ["Burrowes", "Bramblefoot", "Clovermere", "Thistlewood"],
@@ -102,7 +104,8 @@ function newCitizen(world, species, ageMonthsNow, household, surnameStr, native)
 /** A household of `size` citizens of one species: 2 adults + children. Not yet homed. */
 export function createHousehold(world, species, size) {
   const sp = SPECIES_BY_ID[species];
-  const hh = { id: world.nextHouseholdId++, members: [], home: -1, species, surname: surname(world, species), arrived: world.tick };
+  // `wealth` is the household's CLASS (SPEC §9f, wealth.js): decided by the lot at arrival (citizensTick sets it), inherited by cubs, kept for life.
+  const hh = { id: world.nextHouseholdId++, members: [], home: -1, species, surname: surname(world, species), arrived: world.tick, wealth: CLASS.MODEST };
   const rng = world.rng;
   for (let k = 0; k < size; k++) {
     let age;
@@ -302,22 +305,27 @@ export function homeScore(world, species, i, strict = false) {
 }
 
 /** Vacant R lots with room for `size` that ADMIT the species (use-zoning, SPEC §7.8), optionally limited to a set of lots. */
-function vacantLots(world, species, size, allowed = null) {
+function vacantLots(world, species, size, allowed = null, wealth = null) {
   const out = [];
   const n = world.w * world.h;
   for (let i = 0; i < n; i++) {
     if (world.zone[i] !== ZONE.R || world.tier[i] === 0) continue;
     if (allowed && !allowed.has(i)) continue;
     if (!admits(world.use[i], species)) continue; // the player's line — a gate, on purpose
+    // A MANSION (SPEC §9f) takes ONE household, and only a new arrival (`wealth` null — it becomes ultrawealthy by taking
+    // it) or a household that already is: a modest family rehoming after a fire does not move into the empty mansion up
+    // the road. Its chalk plot is tier 0 and never reaches here; its parts hold nobody by capacityOf.
+    if (world.estate[i] && (world.estate[i] !== ESTATE.MANSION || world.occupants[i] > 0 || (wealth !== null && wealth < CLASS.ULTRAWEALTHY))) continue;
     if (capacityOf(world, i) - world.occupants[i] >= size) out.push(i);
   }
   return out;
 }
 
-function bestHome(world, species, size, strict, allowed = null) {
+/** The best vacant R lot for a household; `wealth` is a rehoming household's class, or null for a new arrival (which may take a mansion). */
+function bestHome(world, species, size, strict, allowed = null, wealth = null) {
   let best = -1;
   let bestS = -Infinity;
-  for (const i of vacantLots(world, species, size, allowed)) {
+  for (const i of vacantLots(world, species, size, allowed, wealth)) {
     const s = homeScore(world, species, i, strict);
     if (s > bestS) { bestS = s; best = i; }
   }
@@ -405,7 +413,7 @@ export function evictFromLot(world, i, newCap) {
     }
     moving.home = -1;
     if (!allowed) allowed = lotsWithinRoad(world, i, KNOBS.REHOME_RADIUS);
-    const to = bestHome(world, moving.species, moving.members.length, false, allowed);
+    const to = bestHome(world, moving.species, moving.members.length, false, allowed, wealthOf(moving));
     if (to >= 0) { placeHousehold(world, moving, to); if (to !== i) for (const id of moving.members) remember(world, world.byId.get(id), KIND.MOVED, to); }
     else if (!startCamping(world, moving)) removeHousehold(world, moving, "evicted", i);
   }
@@ -435,7 +443,7 @@ export function clearLot(world, i) {
       world.occupants[i]--;
     }
     moving.home = -1;
-    const to = bestHome(world, moving.species, moving.members.length, false);
+    const to = bestHome(world, moving.species, moving.members.length, false, null, wealthOf(moving));
     if (to >= 0) { placeHousehold(world, moving, to); for (const id of moving.members) remember(world, world.byId.get(id), KIND.MOVED, to); }
     else removeHousehold(world, moving, "bulldozed", i);
   }
@@ -552,7 +560,7 @@ export function rehouseCampers(world) {
     const hh = world.hhById.get(cp.householdId);
     if (!hh || hh.gone || !hh.members.length) return false;
     if (world.valves.R <= 0) return true;
-    const lot = bestHome(world, hh.species, hh.members.length, false);
+    const lot = bestHome(world, hh.species, hh.members.length, false, null, wealthOf(hh));
     if (lot < 0) return true;
     placeHousehold(world, hh, lot);
     for (const id of hh.members) remember(world, world.byId.get(id), KIND.MOVED, lot);
@@ -579,7 +587,7 @@ export function citizensTick(world, cen, dem) {
     if (!moving) continue;
     for (const id of moving.members) { const c = world.byId.get(id); c.home = -1; world.occupants[i]--; }
     moving.home = -1;
-    const to = bestHome(world, moving.species, moving.members.length, false);
+    const to = bestHome(world, moving.species, moving.members.length, false, null, wealthOf(moving));
     if (to >= 0) { placeHousehold(world, moving, to); for (const id of moving.members) remember(world, world.byId.get(id), KIND.MOVED, to); }
     else removeHousehold(world, moving, "homeless", i);
   }
@@ -602,7 +610,7 @@ export function citizensTick(world, cen, dem) {
     allowed.delete(from);
     for (const id of moving.members) { const c = world.byId.get(id); c.home = -1; world.occupants[from]--; }
     moving.home = -1;
-    const to = bestHome(world, moving.species, moving.members.length, false, allowed);
+    const to = bestHome(world, moving.species, moving.members.length, false, allowed, wealthOf(moving));
     if (to >= 0) { placeHousehold(world, moving, to); for (const id of moving.members) remember(world, world.byId.get(id), KIND.MOVED, to); out.rehomed++; moving.notice = 0; }
     else {
       const n = moving.members.length;
@@ -628,12 +636,13 @@ export function citizensTick(world, cen, dem) {
       if (hh && hh.members.length > 1 && c.home >= 0) {
         const allowed = lotsWithinRoad(world, c.home, KNOBS.REHOME_RADIUS);
         allowed.delete(c.home);
-        const to = bestHome(world, c.species, 1, false, allowed);
+        const to = bestHome(world, c.species, 1, false, allowed, wealthOf(hh));
         if (to >= 0) {
           const k = hh.members.indexOf(c.id);
           hh.members.splice(k, 1);
           world.occupants[c.home]--;
-          const nh = { id: world.nextHouseholdId++, members: [c.id], home: -1, species: c.species, surname: c.surname, arrived: tick };
+          // The cub takes the family's class with it (SPEC §9f): class is inherited, never re-read from the new lot.
+          const nh = { id: world.nextHouseholdId++, members: [c.id], home: -1, species: c.species, surname: c.surname, arrived: tick, wealth: wealthOf(hh) };
           world.households.push(nh);
           world.hhById.set(nh.id, nh);
           c.household = nh.id;
@@ -716,7 +725,7 @@ export function citizensTick(world, cen, dem) {
     allowed.delete(from);
     for (const id of moving.members) { const c = world.byId.get(id); c.home = -1; world.occupants[from]--; }
     moving.home = -1;
-    const to = bestHome(world, moving.species, moving.members.length, false, allowed);
+    const to = bestHome(world, moving.species, moving.members.length, false, allowed, wealthOf(moving));
     if (to >= 0 && world.dread[to] < world.dread[from]) { placeHousehold(world, moving, to); for (const id of moving.members) remember(world, world.byId.get(id), KIND.MOVED, to); out.rehomed++; }
     else placeHousehold(world, moving, from);
   }
@@ -743,9 +752,12 @@ export function citizensTick(world, cen, dem) {
       if (lot < 0) lot = bestHome(world, species, size, false);
       if (lot < 0) break;
       const hh = createHousehold(world, species, size);
+      // CLASS is decided here, once, by the lot (SPEC §9f): what the ladder attains at this address, or ultrawealthy for a mansion.
+      hh.wealth = classForArrival(world, lot);
       placeHousehold(world, hh, lot);
       for (const id of hh.members) remember(world, world.byId.get(id), KIND.ARRIVED, lot);
       out.arrived += size;
+      if (world.estate[lot] === ESTATE.MANSION) out.notices.push(`THE ESTATE — the ${hh.surname}s (${size} ${pluralSpecies(species)}) have moved into the mansion at (${lot % world.w},${(lot / world.w) | 0}).`);
       // For the walker layer: these animals walk in from the edge road.
       world.arrivals.push(...hh.members);
     }

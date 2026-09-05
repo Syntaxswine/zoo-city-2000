@@ -8,7 +8,7 @@
 // citizens.js (birthMult, friendMult, moodBoost) and budget.js (bear winter).
 
 import { KNOBS } from "./rules.js";
-import { ZONE, CIVIC, TERRAIN, ROAD, idx, inBounds, capacityOf } from "./world.js";
+import { ZONE, CIVIC, TERRAIN, ROAD, idx, inBounds, capacityOf, anchorOf } from "./world.js";
 import { post } from "./budget.js";
 import { removeHousehold, evictFromLot, fireFromLot } from "./citizens.js";
 import { neutralRate } from "./demand.js";
@@ -29,8 +29,8 @@ function anyWater(world) {
 
 function lowerTier(world, i) {
   if (world.tier[i] <= 0) return;
-  dissolve(world, i); // a block comes apart before one of its tiles loses a storey (blocks.js)
-  world.tier[i]--;
+  dissolve(world, i); // a block comes apart before one of its tiles loses a storey (blocks.js); an ESTATE's dissolve takes every tier to 0 already (wealth.unbuildMansion)
+  if (world.tier[i] > 0) world.tier[i]--; // guarded: a Uint8 storey count under a mansion must not wrap to 255
   const cap = capacityOf(world, i);
   if (world.zone[i] === ZONE.R) evictFromLot(world, i, cap);
   else fireFromLot(world, i, cap);
@@ -59,6 +59,7 @@ function toRubble(world, i) {
  * gutted — tier 0, but clear ground, not rubble, so it rebuilds next month.
  */
 function saveFromFire(world, i) {
+  if (world.estate[anchorOf(world, i)]) return; // a mansion has no storey to spare (SPEC §9f): the engine saved the house whole
   if (world.tier[i] > 0) lowerTier(world, i);
 }
 
@@ -378,6 +379,7 @@ export const EVENT_TITLES = Object.freeze({
   heist: "Heist", skunked: "Skunk incident", skunkedMood: "Skunk incident (the sulk)",
   killing: "Killing", fear: "Killing (the fear)", burglary: "Burglary", arrest: "Arrest", cold: "File closed cold", home: "Home from the centre", released: "Released from the cells",
   exonerated: "Exonerated", namedMood: "Exonerated (the town)", raid: "Raid", greensLeague: "The Greens' League", greensMood: "The Greens' League (the march)", licence: "The Butchers' licence",
+  mansion: "A mansion rises", estate: "The estate",
 });
 export const eventTitle = (id) => EVENT_TITLES[id] || id;
 
@@ -395,6 +397,7 @@ const NEWS_EXTRA = Object.freeze([
   ["home", "HOME", "good", true], ["released", "RELEASED", "good", true], ["exonerated", "EXONERATED", "good", true],
   ["cold", "COLD", "bad", true], ["saved", "SAVED", "good", true], ["landmark", "LANDMARK", "good", true],
   ["identified", "IDENTIFIED", "good", true],
+  ["mansion", "MANSION", "good", true], ["estate", "THE ESTATE", "good", true], // wealth and class (SPEC §9f)
   ["emptyHooks", "EMPTY HOOKS", "bad", true], ["market", "THE MARKET", "good", false],
   ["bought", "BOUGHT", "bad", false], ["pen", "THE PEN", "bad", false], ["trespass", "TRESPASS", "bad", false],
   ["cold-file", "The file", "bad", false],

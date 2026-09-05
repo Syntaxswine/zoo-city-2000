@@ -8,6 +8,7 @@
 
 import { KNOBS } from "./rules.js";
 import { ZONE, CIVIC, ROAD, TERRAIN, isStation, isPart } from "./world.js";
+import { classOfCitizen } from "./wealth.js";
 
 export function post(world, kind, amount) {
   const a = Math.round(amount);
@@ -21,9 +22,17 @@ export function post(world, kind, amount) {
 export function yearlyFigures(world) {
   const { citizens, rates } = world;
   let baseR = 0;
+  // WEALTH (SPEC §9f): the R base by the household's class, × TAX_CLASS [1, 2, 5] — a few animals paying a large share, and the
+  // Budget and Census tabs print the share. A town with no class multiplies every animal by 1 and books what it always did.
+  const baseByClass = [0, 0, 0];
   for (const c of citizens) {
-    if (c.home >= 0) baseR += 0.5 + world.lv[c.home] / 100;
+    if (c.home < 0) continue;
+    const k = classOfCitizen(world, c);
+    const base = (0.5 + world.lv[c.home] / 100) * KNOBS.TAX_CLASS[k];
+    baseR += base;
+    baseByClass[k] += base;
   }
+  const taxByClass = baseByClass.map((b) => Math.round(rates.R * b * KNOBS.TAX_R_PER_CITIZEN));
   let fc = 0;
   let fi = 0;
   let fm = 0;
@@ -81,7 +90,7 @@ export function yearlyFigures(world) {
     + KNOBS.UPKEEP_LIBRARY * libraries + KNOBS.UPKEEP_UNIVERSITY * universities + KNOBS.UPKEEP_GALLERY * galleries + KNOBS.UPKEEP_AMPHITHEATER * amphitheaters;
   const winter = world.events.active.find((e) => e.id === "bearWinter");
   if (winter) upkeepYr *= 0.8;
-  return { incomeYr: Math.round(incomeYr), upkeepYr: Math.round(upkeepYr), cutYr: Math.round(cutYr), fc, fi, fm, roads, bridges, parks, largeParks, zoos, fireStations, policeStations, centres, markets, walls, rails, railBridges, stations, cams, licence, libraries, universities, galleries, amphitheaters };
+  return { incomeYr: Math.round(incomeYr), upkeepYr: Math.round(upkeepYr), cutYr: Math.round(cutYr), taxByClass, fc, fi, fm, roads, bridges, parks, largeParks, zoos, fireStations, policeStations, centres, markets, walls, rails, railBridges, stations, cams, licence, libraries, universities, galleries, amphitheaters };
 }
 
 /** The monthly slice: post tax and upkeep, apply receivership rules. */

@@ -57,8 +57,10 @@ toggles disasters for the current city.
 The build remote on the left is the key: `1` Residential, `2` Commercial,
 `3` Industrial, `4` Meat, `5` Road, `6` Wall, `7` Rail, `8` Station, `9`
 Tree, `E` Camera, `0` Park, `G` Large Park, `Z` Zoo (prison), `V` Pacification, `P` Police, `F` Fire, `I` Inspect,
-`B` Bulldoze, and the four public buildings — `K` Library, `Y` University, `M` Gallery, `T` Amphitheater (knowledge
-raises the town's capacity; culture lifts mood and land value; a University reaches half the map's tiles, an Amphitheater an eighth). `H` changes density and `U` opens the use-zoning checklist. WASD and the
+`B` Bulldoze, the four public buildings — `K` Library, `Y` University, `M` Gallery, `T` Amphitheater (knowledge
+raises the town's capacity; culture lifts mood and land value; a University reaches half the map's tiles, an Amphitheater an eighth) — and `Q` Estate,
+a 3×3 plot that stays chalk until culture, knowledge, a park, a shop, clean air, quiet streets, land value 80 and nature are all met at it, then raises
+a mansion for one ultrawealthy household (their tax is ×5, their burglaries are worked first and sentenced a step harder; the card lists what the plot waits for). `H` changes density and `U` opens the use-zoning checklist. WASD and the
 arrows only pan. `Backspace` or `Ctrl+Z` undoes; `Ctrl+S` opens save-as and
 `L` opens the saves list. The generated help line in the game carries the
 remaining pause, speed, overlay, news, zoom, new-city and menu keys.

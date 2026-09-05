@@ -36,16 +36,24 @@ import { served, exposure } from "./fields.js";
 import { reachFrom } from "./reach.js";
 import { KIND, remember } from "./life.js";
 import { hallReach, routeToHall, receiveMeat } from "./meat.js";
+import { CLASS, classAt, classOfCitizen, estateName } from "./wealth.js";
 
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 const monthName = (tick) => MONTHS[((tick % 12) + 12) % 12];
 const nameOf = (c) => `${c.name} ${c.surname} (${c.species})`;
 const at = (world, i) => `(${i % world.w},${(i / world.w) | 0})`;
 const cheb = (world, a, b) => Math.max(Math.abs((a % world.w) - (b % world.w)), Math.abs(((a / world.w) | 0) - ((b / world.w) | 0)));
+/** "(18,4)" — or "(18,4), the Greyback estate" when a mansion stands there (SPEC §9f); the coordinates stay first for play.mjs --when. */
+const addressOf = (world, i) => { const e = estateName(world, i); return e ? `${at(world, i)}, ${e}` : at(world, i); };
+/** How long a file is WORKED: an ultrawealthy victim's case runs CASE_MONTHS_RICH; everyone else's CASE_MONTHS (SPEC §9f). */
+const caseMonthsOf = (f) => ((f.victimClass || 0) === CLASS.ULTRAWEALTHY ? KNOBS.CASE_MONTHS_RICH : KNOBS.CASE_MONTHS);
 
 /** Open a file at an incident: a crime stain for FILE_MONTHS, an investigation for CASE_MONTHS. */
-export function openFile(world, { tile, culpritId, victimId = 0, cause, line = "", crime = KNOBS.FILE_CRIME, radius = KNOBS.FILE_RADIUS }) {
-  const f = { tile, radius, crime, opened: world.tick, until: world.tick + KNOBS.FILE_MONTHS, culpritId, victimId, cause, line, closed: false };
+export function openFile(world, { tile, culpritId, victimId = 0, cause, line = "", crime = KNOBS.FILE_CRIME, radius = KNOBS.FILE_RADIUS, victimClass = 0 }) {
+  // `victimClass` (SPEC §9f): the class of the household at a burgled address, or of a killing's victim — 0 for a shop, a works,
+  // a hall, a trespass. It is what "priority policing" reads: the arrest roll (arrestChance) and the case length (caseMonthsOf).
+  // Written only when it is not 0: the file is SAVED under events, and a town whose files carry no class must hash as it did.
+  const f = { tile, radius, crime, opened: world.tick, until: world.tick + KNOBS.FILE_MONTHS, culpritId, victimId, ...(victimClass ? { victimClass } : {}), cause, line, closed: false };
   world.events.files.push(f);
   return f;
 }
@@ -119,6 +127,7 @@ function kill(world, killer, victim, notices) {
   const mourners = victim.friends.slice();
   const hh = world.hhById.get(victim.household);
   const family = hh ? hh.members.filter((id) => id !== victim.id) : [];
+  const victimClass = classOfCitizen(world, victim); // before removeCitizen scrubs the household (SPEC §9f)
   const market = hallReach(world, killer.home, KNOBS.MEAT_ROAD, { space: true });
   const selectedHall = market?.hall ?? -1;
   // The sim publishes the exact selected two-layer path before deleting the
@@ -149,8 +158,8 @@ function kill(world, killer, victim, notices) {
   const since = jobless ? `, out of work since ${monthName(tick - Math.min(tick, killer.jobless || 0))}` : "";
   const bought = hall >= 0 ? `; the meat hall at ${at(world, hall)} had ${victim.species} on Tuesday` : "";
   const wake = mourners.length >= 3 ? ` ${mourners.length} friends held a wake.` : "";
-  const line = `KILLING — ${nameOf(victim)} did not come home to ${at(world, victimHome)}. ${nameOf(killer)} of ${at(world, killer.home)}${since} was seen on the street${bought}.${wake}`;
-  openFile(world, { tile: victimHome, culpritId: killer.id, victimId: victim.id, cause: "killing", line });
+  const line = `KILLING — ${nameOf(victim)} did not come home to ${addressOf(world, victimHome)}. ${nameOf(killer)} of ${at(world, killer.home)}${since} was seen on the street${bought}.${wake}`;
+  openFile(world, { tile: victimHome, culpritId: killer.id, victimId: victim.id, cause: "killing", line, victimClass });
   ev.log.push({ t: tick, id: "killing", line, links: [victim.id, killer.id] });
   notices.push(line);
 }
@@ -219,12 +228,16 @@ export function burglaryTick(world, cen, notices) {
   const loss = KNOBS.BURGLARY_LOSS * tier;
   post(world, "theft", -Math.min(loss, Math.max(0, world.cash)));
   const z = world.zone[lot];
-  const where = z === ZONE.R ? `broke into the house at ${at(world, lot)}` : z === ZONE.C ? `walked out of the shop at ${at(world, lot)} with §${loss} of stock` : z === ZONE.M ? `left the meat hall at ${at(world, lot)} with §${loss} of stock` : `took §${loss} of copper off the works at ${at(world, lot)}`;
+  // The victim's CLASS (SPEC §9f): the richest household at a burgled HOME — a shop, a works or a hall has no class (the owner's
+  // scope is the home; shops have no owners yet). An ultrawealthy victim's file is worked longer and harder, and the line says so.
+  const victimClass = z === ZONE.R ? classAt(world, lot) : 0;
+  const where = z === ZONE.R ? `broke into the house at ${addressOf(world, lot)}` : z === ZONE.C ? `walked out of the shop at ${at(world, lot)} with §${loss} of stock` : z === ZONE.M ? `left the meat hall at ${at(world, lot)} with §${loss} of stock` : `took §${loss} of copper off the works at ${at(world, lot)}`;
   // The file opens either way: it is the STREET's memory of the burglary, not
   // the paperwork's, and a street does not forget faster for want of a desk
   // sergeant. Whether anyone WORKS it is filesTick's question.
-  const line = `BURGLARY — ${nameOf(thief)} ${where}. ${cen.policeStations ? "A file is open for six months." : "There is no station in town; the street remembers it and nobody comes looking."}`;
-  openFile(world, { tile: lot, culpritId: thief.id, cause: "burglary", line });
+  const filed = victimClass === CLASS.ULTRAWEALTHY ? `A file is open for ${KNOBS.CASE_MONTHS_RICH} months; a theft from the ultrawealthy takes priority.` : "A file is open for six months.";
+  const line = `BURGLARY — ${nameOf(thief)} ${where}. ${cen.policeStations ? filed : "There is no station in town; the street remembers it and nobody comes looking."}`;
+  openFile(world, { tile: lot, culpritId: thief.id, cause: "burglary", line, victimClass });
   markBurgled(world, lot);
   world.events.log.push({ t: world.tick, id: "burglary", line, links: [thief.id] });
   notices.push(line);
@@ -359,8 +372,13 @@ export function arrest(world, f, c, wrongful, notices, opts = {}) {
   const theft = f.cause === "burglary" || f.cause === "theft";
   const thefts = (c.thefts || 0) + (theft ? 1 : 0);
   const murder = f.cause === "killing" || f.cause === "murder";
-  const sentence = (theft && thefts >= 3) || (theft && c.fixed) ? "hall"
-    : murder || (theft && thefts === 2) ? "centre" : "zoo";
+  // THE OWNER'S STEP (SPEC §9f): "any theft from the ultrawealthy gets … one step harsher punishment." One step up the table
+  // for a theft from an estate — a first theft goes to the centre, a second to the hall — and murder of the ultrawealthy,
+  // already the centre, becomes the hall. The counter records what happened (thefts); the step is on the SENTENCE.
+  const harsher = (f.victimClass || 0) === CLASS.ULTRAWEALTHY && (theft || murder);
+  const steps = thefts + (harsher && theft ? 1 : 0);
+  const sentence = (theft && steps >= 3) || (theft && c.fixed) || (murder && harsher) ? "hall"
+    : murder || (theft && steps === 2) ? "centre" : "zoo";
   const market = sentence === "hall" ? hallReach(world, c.home, KNOBS.MEAT_ROAD, { space: true }) : null;
   const destination = sentence === "hall" ? market?.hall ?? -1 : custodyWithBed(world, c.home, sentence === "zoo" ? CIVIC.ZOO : CIVIC.CENTRE);
   if (destination < 0) {
@@ -386,7 +404,7 @@ export function arrest(world, f, c, wrongful, notices, opts = {}) {
   ev.arrests.push({ tick, tile: f.tile, citizenId: c.id, name: nameOf(c), culpritId: f.culpritId, culpritName: culprit ? nameOf(culprit) : "", wrongful, cause: f.cause, exonerated: false, hard: !!opts.minor && !minor });
   if (ev.arrests.length > 200) ev.arrests.splice(0, ev.arrests.length - 200);
   if (!wrongful) exonerate(world, c, notices);
-  const why = `for the ${f.cause} at ${at(world, f.tile)}`;
+  const why = `for the ${f.cause} at ${addressOf(world, f.tile)}`;
   const still = wrongful && culprit && !culprit.dead ? ` ${nameOf(culprit)} is still at ${at(world, culprit.home)}.` : "";
   const tail = wrongful ? ` ${c.name} was at home on Tuesday; it was the wrong animal.${still}` : "";
   const home = c.home;
@@ -400,14 +418,15 @@ export function arrest(world, f, c, wrongful, notices, opts = {}) {
     post(world, "cut", KNOBS.SOLD_PRICE);
     receiveMeat(world, destination, "convicted", 1);
     ev.justice.sold++;
-    line = `SOLD — ${nameOf(c)} was convicted ${why} and sold at the meat hall at ${at(world, destination)}. ${thefts >= 3 ? "Third theft." : "An offence after pacification."}${tail}`;
+    const because = murder ? "Murder of the ultrawealthy." : thefts >= 3 ? "Third theft." : c.fixed ? "An offence after pacification." : "A second theft from the ultrawealthy.";
+    line = `SOLD — ${nameOf(c)} was convicted ${why} and sold at the meat hall at ${at(world, destination)}. ${because}${tail}`;
   } else {
     const months = sentence === "centre" ? KNOBS.PACIFY_MONTHS : minor ? KNOBS.TRESPASS_MONTHS : KNOBS.CELLS_MONTHS;
     c.held = tick + months;
     c.heldAt = destination;
     if (sentence === "centre") {
       ev.justice.takenIn++;
-      line = `TAKEN IN — ${nameOf(c)} went from ${at(world, home)} to the Pacification Centre at ${at(world, destination)} ${why}. ${months} months.${tail}`;
+      line = `TAKEN IN — ${nameOf(c)} went from ${at(world, home)} to the Pacification Centre at ${at(world, destination)} ${why}. ${months} months.${harsher && theft && thefts === 1 ? " A first theft from the ultrawealthy: one step harsher." : ""}${tail}`;
     } else {
       ev.justice.cells++;
       if (minor) ev.justice.trespass++;
@@ -420,6 +439,21 @@ export function arrest(world, f, c, wrongful, notices, opts = {}) {
   return line;
 }
 
+/**
+ * The probability this month's roll on file `f` is made against — ONE function,
+ * so the suite pins the number and not a copy of the formula. 0 with no force
+ * in town (no roll is made at all). The victim's class adds ARREST_PRIORITY
+ * (SPEC §9f): the owner's "priority policing", as probability.
+ */
+export function arrestChance(world, cen, f, culprit) {
+  const force = Math.min(1, cen.policeStations / KNOBS.ARREST_FORCE_N);
+  if (force <= 0) return 0;
+  const cov = world.camCov[f.tile] / KNOBS.CAM_EFFECT;
+  const p = KNOBS.ARREST_BASE + KNOBS.ARREST_FORCE * force + KNOBS.ARREST_COVER * world.policeCov[f.tile] / KNOBS.POLICE_EFFECT + KNOBS.CAM_ARREST * cov + KNOBS.ARREST_PRIOR * (culprit.record || 0)
+    + KNOBS.ARREST_PRIORITY[f.victimClass || 0];
+  return Math.min(0.95, p);
+}
+
 export function filesTick(world, cen, notices) {
   const ev = world.events;
   const tick = world.tick;
@@ -427,7 +461,8 @@ export function filesTick(world, cen, notices) {
     if (f.closed) continue;
     const culprit = world.byId.get(f.culpritId);
     if (!culprit || culprit.dead) { f.closed = true; continue; }
-    if (tick >= f.opened + KNOBS.CASE_MONTHS) {
+    const caseMonths = caseMonthsOf(f); // an estate's file does not go cold while a cottage's does (SPEC §9f)
+    if (tick >= f.opened + caseMonths) {
       f.closed = true;
       ev.justice.cold++;
       // A killing going cold is a headline (COLD is in TICKER_FLASH). A
@@ -443,11 +478,11 @@ export function filesTick(world, cen, notices) {
       const wrong = standingWrongful(world, f);
       const line = wrong
         ? (f.cause === "killing"
-          ? `COLD — the file on the ${f.cause} at ${at(world, f.tile)} closed after ${KNOBS.CASE_MONTHS} months. ${wrong.name} was wrongly convicted for it. ${nameOf(culprit)} is still at ${at(world, culprit.home)}.`
-          : `The file on the ${f.cause} at ${at(world, f.tile)} closed after ${KNOBS.CASE_MONTHS} months. ${wrong.name} was wrongly convicted for it and ${nameOf(culprit)} was never charged.`)
+          ? `COLD — the file on the ${f.cause} at ${at(world, f.tile)} closed after ${caseMonths} months. ${wrong.name} was wrongly convicted for it. ${nameOf(culprit)} is still at ${at(world, culprit.home)}.`
+          : `The file on the ${f.cause} at ${at(world, f.tile)} closed after ${caseMonths} months. ${wrong.name} was wrongly convicted for it and ${nameOf(culprit)} was never charged.`)
         : (f.cause === "killing"
           ? `COLD — the file on the ${f.cause} at ${at(world, f.tile)} closed without an arrest. ${nameOf(culprit)} is still at ${at(world, culprit.home)}.`
-          : `The file on the ${f.cause} at ${at(world, f.tile)} closed after ${KNOBS.CASE_MONTHS} months. ${nameOf(culprit)} was never charged.`);
+          : `The file on the ${f.cause} at ${at(world, f.tile)} closed after ${caseMonths} months. ${nameOf(culprit)} was never charged.`);
       ev.log.push({ t: tick, id: "cold", line, links: [culprit.id] });
       notices.push(line);
       continue;
@@ -469,8 +504,9 @@ export function filesTick(world, cen, notices) {
     // station there is no roll at all, so a network without a police force
     // does exactly nothing, however much of the town it covers.
     const cov = world.camCov[f.tile] / KNOBS.CAM_EFFECT;
-    const p = KNOBS.ARREST_BASE + KNOBS.ARREST_FORCE * force + KNOBS.ARREST_COVER * world.policeCov[f.tile] / KNOBS.POLICE_EFFECT + KNOBS.CAM_ARREST * cov + KNOBS.ARREST_PRIOR * (culprit.record || 0);
-    if (!world.rng.chance(Math.min(0.95, p))) continue;
+    // … plus the victim's class (SPEC §9f): arrestChance is the ONE formula the roll is made against.
+    const p = arrestChance(world, cen, f, culprit);
+    if (!world.rng.chance(p)) continue;
     // The same single draw it always was — the knob moves the threshold, not
     // the number of times the die is thrown.
     let wrongful = world.rng.chance(KNOBS.WRONGFUL_P + KNOBS.CAM_WRONGFUL * cov);

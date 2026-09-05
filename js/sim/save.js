@@ -15,7 +15,7 @@ import { refreshLast } from "./tick.js";
 import { migrateLegacyNames } from "./legacy.js";
 import { normalizeUse } from "./use.js";
 
-const TILE_ARRAYS = ["terrain", "road", "zone", "maxTier", "tier", "civic", "civicSize", "burning", "rubble", "variant", "flooded", "wall", "use", "rail", "meat", "big", "theme", "since", "cam"];
+const TILE_ARRAYS = ["terrain", "road", "zone", "maxTier", "tier", "civic", "civicSize", "burning", "rubble", "variant", "flooded", "wall", "use", "rail", "meat", "big", "theme", "since", "cam", "estate"];
 
 // This expanded shape is the pre-Part-B save shape. stateHash deliberately
 // keeps using it: storage compaction must not redefine simulation identity.
@@ -63,7 +63,8 @@ export function toPlain(world) {
     valves: { ...world.valves }, festivalBonus: world.festivalBonus,
     citizens: world.citizens.filter((c) => !c.dead).map(plainCitizen),
     deaths: (world.deaths || []).map((entry) => Array.isArray(entry) ? entry.slice() : { ...entry }),
-    households: world.households.filter((h) => !h.gone).map((h) => ({ id: h.id, members: h.members.slice(), home: h.home, species: h.species, surname: h.surname, arrived: h.arrived, notice: h.notice || 0 })),
+    // `wealth` (the class, SPEC §9f) is written only when it is not 0, so a town in which no household has a class saves and hashes as it did.
+    households: world.households.filter((h) => !h.gone).map((h) => ({ id: h.id, members: h.members.slice(), home: h.home, species: h.species, surname: h.surname, arrived: h.arrived, notice: h.notice || 0, ...(h.wealth ? { wealth: h.wealth } : {}) })),
     campers: world.campers.map((c) => ({ ...c })),
     nextId: world.nextId, nextHouseholdId: world.nextHouseholdId,
     events: JSON.parse(JSON.stringify({ ...world.events, log: world.events.log.slice(-200) })),
@@ -78,7 +79,7 @@ export function toPlain(world) {
   if (world.meatStats) o.meatStats = JSON.parse(JSON.stringify(world.meatStats));
   if (world.legacy?.length) o.legacy = world.legacy.slice();
   if (Object.keys(world.names || {}).length) o.names = { ...world.names };
-  for (const k of TILE_ARRAYS) if (k !== "civicSize" || world[k].some(Boolean)) o[k] = Array.from(world[k]);
+  for (const k of TILE_ARRAYS) if ((k !== "civicSize" && k !== "estate") || world[k].some(Boolean)) o[k] = Array.from(world[k]); // an all-zero civicSize or estate is left out: the save and the hash of a town without them are unchanged
   return o;
 }
 
@@ -108,7 +109,7 @@ export function fromPlain(o) {
     ...citizenDefaults(), ...c,
     friends: (c.friends || []).slice(), life: (c.life || []).map((e) => e.slice()), path: null, stale: false,
   }));
-  world.households = o.households.map((h) => ({ ...h, members: h.members.slice() }));
+  world.households = o.households.map((h) => ({ ...h, members: h.members.slice(), wealth: h.wealth | 0 })); // an old save has no class: modest
   world.names = { ...(o.names || {}) };
   world.legacy = Array.isArray(o.legacy) ? o.legacy.filter((row) => typeof row === "string") : [];
   migrateLegacyNames(world);
