@@ -71,6 +71,9 @@ Zoned buildings acquire ivy after 15 years and roof repairs after 25 years since
 construction or expansion. Inspect shows the age; old exports begin tracking it
 when first loaded. [People finishing work](docs/HANDOFF-PEOPLE-EXTRAS-2026-09-05.md).
 
+Rail drawn over water builds a bridge (§60 per tile; §16 yearly upkeep).
+Stations remain on land. Commuters and freight can cross the span.
+
 ## The rules are the game
 
 Every equation the sim runs is printed live in the **Rules** tab with the

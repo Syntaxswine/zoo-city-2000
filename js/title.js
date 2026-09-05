@@ -108,8 +108,7 @@ export function createTitle(app) {
     card.hidden = false;
     if (which === "new") {
       card.append(el("h2", "", "A new city"));
-      const seed = app.ui.foundForm(card, close);
-      backRow();
+      const seed = app.ui.foundForm(card, close, hidePanel);
       seed.focus();
       seed.select();
     } else if (which === "saves") {

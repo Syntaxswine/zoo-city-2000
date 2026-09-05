@@ -111,7 +111,7 @@ export function createUI(app) {
       ["fire stations", KNOBS.UPKEEP_STATION * (fig.fireStations || 0)], ["police stations", KNOBS.UPKEEP_STATION * (fig.policeStations || 0)],
       ["pacification centres", KNOBS.UPKEEP_CENTRE * (fig.centres || 0)], ["licence inspectors", fig.licence ? KNOBS.UPKEEP_LICENCE * (fig.markets || 0) : 0],
       ["walls", KNOBS.UPKEEP_WALL * (fig.walls || 0)],
-      ["rail", KNOBS.UPKEEP_RAIL * (fig.rails || 0)], ["stations", KNOBS.UPKEEP_STATION_RAIL * (fig.stations || 0)],
+      ["rail", KNOBS.UPKEEP_RAIL * ((fig.rails || 0) - (fig.railBridges || 0))], ["rail bridges", KNOBS.UPKEEP_RAIL_BRIDGE * (fig.railBridges || 0)], ["stations", KNOBS.UPKEEP_STATION_RAIL * (fig.stations || 0)],
     ];
     const lines = raw.filter(([, v]) => v > 0).map(([name, v]) => [name, Math.round(v * k)]);
     const sum = lines.reduce((s, l) => s + l[1], 0);
@@ -979,7 +979,7 @@ export function createUI(app) {
   let uid = 0;
 
   /** Seed, dice, no-disasters, FOUND THE CITY. Returns the seed input (for focus); `done()` runs after founding. */
-  function foundForm(box, done) {
+  function foundForm(box, done, back = null) {
     const row = el("div", "row");
     row.append(el("label", "", "seed"));
     const seed = el("input");
@@ -1002,8 +1002,9 @@ export function createUI(app) {
     const go = el("button", "primary", "FOUND THE CITY");
     go.addEventListener("click", () => { app.newCity({ seed: seed.value.trim() || "zoo", noDisasters: nd.checked }); done(); });
     seed.addEventListener("keydown", (e) => { if (e.key === "Enter") go.click(); });
-    const goRow = el("div", "btnrow");
+    const goRow = el("div", "btnrow found-actions");
     goRow.append(go);
+    if(back){const b=el("button","found-back","back");b.addEventListener("click",back);goRow.append(b);}
     box.append(goRow);
     return seed;
   }

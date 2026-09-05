@@ -264,6 +264,7 @@ export function createRenderer(canvas, initialWorld, art) {
         if (isWater) {
           water.push([sx, sy]);
           if (hasRoad) items.push({ sprite: art.bridge(roadMask(tx, ty)), tx, ty, kind: "ground", z: 1 });
+          else if(world.rail[i]) items.push({sprite:art.railBridge(railMask(tx,ty)),tx,ty,kind:"ground",z:1});
         } else {
           let sprite;
           let tint = null;
@@ -569,7 +570,8 @@ export function createRenderer(canvas, initialWorld, art) {
       }
       // On a bridge the deck sits DECK_TOP px above the water plane (roads.js);
       // shots.mjs lifted its walkers, the renderer did not — they stood in the river.
-      const onBridge = world.road[Math.floor(w.ty) * world.w + Math.floor(w.tx)] === ROAD.BRIDGE;
+      const wi = Math.floor(w.ty) * world.w + Math.floor(w.tx);
+      const onBridge = world.road[wi] === ROAD.BRIDGE || (world.rail[wi] && world.terrain[wi] === TERRAIN.WATER);
       items.push({ sprite: art.citizen(w.species, w.facing, w.frame, w.age, { look: w.look, hat: w.hat, carry: w.carry }), tx: w.tx, ty: w.ty, kind: "walker", walker: w, dy: onBridge ? -DECK_TOP : w.riding ? -3 : 0 }); // a rider sits up on the train
       if (w.kind === "cart" && w.leg >= 1 && w.companion) {
         const p = w.companion;

@@ -134,11 +134,12 @@ export const KNOBS = {
   UPKEEP_CITIZEN: 12,
   UPKEEP_ROAD: 5,
   UPKEEP_BRIDGE: 12,
+  UPKEEP_RAIL_BRIDGE: 16,
   UPKEEP_TIER: 4,
   UPKEEP_PARK: 300,
   UPKEEP_LARGE_PARK: 1500,
   UPKEEP_STATION: 400,
-  COST: { zoneR: 5, zoneC: 8, zoneI: 8, zoneM: 12, road: 10, bridge: 40, bulldoze: 2, bulldozeTree: 4, tree: 4, park: 150, largePark: 2500, zoo: 2500, pond: 40, fire: 500, police: 500, centre: 1500, wall: 8, use: 1, rail: 20, station: 300 },
+  COST: { zoneR: 5, zoneC: 8, zoneI: 8, zoneM: 12, road: 10, bridge: 40, bulldoze: 2, bulldozeTree: 4, tree: 4, park: 150, largePark: 2500, zoo: 2500, pond: 40, fire: 500, police: 500, centre: 1500, wall: 8, use: 1, rail: 20, railBridge: 60, station: 300 },
   // ---- crime and punishment (the owner, 2026-09-02; docs/PROPOSAL-CRIME-AND-PUNISHMENT.md) ----
   // Zone M — the grey-market meat hall: stall / meat hall / cold store.
   M_JOBS: [0, 3, 8, 16],
@@ -337,7 +338,7 @@ export const RULES = Object.freeze([
   },
   {
     id: "R1", title: "Rail: a commute is the cheapest walk-and-ride",
-    formula: `walk 1 a step (×${KNOBS.TRESPASS_STEP} onto a road the line forbids), ride ${f2(KNOBS.RAIL_COST / KNOBS.WALK)} a step between stations (visually ×${f1(KNOBS.RIDE_SPEED)}); a station served by road within ${KNOBS.ROAD_REACH} tiles is reached across its forecourt on foot, then boarding and alighting are free; a level crossing is walked and ridden through, and boards nobody; traffic and trespass count walking steps only — neutral travel, until you step off`,
+    formula: `walk 1 a step (×${KNOBS.TRESPASS_STEP} onto a road the line forbids), ride ${f2(KNOBS.RAIL_COST / KNOBS.WALK)} a step between stations (visually ×${f1(KNOBS.RIDE_SPEED)}); a station served by road within ${KNOBS.ROAD_REACH} tiles is reached across its forecourt on foot, then boarding and alighting are free; rail bridges cost §60/tile and §16/tile/year; a level crossing is walked and ridden through, and boards nobody; traffic and trespass count walking steps only — neutral travel, until you step off`,
     live: (w) => `${w.last.census.railTiles || 0} rail tiles · ${w.last.census.stations || 0} stations · ${w.last.census.riders || 0} riders · mean commute ${(w.last.census.meanCommute || 0).toFixed(1)} walk-steps`,
   },
   {
@@ -392,7 +393,7 @@ export const RULES = Object.freeze([
   },
   {
     id: "B2", title: "Upkeep per year",
-    formula: "12·P + 5·roads + 12·bridges + 4·Σ tiers + 300·parks + 1500·large parks + 1500·zoos + 400·stations",
+    formula: "12·P + 5·roads + 12·road bridges + 3·land rails + 16·rail bridges + 4·Σ tiers + 300·parks + 1500·large parks + 1500·zoos + 400·stations",
     live: (w) => `≈ §${w.last.budget.upkeepYr}/yr → net §${w.last.budget.incomeYr - w.last.budget.upkeepYr}/yr`,
   },
   {

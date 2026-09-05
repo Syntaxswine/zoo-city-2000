@@ -314,3 +314,7 @@ li.nrow.at { background: #ece7d6; }
 li.nrow.at .gut { color: var(--ink); }
 .newsfoot { display: flex; align-items: center; gap: 8px; margin-top: 7px; }
 .newsfoot .dim { flex: 1; text-align: center; color: var(--dim); }
+
+.found-actions { align-items: center; justify-content: space-between; }
+.found-actions .primary { min-height: 42px; padding: 10px 18px; font-size: 14px; }
+.found-actions .found-back { margin-left: auto; }

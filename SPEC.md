@@ -710,8 +710,14 @@ The owner: *"rail … shortens commute times, lightens traffic, and allows
 neutral travel (as long as predators don't exit the train in a prey only
 zone)."* Tool `7` lays rail like a road (an L-drag, §20 a tile, §3 a year;
 grass or trees, across a wall — a tunnel; square-on across a road — a
-**level crossing**, below; **not on water**: no rail bridges — BACKLOG); `8` makes a **station**
-of a rail tile (§300, §100 a year). A station is **served like any lot**
+**level crossing**, below; water creates a **rail bridge**, §60/tile and §16/year).
+Bridges carry the existing commute/freight rail layer, with no pedestrian boarding
+on the span. Any rail mask is supported, as with road bridges; isolated spans
+can be extended to shore later. Road bridges and rail bridges cannot share tiles.
+Raised deck artwork is rendered at both resolutions and riders sit at deck height.
+Demolition, undo and saves preserve the water beneath the track. Beaver ponds
+exclude rail, stations and walls. `8` makes a **station**
+of a dry rail tile (§300, §100 a year). A station is **served like any lot**
 (§6c): its doors are every road tile at its road distance, up to
 `ROAD_REACH` 3, and the walk layer crosses the forecourt between them one
 tile at a time (the card says which sides, and how far). Until session 15

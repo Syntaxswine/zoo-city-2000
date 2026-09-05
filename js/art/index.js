@@ -42,7 +42,7 @@ import { markSprite, MARKS } from "./building-character.js";
 import { hires } from "./hires.js";
 import { roadSprite, bridgeSprite, allRoads } from "./roads.js";
 import { wallSprite, tunnelSprite, allWalls } from "./walls.js";
-import { railSprite, stationSprite, crossingSprite, allRail } from "./rail.js";
+import { railSprite, railBridgeSprite, stationSprite, crossingSprite, allRail } from "./rail.js";
 import { GRASS, CHALK, RUBBLE, WATER_TILE, KERB, TREES, TREE_LIST, ZOTS, PLAZA, CURSOR, GHOST, waterTint, WATER_FRAMES, allTerrain } from "./terrain.js";
 import { citizenSprite, portraitSprite, TENT, HAT, MEETING, SACKS, allCitizens } from "./citizens.js";
 import { bubbleSprite, BUBBLE_SAMPLES } from "./bubbles.js";
@@ -120,6 +120,7 @@ export const art = Object.freeze({
   wall: wallSprite,
   tunnel: tunnelSprite,
   rail: railSprite,
+  railBridge: railBridgeSprite,
   station: stationSprite,
   ground,
   chalk,

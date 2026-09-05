@@ -1389,7 +1389,7 @@ check("determinism: same seed + same inputs ⇒ same hash", stateHash(A.world) =
       `tunnel tile rail ${G2.rail[at(px + 14, py + 3)]} · one short of it ${G2.rail[at(px + 14, py + 1)]}`);
   }
 
-  // "No rail bridges" is the one v1 limit SPEC §7.9 still leans on, and no
+  // Rail bridges use water, but the road and rail decks cannot share a tile. No
   // check in the suite had ever laid rail on water — the fixture that carried
   // the claim is dry by construction, so it could not fail for the reason it
   // named. Find real water, bridge it, and try both ways over it.
@@ -1410,10 +1410,12 @@ check("determinism: same seed + same inputs ⇒ same hash", stateHash(A.world) =
     } else {
       const wx = wet % Wt.w, wy = (wet / Wt.w) | 0;
       const onWater = apply(Wt, { kind: "rail", tiles: [wet] });
+      const railBuilt = onWater.ok && Wt.rail[wet] === 1;
+      apply(Wt,{kind:"bulldoze",x0:wx,y0:wy,x1:wx,y1:wy});
       const span = apply(Wt, { kind: "road", tiles: [wet] }); // a bridge
       const overBridge = apply(Wt, { kind: "rail", tiles: [wet - Wt.w, wet, wet + Wt.w] });
-      check("crossing: still no rail bridges — a line may not be laid on water, nor square-on across a road that is a BRIDGE; the bridge keeps the channel to itself",
-        onWater.ok === false && Wt.rail[wet] === 0 && span.ok && Wt.road[wet] === ROAD.BRIDGE &&
+      check("crossing: rail can bridge water but cannot share a road bridge",
+        railBuilt && Wt.rail[wet] === 0 && span.ok && Wt.road[wet] === ROAD.BRIDGE &&
         Wt.rail[wet] === 0 && Wt.rail[wet - Wt.w] === 1 && Wt.rail[wet + Wt.w] === 1,
         `water at (${wx},${wy}) · rail on water ${onWater.reason || onWater.ok} · bridge ${Wt.road[wet]} · rail on the deck ${Wt.rail[wet]} · either bank ${Wt.rail[wet - Wt.w]}/${Wt.rail[wet + Wt.w]}`);
     }
@@ -6844,6 +6846,7 @@ if (existsSync(path.join(ROOT,"docs/fixtures/control-city.json"))) {
   try { const { verifyControlCity } = await import("./control-city.mjs"); verifyControlCity(path.join(ROOT,"docs/fixtures/control-city.json")); check("integration: owner control city twelve-month baseline",true); }
   catch(e) { check("integration: owner control city twelve-month baseline",false,e.message); }
 } else console.log("DEFERRED: owner control-city.json has not arrived; no owner-city regression claimed.");
+{ const {checkRailBridges} = await import("./check-rail-bridges.mjs"); checkRailBridges(check); }
 console.log(`${checks} checks, ${failures.length} failures`);
 for (const f of failures) console.log(`  FAIL ${f}`);
 process.exit(failures.length ? 1 : 0);

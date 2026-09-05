@@ -7,7 +7,7 @@
 // posts under "cheat", so the ledger always says how much came that way.
 
 import { KNOBS } from "./rules.js";
-import { ZONE, CIVIC, ROAD, isStation, isPart } from "./world.js";
+import { ZONE, CIVIC, ROAD, TERRAIN, isStation, isPart } from "./world.js";
 
 export function post(world, kind, amount) {
   const a = Math.round(amount);
@@ -52,12 +52,12 @@ export function yearlyFigures(world) {
   let centres = 0;
   let markets = 0;
   let walls = 0;
-  let rails = 0;
+  let rails = 0, railBridges = 0;
   let stations = 0;
   const n = world.w * world.h;
   for (let i = 0; i < n; i++) {
     if (world.wall[i]) walls++;
-    if (world.rail[i] === 1) rails++;
+    if (world.rail[i] === 1) { rails++; if(world.terrain[i] === TERRAIN.WATER) railBridges++; }
     else if (world.rail[i] === 2) stations++;
     if (world.road[i] === ROAD.ROAD) roads++;
     else if (world.road[i] === ROAD.BRIDGE) bridges++;
@@ -70,10 +70,10 @@ export function yearlyFigures(world) {
     else if (world.civic[i] === CIVIC.POLICE) policeStations++;
     else if (world.civic[i] === CIVIC.CENTRE) centres++;
   }
-  let upkeepYr = KNOBS.UPKEEP_CITIZEN * citizens.length + KNOBS.UPKEEP_ROAD * roads + KNOBS.UPKEEP_BRIDGE * bridges + KNOBS.UPKEEP_TIER * tiers + KNOBS.UPKEEP_PARK * parks + KNOBS.UPKEEP_LARGE_PARK * largeParks + KNOBS.UPKEEP_ZOO * zoos + KNOBS.UPKEEP_STATION * (fireStations + policeStations) + KNOBS.UPKEEP_CENTRE * centres + KNOBS.UPKEEP_WALL * walls + KNOBS.UPKEEP_RAIL * rails + KNOBS.UPKEEP_STATION_RAIL * stations + (licence ? KNOBS.UPKEEP_LICENCE * markets : 0);
+  let upkeepYr = KNOBS.UPKEEP_CITIZEN * citizens.length + KNOBS.UPKEEP_ROAD * roads + KNOBS.UPKEEP_BRIDGE * bridges + KNOBS.UPKEEP_TIER * tiers + KNOBS.UPKEEP_PARK * parks + KNOBS.UPKEEP_LARGE_PARK * largeParks + KNOBS.UPKEEP_ZOO * zoos + KNOBS.UPKEEP_STATION * (fireStations + policeStations) + KNOBS.UPKEEP_CENTRE * centres + KNOBS.UPKEEP_WALL * walls + KNOBS.UPKEEP_RAIL * (rails - railBridges) + KNOBS.UPKEEP_RAIL_BRIDGE * railBridges + KNOBS.UPKEEP_STATION_RAIL * stations + (licence ? KNOBS.UPKEEP_LICENCE * markets : 0);
   const winter = world.events.active.find((e) => e.id === "bearWinter");
   if (winter) upkeepYr *= 0.8;
-  return { incomeYr: Math.round(incomeYr), upkeepYr: Math.round(upkeepYr), cutYr: Math.round(cutYr), fc, fi, fm, roads, bridges, parks, largeParks, zoos, fireStations, policeStations, centres, markets, walls, rails, stations, licence };
+  return { incomeYr: Math.round(incomeYr), upkeepYr: Math.round(upkeepYr), cutYr: Math.round(cutYr), fc, fi, fm, roads, bridges, parks, largeParks, zoos, fireStations, policeStations, centres, markets, walls, rails, railBridges, stations, licence };
 }
 
 /** The monthly slice: post tax and upkeep, apply receivership rules. */

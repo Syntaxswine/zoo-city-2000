@@ -155,7 +155,7 @@ export const ROSTER = [
           for (let yy = ay; yy <= ay + 1 && ok; yy++) for (let xx = ax; xx <= ax + 1; xx++) {
             if (!inBounds(w, xx, yy)) { ok = false; break; }
             const j = yy * W + xx;
-            if (w.terrain[j] === TERRAIN.WATER || w.road[j] || w.tier[j] > 0 || w.civic[j]) { ok = false; break; }
+            if (w.terrain[j] === TERRAIN.WATER || w.road[j] || w.rail[j] || w.wall[j] || w.tier[j] > 0 || w.civic[j]) { ok = false; break; }
           }
           if (ok) cands.push([ax, ay]);
         }

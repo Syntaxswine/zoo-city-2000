@@ -204,7 +204,7 @@ export function costOf(world, op) {
       const taken = new Set(); // a block's tiles, listed once however many the rect touches
       for (const i of rect(world, op)) {
         if (taken.has(i)) continue;
-        if (world.terrain[i] === TERRAIN.WATER && !world.road[i]) continue;
+        if (world.terrain[i] === TERRAIN.WATER && !world.road[i] && !world.rail[i]) continue;
         if (world.wall[i]) { add(i, C.bulldoze, "wall"); continue; } // a tunnel's wall comes down first; the road stays
         if (world.rail[i]) { add(i, C.bulldoze, world.rail[i] === 2 ? "station" : "rail"); continue; }
         if (world.road[i]) { add(i, C.bulldoze, "road"); continue; }
@@ -273,20 +273,20 @@ export function costOf(world, op) {
     }
     case "rail": {
       // Rail is an L-drag like a road (SPEC §7.9): grass or trees (felled), across a wall (a tunnel),
-      // square-on across a road (a level crossing); not on water, chalk, a civic or a building — no bridges.
+      // square-on across a road (a level crossing); water makes a rail bridge; not on chalk, a civic or a building.
       const line = (op.tiles || []).filter((i) => i >= 0 && i < world.w * world.h);
       const lay = new Set();
       for (const i of line) {
-        if (world.rail[i] || world.terrain[i] === TERRAIN.WATER || world.civic[i] || world.zone[i] || isBuilt(world, i)) continue;
+        if (world.rail[i] || world.civic[i] || world.zone[i] || isBuilt(world, i)) continue;
         if (world.road[i] && !crossable(world, i)) continue;
         lay.add(i);
       }
       const refused = refuseCrossings(world, lay, "rail");
       for (const i of line) {
         if (!lay.has(i)) continue;
-        let c = C.rail;
+        let c = world.terrain[i] === TERRAIN.WATER ? C.railBridge : C.rail;
         if (world.terrain[i] === TERRAIN.TREE) c += C.bulldozeTree;
-        add(i, c, world.wall[i] ? "tunnel" : world.road[i] ? "crossing" : "rail");
+        add(i, c, world.terrain[i] === TERRAIN.WATER ? "rail bridge" : world.wall[i] ? "tunnel" : world.road[i] ? "crossing" : "rail");
       }
       if (!tiles.length && refused.length) return { cost: 0, tiles, reason: CROSS_REASON };
       break;
@@ -295,7 +295,7 @@ export function costOf(world, op) {
       // A station is a click on a plain rail tile; it becomes usable when a
       // road reaches it within ROAD_REACH across passable forecourt ground.
       const i = inBounds(world, op.tx, op.ty) ? idx(world, op.tx, op.ty) : -1;
-      if (i < 0 || world.rail[i] !== 1) return { cost: 0, tiles, reason: "blocked" };
+      if (i < 0 || world.terrain[i] === TERRAIN.WATER || world.rail[i] !== 1) return { cost: 0, tiles, reason: "blocked" };
       if (world.road[i]) return { cost: 0, tiles, reason: "a station cannot stand on a level crossing" }; // the platform would sit in the road
       // A PLATFORM IS THE EXCEPTION, and the owner ruled it so: a line is laid
       // ahead of the town, and a platform no road reaches yet wears the NO ROAD

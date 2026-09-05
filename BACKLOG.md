@@ -10,9 +10,8 @@ could ship whole.
 
 ## Owner-reported follow-ups — 2026-09-05
 
-- [ ] **New-game actions:** place Back on the same horizontal row as Found the
-  City, aligned to the far right. Make Found the City larger and more prominent.
-  Verify the layout at narrow and wide window sizes.
+- [x] **New-game actions:** Back shares the Found the City row at the far right;
+  Found is larger. Browser-verified at 1280px and 390px, including Back navigation.
 - [x] **Large Park and park wishes:** Large Parks now satisfy the home-based
   recreation need within four tiles of any footprint tile, including legacy 2×2
   parks. Zoo prisons remain excluded. Wishes explicitly refer to home; the remedy
@@ -20,14 +19,15 @@ could ship whole.
   Verified: 658 checks pass; hostile review 9/10 (320 independent coverage cases).
   Existing checked baselines are unchanged; cities near Large Parks now receive
   the intended +10 park mood benefit and can develop differently over time.
-- [ ] **Rail bridges over water:** rail placement currently rejects water. Add
-  rail bridge placement and distinct bridge artwork, with connected routes for
-  commuters and freight. Define bridge cost/upkeep and placement constraints;
-  verify shore connections, both orientations, demolition/undo, save/load and
-  pathfinding. Keep stations and road/rail level crossings off water spans.
+- [x] **Rail bridges over water:** Rail now builds raised spans for §60/tile,
+  §16/tile/year. Commuters and freight use them; stations and road crossings
+  remain off water. Twenty checks cover both axes, routes, costs, upkeep,
+  demolition/undo, saves/continuation, artwork and beaver-pond protection.
 - [ ] **Flock cameras on the remote:** restore/expose the flock camera controls
   in the remote-control UI. Check existing camera functionality and bindings,
   and verify that the controls remain accessible at narrow window sizes.
+  No existing Flock implementation found; awaiting whether this means placeable
+  surveillance cameras or views that follow citizen groups.
 
 ## Building character — People E core shipped 2026-09-05
 
@@ -990,8 +990,7 @@ Left:
 - **An overlay is painted on the ground, so a zoo hides its own band.** The
   platform's red can be photographed; the zoo's cannot, because its 2×2
   sprite covers all four of its diamonds. True of every overlay in the game.
-- Rail bridges are still refused (no rail on water), so a station can be
-  cut off by a channel the road crosses. Unchanged by this part.
+- Historical limitation resolved 2026-09-05: rail bridges now cross water.
 
 ## The freeze on a freshly zoned lot — FIXED 2026-09-03 (handoff §23; `tools/dom-shim.mjs`; 4 checks, both mutation-tested)
 The owner: *"the game hangs on placement of residential tiles."* It was not a
@@ -1063,7 +1062,7 @@ The chain is now signed, invalidated, replanned and save/continued in the
 regression. The integrated canonical suite is 534 checks.
 
 Left:
-- Rail bridges (a deck sprite with rails) — still not built.
+- Rail bridges shipped 2026-09-05 (SPEC §7.9).
 - A two-car train walker on busy lines; a crossing has no gate, no lights
   and no bell (it is one ground tile, and a moving barrier wants the
   walker layer).
@@ -1176,7 +1175,7 @@ size-aware pull-back. What is left:
   zot (a commuter's card says it; the map does not); a "stopped" walker
   glyph; per-species stop counts.
 - Phase C rail SHIPPED (SPEC §7.9); **level crossings SHIPPED 2026-09-03**
-  (their own section above). Left: rail bridges (a deck sprite with rails);
+  (their own section above); rail bridges shipped 2026-09-05. Left:
   a two-car train walker on busy lines; a lone rail tile draws a bare pad
   (the wall draws its straight run — do the same), and so does a crossing
   whose line has been bulldozed off both sides.

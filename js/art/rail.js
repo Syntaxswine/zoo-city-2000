@@ -19,7 +19,7 @@ import { defineSprite } from "./format.js";
 import { keysOf } from "./palette.js";
 import { box, render, A_STEP, RECIPES } from "./solid.js";
 import { groundSprite, grassKey, hash, TILE_ANCHOR } from "./terrain.js";
-import { onRoad, roadKey, tarmacKey } from "./roads.js";
+import { onRoad, roadKey, tarmacKey, bridgeBoxes } from "./roads.js";
 
 const EARTH = keysOf("earth"); // q r s t u
 const ASPH = keysOf("asphalt"); // 1 2 3 4
@@ -191,9 +191,17 @@ export const squareOnCrossings = () => [0, 1].map((busy) => ({
   ew: crossingSprite(N | S, E | W, !!busy), // an E–W line across a N–S road
 }));
 
+export const RAIL_BRIDGES = Array.from({length:16},(_,mask)=>{
+  const boxes=bridgeBoxes(mask,(a,b,x,y)=>railKey(mask,a,b,x,y));
+  const r=render(boxes,{hub:A_STEP/2});
+  const s=defineSprite({name:`rail-bridge-${mask}`,anchor:r.anchor,rows:r.rows,tags:["ground","rail","bridge"]});
+  RECIPES.set(s,{name:s.name,boxes,hub:A_STEP/2,footprint:[1,1],extent:[],stamps:[]});return s;
+});
+export const railBridgeSprite = mask => RAIL_BRIDGES[mask&15];
+
 /** Every rail sprite, named, for the audit. */
 export function allRail() {
-  const out = RAILS.map((s) => ({ name: s.name, sprite: s }));
+  const out = [...RAILS,...RAIL_BRIDGES].map((s) => ({ name: s.name, sprite: s }));
   out.push({ name: STATIONS.ns.name, sprite: STATIONS.ns }, { name: STATIONS.ew.name, sprite: STATIONS.ew });
   const sq = squareOnCrossings();
   for (const busy of [0, 1]) for (const axis of ["ns", "ew"]) out.push({ name: sq[busy][axis].name, sprite: sq[busy][axis] });

@@ -103,13 +103,13 @@ export function roadSprite(mask, busy = false) {
 export const DECK_TOP = 3;
 const DECK_THICK = 2;
 const PARAPET = 0.5;
-function bridgeBoxes(mask) {
+export function bridgeBoxes(mask, surface = (a,b,x,y) => roadKey(mask, false, a,b,x,y)) {
   const straightNS = mask === (N | S);
   const straightEW = mask === (E | W);
   const a0 = straightNS ? 8 - HALF - PARAPET : 0, a1 = straightNS ? 8 + HALF + PARAPET : 16;
   const b0 = straightEW ? 8 - HALF - PARAPET : 0, b1 = straightEW ? 8 + HALF + PARAPET : 16;
   const deckSkin = {
-    top: (a, b, x, y) => roadKey(mask, false, a + a0, b + b0, x, y) || CONC[2],
+    top: (a, b, x, y) => surface(a + a0, b + b0, x, y) || CONC[2],
     side: () => CONC[1],
     end: () => CONC[0],
   };

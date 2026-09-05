@@ -16,7 +16,7 @@ export const TOOLS = Object.freeze([
   row(4, "M", "4", "Meat", { kind: "zone", zone: ZONE.M }, { kind: "building", args: [ZONE.M, 1, 0] }, "zone meat market (drag) — grey, off the books"),
   row(5, "road", "5", "Road", { kind: "road" }, { kind: "road", args: [5, false] }, "L-drag; Shift = straight; water makes a bridge; a square rail makes a crossing"),
   row(6, "wall", "6", "Wall", { kind: "wall" }, { kind: "wall", args: [5] }, "L-drag; Shift = straight; a road or rail through it is a tunnel"),
-  row(7, "rail", "7", "Rail", { kind: "rail" }, { kind: "rail", args: [5] }, "L-drag; Shift = straight; a square road makes a crossing"),
+  row(7, "rail", "7", "Rail", { kind: "rail" }, { kind: "rail", args: [5] }, "L-drag; Shift = straight; water makes a rail bridge; a square road makes a crossing"),
   row(8, "station", "8", "Station", { kind: "station" }, { kind: "station", args: ["ns"] }, "click a plain rail tile; it is a door wherever a road comes within 3 tiles, and riders walk the forecourt"),
   row(9, "tree", "9", "Tree", { kind: "tree" }, { kind: "tree", args: ["round"] }, "plant trees (drag)"),
   row(10, "park", "0", "Park", { kind: "park" }, { kind: "civic", args: ["park"] }, "place a 1×1 park"),
