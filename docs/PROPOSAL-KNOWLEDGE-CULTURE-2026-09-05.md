@@ -1,25 +1,40 @@
 # Proposal — Knowledge and culture civics
 
-Status: specification only, 2026-09-05. No gameplay changes are implemented by this document. The owner specified the four buildings and their sizes. Mechanics, prices and ranges below are proposed starting values to validate during implementation.
+Status: specification only, 2026-09-05. No gameplay changes are implemented by this document. The owner specified the four buildings and their sizes. The owner also specifies five-tile Library/Gallery coverage, a University coverage area equal to half the map tile count, and an Amphitheater coverage area equal to one eighth. These are local coverage areas whose position follows the building. Mechanics and prices below remain proposed starting values to validate during implementation.
 
 ## Four buildings, two public services
 
 Knowledge gives a growing town room to develop. Culture makes everyday life in the town better. Library and Gallery are useful neighborhood investments; University and Amphitheater are stronger district institutions. The larger buildings do not require or replace the smaller ones.
 
-| Building | Represents | Footprint | Build cost | Annual upkeep | C-type jobs | Service radius | Full benefit |
+| Building | Represents | Footprint | Build cost | Annual upkeep | C-type jobs | Coverage | Full benefit |
 |---|---|---:|---:|---:|---:|---:|---|
-| Library | Knowledge | 2×2 | §1,000 | §350 | 4 | 4 tiles | 50 knowledge |
-| University | Knowledge | 3×3 | §4,000 | §1,200 | 12 | 7 tiles | 100 knowledge |
-| Gallery | Culture | 2×2 | §800 | §300 | 4 | 4 tiles | +4 culture mood |
-| Amphitheater | Culture | 3×3 | §3,000 | §900 | 8 | 7 tiles | +8 culture mood |
+| Library | Knowledge | 2×2 | §1,000 | §350 | 4 | 5 tiles | 50 knowledge |
+| University | Knowledge | 3×3 | §4,000 | §1,200 | 12 | Half the map tiles | 100 knowledge |
+| Gallery | Culture | 2×2 | §800 | §300 | 4 | 5 tiles | +4 culture mood |
+| Amphitheater | Culture | 3×3 | §3,000 | §900 | 8 | One eighth of the map tiles | +8 culture mood |
 
 All four are available immediately and need a road touching an edge to be built. They employ existing citizens under the normal job and commute rules. They provide no housing, inmate capacity or compulsory attendance. Jobs count once per anchor. Budget charges remain due when a building loses road access; service stops until access is restored. Initial service is not proportional to staff occupancy, matching the existing service-building approach and avoiding a new staffing feedback loop.
 
 ## Coverage and operation
 
-Use one shared service calculation for cards, Census, mood, demand, overlays and wishes. A source operates when the whole-campus road-access test succeeds and no tile of the campus is burning or flooded. Demolition removes its service immediately. Reuse the existing wall-aware field traversal, seeded from every footprint tile at distance zero; each source's own footprint is traversable for emission. Other tiles obey the current field passability rules, including walls and tunnels. Rail does not multiply this radius.
+The large-building catchments scale with the actual saved map dimensions. Let N = world.w × world.h, counting all map tiles, including water and undeveloped ground. University has a local coverage budget of ceil(N / 2) distinct tiles; Amphitheater has ceil(N / 8). Library and Gallery retain a fixed five-tile radius measured from their whole footprint. Do not halve or divide a linear map dimension to get the large-building range: the owner's fractions apply to AREA.
 
-Coverage is full strength through the stated radius, inclusive, then zero. For a multi-tile home, use the strongest service reaching any tile of its footprint. Aggregate sources using maximum strength, not addition: two Libraries still provide 50 knowledge, while a University provides 100; a Gallery and Amphitheater together provide +8 culture. Knowledge and culture are independent and can both apply. The footprint distance rule is essential: a citizen living beside the far corner must not be treated as distant from the anchor.
+| Map dimensions | Total tiles | University coverage budget | Amphitheater coverage budget |
+|---|---:|---:|---:|
+| 32×32 | 1,024 | 512 | 128 |
+| 64×64 (current default) | 4,096 | 2,048 | 512 |
+| 128×128 | 16,384 | 8,192 | 2,048 |
+| 80×48 | 3,840 | 1,920 | 480 |
+
+Use one shared service calculation for cards, Census, mood, demand, overlays and wishes. A source operates when the whole-campus road-access test succeeds and no tile of the campus is burning or flooded. Demolition removes its service immediately. Reuse the existing wall-aware field traversal, seeded from every footprint tile at distance zero; each source's own footprint is traversable for emission. Other tiles obey the current field passability rules, including walls and tunnels. Rail does not multiply coverage.
+
+For a University or Amphitheater, expand locally in shortest field-traversal distance order until the tile budget is filled or no reachable tiles remain. Count each reached tile once, including the source footprint and reachable water/open ground; do not count blocked or off-map tiles. At the final distance layer, resolve ties by ascending tile index so the catchment is exact and deterministic without RNG. Near a map edge the catchment extends farther into the map to fill its budget; barriers can reshape it, and a sealed region may leave it underfilled. Compute source catchments independently: do not redirect overlapping coverage to distant unserved neighborhoods.
+
+Two Universities or eight Amphitheaters supply one map's worth of nominal coverage area. Overlap and disconnected regions can leave gaps, so that building count does not automatically guarantee every tile is served. Placement and the actual coverage overlay determine the covered union. The University catchment has four times the tile budget of the Amphitheater, not four times its linear reach.
+
+For a Library or Gallery, expand through field distance five inclusive, then stop; do not expand extra to compensate for map edges or blocked tiles. A fully open interior 2×2 footprint therefore reaches a 12×12 square (144 tiles including the footprint) under the existing eight-connected unit-distance convention. All four services are full strength inside their selected catchment and zero outside it.
+
+For a multi-tile home, use the strongest service reaching any tile of its footprint. Aggregate sources using maximum strength, not addition: two Libraries still provide 50 knowledge, while a University provides 100; a Gallery and Amphitheater together provide +8 culture. Knowledge and culture are independent and can both apply. The whole-footprint rule is essential: a citizen living beside the far corner must not be treated as distant from the anchor.
 
 Eligibility uses the citizen's home, not the walker's current screen position. Citizens without a home receive neither benefit in this first version; camping continues to ask for housing first. Apply the same eligibility to numerator and denominator in knowledge reporting: living, housed citizens who are not absent under the existing custody/pen rules. No species, age or predator/prey restriction applies to public service benefits. Ordinary workforce eligibility still controls who can take jobs.
 
@@ -56,7 +71,7 @@ No attendance tickets, operating schedule or noise penalty in the first version.
 
 Add all four to the remote's shared tool registry, placement previews, help and cost readouts. Preserve existing shortcuts, especially E for Camera, G for Large Park, and L for Load. Assign new keys only after an explicit collision audit; mouse access must work regardless. Allow the palette to scroll so its final row remains reachable at short window heights.
 
-Inspect any campus tile to show the building name, footprint, jobs filled/available, purchase price, annual upkeep, service radius and operational state. A disconnected or disaster-closed building must explain why its service is unavailable. Home and citizen cards show the actual contributing building and benefit, such as 'Library: 50 knowledge' or 'Amphitheater: +8 culture'. Resolve equally strong providers deterministically by anchor index.
+Inspect any campus tile to show the building name, footprint, jobs filled/available, purchase price, annual upkeep, coverage budget/range, actual covered tile count and operational state. A disconnected or disaster-closed building must explain why its service is unavailable. Home and citizen cards show the actual contributing building and benefit, such as 'Library: 50 knowledge' or 'Amphitheater: +8 culture'. Resolve equally strong providers deterministically by anchor index.
 
 Census reports building counts, knowledge access K, the resulting capacity addition, culture-served population and mean culture bonus. Give each building its own Budget line. Rules displays the new capacity formula and culture mood rule with current values. Add separate Knowledge and Culture overlays, with visible range boundaries during placement.
 
@@ -88,6 +103,6 @@ Put all proposed constants in KNOBS. Add independent headless probe scenarios be
 3. Finish artwork, remote icons and in-game previews; verify layout at wide, narrow and short window sizes.
 4. Run regressions and controlled multi-seed probes, fix review findings, then mark this proposal implemented with measured results.
 
-Required regressions include every footprint edge and corner; invalid placement and occupied camps; far-edge road access; disconnection/reconnection; walls and tunnels; joined-home coverage; inclusive radius and radius+1; maximum-source overlap; all Library/University mixtures; culture and park independence; campus fire/flood/demolition/undo; job cleanup; old-save compatibility; save/load/continuation; exact annual budget; unchanged no-building baselines; and UI/card/wish agreement immediately after edits.
+Required regressions include every footprint edge and corner; invalid placement and occupied camps; far-edge road access; disconnection/reconnection; walls and tunnels; joined-home coverage; five-tile radius and radius+1 for small buildings; exact half-map/eighth-map tile budgets on square, rectangular and odd-area maps; deterministic final-layer ties; edge compensation for large catchments; underfilled sealed regions; overlap union versus nominal summed area; maximum-source overlap; all Library/University mixtures; culture and park independence; campus fire/flood/demolition/undo; job cleanup; old-save compatibility; save/load/continuation; exact annual budget; unchanged no-building baselines; and UI/card/wish agreement immediately after edits.
 
 Probe zero buildings, each type alone, both small types, both large types, overlapping duplicates and separated coverage, using the same seeds and starting towns. Record population, K, cap, approval, jobs, cash and upkeep at 5, 15 and 30 years. Require the intended local effects and no duplicate-source stacking; do not assume that a cap increase must produce population growth. Measure tick cost at a dense campus count. Numerical tuning must cite these results rather than overwrite golden baselines merely to pass tests.

@@ -1976,4 +1976,4 @@ Each tent occupies one saved free grass tile. Construction and bulldozing cannot
 
 ## Proposed extension: knowledge and culture (not implemented)
 
-The owner requested a 3×3 University and Amphitheater, plus a 2×2 Library and Gallery. The [knowledge and culture proposal](docs/PROPOSAL-KNOWLEDGE-CULTURE-2026-09-05.md) defines distinct effects, tentative balance, artwork, mixed-size civic integration and acceptance criteria. It is a future specification; current simulation rules above remain the implemented behavior.
+The owner requested a 3×3 University and Amphitheater, plus a 2×2 Library and Gallery. University coverage is based on half the map tile count, Amphitheater on one eighth, and Library/Gallery on a five-tile local range. The [knowledge and culture proposal](docs/PROPOSAL-KNOWLEDGE-CULTURE-2026-09-05.md) defines distinct effects, tentative balance, artwork, mixed-size civic integration and acceptance criteria. It is a future specification; current simulation rules above remain the implemented behavior.

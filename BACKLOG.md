@@ -10,7 +10,7 @@ could ship whole.
 
 ## Knowledge and culture — specified, not implemented
 
-- [ ] **University (3×3), Amphitheater (3×3), Library (2×2), Gallery (2×2):** [proposal and acceptance criteria](docs/PROPOSAL-KNOWLEDGE-CULTURE-2026-09-05.md). Knowledge supports city capacity; culture adds local mood. Building sizes are owner requirements; mechanics and balance values are proposed. The historical school/accelerated-adulthood idea remains deferred.
+- [ ] **University (3×3), Amphitheater (3×3), Library (2×2), Gallery (2×2):** [proposal and acceptance criteria](docs/PROPOSAL-KNOWLEDGE-CULTURE-2026-09-05.md). Knowledge supports city capacity; culture adds local mood. Building sizes and coverage are owner requirements: University half the map tiles, Amphitheater one eighth, Library/Gallery five-tile range. Mechanics and balance values are proposed. The historical school/accelerated-adulthood idea remains deferred.
 
 ## Owner-reported follow-ups — 2026-09-05
 
