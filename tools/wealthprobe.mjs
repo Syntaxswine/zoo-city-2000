@@ -40,7 +40,7 @@ import { tick } from "../js/sim/tick.js";
 import { apply } from "../js/sim/ops.js";
 import { computeFields } from "../js/sim/fields.js";
 import { KNOBS } from "../js/sim/rules.js";
-import { rungsFor, siteOf, attainableClass } from "../js/sim/wealth.js";
+import { rungsFor, siteOf, CLASS } from "../js/sim/wealth.js";
 
 const args = process.argv.slice(2);
 const arg = (k, d) => { const i = args.indexOf(k); return i >= 0 && args[i + 1] != null ? args[i + 1] : d; };
@@ -139,10 +139,10 @@ function graftQuarter(w, sx, sy) {
 }
 /** The nine tiles of the 3×3 anchored at a. */
 const nineOf = (w, a) => [0, 1, 2].flatMap((dy) => [0, 1, 2].map((dx) => a + dx + dy * w.w));
-/** Every opportunity the corner's WINDOW lacks and every drag on it — the 3×3 read as a mansion would be (at its heart, nature round its border) — what keeps the mansion, whatever the card's next class is. */
-const allUnmet = (w, a) => { const { opp, drag } = rungsFor(w, siteOf(w, a, nineOf(w, a))); return [...opp.filter((o) => o.have < o.worth).map((o) => (o.have ? `${o.rung} ${o.have}/${o.worth}` : o.rung)), ...drag.filter((d) => d.on).map((d) => d.rung)]; }; // "knowledge 1/2": had in part
-/** The window's points this month — the mansion's own once it stands. */
-const pointsAt = (w, a) => attainableClass(w, a, null, w.mansion[a] ? null : nineOf(w, a)).points;
+/** Every item of the AFFLUENT checklist the corner's WINDOW lacks — the 3×3 read as a mansion would be (at its heart) — what keeps the mansion, whatever the card's next class is. */
+const allUnmet = (w, a) => rungsFor(w, siteOf(w, a, nineOf(w, a)), CLASS.AFFLUENT).filter((r) => !r.ok).map((r) => r.rung);
+/** The window's ticks this month, "6/8" — the mansion's own once it stands. */
+const ticksAt = (w, a) => { const r = rungsFor(w, siteOf(w, a, w.mansion[a] ? null : nineOf(w, a)), CLASS.AFFLUENT); return `${r.filter((x) => x.ok).length}/${r.length}`; };
 
 function runOne(seed) {
   const world = createWorld({ seed });
@@ -198,7 +198,7 @@ function runOne(seed) {
       for (let i = 0; i < world.w * world.h; i++) if (world.zone[i] === ZONE.R && !isPart(world, i) && world.tier[i] > 0) lots[world.klass[i]]++;
       const heart = corner >= 0 ? corner + 1 + world.w : -1; // the window's heart: where its ladder is read
       rows.push({ year: (t + 1) / 12, P: c.P, by: c.byClass, share: c.taxShareByClass, cash: world.cash, mansions: c.mansions, lots, lv: heart >= 0 ? world.lv[heart] : 0, pol: heart >= 0 ? world.pol[heart] : 0, crime: heart >= 0 ? world.crime[heart] : 0,
-        points: corner >= 0 ? pointsAt(world, corner) : 0, unmet: corner >= 0 && !risen.length ? allUnmet(world, corner).join(" · ") : "" });
+        ticks: corner >= 0 ? ticksAt(world, corner) : "", unmet: corner >= 0 && !risen.length ? allUnmet(world, corner).join(" · ") : "" });
     }
   }
   const byClass = { 0: { n: 0, arrested: 0, cold: 0, open: 0, waited: {} }, 1: { n: 0, arrested: 0, cold: 0, open: 0, waited: {} }, 2: { n: 0, arrested: 0, cold: 0, open: 0, waited: {} } };
@@ -215,15 +215,15 @@ if (!justice) {
   if (!r.where) console.log("  NOWHERE TO PUT THE QUARTER — no 3×3 of R chalk touching a road; nothing measured");
   else {
     console.log(`  landed: ${where(r)}`);
-    console.log(`  what the corner's window lacked, and what dragged on it — months before the first mansion (${r.monthsWaiting} months): ${Object.entries(r.unmetMonths).sort((a, b) => b[1] - a[1]).map(([k, v]) => `${k} ${v}`).join(" · ") || "none"}`);
+    console.log(`  what the corner's window lacked of the affluent checklist — months before the first mansion (${r.monthsWaiting} months): ${Object.entries(r.unmetMonths).sort((a, b) => b[1] - a[1]).map(([k, v]) => `${k} ${v}`).join(" · ") || "none"}`);
     console.log(`  mansions: ${r.risen.length ? r.risen.map((m) => `month ${m.t} at (${m.anchor % r.world.w},${(m.anchor / r.world.w) | 0}) — ${m.displaced} moved out; ${m.campers} household${m.campers === 1 ? "" : "s"} camping that month, ${r.campersByMonth[m.t + 12] ?? "—"} a year on`).join(" · ") : "NONE ROSE"}`);
     if (r.risen.length) console.log(`  what the rises cost the street: ${r.risen.reduce((s, m) => s + m.displaced, 0)} animals moved out over ${r.risen.length} mansion${r.risen.length === 1 ? "" : "s"}`);
     for (const m of r.risen.slice(0, 3)) console.log(`    ${m.line}`);
   }
-  if (csv) { console.log("year,P,poverty,modest,affluent,sharePoverty,shareModest,shareAffluent,cash,mansions,lotsPoverty,lotsModest,lotsAffluent,lv,pol,crime,points,unmet"); for (const x of r.rows) console.log([x.year, x.P, ...x.by, ...x.share.map((s) => s.toFixed(3)), x.cash, x.mansions, ...x.lots, x.lv, x.pol, x.crime, x.points, x.unmet].join(",")); }
+  if (csv) { console.log("year,P,poverty,modest,affluent,sharePoverty,shareModest,shareAffluent,cash,mansions,lotsPoverty,lotsModest,lotsAffluent,lv,pol,crime,ticks,unmet"); for (const x of r.rows) console.log([x.year, x.P, ...x.by, ...x.share.map((s) => s.toFixed(3)), x.cash, x.mansions, ...x.lots, x.lv, x.pol, x.crime, x.ticks, x.unmet].join(",")); }
   else {
-    console.log(" yr     P  poverty modest  affl | tax share p/m/a | lots p/m/a  |   cash  | mans |  heart LV pol crime pts  lacking / dragging");
-    for (const x of r.rows) console.log(`${String(x.year).padStart(3)} ${String(x.P).padStart(5)} ${String(x.by[0]).padStart(8)} ${String(x.by[1]).padStart(6)} ${String(x.by[2]).padStart(5)} | ${x.share.map((s) => `${Math.round(100 * s)}%`.padStart(4)).join(" ")} | ${x.lots.map((n) => String(n).padStart(3)).join(" ")} | ${String(x.cash).padStart(7)} | ${String(x.mansions).padStart(4)} | ${String(x.lv).padStart(9)} ${String(x.pol).padStart(3)} ${String(x.crime).padStart(5)} ${String(x.points).padStart(3)}  ${x.unmet}`);
+    console.log(" yr     P  poverty modest  affl | tax share p/m/a | lots p/m/a  |   cash  | mans |  heart LV pol crime ticks  lacking");
+    for (const x of r.rows) console.log(`${String(x.year).padStart(3)} ${String(x.P).padStart(5)} ${String(x.by[0]).padStart(8)} ${String(x.by[1]).padStart(6)} ${String(x.by[2]).padStart(5)} | ${x.share.map((s) => `${Math.round(100 * s)}%`.padStart(4)).join(" ")} | ${x.lots.map((n) => String(n).padStart(3)).join(" ")} | ${String(x.cash).padStart(7)} | ${String(x.mansions).padStart(4)} | ${String(x.lv).padStart(9)} ${String(x.pol).padStart(3)} ${String(x.crime).padStart(5)} ${String(x.ticks).padStart(5)}  ${x.unmet}`);
   }
   const last = r.rows[r.rows.length - 1];
   console.log(`end: P ${last.P} · ${last.by[0]} in poverty · ${last.by[1]} modest carrying ${Math.round(100 * last.share[1])}% of the R tax · ${last.by[2]} affluent carrying ${Math.round(100 * last.share[2])}% · ${last.mansions} mansion${last.mansions === 1 ? "" : "s"} · cash ${fmt(last.cash)}`);

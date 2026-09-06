@@ -391,3 +391,47 @@ town-wide (one number); MANSION_P 0.25 against three mansions in fourteen
 months hollowing a quarter and a third of a town into tents (a rate, a cap per
 quarter or a fill rule — one knob each); a mansion rises on EMPTY chalk the
 month the amenities land, before anyone lives there.
+
+## Owner ruling — 2026-09-06: a checklist, not points
+
+On the points ladder and its measurement (one Amphitheater made a town modest
+and doubled its R income), the owner: *"so it should not be about points in
+the sense that each item has a variable amount of influence, its more about a
+checklist, the affluent house MUST be in range of all of these, amphitheater,
+university, library, gallery, large park within 5 tiles, police, fire. and a
+shop within 10 road tiles"*.
+
+**What changed.** A class is a CHECKLIST — every item required, none weighed
+against another. The AFFLUENT list is the owner's, word for word: an
+Amphitheater, a University, a Library and a Gallery each reaching the address
+(a new derived field, `world.civicReach`, keeps a bit per building beside the
+knowledge and culture fields, which keep only the stronger source and cannot
+tell a Library from a University); a Large Park with a tile within 5 of the
+heart; a police station's cover; a fire station's cover; a standing shop within
+10 road tiles of a door. The MODEST list is the proposal's default — culture in
+reach and a park within the same five — because the owner has not ruled on the
+modest. Nothing else is on either list: not the air, not the crime, not the
+land value, not the trees. So a 3×3 in the densest block is affluent the month
+the last item lands, and the police station on the list is what its crime
+answers to. The window still admits whole blocks inside it (the apartment block
+becomes the mansion). The card says which items are in range and which the
+next class still wants; Rules W1 and the MANSION line say the same.
+
+**What it measured** (`tools/wealthprobe.mjs`, estate layout, seed 7, thirty
+years; the graft is the list itself, §5,350 a year). Into the High block at
+year 0: the mansion in month 25, the shop the last item for 22 months; the
+Russets (5 foxes) kept the house, 149 animals were moved out, none camping a
+year on; the town at year 30 carried the list's upkeep as its whole surplus —
+§1,444 with TAX_CLASS [1, 2, 5], −§46,983 with no class tax: the progressive
+tax is what pays for the list. Carved into the FULL block at year 5: month 66,
+the Fangleys (7 wolves), 158 moved out. The planned quarter: month 28. The
+control — the four buildings and a park, no Large Park, no stations, no shop —
+never. Justice, four seeds: mansions on 3 of 4 seeds, two affluent files
+(killings), both cleared, both the hall; a mansion was never a hot lot (crime
+at most 11). Under the points ladder the same graft raised mansions in months
+10 and 27; under the gates never.
+
+**Open for the owner.** The MODEST list; "in range" for the police and the
+fire station read as their cover (a radius, like the park's five, is one item
+away if tiles were meant); MANSION_P 0.25 against the shop that binds for two
+years; a mansion on EMPTY chalk the month the last item lands.

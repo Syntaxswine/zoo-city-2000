@@ -96,6 +96,7 @@ export function createWorld({ seed = "zoo", w = 64, h = 64 } = {}) {
     knowledge: new Uint8Array(n), // 0 none · 1 a Library · 2 a University reaches this tile (the strongest; fields.computeKnowledgeCulture; SPEC §9e)
     culture: new Uint8Array(n), // 0 none · 1 a Gallery · 2 an Amphitheater
     klass: new Uint8Array(n), // WEALTH (SPEC §9f, wealth.computeClass): the class the ADDRESS attains this month — 0 poverty · 1 modest · 2 affluent — on every R lot of its own or block anchor; derived after the fields, never saved
+    civicReach: new Uint8Array(n), // WEALTH (SPEC §9f, fields.computeKnowledgeCulture): WHICH of the four public buildings reach the tile, fields.REACH bits — the checklist asks for each by name where the knowledge and culture fields keep only the stronger; derived, never saved
     _camGen: 0, // the camera walk’s visited-set generation (fields.computeCamCover)
     dread: new Uint8Array(n),
     carnAt: new Uint16Array(n), // Uint16 since the blocks: a 3×3 R block keeps 270 animals on its anchor

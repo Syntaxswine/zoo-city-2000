@@ -152,6 +152,8 @@ export function touchesRoad(world, tiles) {
 }
 
 export const served = (world, i, seen = null) => siteRoadDist(world, i, seen) <= KNOBS.ROAD_REACH;
+/** world.civicReach bits: WHICH of the four public buildings reach a tile (a Library or a University may both, where the knowledge field keeps only the stronger) — wealth.js's checklist reads them (SPEC §9f). */
+export const REACH = Object.freeze({ LIBRARY: 1, UNIVERSITY: 2, GALLERY: 4, AMPHITHEATER: 8 });
 
 /**
  * Traffic: the number of commuter paths through each tile they WALK - roads,
@@ -329,7 +331,10 @@ export function computeLandValue(world) {
  * (a Gallery) / 2 (an Amphitheater) — the STRONGEST source reaching the tile,
  * never a sum (two Libraries are still 50 knowledge; a Gallery under an
  * Amphitheater is still +8). The knobs turn the class into a number:
- * KNOWLEDGE[k], CULTURE_MOOD[k], LV_CULTURE[k].
+ * KNOWLEDGE[k], CULTURE_MOOD[k], LV_CULTURE[k]. Beside them world.civicReach
+ * keeps WHICH buildings reach the tile (REACH bits), because the wealth
+ * checklist (SPEC §9f) asks for a Library AND a University, a Gallery AND an
+ * Amphitheater — the strongest-source fields cannot tell one from both.
  *
  * A building OPERATES while it is served (a road within ROAD_REACH of its
  * footprint — the one predicate) and no tile of it is flooded or alight;
@@ -346,6 +351,7 @@ export function computeKnowledgeCulture(world) {
   const n = w * h;
   world.knowledge.fill(0);
   world.culture.fill(0);
+  world.civicReach.fill(0);
   for (let i = 0; i < n; i++) {
     const c = world.civic[i];
     const knowledge = isKnowledgeCivic(c);
@@ -355,7 +361,8 @@ export function computeKnowledgeCulture(world) {
     if (tiles.some((j) => world.flooded[j] || world.burning[j])) continue;
     const field = knowledge ? world.knowledge : world.culture;
     const cls = c === CIVIC.LIBRARY || c === CIVIC.GALLERY ? 1 : 2;
-    const paint = (j) => { if (field[j] < cls) field[j] = cls; };
+    const bit = c === CIVIC.LIBRARY ? REACH.LIBRARY : c === CIVIC.UNIVERSITY ? REACH.UNIVERSITY : c === CIVIC.GALLERY ? REACH.GALLERY : REACH.AMPHITHEATER;
+    const paint = (j) => { if (field[j] < cls) field[j] = cls; world.civicReach[j] |= bit; };
     if (cls === 1) forEachWithinAll(world, tiles, KNOBS.KNOW_RADIUS, paint);
     else floodBudget(world, tiles, Math.ceil(n * (c === CIVIC.UNIVERSITY ? KNOBS.KNOW_UNI_SHARE : KNOBS.CULT_AMPH_SHARE)), paint);
   }

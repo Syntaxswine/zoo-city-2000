@@ -59,13 +59,13 @@ The build remote on the left is the key: `1` Residential, `2` Commercial,
 Tree, `E` Camera, `0` Park, `G` Large Park, `Z` Zoo (prison), `V` Pacification, `P` Police, `F` Fire, `I` Inspect,
 `B` Bulldoze, the four public buildings — `K` Library, `Y` University, `M` Gallery, `T` Amphitheater (knowledge
 raises the town's capacity; culture lifts mood and land value; a University reaches half the map's tiles, an Amphitheater an eighth).
-There is no tool for a mansion: every street is in poverty, modest or affluent by the POINTS of what stands near it — culture
-at home (a Gallery 2, an Amphitheater 4), knowledge (a Library 1, a University 2), a park within four (1, a Large Park 2), a
-shop within six road tiles (1), trees or water beside it (1), less one each for smoke, a hot street and a meat hall's dread;
-modest at 3, affluent at 7 with culture — and where a 3×3 of housing sits on an affluent address, dense tenements and
-apartment blocks included, a mansion rises on its own, like a storey: one household keeps the house and the rest are moved
-out (their tax is ×5, their burglaries are worked first and sentenced a step harder; every lot's card says its points, what
-they are made of and what the next class needs). `H` changes density and `U` opens the use-zoning checklist. WASD and the
+There is no tool for a mansion: every street is in poverty, modest or affluent by a CHECKLIST of what stands near it — the
+modest need culture in reach and a park within five; the affluent need every one of an Amphitheater, a University, a Library
+and a Gallery in reach, a Large Park within five, a police and a fire station's cover, and a shop within ten road tiles —
+and where a 3×3 of housing sits on an affluent address, dense tenements and apartment blocks included, a mansion rises on its
+own, like a storey: one household keeps the house and the rest are moved out (their tax is ×5, their burglaries are worked
+first and sentenced a step harder; every lot's card says which items are in range and which the next class still wants).
+`H` changes density and `U` opens the use-zoning checklist. WASD and the
 arrows only pan. `Backspace` or `Ctrl+Z` undoes; `Ctrl+S` opens save-as and
 `L` opens the saves list. The generated help line in the game carries the
 remaining pause, speed, overlay, news, zoom, new-city and menu keys.

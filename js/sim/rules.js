@@ -174,25 +174,20 @@ export const KNOBS = {
   NEED_CULTURE_PTS: 4,      // the culture wish sits exactly on NEED_MIN — it speaks only when nothing else is wrong
   // ---- wealth and class (the owner, 2026-09-05; docs/PROPOSAL-WEALTH-AND-CLASS-2026-09-05.md; sim/wealth.js) ----
   // Class is what the ADDRESS attains this month (the owner: "class based on the opportunities near you" · "mansions should
-  // rise in dense blocks too. the biggest factor should be what amenities are near it"): 0 poverty · 1 modest · 2 affluent,
-  // derived on every R lot by wealth.computeClass from POINTS — the positive things in reach of the address, every one a field
-  // the game already computes, less a point for each thing the street does to them and never more than three — so the
-  // amenities decide and the fields only drag. A 3×3 is read at its heart. Index = the class the number is FOR.
+  // rise in dense blocks too. the biggest factor should be what amenities are near it" · "its more about a checklist, the
+  // affluent house MUST be in range of all of these"): 0 poverty · 1 modest · 2 affluent, derived on every R lot by
+  // wealth.computeClass from a CHECKLIST per class — every item required, none weighed against another; nothing else (not
+  // the air, the crime, the land value or the trees) is on a list. A 3×3 is read at its heart. wealth.ITEMS names the items.
   TAX_CLASS: [1, 2, 5],          // × the R tax base per animal, by the class at home — the owner's PROGRESSIVE tax, "to balance out that less people can live on the same plot"; the Census prints the share
   MANSION_CAP: 8,                // a mansion houses ONE household — two adults and their cubs — on nine tiles that would hold 270 ("less people are homed in the same area")
   MANSION_P: 0.25,               // p = MANSION_P·score a month for a 3×3 of housing whose address is affluent — SPROUT_P's rate, not a block's BIG_P: the address has done the work a storey's fill does
-  CLASS_MIN: [0, 3, 7],          // POINTS an address needs: modest 3, affluent 7 of the 10 there are
-  CLASS_CULTURE_MIN: [0, 0, 1],  // … and the affluent need culture at home whatever their points — the owner's morning word was PREREQUISITE
-  OPP_CULTURE: [0, 2, 4],        // points by the culture level at home: a Gallery's, an Amphitheater's — the biggest single factor, as the owner asked
-  OPP_KNOWLEDGE: [0, 1, 2],      // a Library's, a University's
-  OPP_PARK: [0, 1, 2],           // a Park, a Large Park, within CLASS_PARK_RADIUS (the PARK mood term's own test) — the better of the two
-  CLASS_PARK_RADIUS: 4,
-  OPP_SHOP: 1,                   // a standing shop within CLASS_SHOP_ROAD road tiles of a door
-  CLASS_SHOP_ROAD: 6,
-  OPP_NATURE: 1,                 // water or trees beside the plot (land value's own nature8; round a 3×3's border)
-  DRAG_POL: 40,                  // a point off for smoke: pollution over this at the heart (R refuses to grow at SMOG_REFUSE 60)
-  DRAG_CRIME: 60,                // a point off for a hot street: crime over this (CRIME_HIGH, the burglary's own line — a dense block's heart reads 100)
-  DRAG_DREAD: 0,                 // a point off for a meat hall's dread over this — any at all
+  CLASS_NEEDS: [                 // the CHECKLISTS, by class — every item required (wealth.ITEMS says how each is read)
+    [],                          //   poverty: the street with none of it
+    ["culture", "park"],         //   modest: culture in reach (a Gallery or an Amphitheater) and a park within CLASS_PARK_RADIUS — the proposal's default; the owner has not ruled on the modest
+    ["amphitheater", "university", "library", "gallery", "largePark", "police", "fire", "shop"], // affluent: the owner's list, word for word — "the affluent house MUST be in range of all of these, amphitheater, university, library, gallery, large park within 5 tiles, police, fire. and a shop within 10 road tiles"
+  ],
+  CLASS_PARK_RADIUS: 5,          // a park within this many tiles of the heart — the owner's "large park within 5 tiles"
+  CLASS_SHOP_ROAD: 10,           // a standing shop within this many road tiles of a door — the owner's "a shop within 10 road tiles"
   ARREST_PRIORITY: [0, 0.05, 0.15], // added to the ARREST roll by the class at the victim's address — "priority policing" as probability, since files roll independently
   CASE_MONTHS_RICH: 12,          // … and a file from an affluent address is worked twice as long (CASE_MONTHS 6 for everyone else)
   // ---- crime and punishment (the owner, 2026-09-02; docs/PROPOSAL-CRIME-AND-PUNISHMENT.md) ----
@@ -409,7 +404,7 @@ export const RULES = Object.freeze([
   },
   {
     id: "W1", title: "Wealth and class: an address is what the opportunities near it afford, this month",
-    formula: "every R lot is in POVERTY, MODEST or AFFLUENT by its own street each month, and its households with it (a 3×3 is read at its heart, one in from the kerb, its nature round its border) ; POINTS = culture at home (a Gallery 2, an Amphitheater 4) + knowledge at home (a Library 1, a University 2) + a park within 4 (a Park 1, a Large Park 2) + a shop within 6 road tiles (1) + water or trees beside (1), less one each for pollution > 40, crime > 60 and any meat hall's dread ; MODEST at 3 points, AFFLUENT at 7 and culture at home — the amenities decide, the street only drags ; R tax × 1 / 2 / 5 (progressive) ; where a 3×3 of housing — lots of their own or whole blocks inside it — would be affluent and demand is positive it may rise as a MANSION at 0.25·score a month: one household keeps the house, everyone else on the nine tiles is moved out, and eight animals live where 270 could",
+    formula: "every R lot is in POVERTY, MODEST or AFFLUENT by its own street each month, and its households with it (a 3×3 is read at its heart, one in from the kerb) ; a class is a CHECKLIST, every item required and none weighed: MODEST = culture in reach (a Gallery or an Amphitheater) + a park within 5 ; AFFLUENT = an Amphitheater + a University + a Library + a Gallery each in reach + a Large Park within 5 + a police station's cover + a fire station's cover + a shop within 10 road tiles — the owner's list; nothing else (not the air, the crime, the land value or the trees) is on it ; R tax × 1 / 2 / 5 (progressive) ; where a 3×3 of housing — lots of their own or whole blocks inside it — would be affluent and demand is positive it may rise as a MANSION at 0.25·score a month: one household keeps the house, everyone else on the nine tiles is moved out, and eight animals live where 270 could",
     live: (w) => { const c = w.last.census; const by = c.byClass || [0, 0, 0]; const sh = c.taxShareByClass || [0, 0, 0]; return `${by[0]} in poverty · ${by[1]} modest · ${by[2]} affluent of ${c.P} · R tax share ${Math.round(100 * sh[0])}% / ${Math.round(100 * sh[1])}% / ${Math.round(100 * sh[2])}% · ${c.mansions || 0} mansion${c.mansions === 1 ? "" : "s"}${c.affluentLots ? ` · ${c.affluentLots} affluent address${c.affluentLots === 1 ? "" : "es"}` : ""}`; },
   },
   {

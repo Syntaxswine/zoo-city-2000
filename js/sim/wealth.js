@@ -1,4 +1,4 @@
-// wealth.js — WEALTH AND CLASS: the opportunities, the class field, the mansion. SPEC §9f;
+// wealth.js — WEALTH AND CLASS: the checklist, the class field, the mansion. SPEC §9f;
 // docs/PROPOSAL-WEALTH-AND-CLASS-2026-09-05.md. Pure; imports cleanly in Node.
 //
 // The owner, morning (2026-09-05): "culture will be a boon to both happiness as
@@ -16,7 +16,11 @@
 // punishment". The owner, night, on the first measurement (no mansion ever
 // rose inside a dense block, because a dense block's heart reads crime 100):
 // "mansions should rise in dense blocks too. the biggest factor should be what
-// amenities are near it."
+// amenities are near it." The owner, on the points that followed (2026-09-06):
+// "it should not be about points in the sense that each item has a variable
+// amount of influence, its more about a checklist, the affluent house MUST be
+// in range of all of these, amphitheater, university, library, gallery, large
+// park within 5 tiles, police, fire. and a shop within 10 road tiles"
 //
 // CLASS IS WHAT THE ADDRESS AFFORDS, THIS MONTH. world.klass[anchor] is derived
 // every tick after the fields (computeClass), never saved: 0 POVERTY · 1
@@ -27,24 +31,23 @@
 // built, like the species histogram is. Species is untouched: an affluent
 // skunk is allowed.
 //
-// THE OPPORTUNITIES. attainableClass(world, lot) COUNTS the positive things in
-// reach of the address — the owner's "enough positive things near you" — as
-// POINTS: culture at home (a Gallery's 2, an Amphitheater's 4), knowledge at
-// home (a Library's 1, a University's 2), a park within 4 (a Park 1, a Large
-// Park 2), a standing shop within 6 ROAD tiles (1), water or trees beside the
-// plot (1): ten in all, every one a thing the game already computes. The street
-// DRAGS on them, ONE point each and never more than three: smoke (pollution
-// over DRAG_POL), a hot street (crime over DRAG_CRIME, the burglary's own
-// line), a meat hall's dread. MODEST is CLASS_MIN 3 points; AFFLUENT is 7 AND
-// culture at home, whatever the points — the owner's morning word was
-// PREREQUISITE. So the amenities decide and the fields only drag: a 3×3 inside
-// a dense block, whose heart reads crime 100 by the game's own density law, is
-// a point down and affluent all the same when an Amphitheater, a University, a
-// Large Park and a shop are near it. Land value is NOT a rung: it is the tax's
-// (SPEC §10) and is already the sum of these same things. Every number is a
-// KNOB (rules.js OPP_*, DRAG_*, CLASS_MIN, CLASS_CULTURE_MIN). It returns the
-// points, what they are made of and what the next class still wants, in the
-// words the card and the Census share, so a poor street says what it lacks.
+// THE CHECKLIST. A class is a LIST of things the address must be in range of,
+// every one of them, none weighed against another (KNOBS.CLASS_NEEDS, by class;
+// ITEMS below says what each is and how it is read). The AFFLUENT list is the
+// owner's, word for word: an Amphitheater, a University, a Library and a
+// Gallery each reaching the address (world.civicReach, the four buildings'
+// own reaches — a University's half the map, a Library's five tiles — painted
+// beside the knowledge and culture fields), a Large Park within
+// CLASS_PARK_RADIUS 5, a police station's cover, a fire station's cover, and
+// a standing shop within CLASS_SHOP_ROAD 10 road tiles of a door. The MODEST
+// list, which the owner has not ruled on, is the proposal's default: culture
+// in reach (a Gallery or an Amphitheater) and a park within the same five.
+// Nothing else is on either list — not the air, not the street's crime, not
+// the land value, not the trees: the owner's "the biggest factor should be
+// what amenities are near it", and then "its more about a checklist". So a
+// 3×3 in the densest block is affluent the month the last item lands, and the
+// card says which items are ticked and which are not, in the words the Census
+// shares, so a poor street says what it lacks.
 //
 // THE MANSION RISES ON ITS OWN, like a storey: where the address is AFFLUENT
 // and demand is positive, the 3×3 of housing anchored at a lot — nine R tiles
@@ -72,7 +75,7 @@
 
 import { KNOBS } from "./rules.js";
 import { ZONE, CIVIC, ROAD, TERRAIN, PART, inBounds, anchorOf, sideOf, footprintOf, civicAnchorOf, isPart } from "./world.js";
-import { doorsOf } from "./fields.js";
+import { doorsOf, REACH } from "./fields.js";
 import { placeHousehold, displaceFrom } from "./citizens.js";
 import { KIND, remember } from "./life.js";
 import { pluralSpecies } from "./landmarks.js";
@@ -107,49 +110,19 @@ export function parkLevel(world, i, r) {
 }
 
 /**
- * WHERE A SITE'S LADDER IS READ. A lot of its own is read at itself, with its
- * eight neighbours for nature. A 3×3 — a block, a mansion, or the window that
- * would become one — is read at its HEART, the centre tile one in from the
- * kerb, because the address is the house and not the road it fronts (a busy
- * ring road puts up to 30 pollution on the tile beside it and nothing on the
- * next), and its nature is counted round the BORDER of the footprint (the
- * heart's own neighbours are all its own tiles, which would count for nothing).
- * A 2×2 block is read at its anchor with nature round its four tiles. Measured
- * before this rule: the owner-scale probe read the corner tile for 360 months
- * and air and land value failed for 330 of them on traffic alone. `footprint`
- * lets a caller judge a window that is not a block yet.
+ * WHERE A SITE'S CHECKLIST IS READ. A lot of its own is read at itself. A 3×3 —
+ * a block, a mansion, or the window that would become one — is read at its
+ * HEART, the centre tile one in from the kerb, because the address is the
+ * house and not the road it fronts: the four buildings' reaches, the stations'
+ * cover and the park's five tiles are all counted from there, and the shop's
+ * road walk starts from the site's doors. A 2×2 block is read at its anchor.
+ * `footprint` lets a caller judge a window that is not a block yet.
  */
 export function siteOf(world, i, footprint = null) {
   const a = anchorOf(world, i);
   const tiles = footprint || footprintOf(world, a);
   return { anchor: a, tiles, heart: tiles.length === 9 ? tiles[4] : a };
 }
-
-/** Water or trees among the tiles that BORDER `tiles` (Chebyshev 1 of any, not in the set) — land value's own nature8 for a lot of its own. */
-export function natureBeside(world, tiles) {
-  const { w } = world;
-  const inside = new Set(tiles);
-  const seen = new Set();
-  let n = 0;
-  for (const i of tiles) {
-    const tx = i % w;
-    const ty = (i / w) | 0;
-    for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
-      if (!dx && !dy) continue;
-      const xx = tx + dx;
-      const yy = ty + dy;
-      if (!inBounds(world, xx, yy)) continue;
-      const j = yy * w + xx;
-      if (inside.has(j) || seen.has(j)) continue;
-      seen.add(j);
-      const t = world.terrain[j];
-      if (t === TERRAIN.WATER || t === TERRAIN.TREE) n++;
-    }
-  }
-  return n;
-}
-/** A lot of its own: water or trees among its eight neighbours. */
-export const nature8 = (world, i) => natureBeside(world, [i]);
 
 /**
  * Every road tile that is a door of a standing shop (zone C, tier > 0, no
@@ -206,80 +179,73 @@ export function shopWithinRoad(world, lot, maxRoad, shopDoors = null) {
 }
 
 /**
- * THE OPPORTUNITIES at a SITE (siteOf) and the DRAGS on them:
- *   opp:  [{ rung, have, worth, name, want }] — `have` the points it gives now, `worth` the most it could, `name` what is
- *         there ("an Amphitheater"), `want` the sentence for what is missing, in the wish system's register
- *   drag: [{ rung, on, cause, want }] — a point off while `on`: `cause` for the card ("smoke (pollution 55)"), `want` the fix
- *   culture: the culture level at the heart, the affluent's prerequisite
- * The fields are read at the site's heart; the shop walk starts from the site's doors; nature is counted round its border.
- * `ctx.shopDoors` may carry the month's shop doors. Every number is a knob.
+ * THE ITEMS a checklist may name (KNOBS.CLASS_NEEDS lists them by class). Each:
+ * `ok(world, site, ctx)` reads the site — the fields, the reaches and the cover
+ * at its heart, the shop from its doors; `has(world, site)` is the item as the
+ * card names it when it is there; `want()` the sentence when it is not, in the
+ * wish system's register; `cheap` items read one tile and are asked first by
+ * mansionWindow, before the searches. `ctx.shopDoors` may carry the month's
+ * shop doors.
  */
-export function rungsFor(world, site, ctx = null) {
+export const ITEMS = Object.freeze({
+  culture: { cheap: true, ok: (w, s) => w.culture[s.heart] > 0, has: (w, s) => (w.culture[s.heart] >= 2 ? "an Amphitheater's culture" : "a Gallery's culture"), want: () => "culture in reach — a Gallery or an Amphitheater" },
+  knowledge: { cheap: true, ok: (w, s) => w.knowledge[s.heart] > 0, has: (w, s) => (w.knowledge[s.heart] >= 2 ? "a University's knowledge" : "a Library's knowledge"), want: () => "knowledge in reach — a Library or a University" },
+  amphitheater: { cheap: true, ok: (w, s) => (w.civicReach[s.heart] & REACH.AMPHITHEATER) !== 0, has: () => "an Amphitheater", want: () => "an Amphitheater in reach" },
+  university: { cheap: true, ok: (w, s) => (w.civicReach[s.heart] & REACH.UNIVERSITY) !== 0, has: () => "a University", want: () => "a University in reach" },
+  library: { cheap: true, ok: (w, s) => (w.civicReach[s.heart] & REACH.LIBRARY) !== 0, has: () => "a Library", want: () => "a Library in reach" },
+  gallery: { cheap: true, ok: (w, s) => (w.civicReach[s.heart] & REACH.GALLERY) !== 0, has: () => "a Gallery", want: () => "a Gallery in reach" },
+  park: { cheap: false, ok: (w, s) => parkLevel(w, s.heart, KNOBS.CLASS_PARK_RADIUS) >= 1, has: (w, s) => (parkLevel(w, s.heart, KNOBS.CLASS_PARK_RADIUS) === 2 ? "a Large Park" : "a Park"), want: () => `a Park or Large Park within ${KNOBS.CLASS_PARK_RADIUS}` },
+  largePark: { cheap: false, ok: (w, s) => parkLevel(w, s.heart, KNOBS.CLASS_PARK_RADIUS) === 2, has: () => "a Large Park", want: () => `a Large Park within ${KNOBS.CLASS_PARK_RADIUS}` },
+  police: { cheap: true, ok: (w, s) => w.policeCov[s.heart] > 0, has: () => "police", want: () => "a police station's cover" },
+  fire: { cheap: true, ok: (w, s) => w.fireCov[s.heart] > 0, has: () => "fire", want: () => "a fire station's cover" },
+  shop: { cheap: false, ok: (w, s, ctx) => shopWithinRoad(w, s.anchor, KNOBS.CLASS_SHOP_ROAD, (ctx && ctx.shopDoors) || null), has: () => "a shop", want: () => `a shop within ${KNOBS.CLASS_SHOP_ROAD} road tiles` },
+});
+
+/**
+ * The checklist of class k (MODEST or AFFLUENT) read at a SITE (siteOf), each
+ * { rung, ok, has, want } — `has` the item as the card names it when it is
+ * there (null when it is not), `want` the sentence for a missing one.
+ */
+export function rungsFor(world, site, k, ctx = null) {
   if (typeof site === "number") site = siteOf(world, site);
-  const a = site.heart;
-  const opp = [];
-  const cul = world.culture[a];
-  const oc = KNOBS.OPP_CULTURE;
-  opp.push({ rung: "culture", have: oc[cul], worth: oc[2], name: cul >= 2 ? "an Amphitheater" : "a Gallery",
-    want: cul === 0 ? `culture at home — a Gallery (+${oc[1]}) or an Amphitheater (+${oc[2]}) in reach` : `an Amphitheater's culture (+${oc[2] - oc[cul]} more)` });
-  const kn = world.knowledge[a];
-  const ok = KNOBS.OPP_KNOWLEDGE;
-  opp.push({ rung: "knowledge", have: ok[kn], worth: ok[2], name: kn >= 2 ? "a University" : "a Library",
-    want: kn === 0 ? `knowledge at home — a Library (+${ok[1]}) or a University (+${ok[2]}) in reach` : `a University's knowledge (+${ok[2] - ok[kn]} more)` });
-  const pk = parkLevel(world, a, KNOBS.CLASS_PARK_RADIUS);
-  const op = KNOBS.OPP_PARK;
-  opp.push({ rung: "park", have: op[pk], worth: op[2], name: pk >= 2 ? "a Large Park" : "a Park",
-    want: pk === 0 ? `a Park (+${op[1]}) or a Large Park (+${op[2]}) within ${KNOBS.CLASS_PARK_RADIUS}` : `a Large Park within ${KNOBS.CLASS_PARK_RADIUS} (+${op[2] - op[pk]} more)` });
-  const shop = shopWithinRoad(world, site.anchor, KNOBS.CLASS_SHOP_ROAD, (ctx && ctx.shopDoors) || shopDoorSet(world));
-  opp.push({ rung: "shops", have: shop ? KNOBS.OPP_SHOP : 0, worth: KNOBS.OPP_SHOP, name: "a shop", want: `a shop within ${KNOBS.CLASS_SHOP_ROAD} road tiles (+${KNOBS.OPP_SHOP})` });
-  const nat = natureBeside(world, site.tiles);
-  opp.push({ rung: "nature", have: nat ? KNOBS.OPP_NATURE : 0, worth: KNOBS.OPP_NATURE, name: "trees or water beside", want: `water or trees beside the plot (+${KNOBS.OPP_NATURE})` });
-  const drag = [
-    { rung: "air", on: world.pol[a] > KNOBS.DRAG_POL, cause: `smoke (pollution ${world.pol[a]})`, want: `cleaner air (pollution ${world.pol[a]}, over ${KNOBS.DRAG_POL})` },
-    { rung: "streets", on: world.crime[a] > KNOBS.DRAG_CRIME, cause: `the streets (crime ${world.crime[a]})`, want: `safer streets (crime ${world.crime[a]}, over ${KNOBS.DRAG_CRIME})` },
-    { rung: "smell", on: world.dread[a] > KNOBS.DRAG_DREAD, cause: `a meat hall's dread (${world.dread[a]})`, want: `no meat hall's dread (${world.dread[a]})` },
-  ];
-  return { opp, drag, culture: cul };
+  return KNOBS.CLASS_NEEDS[k].map((name) => {
+    const it = ITEMS[name];
+    const ok = it.ok(world, site, ctx);
+    return { rung: name, ok, has: ok ? it.has(world, site) : null, want: it.want() };
+  });
 }
 
 /**
- * The class a lot attains NOW and what the next class wants:
- * { cls, next, points, max, nextAt, cultureShort, have: [opp], drags: [drag], unmet: [{ rung, want, worth }] } — `points`
- * the opportunities less the drags, `nextAt` the next class's CLASS_MIN (null at AFFLUENT), `cultureShort` whether the next
- * class's culture prerequisite is unmet, `have` the opportunities that give points, `drags` the ones that are on, `unmet`
- * every opportunity not fully had and every drag on (empty at AFFLUENT). The ladder as the fields stand; computeClass
- * writes the class into world.klass once a month, the card asks it live.
+ * The class a lot attains NOW and the checklist that decides its next step:
+ * { cls, next, list, have, unmet } — `list` the checklist judged (the next
+ * class's; the affluent's own when nothing is left to climb), `have` its items
+ * that are there, `unmet` the ones that are not (empty at AFFLUENT). The
+ * checklists as the fields stand; computeClass writes the class into
+ * world.klass once a month, the card asks it live.
  */
 export function attainableClass(world, i, ctx = null, footprint = null) {
   const site = siteOf(world, i, footprint);
-  const { opp, drag, culture } = rungsFor(world, site, ctx);
-  const drags = drag.filter((d) => d.on);
-  const points = opp.reduce((s, o) => s + o.have, 0) - drags.length;
-  const max = opp.reduce((s, o) => s + o.worth, 0);
-  const afford = (k) => points >= KNOBS.CLASS_MIN[k] && culture >= KNOBS.CLASS_CULTURE_MIN[k];
-  const cls = afford(CLASS.AFFLUENT) ? CLASS.AFFLUENT : afford(CLASS.MODEST) ? CLASS.MODEST : CLASS.POVERTY;
+  let cls = CLASS.POVERTY;
+  let list = [];
+  for (let k = CLASS.MODEST; k <= CLASS.AFFLUENT; k++) {
+    list = rungsFor(world, site, k, ctx);
+    if (list.some((r) => !r.ok)) break;
+    cls = k;
+  }
   const next = cls < CLASS.AFFLUENT ? cls + 1 : null;
-  const unmet = next === null ? [] : [
-    ...opp.filter((o) => o.have < o.worth).map((o) => ({ rung: o.rung, want: o.want, worth: o.worth - o.have })),
-    ...drags.map((d) => ({ rung: d.rung, want: d.want, worth: 1 })),
-  ];
-  return { cls, next, points, max, nextAt: next === null ? null : KNOBS.CLASS_MIN[next], cultureShort: next !== null && culture < KNOBS.CLASS_CULTURE_MIN[next], have: opp.filter((o) => o.have > 0), drags, unmet };
+  return { cls, next, list, have: list.filter((r) => r.ok), unmet: list.filter((r) => !r.ok) };
 }
 
-/** "7 of 10 points — an Amphitheater, a Library, a Park, a shop; 1 off for the streets (crime 100)": what the address has, for the card and the line. */
-export function pointsLine(res) {
-  const has = res.have.length ? ` — ${res.have.map((o) => o.name).join(", ")}` : "";
-  const off = res.drags.length ? `; ${res.drags.length} off for ${res.drags.map((d) => d.cause).join(" and ")}` : "";
-  return `${res.points} of ${res.max} points${has}${off}`;
+/** "in range of an Amphitheater, a Gallery, police — 3 of 8 the affluent need" · "in range of everything the affluent need — …" · "in range of nothing the modest need (0 of 2)": what the address has, for the card and the line. */
+export function haveLine(res) {
+  const who = CLASS_NAME[res.next === null ? CLASS.AFFLUENT : res.next];
+  const names = res.have.map((r) => r.has).join(", ");
+  if (res.next === null) return `in range of everything the ${who} need — ${names}`;
+  return res.have.length ? `in range of ${names} — ${res.have.length} of ${res.list.length} the ${who} need` : `in range of nothing the ${who} need (0 of ${res.list.length})`;
 }
 
-/** What the next class wants, as one line for the card: "2 more points: a University's knowledge (+1 more) · a Large Park within 4 (+1 more) · safer streets (crime 100, over 60)". Empty at AFFLUENT. */
-export function waitingLine(res) {
-  if (res.next === null) return "";
-  const short = res.nextAt - res.points;
-  const head = short > 0 ? `${short} more point${short === 1 ? "" : "s"}${res.cultureShort ? " and culture at home" : ""}` : "culture at home";
-  return `${head}: ${res.unmet.map((r) => r.want).join(" · ")}`;
-}
+/** The missing items as one line for the card: "a University in reach · a Large Park within 5 · a fire station's cover". Empty at AFFLUENT. */
+export const waitingLine = (res) => res.unmet.map((r) => r.want).join(" · ");
 
 /**
  * THE CLASS FIELD: world.klass[i] for every R lot of its own or block anchor
@@ -305,16 +271,14 @@ export function computeClass(world) {
  * a tile of a block lying WHOLLY inside the window (a 2×2 within it, or the
  * 3×3 block that is the window: the apartment block becomes the mansion, the
  * owner's "like when the building upgrades to an apartment building"); no
- * standing mansion anywhere in it — where the ADDRESS is affluent — the ladder
- * read on the window as the 3×3 it would be (siteOf: at its heart, nature
- * round its border). Reads only; lots.lotScore rolls it at MANSION_P·score.
- * Anchored at i, so a window rolls once a month and not once from each of its
- * nine tiles. The cheap questions come first: culture at the heart is the
- * affluent's prerequisite, and the MOST the address could score — its culture
- * and knowledge as they are, the best park, a shop and nature, less the
- * heart's drags — must reach CLASS_MIN before the searches are worth running,
- * so a street that cannot afford one costs the tick nothing. The whole ladder
- * decides.
+ * standing mansion anywhere in it — where the ADDRESS is affluent: the
+ * checklist read on the window as the 3×3 it would be (siteOf: at its heart,
+ * the shop from its doors). Reads only; lots.lotScore rolls it at
+ * MANSION_P·score. Anchored at i, so a window rolls once a month and not once
+ * from each of its nine tiles. The CHEAP items of the affluent list — the
+ * reaches and the cover, one tile each at the heart — are asked first, so a
+ * street that cannot afford one costs the tick nothing; then the nine tiles;
+ * then the whole checklist decides.
  */
 export function mansionWindow(world, i) {
   const { w, h } = world;
@@ -323,11 +287,8 @@ export function mansionWindow(world, i) {
   const ty = (i / w) | 0;
   if (tx + 2 >= w || ty + 2 >= h) return null;
   const heart = i + 1 + w;
-  const cul = world.culture[heart];
-  if (cul < KNOBS.CLASS_CULTURE_MIN[CLASS.AFFLUENT]) return null;
-  const drags = (world.pol[heart] > KNOBS.DRAG_POL ? 1 : 0) + (world.crime[heart] > KNOBS.DRAG_CRIME ? 1 : 0) + (world.dread[heart] > KNOBS.DRAG_DREAD ? 1 : 0);
-  const most = KNOBS.OPP_CULTURE[cul] + KNOBS.OPP_KNOWLEDGE[world.knowledge[heart]] + KNOBS.OPP_PARK[2] + KNOBS.OPP_SHOP + KNOBS.OPP_NATURE - drags;
-  if (most < KNOBS.CLASS_MIN[CLASS.AFFLUENT]) return null;
+  const atHeart = { anchor: i, tiles: null, heart };
+  for (const name of KNOBS.CLASS_NEEDS[CLASS.AFFLUENT]) { const it = ITEMS[name]; if (it.cheap && !it.ok(world, atHeart)) return null; }
   const tiles = [];
   for (let dy = 0; dy < 3; dy++) for (let dx = 0; dx < 3; dx++) {
     const j = i + dx + dy * w;
@@ -393,8 +354,7 @@ export function mansionLine(world, res) {
   const at = `(${anchor % world.w},${(anchor / world.w) | 0})`;
   const house = keeper ? `The ${keeper.surname}s (${keeper.members.length} ${pluralSpecies(keeper.species)}) keep the house` : "Nobody lived on the nine lots; the house stands empty";
   const out = displaced ? `; ${displaced} animal${displaced === 1 ? "" : "s"} ${displaced === 1 ? "was" : "were"} moved out to make room` : "";
-  const cls = attainableClass(world, anchor);
-  return `MANSION — a mansion has risen at ${at}. ${house}${out}. The address has ${pointsLine(cls)}; one household of up to ${KNOBS.MANSION_CAP} lives on nine tiles.`;
+  return `MANSION — a mansion has risen at ${at}. ${house}${out}. The address is ${haveLine(attainableClass(world, anchor))}; one household of up to ${KNOBS.MANSION_CAP} lives on nine tiles.`;
 }
 
 /** "the Greyback estate" for a mansion with a family in it, "the empty mansion" for one without, null for anything else. */

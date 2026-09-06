@@ -2825,3 +2825,117 @@ owner); MANSION_P 0.25 against three mansions in fourteen months (a rate, a cap
 per quarter, or a fill rule — each one knob); a mansion on EMPTY chalk; the
 species-skinned mansion set; the centre bottleneck whenever an affluent theft
 file exists.
+
+
+## 35. "Its more about a checklist" — the ladder becomes the owner's list (session 18, 2026-09-06)
+
+§34's points ladder measured one Amphitheater making a whole town modest and
+doubling its R income. The owner, on that: *"so it should not be about points
+in the sense that each item has a variable amount of influence, its more about
+a checklist, the affluent house MUST be in range of all of these,
+amphitheater, university, library, gallery, large park within 5 tiles, police,
+fire. and a shop within 10 road tiles"*. Two commits again: `30111e1` first —
+the probe grafts the owner's list (a fire station, a University, the stations
+wherever their cover reaches the heart, the Large Park within five, amenities
+on unzoned ground; `--clear` takes blocks), measured under the points law
+(mansions in months 10 and 27 in the dense block; one in month 63 carved in at
+year 5) — then the law.
+
+**The rule now.** A class is a CHECKLIST: every item required, none weighed
+against another (`KNOBS.CLASS_NEEDS` by class; `wealth.ITEMS` says how each is
+read at the site's heart). The AFFLUENT list is the owner's, word for word: an
+Amphitheater, a University, a Library and a Gallery each REACHING the address;
+a Large Park with a tile within `CLASS_PARK_RADIUS` 5 of the heart; a police
+station's cover; a fire station's cover; a standing shop within
+`CLASS_SHOP_ROAD` 10 road tiles of a door. Four buildings by name needed a new
+derived field: `world.civicReach` keeps a bit per building
+(`fields.REACH`), painted in `computeKnowledgeCulture` beside the knowledge
+and culture fields, which keep only the STRONGER source and cannot tell a
+Library from a University. The MODEST list is the proposal's default — culture
+in reach and a park within the same five — because the owner has not ruled on
+the modest. Nothing else is on either list: not the air, not the crime, not
+the land value, not the trees; the points, the drags, the tree and the
+land-value rung are gone. So a 3×3 in the densest block is affluent the month
+the last item lands, and the police station on the list is what a dense
+block's crime answers to. `haveLine` says what is ticked ("in range of an
+Amphitheater, a Gallery, police — 3 of 8 the affluent need"; "in range of
+everything the affluent need — …"), `waitingLine` what the next class wants;
+the card, Rules W1 and the MANSION line carry them. `mansionWindow` asks the
+cheap items first (the reaches and the cover, one tile each at the heart),
+then the nine tiles, then the whole list.
+
+**Numbers.** 68 checks in `tools/check-wealth.mjs` (922 in all) on a fixture
+that holds the whole list — a Gallery and a Park for the modest; an
+Amphitheater five from the heart, a police station on the road, a Library, a
+fire station, a University along the south side, a Large Park FIVE from the
+heart and SIX from the corner so the heart read is visible, a shop six road
+tiles from the door: every item bites and names itself; the Library AND the
+University, the Gallery AND the Amphitheater are each wanted though the fields
+read only the stronger; a Large Park is a park for the modest; both parks razed
+falls two steps; pollution 99, crime 100, dread, land value 0 and a tree
+change nothing; the shop walks the road, ten in and eleven out; the corner as a
+lot of its own is MODEST and the window AFFLUENT; the fire station moved one
+east leaves the corner outside its cover and the window standing; the lists
+are knobs; nine full tenements are affluent all the same; the 3×3 block and
+the 2×2 inside are windows and the straddler is not; the tax; fire off and on
+the beat; dissolve; justice at EQUAL cover; five sentences. Fifteen mutants,
+15 of 15 caught on the first sweep. The six published mayor rigs
+byte-identical (`c055aba5` · `882a48c7` · `ecb5a902` · `2ced10f8` ·
+`46520f05` · `461784c9`): without culture and a park nobody leaves poverty.
+
+**Measured (`tools/wealthprobe.mjs`, estate layout, seed 7, thirty years; the
+graft is the list itself, §5,350 a year).** `--dense` — the list into the
+first High block at year 0, the tenements left High: the mansion in month 25,
+the SHOP the last item for 22 months (a corner shop zoned on the ring road has
+to grow); the Russets (5 foxes) kept the house, 149 animals were moved out, 3
+households in tents that month and none a year on; the town at year 30: 983
+animals, 794 in poverty, 116 modest carrying 17% of the R tax, 73 affluent
+carrying 30%; the treasury §1,444 — the list's upkeep is the town's whole
+surplus, and the same town with `--tax 1,1,1` ends at −§46,983: the
+progressive tax is what pays for the list. `--at 5 --clear` — carved into the
+FULL block at year 5: month 66, the Fangleys (7 wolves), 158 moved out, 7
+households in tents then and none a year on; 194 affluent carrying 53%;
+−§3,974. The planned quarter (the housing round it Low): month 28, the shop
+again for 25 months; the Tabbss (4 cats), 31 moved out; −§3,164. `--bare` (the
+four buildings and a park, a control): NONE ROSE — the Large Park, the police
+and the fire cover wanting all 360 months; 457 modest carrying 60%; §54,214.
+`--dense --justice`, four seeds with the mayor's stations: mansions on 3 of 4
+seeds (months 30, 21, 33), 364 moved out; two affluent files, both killings,
+both cleared, both the hall; a mansion was never a hot lot (crime at most 11 —
+the cover is on the list).
+
+**Browser (the rebuilt `docs/fixtures/mansion-quarter.json`: the list on the
+suite's street, the Russets in the mansion).** The mansion at (10,9): *a
+mansion: one household, up to 8, on nine tiles · class here affluent · R tax
+×5 · in range of everything the affluent need — an Amphitheater, a University,
+a Library, a Gallery, a Large Park, police, fire, a shop* (the Russet estate,
+occ 3/8). The apartment by the Gallery at (14,9): *class here: modest · R tax
+×2 · in range of a University, a Library, a Gallery, a Large Park, police,
+fire, a shop — 7 of 8 the affluent need — affluent needs an Amphitheater in
+reach*. The cottage at (5,10): *class here: poverty · R tax ×1 · in range of
+an Amphitheater's culture — 1 of 2 the modest need — modest needs a Park or
+Large Park within 5*. The row at (25,10), out of culture's reach: *in range of
+nothing the modest need (0 of 2) — modest needs culture in reach — a Gallery
+or an Amphitheater · a Park or Large Park within 5*. Census *class at home 155
+· 24 · 3 · R tax share 64% · 28% · 8% · affluent addresses · mansions 1 · 1*;
+Budget *— of which the modest, ×2 §553 · — and the affluent, ×5 §163*; Rules
+W1 the checklist and its live line; zero console errors after the marker.
+
+**Symptom-keyed traps, for whoever comes next.**
+
+| what you see | what it is |
+|---|---|
+| a fixture's station "did not land" — `policeStations 0`, every check wanting "a police station's cover" | a civic needs a ROAD-ADJACENT footprint; two tiles off the road the op fails silently — read `census.policeStations` before trusting a fixture |
+| the justice roll differs by more than the priority | police cover is 60 within three of the footprint and 30 at four to six; the mansion's anchor and the thief's home must sit at EQUAL cover — put the station where both are four away |
+| an affluent fixture turns modest after a dozen ticks, wanting "a shop within 10 road tiles" | shops DECAY when nobody shops; hold `DECAY_P` 0 through a long wait, or the list loses its shop |
+| a fresh mansion's `world.klass` reads the corner lot's class | the class field is written at tick step 1, before lotsTick's rise; run `computeClass` again (the card asks live) |
+| the probe says the stations or the Large Park landed NOWHERE beside a full block | the graft searched R chalk only; an amenity may take unzoned ground, and under `--clear` any ground the bulldozer could take — the corner stays R |
+| the knowledge field reads 2 but the card wants "a Library in reach" | the field keeps the STRONGER source; the list asks for each building by name — `world.civicReach` bits are what the items read |
+| a mansion on the old fixture reads "the street has come down since it rose" | the fixture predates the list (no University, Large Park, police or fire) — rebuilt by the scratch builder on the list |
+
+**Left open, said out loud.** The MODEST list (the proposal's default, unruled);
+"in range" for the police and the fire station read as their cover — a radius
+like the park's five is one item away if the owner meant tiles; MANSION_P 0.25
+against the two years the shop binds; a mansion on EMPTY chalk the month the
+last item lands; the species-skinned mansion set; the centre bottleneck
+whenever an affluent theft file exists.

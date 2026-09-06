@@ -40,7 +40,7 @@ import { starredNotices } from "./people.js";
 import { buildingAge } from "./sim/building-age.js";
 import { paintPortrait } from "./render.js";
 import { USE, USE_OPTIONS, USE_SPECIES, useName, useShortLabel } from "./sim/use.js";
-import { CLASS_NAME, waitingLine, pointsLine } from "./sim/wealth.js";
+import { CLASS_NAME, waitingLine, haveLine } from "./sim/wealth.js";
 
 const $ = (sel, root = document) => root.querySelector(sel);
 const el = (tag, cls, text) => {
@@ -464,9 +464,9 @@ export function createUI(app) {
       // the opportunities near you"), so every household here shares it.
       if (rep.klass) {
         const k = rep.klass;
-        if (rep.mansion) lines.push(el("div", "dim", `a mansion: one household, up to ${KNOBS.MANSION_CAP}, on nine tiles · class here ${CLASS_NAME[k.cls]} · R tax ×${KNOBS.TAX_CLASS[k.cls]} · ${pointsLine(k)}${k.cls < 2 ? ` · the street has come down since it rose — ${CLASS_NAME[k.next]} needs ${waitingLine(k)}` : ""}`));
-        else if (k.cls === 2 && t === 0) lines.push(el("div", "", `class here: affluent · R tax ×${KNOBS.TAX_CLASS[2]} · ${pointsLine(k)} — a mansion may rise on the 3×3 of housing anchored here`));
-        else lines.push(el("div", "dim", `class here: ${CLASS_NAME[k.cls]} · R tax ×${KNOBS.TAX_CLASS[k.cls]} · ${pointsLine(k)}${k.next != null ? ` — ${CLASS_NAME[k.next]} needs ${waitingLine(k)}` : " — a mansion may rise on a 3×3 of housing anchored here"}`));
+        if (rep.mansion) lines.push(el("div", "dim", `a mansion: one household, up to ${KNOBS.MANSION_CAP}, on nine tiles · class here ${CLASS_NAME[k.cls]} · R tax ×${KNOBS.TAX_CLASS[k.cls]} · ${haveLine(k)}${k.cls < 2 ? ` · the street has come down since it rose — ${CLASS_NAME[k.next]} needs ${waitingLine(k)}` : ""}`));
+        else if (k.cls === 2 && t === 0) lines.push(el("div", "", `class here: affluent · R tax ×${KNOBS.TAX_CLASS[2]} · ${haveLine(k)} — a mansion may rise on the 3×3 of housing anchored here`));
+        else lines.push(el("div", "dim", `class here: ${CLASS_NAME[k.cls]} · R tax ×${KNOBS.TAX_CLASS[k.cls]} · ${haveLine(k)}${k.next != null ? ` — ${CLASS_NAME[k.next]} needs ${waitingLine(k)}` : " — a mansion may rise on a 3×3 of housing anchored here"}`));
       }
     }
     if (rep.civic === CIVIC.LARGE_PARK) head.append(el("span", "", `  jobs ${rep.staff}/${rep.jobs}`));
