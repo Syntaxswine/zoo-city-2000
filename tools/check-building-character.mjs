@@ -4,6 +4,7 @@ import { BUILDINGS, RECIPES, allBuildings } from "../js/art/buildings.js";
 import { allBlocks } from "../js/art/blocks.js";
 import { allLandmarks } from "../js/art/landmarks.js";
 import { allShops } from "../js/art/shops.js";
+import { allMansion } from "../js/art/mansion.js";
 import { characterSprite, lightLevel, MARKS } from "../js/art/building-character.js";
 import { createWorld, ZONE } from "../js/sim/world.js";
 import { SPECIES } from "../js/sim/species.js";
@@ -20,7 +21,7 @@ function differences(a, b) {
 }
 
 export function checkBuildingCharacter(check) {
-  const bases = [...new Set([...allBuildings(), ...allBlocks(), ...allLandmarks(), ...allShops()]
+  const bases = [...new Set([...allBuildings(), ...allBlocks(), ...allLandmarks(), ...allShops(), ...allMansion()]
     .map(x => x.sprite).filter(s => s.tags.includes("building")))];
   check("buildings E: all twelve original families have four pairwise-distinct authored plans",
     [1, 2, 3, 4].every(z => [1, 2, 3].every(t => BUILDINGS[z][t].length === 4 && new Set(BUILDINGS[z][t].map(s => s.rows.join("\n"))).size === 4)));

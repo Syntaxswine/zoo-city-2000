@@ -119,6 +119,8 @@ function draw(ctx, s, x, y, scale) {
   ctx.setTransform(1, 0, 0, 1, 0, 0);
 }
 function sheet(name, sprites, cellW, cellH, columns, zoom = 4) {
+  cellW = Math.max(cellW, ...sprites.map(s => s.w * zoom * 2 + 32));
+  cellH = Math.max(cellH, ...sprites.map(s => s.h * zoom + 52));
   const c = createCanvas(cellW * columns, cellH * Math.ceil(sprites.length / columns));
   const ctx = c.getContext("2d"); ctx.fillStyle = "#222b2d"; ctx.fillRect(0, 0, c.width, c.height);
   sprites.forEach((s, i) => {
@@ -130,9 +132,11 @@ function sheet(name, sprites, cellW, cellH, columns, zoom = 4) {
       const r = renderRecipe(RECIPES.get(s), 2);
       old = defineSprite({ name: "old", rows: r.grid.map(row => row.join("")), anchor: r.anchor }); oldScale = zoom / 2;
     }
-    draw(ctx, old, x + cellW / 4, y + cellH - 24, oldScale);
     const h = art.hires(s, zoom >= 3 ? 4 : 2);
-    draw(ctx, h, x + cellW * 3 / 4, y + cellH - 24, zoom / h.scale);
+    const detailScale = zoom / h.scale;
+    const baseline = y + cellH - 16 - Math.max((old.h - old.anchor[1]) * oldScale, (h.h - h.anchor[1]) * detailScale);
+    draw(ctx, old, x + cellW / 4, baseline, oldScale);
+    draw(ctx, h, x + cellW * 3 / 4, baseline, detailScale);
   });
   writeFileSync(`out/closeups/${name}.png`, encodePNG(c));
 }
@@ -140,4 +144,5 @@ sheet("citizens", SPECIES_IDS.map(s => art.citizen(s, "se", 0, "adult")), 160, 1
 sheet("citizen-poses", FACINGS.flatMap(f => AGES.map(a => art.citizen("fox", f, 1, a, { hat: true, carry: "sack" }))), 192, 164, 4);
 sheet("buildings", [1, 2, 3, 4].flatMap(z => [1, 2, 3].map(t => art.building(z, t, 0))), 540, 330, 2);
 sheet("civics", ["fire", "police", "centre", "zoo", "largePark", "park"].map(k => art.civic(k, k === "park" ? 1 : 3)), 840, 340, 2, 2);
+sheet("knowledge-and-mansions", ["library", "gallery", "university", "amphitheater"].map(k => art.civic(k)).concat([art.mansion(0), art.mansion(1)]), 840, 380, 2, 2);
 console.log(`Close-up checks passed: ${JSON.stringify(stats)}; comparison sheets in out/closeups (old left, new right).`);

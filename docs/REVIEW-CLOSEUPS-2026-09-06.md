@@ -25,19 +25,22 @@ This was a self-review, with executable regression checks and visual sheets.
 - Required actual new architectural pixels on every building/civic/block/
   station recipe. This caught the small park's untouched bench; added slats.
 - Checked the comparison-sheet layout itself and increased row height to
-  avoid overlapping tall towers.
+  avoid overlapping tall towers; reserve space below campus anchors too.
+- Integrated remote main through `0118863` before release, retaining the
+  newer wealth/class and knowledge/culture features. The art audit now also
+  covers both mansions and all four knowledge/culture civic buildings.
 
 ## Verification
 
-- Full existing suite: **793 checks, zero failures**.
-- Dedicated audit: **171 solid recipes**, each at 2× and 4×, palette validity,
+- Full integrated suite: **922 checks, zero failures**.
+- Dedicated audit: **177 solid recipes**, each at 2× and 4×, palette validity,
   exact original high-resolution silhouette and anchor, and cache identity.
   All building/civic/block/station families gain new detail.
 - **2,688 citizen cases**, each at 2× and 4×: fourteen species, four facings,
   three ages, four animation frames, and four look/accessory configurations.
   Every case gains detail, keeps its original footprint, and retains its base.
-- Occupancy/species-mark audit at 1×/2×/4×: 106 building plans,
-  296,196 light pixels and 79,887 species-mark pixels.
+- Occupancy/species-mark audit at 1×/2×/4×: 108 building plans,
+  302,938 light pixels and 80,763 species-mark pixels.
 - Renderer sequence 1→2→3→4→2→4→1 matches fresh renderers pixel-for-pixel;
   tile and citizen picking pass at every level. The 1× frame with citizens
   matches the renderer with high-resolution art disabled.
