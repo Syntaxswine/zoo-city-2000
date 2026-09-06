@@ -1,6 +1,6 @@
 # Proposal — Wealth and class: the ultrawealthy, their mansions, and whose burglary gets worked first
 
-Status: proposal, 2026-09-05; BUILT 2026-09-05 (session 18) — see the BUILT note at the end. Written the day the owner sketched
+Status: proposal, 2026-09-05; BUILT 2026-09-05 (session 18) on its defaults, then REBUILT the same evening on the owner rulings — see the two notes at the end. Written the day the owner sketched
 the arc, against HEAD `333408b`, so the seams are the code's own and not
 guessed. The decisions the owner has not made are listed in §6 and nothing
 here is built up toward one answer to them.
@@ -297,3 +297,52 @@ BOTTLENECK the justice probe measured — a first theft from the ultrawealthy
 needs a centre bed, and 9 of 11 cold ultrawealthy files had a roll succeed and
 wait for one (§7's clearance question, answered: 8% against 22% plain and 37%
 affluent, four seeds, thirty years, one station).
+
+
+## Owner rulings — 2026-09-05 (evening), and the rebuild
+
+The eight answers, verbatim, against the §8 numbers:
+
+1. *"poverty, modest, affluent."* → three classes, renamed: the baseline is
+   POVERTY (a street with none of the amenities), the middle MODEST, the top
+   AFFLUENT — the mansion class. "Ultrawealthy" is retired from the code and
+   the lines.
+2. *"class based on the opportunities near you."* → class is what the ADDRESS
+   affords, this month: `world.klass`, derived every tick, never saved. The
+   BUILT note's `hh.wealth` (fixed at arrival, inherited, kept) is gone; a
+   family that moves reads its new street; nothing is carried.
+3. *"same as 2, if there are enough positive things near you it happens
+   naturally like when the building upgrades to an apartment building."* → no
+   Estate tool, no plot: a mansion RISES from any 3×3 of housing whose site is
+   affluent, rolled by `lots.lotScore` at `MANSION_P` 0.25·score a month like
+   a storey. The tool, the op, the chalk plot and its sprite are removed.
+4. *"yes, that's the right POV, less people are homed in the same area."* →
+   MANSION_CAP 8 on nine tiles stands; everyone else on the nine lots is moved
+   out when it rises (`citizens.displaceFrom`).
+5. *"the option for a progressive tax is a wonderful idea and would balance out
+   that less people can live on the same plot."* → TAX_CLASS [1, 2, 5] stands
+   as the progressive tax; it is always on (an Options switch is one line if
+   wanted).
+6. *"i'm not sure what this is asking."* → §6 asked which rungs of §3 are hard
+   gates and their numbers; all nine stand as hard gates with the numbers of
+   §3, every one a knob. One refinement from the measurement: a 3×3 is read at
+   its HEART (one tile in from the kerb) with nature counted round its border
+   — the corner tile read the ring road's pollution and no tree.
+7. *"i like the art you picked, at some point a species specific variation is
+   welcome."* → the mansion stays (`js/art/mansion.js`); the species-skinned
+   set is a later art arc on the landmark pattern.
+8. *"this applies just to the home, yes harsher punishment."* → as built: the
+   class at a burgled HOME's address; one step harsher for a theft from the
+   affluent; the hall for their murder.
+
+**What the rebuild measured** (`tools/wealthprobe.mjs`): the bare amenities at
+a High block's corner raise no mansion in thirty years, because inside a High
+block the heart of any 3×3 reads crime 100 — density is crime, the game's own
+law since session 1 — and pig pollution from the tenements beside it. The
+quarter a player would plan (low density within two of the window, a Large Park
+within five, a police station, one corner shop, the Library and Gallery within
+five of the heart) raised a mansion in month 26 on the estate layout: the shop
+had to grow first, the Scrapleys (4 raccoons) kept the house and 26 animals were
+moved out; the quarter's upkeep is §2,250 a year. So the arc reads, in the
+owner's own frame: the poor live in the dense blocks, the modest near a gallery
+and a park, and the affluent where a player has planned for them.

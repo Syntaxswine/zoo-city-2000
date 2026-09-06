@@ -11,7 +11,7 @@ import { budgetTick } from "./budget.js";
 import { eventsTick } from "./events.js";
 import { justiceTick } from "./justice.js";
 import { storyTick } from "./story.js";
-import { estatesTick } from "./wealth.js";
+import { computeClass } from "./wealth.js";
 import { beginMeatMonth, penMaturityTick, meatTick, meatCensus, resetMeatRoutes } from "./meat.js";
 import { SPECIES } from "./species.js";
 import { ZONE } from "./world.js";
@@ -48,6 +48,7 @@ export function tick(world) {
   // 1. fields
   computeFields(world);
   recountRosters(world);
+  computeClass(world); // wealth (SPEC §9f): the class every address attains this month — the census, the budget, the lots and justice read it
   // 2. census
   const cen = census(world);
   // 3. valves
@@ -55,10 +56,7 @@ export function tick(world) {
   // 4. lots
   const lots = lotsTick(world);
   notices.push(...lots.landmarks); // a landmark rose (SPEC §3c); lotsTick logged it under its own id
-  // 4a. The estates (SPEC §9f): a chalk plot whose ladder is complete sprouts its mansion. It moves `tier`, so it runs
-  //     before settleDoors like the lots do; it draws no RNG, so a town with no estate is unmoved.
-  const mansions = estatesTick(world);
-  notices.push(...mansions);
+  notices.push(...lots.mansions); // a mansion rose (SPEC §9f); lotsTick logged it under its own id
   // 4b. lotsTick may have BUILT or RAZED across a station's forecourt, which is
   // ground `fields.passable` reads: the platform's doors move and stored
   // commutes are left walking through a building. Settle it HERE, in the month
@@ -138,7 +136,7 @@ export function tick(world) {
   // Every line the ticker shows goes into the log too, so a loaded city can
   // show its own history (rolled events already logged themselves).
   for (const line of notices) {
-    if (evNotices.includes(line) || jNotices.includes(line) || meatNotices.includes(line) || lots.landmarks.includes(line) || mansions.includes(line) || storyNotices.includes(line)) continue;
+    if (evNotices.includes(line) || jNotices.includes(line) || meatNotices.includes(line) || lots.landmarks.includes(line) || lots.mansions.includes(line) || storyNotices.includes(line)) continue;
     const report = /^REPORT /.test(line);
     const notable = cen.notables || {};
     const links = report ? [...new Set([notable.oldest?.id, notable.largest?.member].filter(Number.isInteger))] : [];
@@ -202,6 +200,7 @@ export function refreshLast(world) {
   computeFields(world);
   settleDoors(world);
   recountRosters(world);
+  computeClass(world); // a loaded city's Census counts its classes at once
   const cen = census(world);
   Object.assign(cen, meatCensus(world));
   const dem = peekDemand(world, cen);

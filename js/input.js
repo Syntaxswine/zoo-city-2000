@@ -430,16 +430,15 @@ export function createInput(canvas, app) {
     if (state.drag && state.cost) h.drag = { tiles: state.cost.tiles, refused: state.cost.refused };
     if (!state.drag && state.hover && GHOST_TOOLS.includes(state.tool) && state.mouse.inside) {
       const [tx, ty] = state.hover;
-      // The footprint the ghost paints is the ONE table ops.js builds by (CIVIC_SIDE), plus the estate's 3: a list here that
-      // stopped at the centre drew a 1×1 diamond under a 2×2 Library and a 3×3 University (session 17), and threw for the estate.
-      const size = state.tool === "estate" ? 3 : CIVIC_SIDE[state.tool] || 1;
+      // The footprint the ghost paints is the ONE table ops.js builds by (CIVIC_SIDE): a list here that stopped at the centre
+      // drew a 1×1 diamond under a 2×2 Library and a 3×3 University (session 17, found in session 18).
+      const size = CIVIC_SIDE[state.tool] || 1;
       const ok = !!state.cost && !state.cost.refused && state.cost.tiles.length > 0;
       // The camera gets the ghost DIAMOND and the cost, and no translucent
       // standing sprite: the owner looked at both and the diamond reads fine
       // on a street, where a 5-px mast at 0.55 alpha over asphalt does not.
       const sprite = state.tool === "camera" ? null
         : state.tool === "station" ? app.art.station("ns")
-        : state.tool === "estate" ? app.art.estatePlot(0) // what lands is the plot; the mansion is earned (SPEC §9f)
         : app.art.civic(state.tool, size);
       h.ghost = { tx, ty, w: size, h: size, ok, sprite };
     }

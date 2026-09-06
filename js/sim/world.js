@@ -83,7 +83,7 @@ export function createWorld({ seed = "zoo", w = 64, h = 64 } = {}) {
     big: new Uint8Array(n), // a BLOCK (SPEC §3b, sim/blocks.js): 0 a lot of its own · 2 | 3 the anchor of a 2×2 | 3×3 · PART | dx | dy << 2 a part pointing at its anchor
     cam: new Uint8Array(n), // a security CAMERA on this road tile (SPEC §9d, docs/PROPOSAL-CAMERAS.md): 0 none · 1 a camera
     theme: new Uint8Array(n), // a LANDMARK (SPEC §3c, sim/landmarks.js): on a 3×3's anchor, the id of the species' landmark it rose as; 0 the plain block
-    estate: new Uint8Array(n), // WEALTH (SPEC §9f, sim/wealth.js): on a 3×3 R block's anchor, 1 an ESTATE plot (chalk, waiting) · 2 its MANSION standing; 0 everywhere else, and omitted from the save and the hash while it is
+    mansion: new Uint8Array(n), // WEALTH (SPEC §9f, sim/wealth.js): 1 on a MANSION's anchor — a 3×3 R block that rose where the address became affluent; 0 everywhere else, and omitted from the save and the hash while it is
     // derived
     roadDist: new Uint8Array(n),
     pol: new Uint8Array(n),
@@ -95,6 +95,7 @@ export function createWorld({ seed = "zoo", w = 64, h = 64 } = {}) {
     camCov: new Uint8Array(n),
     knowledge: new Uint8Array(n), // 0 none · 1 a Library · 2 a University reaches this tile (the strongest; fields.computeKnowledgeCulture; SPEC §9e)
     culture: new Uint8Array(n), // 0 none · 1 a Gallery · 2 an Amphitheater
+    klass: new Uint8Array(n), // WEALTH (SPEC §9f, wealth.computeClass): the class the ADDRESS attains this month — 0 poverty · 1 modest · 2 affluent — on every R lot of its own or block anchor; derived after the fields, never saved
     _camGen: 0, // the camera walk’s visited-set generation (fields.computeCamCover)
     dread: new Uint8Array(n),
     carnAt: new Uint16Array(n), // Uint16 since the blocks: a 3×3 R block keeps 270 animals on its anchor
@@ -405,7 +406,7 @@ export function capacityOf(world, i) {
   const t = world.tier[i];
   const b = world.big[i];
   if (b & PART) return 0;
-  if (world.estate[i]) return z === ZONE.R && t > 0 ? KNOBS.MANSION_CAP : 0; // a MANSION houses one household of MANSION_CAP (SPEC §9f); its chalk plot houses nobody
+  if (world.mansion[i]) return t > 0 ? KNOBS.MANSION_CAP : 0; // a MANSION houses one household of MANSION_CAP (SPEC §9f) on nine tiles that would hold 270
   const m = blockMultiplier(b);
   if (z === ZONE.R) return Math.round(KNOBS.R_CAP[t] * m);
   if (z === ZONE.C) return Math.round(KNOBS.C_JOBS[t] * m);

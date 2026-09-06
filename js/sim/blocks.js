@@ -46,7 +46,6 @@ import { served } from "./fields.js";
 import { placeHousehold, evictFromLot, fireFromLot } from "./citizens.js";
 import { KIND, remember } from "./life.js";
 import { themeFor } from "./landmarks.js";
-import { unbuildMansion } from "./wealth.js";
 
 /** Can lot j join a block with the tier-3 lot i: same zone, tier 2 or better, a lot of its own, High, on the same line, untroubled, served. */
 function joinable(world, i, j) {
@@ -185,14 +184,14 @@ export function mergeLots(world, win) {
  */
 export function splitLot(world, anchor, { evict = true } = {}) {
   const tiles = footprintOf(world, anchor);
-  // An ESTATE (SPEC §9f) does not come apart into singles: the mansion comes down and the plot stays a plot
-  // (wealth.unbuildMansion — chalk again, tier 0 on every tile, the block kept so the footprint is still one thing that
-  // may sprout again), and its household leaves by the ordinary capacity path, which is 0 on chalk. Evicted HERE even
-  // for a caller that asked not to, because that caller (events.toRubble) evicts by lowering storeys, and chalk has none.
-  if (world.estate[anchor]) {
-    unbuildMansion(world, anchor);
+  // A MANSION (SPEC §9f) comes apart into COTTAGES, not tier-3 singles: nine tier-1 lots of their own where eight animals
+  // lived, its family kept on the anchor if it fits four and rehomed if not (the capacity path). Fire's toRubble then
+  // takes the cottages' one storey each, as it takes a block's three; the address may raise another mansion later.
+  if (world.mansion[anchor]) {
+    world.mansion[anchor] = 0;
+    for (const j of tiles) { world.big[j] = 0; world.theme[j] = 0; world.tier[j] = 1; }
     replanOn(world, tiles);
-    evictFromLot(world, anchor, 0);
+    if (evict) evictFromLot(world, anchor, capacityOf(world, anchor));
     return tiles;
   }
   for (const j of tiles) { world.big[j] = 0; world.theme[j] = 0; }

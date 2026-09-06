@@ -4,8 +4,7 @@
 //                                       variant is the whole tile byte; original families use & 3; the shop kind still uses >> 1
 //                                       character = {lit:0..3, majority:species index+1, seed:tile index}; omitted for previews
 //                                       theme > 0 with side 3 → that landmark (landmarks.js; ids per js/sim/landmarks.js)
-//   art.mansion(variant, character)     the MANSION (estate.js; SPEC §9f): the ultrawealthy's 3×3, lit and marked like every building
-//   art.estatePlot(variant)             the estate plot before its mansion: the wall, the gate, the board
+//   art.mansion(variant, character)     the MANSION (mansion.js; SPEC §9f): the affluent address's 3×3, risen not placed, lit and marked like every building
 //   art.civic(kind, side)               'park' | 'largePark' | 'zoo' | 'fire' | 'police' | 'centre'; side 3 selects campuses; legacy saves supply their existing side
 //                                       'library' | 'gallery' (2) and 'university' | 'amphitheater' (3): knowledge and culture (civics-knowledge.js)
 //   art.road(mask, busy)                4-bit mask N=1 E=2 S=4 W=8
@@ -43,7 +42,7 @@ import { allKnowledgeCivics } from "./civics-knowledge.js";
 import { allBlocks } from "./blocks.js"; // registers the 2×2 and 3×3 families with buildings.js at load
 import { allLandmarks } from "./landmarks.js"; // registers the eleven landmarks (SPEC §3c)
 import { allShops } from "./shops.js"; // registers the shop pool (SPEC §12.2d)
-import { allEstate, MANSION, ESTATE_PLOT } from "./estate.js"; // the mansion and the estate plot (SPEC §9f)
+import { allMansion, MANSION } from "./mansion.js"; // the mansion (SPEC §9f)
 import { markSprite, characterSprite, MARKS } from "./building-character.js";
 import { hires } from "./hires.js";
 import { roadSprite, bridgeSprite, allRoads } from "./roads.js";
@@ -109,15 +108,10 @@ function notBuilt(name) {
   throw new Error(`art.${name}: not built`);
 }
 
-/** The mansion (SPEC §9f): the ultrawealthy's 3×3 R family, with the same lights and species mark as every building. */
+/** The mansion (SPEC §9f): the affluent address's 3×3 R family, with the same lights and species mark as every building. */
 export function mansion(variant = 0, character = null) {
   const base = MANSION[variant & 1];
   return character ? characterSprite(base, character) : base;
-}
-
-/** The estate plot before its mansion: the wall, the gate and the board on a bare lawn. */
-export function estatePlot(variant = 0) {
-  return ESTATE_PLOT[variant & 1];
 }
 
 export const bubble = bubbleSprite;
@@ -137,7 +131,6 @@ export function look(id) {
 export const art = Object.freeze({
   building: buildingSprite,
   mansion,
-  estatePlot,
   civic: civicSprite,
   road: roadSprite,
   bridge: bridgeSprite,
@@ -165,7 +158,7 @@ export const art = Object.freeze({
 
 /** Every sprite the registry can hand out, named — the check.mjs audit walks this. */
 export function allSprites() {
-  const out = [...Object.values(MARKS).map(sprite => ({ name: sprite.name, sprite })), ...allBuildings(), ...allLargeCivics(), ...allKnowledgeCivics(), ...allBlocks(), ...allLandmarks(), ...allEstate(), ...allShops(), ...allRoads(), ...allWalls(), ...allRail(), ...allTerrain(), ...allCitizens(), ...BUBBLE_SAMPLES.map((sprite) => ({ name: sprite.name, sprite }))];
+  const out = [...Object.values(MARKS).map(sprite => ({ name: sprite.name, sprite })), ...allBuildings(), ...allLargeCivics(), ...allKnowledgeCivics(), ...allBlocks(), ...allLandmarks(), ...allMansion(), ...allShops(), ...allRoads(), ...allWalls(), ...allRail(), ...allTerrain(), ...allCitizens(), ...BUBBLE_SAMPLES.map((sprite) => ({ name: sprite.name, sprite }))];
   const seen = new Set();
   return out.filter(({ name }) => (seen.has(name) ? false : (seen.add(name), true)));
 }

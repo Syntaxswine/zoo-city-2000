@@ -150,7 +150,7 @@ export const KNOBS = {
   UPKEEP_PARK: 300,
   UPKEEP_LARGE_PARK: 1500,
   UPKEEP_STATION: 400,
-  COST: { zoneR: 5, zoneC: 8, zoneI: 8, zoneM: 12, road: 10, bridge: 40, bulldoze: 2, bulldozeTree: 4, tree: 4, park: 150, largePark: 2500, zoo: 2500, pond: 40, fire: 500, police: 500, centre: 1500, wall: 8, use: 1, rail: 20, railBridge: 60, station: 300, camera: 100, library: 1000, university: 4000, gallery: 800, amphitheater: 3000, estate: 200 },
+  COST: { zoneR: 5, zoneC: 8, zoneI: 8, zoneM: 12, road: 10, bridge: 40, bulldoze: 2, bulldozeTree: 4, tree: 4, park: 150, largePark: 2500, zoo: 2500, pond: 40, fire: 500, police: 500, centre: 1500, wall: 8, use: 1, rail: 20, railBridge: 60, station: 300, camera: 100, library: 1000, university: 4000, gallery: 800, amphitheater: 3000 },
   // ---- knowledge and culture (the owner, 2026-09-05; docs/PROPOSAL-KNOWLEDGE-CULTURE-2026-09-05.md, its review and the owner's ruling) ----
   // Four public buildings: Library 2×2 and University 3×3 give KNOWLEDGE, Gallery 2×2 and Amphitheater 3×3 give CULTURE.
   // C-type jobs, a road touching to build, served to operate. The owner ruled the reach: five tiles for the small
@@ -173,23 +173,25 @@ export const KNOBS = {
                             // K is a MEAN: a town that grows past its catchment lowers its own cap. The review pre-registers measuring that.
   NEED_CULTURE_PTS: 4,      // the culture wish sits exactly on NEED_MIN — it speaks only when nothing else is wrong
   // ---- wealth and class (the owner, 2026-09-05; docs/PROPOSAL-WEALTH-AND-CLASS-2026-09-05.md; sim/wealth.js) ----
-  // Class is a property of a HOUSEHOLD, decided once by the lot it arrives at: 0 modest · 1 affluent · 2 ultrawealthy. The
-  // ladder is GATES, not weights (the owner's word was PREREQUISITE); every rung is a field the game already computes, read
-  // on the lot's anchor. Index = the class the rung is FOR; a rung at 0 (or a ceiling at 100) is no rung for that class.
-  TAX_CLASS: [1, 2, 5],          // × the R tax base per animal, by the household's class — a few animals paying a large share; the Census prints the share
-  MANSION_CAP: 8,                // a mansion houses ONE household — two adults and their cubs — on nine tiles that would hold 270
-  CLASS_CULTURE: [0, 1, 2],      // culture at home: the affluent any (a Gallery), the ultrawealthy an Amphitheater's — the owner's prerequisite
-  CLASS_KNOWLEDGE: [0, 0, 1],    // the ultrawealthy: a Library or a University reaches home
+  // Class is what the ADDRESS attains this month (the owner: "class based on the opportunities near you"): 0 poverty ·
+  // 1 modest · 2 affluent, derived on every R lot by wealth.computeClass. The ladder is GATES, not weights (the owner's word
+  // was PREREQUISITE); every rung is a field the game already computes, read on the lot's anchor. Index = the class the rung
+  // is FOR; a rung at 0 (or a ceiling at 100) is no rung for that class.
+  TAX_CLASS: [1, 2, 5],          // × the R tax base per animal, by the class at home — the owner's PROGRESSIVE tax, "to balance out that less people can live on the same plot"; the Census prints the share
+  MANSION_CAP: 8,                // a mansion houses ONE household — two adults and their cubs — on nine tiles that would hold 270 ("less people are homed in the same area")
+  MANSION_P: 0.25,               // p = MANSION_P·score a month for a 3×3 of housing whose address is affluent — SPROUT_P's rate, not a block's BIG_P: the address has done the work a storey's fill does
+  CLASS_CULTURE: [0, 1, 2],      // culture at home: the modest any (a Gallery), the affluent an Amphitheater's — the owner's prerequisite
+  CLASS_KNOWLEDGE: [0, 0, 1],    // the affluent: a Library or a University reaches home
   CLASS_PARK: [0, 1, 1],         // a Park or Large Park within CLASS_PARK_RADIUS (the PARK mood term's own test)
   CLASS_PARK_RADIUS: 4,
-  CLASS_SHOP_ROAD: [0, 0, 6],    // the ultrawealthy: a standing shop within this many road tiles of a door
+  CLASS_SHOP_ROAD: [0, 0, 6],    // the affluent: a standing shop within this many road tiles of a door
   CLASS_POL_MAX: [100, 20, 10],  // the air
   CLASS_CRIME_MAX: [100, 40, 25],// the streets
   CLASS_DREAD_MAX: [100, 0, 0],  // the smell: no meat hall's dread at all
-  CLASS_LV_MIN: [0, 60, 80],     // land value: the tier-3 line for the affluent; 80 for a mansion (near the centre, or a Large Park and nature)
-  CLASS_NATURE: [0, 0, 1],       // the ultrawealthy: water or trees among the eight neighbours (land value's own nature8)
-  ARREST_PRIORITY: [0, 0.05, 0.15], // added to the ARREST roll by the victim's class — "priority policing" as probability, since files roll independently
-  CASE_MONTHS_RICH: 12,          // … and an ultrawealthy victim's case is worked twice as long (CASE_MONTHS 6 for everyone else)
+  CLASS_LV_MIN: [0, 60, 80],     // land value: the tier-3 line for the modest; 80 for the affluent (near the centre, or a Large Park and nature)
+  CLASS_NATURE: [0, 0, 1],       // the affluent: water or trees among the eight neighbours (land value's own nature8)
+  ARREST_PRIORITY: [0, 0.05, 0.15], // added to the ARREST roll by the class at the victim's address — "priority policing" as probability, since files roll independently
+  CASE_MONTHS_RICH: 12,          // … and a file from an affluent address is worked twice as long (CASE_MONTHS 6 for everyone else)
   // ---- crime and punishment (the owner, 2026-09-02; docs/PROPOSAL-CRIME-AND-PUNISHMENT.md) ----
   // Zone M — the grey-market meat hall: stall / meat hall / cold store.
   M_JOBS: [0, 3, 8, 16],
@@ -403,9 +405,9 @@ export const RULES = Object.freeze([
     live: (w) => { const c = w.last.census; return `${c.libraries || 0} librar${c.libraries === 1 ? "y" : "ies"} · ${c.universities || 0} universit${c.universities === 1 ? "y" : "ies"} · ${c.galleries || 0} galler${c.galleries === 1 ? "y" : "ies"} · ${c.amphitheaters || 0} amphitheater${c.amphitheaters === 1 ? "" : "s"} · K ${f2(c.K || 0)} (+${Math.round(KNOBS.CAP_KNOWLEDGE * (c.K || 0))} capacity before the H multiplier) · ${Math.round(100 * (c.cultureShare || 0))}% of animals under culture, mean +${f2(c.cultureMean || 0)} mood${(c.knowledgeNoRoad || 0) + (c.cultureNoRoad || 0) ? ` · ${(c.knowledgeNoRoad || 0) + (c.cultureNoRoad || 0)} without a road (upkeep due, no service)` : ""}`; },
   },
   {
-    id: "W1", title: "Wealth and class: a household takes the class its lot attains, once, and keeps it",
-    formula: "modest / affluent / ultrawealthy by the lot at arrival; cubs inherit ; AFFLUENT needs culture at home, a park within 4, pollution ≤ 20, crime ≤ 40, no dread, LV ≥ 60 ; ULTRAWEALTHY needs an Amphitheater's culture, knowledge, a park, a shop within 6 road tiles, pollution ≤ 10, crime ≤ 25, no dread, LV ≥ 80, water or trees beside ; R tax × 1 / 2 / 5 ; the ultrawealthy live only in a MANSION — a 3×3 Estate plot (§200) placed beside a road, chalk until every rung is met, then one household of up to 8 ; no roll: the mansion rises the month the last rung is met",
-    live: (w) => { const c = w.last.census; const by = c.byClass || [0, 0, 0]; const sh = c.taxShareByClass || [0, 0, 0]; return `${by[1]} affluent · ${by[2]} ultrawealthy of ${c.P} · R tax share ${Math.round(100 * sh[1])}% / ${Math.round(100 * sh[2])}% · ${c.estates || 0} estate plot${c.estates === 1 ? "" : "s"} waiting · ${c.mansions || 0} mansion${c.mansions === 1 ? "" : "s"}`; },
+    id: "W1", title: "Wealth and class: an address is what the opportunities near it afford, this month",
+    formula: "every R lot is in POVERTY, MODEST or AFFLUENT by its own street each month, and its households with it (a 3×3 is read at its heart, one in from the kerb, its nature round its border) ; MODEST needs culture at home, a park within 4, pollution ≤ 20, crime ≤ 40, no dread, LV ≥ 60 ; AFFLUENT needs an Amphitheater's culture, knowledge, a park, a shop within 6 road tiles, pollution ≤ 10, crime ≤ 25, no dread, LV ≥ 80, water or trees beside ; R tax × 1 / 2 / 5 (progressive) ; where a 3×3 of housing would be affluent and demand is positive it may rise as a MANSION at 0.25·score a month: one household keeps the house, everyone else on the nine lots is moved out, and eight animals live where 270 could",
+    live: (w) => { const c = w.last.census; const by = c.byClass || [0, 0, 0]; const sh = c.taxShareByClass || [0, 0, 0]; return `${by[0]} in poverty · ${by[1]} modest · ${by[2]} affluent of ${c.P} · R tax share ${Math.round(100 * sh[0])}% / ${Math.round(100 * sh[1])}% / ${Math.round(100 * sh[2])}% · ${c.mansions || 0} mansion${c.mansions === 1 ? "" : "s"}${c.affluentLots ? ` · ${c.affluentLots} affluent address${c.affluentLots === 1 ? "" : "es"}` : ""}`; },
   },
   {
     id: "G1", title: "Road access: one rule, asked of the whole building, and every side is a way in",
@@ -449,7 +451,7 @@ export const RULES = Object.freeze([
   },
   {
     id: "B1", title: "Income per year",
-    formula: "rate_R · Σ(0.5 + LV_home/100) × class [1 modest · 2 affluent · 5 ultrawealthy] + rate_C · 1.5·C jobs filled + rate_I · 2.0·I jobs filled",
+    formula: "rate_R · Σ(0.5 + LV_home/100) × class at home [1 poverty · 2 modest · 5 affluent — the progressive tax] + rate_C · 1.5·C jobs filled + rate_I · 2.0·I jobs filled",
     live: (w) => `≈ §${w.last.budget.incomeYr}/yr`,
   },
   {
@@ -534,12 +536,12 @@ export const RULES = Object.freeze([
   },
   {
     id: "P1", title: "The file and the arrest",
-    formula: "every incident opens a file for 6 months ; each month p = 0.02 + 0.18·police cover/60 + 0.05·record → 11% / 50% / 74% over the file at cover 0 / 30 / 60 ; 5% of arrests take the wrong animal, random by proximity ; a file also stains crime +15 within 2 for 24 months ; the victim's class adds +0.05 (affluent) or +0.15 (ultrawealthy) to the roll, and an ultrawealthy victim's file is worked for 12 months — priority policing is probability and time, never order",
+    formula: "every incident opens a file for 6 months ; each month p = 0.02 + 0.18·police cover/60 + 0.05·record → 11% / 50% / 74% over the file at cover 0 / 30 / 60 ; 5% of arrests take the wrong animal, random by proximity ; a file also stains crime +15 within 2 for 24 months ; the class at the victim's address adds +0.05 (modest) or +0.15 (affluent) to the roll, and a file from an affluent address is worked for 12 months — priority policing is probability and time, never order",
     live: (w) => `taken in ${w.events.justice.takenIn} · cells ${w.events.justice.cells} · wrongful ${w.events.justice.wrongful} · exonerated ${w.events.justice.exonerated} · cold ${w.events.justice.cold}`,
   },
   {
     id: "P2", title: "The sentence",
-    formula: "lighter crimes: Zoo prison (24 beds, release unchanged); murder or second theft: Pacification Centre (6 beds, six months, home FIXED); third theft, or theft after pacification: meat hall (§100 cut). A missing or full destination leaves the case open. Species does not determine sentencing. Theft from the ultrawealthy is one step harsher: a first theft goes to the centre and a second to the hall; murder of the ultrawealthy goes to the hall.",
+    formula: "lighter crimes: Zoo prison (24 beds, release unchanged); murder or second theft: Pacification Centre (6 beds, six months, home FIXED); third theft, or theft after pacification: meat hall (§100 cut). A missing or full destination leaves the case open. Species does not determine sentencing. Theft from the affluent is one step harsher: a first theft goes to the centre and a second to the hall; murder of the affluent goes to the hall.",
     live: (w) => `${w.last.census.centres} centre${w.last.census.centres === 1 ? "" : "s"} · ${w.last.census.held} held · pacified ${w.events.justice.pacified} · sold ${w.events.justice.sold}`,
   },
   {

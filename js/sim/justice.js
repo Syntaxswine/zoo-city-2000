@@ -45,13 +45,14 @@ const at = (world, i) => `(${i % world.w},${(i / world.w) | 0})`;
 const cheb = (world, a, b) => Math.max(Math.abs((a % world.w) - (b % world.w)), Math.abs(((a / world.w) | 0) - ((b / world.w) | 0)));
 /** "(18,4)" — or "(18,4), the Greyback estate" when a mansion stands there (SPEC §9f); the coordinates stay first for play.mjs --when. */
 const addressOf = (world, i) => { const e = estateName(world, i); return e ? `${at(world, i)}, ${e}` : at(world, i); };
-/** How long a file is WORKED: an ultrawealthy victim's case runs CASE_MONTHS_RICH; everyone else's CASE_MONTHS (SPEC §9f). */
-const caseMonthsOf = (f) => ((f.victimClass || 0) === CLASS.ULTRAWEALTHY ? KNOBS.CASE_MONTHS_RICH : KNOBS.CASE_MONTHS);
+/** How long a file is WORKED: a file from an affluent address runs CASE_MONTHS_RICH; everyone else's CASE_MONTHS (SPEC §9f). */
+const caseMonthsOf = (f) => ((f.victimClass || 0) === CLASS.AFFLUENT ? KNOBS.CASE_MONTHS_RICH : KNOBS.CASE_MONTHS);
 
 /** Open a file at an incident: a crime stain for FILE_MONTHS, an investigation for CASE_MONTHS. */
 export function openFile(world, { tile, culpritId, victimId = 0, cause, line = "", crime = KNOBS.FILE_CRIME, radius = KNOBS.FILE_RADIUS, victimClass = 0 }) {
-  // `victimClass` (SPEC §9f): the class of the household at a burgled address, or of a killing's victim — 0 for a shop, a works,
-  // a hall, a trespass. It is what "priority policing" reads: the arrest roll (arrestChance) and the case length (caseMonthsOf).
+  // `victimClass` (SPEC §9f): the class the burgled HOME's address attains this month, or the class at a killing's victim's home —
+  // 0 for a shop, a works, a hall, a trespass. It is what "priority policing" reads: the arrest roll (arrestChance) and the case
+  // length (caseMonthsOf). The owner: "this applies just to the home".
   // Written only when it is not 0: the file is SAVED under events, and a town whose files carry no class must hash as it did.
   const f = { tile, radius, crime, opened: world.tick, until: world.tick + KNOBS.FILE_MONTHS, culpritId, victimId, ...(victimClass ? { victimClass } : {}), cause, line, closed: false };
   world.events.files.push(f);
@@ -127,7 +128,7 @@ function kill(world, killer, victim, notices) {
   const mourners = victim.friends.slice();
   const hh = world.hhById.get(victim.household);
   const family = hh ? hh.members.filter((id) => id !== victim.id) : [];
-  const victimClass = classOfCitizen(world, victim); // before removeCitizen scrubs the household (SPEC §9f)
+  const victimClass = classOfCitizen(world, victim); // the class at the victim's home, before removeCitizen scrubs it (SPEC §9f)
   const market = hallReach(world, killer.home, KNOBS.MEAT_ROAD, { space: true });
   const selectedHall = market?.hall ?? -1;
   // The sim publishes the exact selected two-layer path before deleting the
@@ -228,14 +229,14 @@ export function burglaryTick(world, cen, notices) {
   const loss = KNOBS.BURGLARY_LOSS * tier;
   post(world, "theft", -Math.min(loss, Math.max(0, world.cash)));
   const z = world.zone[lot];
-  // The victim's CLASS (SPEC §9f): the richest household at a burgled HOME — a shop, a works or a hall has no class (the owner's
-  // scope is the home; shops have no owners yet). An ultrawealthy victim's file is worked longer and harder, and the line says so.
+  // The victim's CLASS (SPEC §9f): the class of a burgled HOME's address this month — a shop, a works or a hall has no class (the
+  // owner's scope is the home; shops have no owners yet). An affluent address's file is worked longer and harder, and the line says so.
   const victimClass = z === ZONE.R ? classAt(world, lot) : 0;
   const where = z === ZONE.R ? `broke into the house at ${addressOf(world, lot)}` : z === ZONE.C ? `walked out of the shop at ${at(world, lot)} with §${loss} of stock` : z === ZONE.M ? `left the meat hall at ${at(world, lot)} with §${loss} of stock` : `took §${loss} of copper off the works at ${at(world, lot)}`;
   // The file opens either way: it is the STREET's memory of the burglary, not
   // the paperwork's, and a street does not forget faster for want of a desk
   // sergeant. Whether anyone WORKS it is filesTick's question.
-  const filed = victimClass === CLASS.ULTRAWEALTHY ? `A file is open for ${KNOBS.CASE_MONTHS_RICH} months; a theft from the ultrawealthy takes priority.` : "A file is open for six months.";
+  const filed = victimClass === CLASS.AFFLUENT ? `A file is open for ${KNOBS.CASE_MONTHS_RICH} months; a theft from the affluent takes priority.` : "A file is open for six months.";
   const line = `BURGLARY — ${nameOf(thief)} ${where}. ${cen.policeStations ? filed : "There is no station in town; the street remembers it and nobody comes looking."}`;
   openFile(world, { tile: lot, culpritId: thief.id, cause: "burglary", line, victimClass });
   markBurgled(world, lot);
@@ -372,10 +373,10 @@ export function arrest(world, f, c, wrongful, notices, opts = {}) {
   const theft = f.cause === "burglary" || f.cause === "theft";
   const thefts = (c.thefts || 0) + (theft ? 1 : 0);
   const murder = f.cause === "killing" || f.cause === "murder";
-  // THE OWNER'S STEP (SPEC §9f): "any theft from the ultrawealthy gets … one step harsher punishment." One step up the table
-  // for a theft from an estate — a first theft goes to the centre, a second to the hall — and murder of the ultrawealthy,
-  // already the centre, becomes the hall. The counter records what happened (thefts); the step is on the SENTENCE.
-  const harsher = (f.victimClass || 0) === CLASS.ULTRAWEALTHY && (theft || murder);
+  // THE OWNER'S STEP (SPEC §9f): "any theft from the ultrawealthy gets … one step harsher punishment" — "yes harsher punishment".
+  // One step up the table for a theft from an affluent address — a first theft goes to the centre, a second to the hall — and
+  // murder of the affluent, already the centre, becomes the hall. The counter records what happened (thefts); the step is on the SENTENCE.
+  const harsher = (f.victimClass || 0) === CLASS.AFFLUENT && (theft || murder);
   const steps = thefts + (harsher && theft ? 1 : 0);
   const sentence = (theft && steps >= 3) || (theft && c.fixed) || (murder && harsher) ? "hall"
     : murder || (theft && steps === 2) ? "centre" : "zoo";
@@ -418,7 +419,7 @@ export function arrest(world, f, c, wrongful, notices, opts = {}) {
     post(world, "cut", KNOBS.SOLD_PRICE);
     receiveMeat(world, destination, "convicted", 1);
     ev.justice.sold++;
-    const because = murder ? "Murder of the ultrawealthy." : thefts >= 3 ? "Third theft." : c.fixed ? "An offence after pacification." : "A second theft from the ultrawealthy.";
+    const because = murder ? "Murder of the affluent." : thefts >= 3 ? "Third theft." : c.fixed ? "An offence after pacification." : "A second theft from the affluent.";
     line = `SOLD — ${nameOf(c)} was convicted ${why} and sold at the meat hall at ${at(world, destination)}. ${because}${tail}`;
   } else {
     const months = sentence === "centre" ? KNOBS.PACIFY_MONTHS : minor ? KNOBS.TRESPASS_MONTHS : KNOBS.CELLS_MONTHS;
@@ -426,7 +427,7 @@ export function arrest(world, f, c, wrongful, notices, opts = {}) {
     c.heldAt = destination;
     if (sentence === "centre") {
       ev.justice.takenIn++;
-      line = `TAKEN IN — ${nameOf(c)} went from ${at(world, home)} to the Pacification Centre at ${at(world, destination)} ${why}. ${months} months.${harsher && theft && thefts === 1 ? " A first theft from the ultrawealthy: one step harsher." : ""}${tail}`;
+      line = `TAKEN IN — ${nameOf(c)} went from ${at(world, home)} to the Pacification Centre at ${at(world, destination)} ${why}. ${months} months.${harsher && theft && thefts === 1 ? " A first theft from the affluent: one step harsher." : ""}${tail}`;
     } else {
       ev.justice.cells++;
       if (minor) ev.justice.trespass++;
@@ -442,8 +443,8 @@ export function arrest(world, f, c, wrongful, notices, opts = {}) {
 /**
  * The probability this month's roll on file `f` is made against — ONE function,
  * so the suite pins the number and not a copy of the formula. 0 with no force
- * in town (no roll is made at all). The victim's class adds ARREST_PRIORITY
- * (SPEC §9f): the owner's "priority policing", as probability.
+ * in town (no roll is made at all). The class at the victim's address adds
+ * ARREST_PRIORITY (SPEC §9f): the owner's "priority policing", as probability.
  */
 export function arrestChance(world, cen, f, culprit) {
   const force = Math.min(1, cen.policeStations / KNOBS.ARREST_FORCE_N);

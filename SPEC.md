@@ -1261,108 +1261,131 @@ for more upkeep is the owner's call, and the K-mean dynamic (a town outgrowing
 its catchment lowers its own cap into camping) is pre-registered for measuring
 with `tools/knowprobe.mjs`.
 
-## 9f. Wealth and class — the ladder, the estate and its mansion, priority policing (`js/sim/wealth.js`, `justice.js`, `budget.js`, `citizens.js`; session 18, 2026-09-05)
+## 9f. Wealth and class — the ladder, the class field, the mansion that rises, priority policing (`js/sim/wealth.js`, `lots.js`, `justice.js`, `budget.js`; session 18, 2026-09-05)
 
-The owner (2026-09-05): *"culture will be a boon to both happiness as well as
+The owner, in the morning: *"culture will be a boon to both happiness as well as
 property desirability, but later when we start getting into wealth/class it
 will be a prerequisite to more affluent housing. the ultrawealthy want to have
 a 3x3 plot next to everything, they will need their own sprites too for their
 mansions. any theft from the ultrawealthy gets priority policing and one step
-harsher punishment."* Scouted in `docs/PROPOSAL-WEALTH-AND-CLASS-2026-09-05.md`
-the day it was said, built in session 18 on the proposal's own defaults (its
-eight §8 decisions taken and said out loud in its BUILT note).
+harsher punishment."* The owner, in the evening, ruling on the proposal's eight
+decisions: *"poverty, modest, affluent"* · *"class based on the opportunities
+near you"* · *"same as 2, if there are enough positive things near you it
+happens naturally like when the building upgrades to an apartment building"* ·
+*"yes, that's the right POV, less people are homed in the same area"* · *"the
+option for a progressive tax is a wonderful idea and would balance out that
+less people can live on the same plot"* · *"i like the art you picked, at some
+point a species specific variation is welcome"* · *"this applies just to the
+home, yes harsher punishment"*. Scouted in
+`docs/PROPOSAL-WEALTH-AND-CLASS-2026-09-05.md`; built twice in session 18 —
+first on the proposal's defaults (a placed Estate plot, class fixed at arrival),
+then rebuilt the same evening on the rulings. This is the rebuilt rule.
 
 ```
-CLASS      hh.wealth 0 modest · 1 affluent · 2 ultrawealthy — a property of the HOUSEHOLD, decided ONCE by the lot it arrives at
-           (citizensTick, wealth.classForArrival), inherited by cubs (the sixteen-year split carries it), kept for life through
-           every move (old money in a cottage is a story, not a bug). Saved beside the surname and OMITTED when 0, so a town in
-           which no lot has ever attained a class hashes as it did. Species untouched: a wealthy skunk is allowed.
-THE LADDER attainableClass(world, lot) → { cls, next, unmet: [{ rung, want }] }: GATES, not weights (the owner's word was
-           PREREQUISITE; the weights-never-gates law is about species and stays about species). Every rung is a field the game
-           already computes, read on the lot's ANCHOR; every number a KNOB (rules.js CLASS_*):
-             rung         affluent (class 1)                     ultrawealthy (class 2)                      knob
-             culture      culture[home] ≥ 1 (a Gallery's)        ≥ 2 (an Amphitheater's)                     CLASS_CULTURE [0, 1, 2]
-             knowledge    —                                      knowledge[home] ≥ 1 (a Library or University) CLASS_KNOWLEDGE [0, 0, 1]
-             park         a Park or Large Park within 4          the same                                    CLASS_PARK [0, 1, 1], CLASS_PARK_RADIUS 4
-             shops        —                                      a standing shop within 6 ROAD tiles of a door CLASS_SHOP_ROAD [0, 0, 6]
-             air          pol ≤ 20                               pol ≤ 10                                    CLASS_POL_MAX [100, 20, 10]
-             streets      crime ≤ 40                             crime ≤ 25                                  CLASS_CRIME_MAX [100, 40, 25]
-             smell        dread 0                                dread 0                                     CLASS_DREAD_MAX [100, 0, 0]
-             land value   LV ≥ 60 (the tier-3 line)              LV ≥ 80                                     CLASS_LV_MIN [0, 60, 80]
-             nature       —                                      nature8 ≥ 1 (water or trees beside)         CLASS_NATURE [0, 0, 1]
-           `unmet` lists the NEXT class's missing rungs in the wish system's words ("a shop within 6 road tiles", "cleaner air
-           (pollution 14, at most 10)"), so a plot, a card and the Census say the same thing and an empty estate is a to-do list.
-TAX        R income = rate_R · Σ over housed animals of (0.5 + LV_home/100) × TAX_CLASS[class], TAX_CLASS [1, 2, 5] — a few animals
-           paying a large share; budget.taxByClass and census.byClass / taxShareByClass print the counts and the shares.
-THE ESTATE key Q, §200 (COST.estate): a 3×3 residential plot placed like a campus — atomic, clear ground, a road TOUCHING — stored as
-           an R block anchor (big 3, PART | dx | dy << 2 parts) with world.estate[anchor] = 1 (PLOT, chalk). It never grows, decays
-           or merges by lotScore (reasons ESTATE / MANSION, NO_ROAD when unserved, p 0); a zone drag or a road refuses its footprint;
-           the bulldozer takes all nine (§2 each) and undo puts them back. capacityOf: 0 on chalk, MANSION_CAP 8 standing.
-SPROUT     wealth.estatesTick (tick.js 4a — after lotsTick, before the first settleDoors, the lots' own window): a SERVED plot with no
-           tile flooded, alight or rubble whose ladder reaches ULTRAWEALTHY → estate 2 (MANSION), tier 3 on all nine (a block is a
-           tier-3 building on every tile), capacity MANSION_CAP for ONE household. No roll, no RNG: the month the last rung is met.
-           MANSION — … is logged under its own id and flashes. A mansion that stands keeps standing whatever the street does later.
-WHO        a NEW ARRIVAL may take an empty mansion and becomes ultrawealthy by taking it; a rehoming household may only if it already
-           is; a second household never while one lives there (citizens.vacantLots); THE ESTATE — the Slyfields (4 foxes) have moved
-           into the mansion at (x,y). when a family does. The species that arrives is the roster's: cats twice and skunks once, measured.
-DOWN       fire, flood and the bulldozer take a mansion as a block, every tile at once. blocks.splitLot on an estate anchor calls
-           wealth.unbuildMansion in place of the split into singles — estate back to PLOT, tier 0 on every tile, the block KEPT so the
-           footprint is still one thing — and evicts through the capacity path (0 on chalk) even for toRubble's evict:false, because
-           that caller evicts by lowering storeys and chalk has none. Rubble clears itself and the plot may sprout again. On the beat
-           the engine saves a mansion WHOLE (events.saveFromFire: it has no storey to spare); events.lowerTier guards the Uint8 wrap.
-JUSTICE    justice.openFile records victimClass — the RICHEST household at a burgled HOME (wealth.classAt; a shop, works, hall or a
-           trespass is 0), or a killing's victim's class — written only when non-zero. justice.arrestChance is the ONE formula the
-           monthly roll is made against and adds ARREST_PRIORITY [0, 0.05, 0.15]; an ultrawealthy victim's case is worked
-           CASE_MONTHS_RICH 12 months instead of CASE_MONTHS 6 (the cold line says which). The sentence takes ONE STEP for a theft from
-           the ultrawealthy — a first theft to the centre, a second to the hall — and murder of the ultrawealthy, already the centre,
-           goes to the hall; the counter records what happened (thefts), the step is on the sentence; trespass is untouched. Lines
-           address a mansion as "(18,4), the Greyback estate" and say "A first theft from the ultrawealthy: one step harsher."
-           Priority policing is PROBABILITY AND TIME, never order: files roll independently, so "worked first" cannot mean queue order.
+CLASS      what the ADDRESS affords THIS MONTH: world.klass[i] = 0 POVERTY · 1 MODEST · 2 AFFLUENT on every R lot of its own or block
+           anchor, derived by wealth.computeClass after the fields (tick step 1; refreshLast), never saved. A citizen's class is
+           its home's (classOfCitizen); a household that moves reads its new street; nothing is carried or inherited. A town with
+           no culture is a town in poverty, and the Census says so: the class histogram is a readout of what the player built.
+THE SITE   a lot of its own is read at itself, its nature its eight neighbours; a 3×3 — a block, a mansion, the window that would be
+           one — is read at its HEART, the centre tile one in from the kerb (a ring road puts up to 30 pollution on the tile beside
+           it and none on the next), and its nature round the BORDER of the footprint (wealth.siteOf, natureBeside)
+THE LADDER attainableClass(world, lot, ctx?, footprint?) → { cls, next, unmet: [{ rung, want }] }: GATES (the owner's word was
+           PREREQUISITE; weights-never-gates is about species), every rung a field the game already computes, every number a KNOB:
+             rung         modest (1)                             affluent (2)                          knob
+             culture      culture[heart] ≥ 1 (a Gallery's)       ≥ 2 (an Amphitheater's)               CLASS_CULTURE [0, 1, 2]
+             knowledge    —                                      knowledge[heart] ≥ 1 (Library/University) CLASS_KNOWLEDGE [0, 0, 1]
+             park         a Park or Large Park within 4          the same                              CLASS_PARK [0, 1, 1], CLASS_PARK_RADIUS 4
+             shops        —                                      a standing shop within 6 ROAD tiles of a door  CLASS_SHOP_ROAD [0, 0, 6]
+             air          pol ≤ 20                               pol ≤ 10                              CLASS_POL_MAX [100, 20, 10]
+             streets      crime ≤ 40                             crime ≤ 25                            CLASS_CRIME_MAX [100, 40, 25]
+             smell        dread 0                                dread 0                               CLASS_DREAD_MAX [100, 0, 0]
+             land value   LV ≥ 60 (the tier-3 line)              LV ≥ 80                               CLASS_LV_MIN [0, 60, 80]
+             nature       —                                      natureBeside ≥ 1 (water or trees)     CLASS_NATURE [0, 0, 1]
+           `unmet` names the NEXT class's missing rungs in the wish system's words ("a shop within 6 road tiles", "cleaner air
+           (pollution 14, at most 10)"); the card and the Census say the same thing, so a poor street says what it lacks.
+TAX        R income = rate_R · Σ over housed animals of (0.5 + LV_home/100) × TAX_CLASS[class at home], TAX_CLASS [1, 2, 5] — the
+           owner's PROGRESSIVE tax, "to balance out that less people can live on the same plot"; budget.taxByClass, census.byClass,
+           census.taxShareByClass print the counts and the shares.
+THE MANSION RISES, like a storey (lots.lotScore): an R lot i that is the north corner of a 3×3 of R lots of their own — on one use
+           line, dry, no civic, none rubble, alight or flooded — whose SITE is affluent (wealth.mansionWindow: the cheap field rungs
+           at the heart first, then the whole ladder on the window) and whose score > GROW_THRESH reads MANSION_RISING at
+           p = MANSION_P 0.25 · score a month — a storey's sprouting rate, because the address has done the work a storey's fill
+           does — before any storey or block there. lotsTick rolls it as it rolls a merge. wealth.raiseMansion: the nine tiles
+           become the block FIRST (big 3 and its parts, tier 3 on every tile, world.mansion[anchor] = 1 — the twentieth tile array,
+           left out of the save and the hash while zero) so nobody is rehomed onto the window they are leaving; the household that
+           keeps the house is the largest that fits MANSION_CAP 8, ties to the earlier arrival then the lower id; everyone else on the
+           nine lots is moved out (citizens.displaceFrom: rehomed within REHOME_RADIUS road tiles, else a tent, else they leave,
+           "displaced" on the record); the keeper moves onto the anchor. MANSION — a mansion has risen at (11,24). The Scrapleys
+           (4 raccoons) keep the house; 26 animals were moved out to make room. … logged under its own id; it flashes.
+WHO        one household at a time (citizens.vacantLots): a new arrival or a rehoming family may take an EMPTY mansion whoever they
+           are — the address makes them affluent — and none may join while one lives there. THE ESTATE — the Slyfields (4 foxes)
+           have moved into the mansion at (x,y). when one does. capacityOf a mansion is MANSION_CAP: eight where 270 could live.
+STANDING   neither grows, decays nor merges (lotScore MANSION, p 0; NO_ROAD unserved) and keeps standing whatever the street does
+           later — its class follows the street and the card says "the street has come down since it rose". blocks.splitLot on a
+           mansion anchor breaks it into nine tier-1 COTTAGES (no block, no mansion) and evicts through the capacity path (a family
+           of four fits, one of six rehomes); fire's toRubble then takes the cottages' storey as it takes a block's three; on the
+           beat events.saveFromFire saves a mansion WHOLE (it has no storey to spare); events.lowerTier guards the Uint8 wrap. The
+           address may raise another when the rubble clears.
+JUSTICE    justice.openFile records victimClass — the class the burgled HOME's address attains this month (classAt; a shop, works,
+           hall or trespass is 0), or the class at a killing's victim's home — written only when non-zero. justice.arrestChance is
+           the ONE formula the monthly roll is made against and adds ARREST_PRIORITY [0, 0.05, 0.15]; a file from an affluent
+           address is worked CASE_MONTHS_RICH 12 months (the cold line says which); the sentence takes ONE STEP for a theft from
+           the affluent — a first theft to the centre, a second to the hall — and murder of the affluent, already the centre, goes
+           to the hall; the counter records what happened; trespass is untouched. The lines: "(18,4), the Greyback estate" ·
+           "A first theft from the affluent: one step harsher." Priority is PROBABILITY AND TIME, never order: files roll independently.
 ```
 
-**The card, the tabs.** Any R lot: *class here: modest — affluent needs culture at
-home — a Gallery or an Amphitheater in reach · a Park or Large Park within 4*.
-An estate plot: *waiting for: a shop within 6 road tiles · water or trees beside
-the plot* (or *every rung met — the mansion rises this month*). A mansion: *3×3
-mansion — the Greyback estate · a mansion: one household of the ultrawealthy,
-up to 8 · R tax ×5*, and *the street has come down since it rose: …* when its
-ladder no longer reaches. Households on any card carry their class in brackets;
-a citizen's card says *the Slyfield household, ultrawealthy*. Census: *class
-(modest · affluent · ultrawealthy)*, *R tax share by class*, *estate plots
-waiting · mansions* — only once a town has any. Budget: *— of which the
-affluent, ×2 · — and the ultrawealthy, ×5* under the R line. Rules W1 is the
-rule; B1, P1 and P2 carry the class terms. The ESTATE and MANSION news ids
-flash; the mansion and the plot are `js/art/estate.js` (§12.2g), lit and
-marked through `characterSprite` like every home.
+**The card, the tabs.** Any R lot: *class here: poverty · R tax ×1 — modest
+needs culture at home — a Gallery or an Amphitheater in reach · a Park or Large
+Park within 4*. Affluent chalk: *class here: affluent · R tax ×5 — a mansion
+may rise on the 3×3 of housing anchored here*. A mansion: *3×3 mansion — the
+Scrapley estate · a mansion: one household, up to 8, on nine tiles · class here
+affluent · R tax ×5*. A citizen's card: *the Scrapley household, affluent*.
+Census: *class at home (poverty · modest · affluent)*, *R tax share by class (×1
+/ 2 / 5)*, *affluent addresses · mansions*. Budget: *— of which the modest, ×2 ·
+— and the affluent, ×5* under the R line. Rules W1 is the rule; B1, P1 and P2
+carry the class terms. There is NO tool for a mansion: it is never placed. Art:
+`js/art/mansion.js` (§12.2g) — pale stone, two wings round a fountain court, a
+portico, a glasshouse, gate lamps — lit and marked through `characterSprite`
+like every home; the species-skinned set the owner welcomes is a later art arc
+on the landmark pattern.
 
-**Measured on the way in (`tools/wealthprobe.mjs`, which grafts the estate
-quarter into the scripted mayor's town the month it is founded).** On the
-owner's `--layout estate` (6×6 blocks), seed 7: the plot is chalk for 15
-months and the ONE binding rung is shops (the C block across the ring road had
-to grow a shop; land value and streets bit for a month each); the mansion rose
-in month 15 and the Slyfields (4 foxes) took it the same month; 24 affluent
-animals at year 1 carried 63% of the R tax, 111 at year 5 carried 34%, 56 at
-year 30 carried 12%; the mansion's 4–5 animals carried 2–8%. On `--layout
-balanced` (5×5 interiors) the quarter does not fit — no 3×3 of chalk for an
-Amphitheater beside the plot — and culture, air (a works opened next door in
-year 6) and land value bound for the whole run: it never rose. Justice, four
-seeds of the estate layout with a station, a prison, a centre and a hall:
-mansions on 3 of 4 seeds (months 13–15, taken at once by cats twice and skunks
-once); 12 ultrawealthy files, all burglaries at the HEIRS' flats — a mansion
-was a hot lot in 0 mansion-months (crime at most 53) — cleared at 8% against
-22% plain and 37% affluent, because 9 of the 11 cold files had a roll SUCCEED
-and then wait for a centre bed: the harsher step sends a first-time thief to
-the centre, and the centre's six beds are where the ultrawealthy's priority
-runs out. Wrongful arrests 2, none within 4 of an estate. The six published
-mayor rigs are byte-identical (the mayor places no estate and grows no class).
+**Measured (`tools/wealthprobe.mjs`, which grafts a quarter into the scripted
+mayor's town the month it is founded).** The BARE amenities — an Amphitheater,
+a Gallery, a Library, a park and a tree at the first High block's corner — raise
+NO mansion in thirty years, and the reason is the game's own law: inside a High
+block the heart of any 3×3 reads crime 100 (0.4 per animal in the 3×3, 3 per
+jobless adult, 40 × the town's unemployed share — Micropolis's density is
+crime), pollution 10–19 from the pig tenements beside it, and land value 63–71
+as the centroid drifts inward. The quarter a player would PLAN — the housing
+within two of the window repainted LOW, a Large Park within five, a police
+station within eight, one corner shop zoned on the ring road, the Library and
+Gallery within five of the heart — raised the mansion in month 26 on
+`--layout estate` seed 7: the corner shop had to grow (shops bound 19 months,
+streets 8), the Scrapleys (4 raccoons) kept the house and 26 animals were
+moved out, and the heart read land value 83–86, pollution 0 and crime 0–2 for
+the rest of the run. Its price: the quarter's upkeep is §2,250 a year and the
+town of ~700 (1,337 in the plain rig — low density and nine tiles of park cost
+housing) spent years 15–26 in the red. Classes at year 30: 652 in poverty, 74
+modest carrying 24% of the R tax, 1 affluent carrying 1% — the raccoons' cubs
+left at sixteen and one old raccoon kept the mansion; nobody joins a lived-in
+one. On `--layout balanced` the quarter does not fit and a works opens next
+door: never. The six published rigs are byte-identical: without culture no
+address leaves poverty, and without an affluent window no roll is drawn.
+Justice, four seeds of the bare graft with a station, a prison, a centre and a
+hall: one mansion (seed 3, month 17) and no file from an affluent address in
+120 town-years — a mansion was a hot lot in 0 mansion-months — so the priority
+is real in the roll (the suite pins it) and rare in the street.
 
-**Not built, said out loud:** growth-made mansions (a tier-3 lot absorbing and
-displacing eight neighbours — the owner's §8.3 call); the affluent "kept" look
-on ordinary buildings; shops as ultrawealthy victims (shops have no owners
-yet); a class weight in the C valve; a species-skinned mansion set. Open from
-the measurement: the centre bottleneck above; TAX_CLASS [1, 2, 5] as proposed,
-now visible in the books; CLASS_LV_MIN 80 binds only where the plot is far
-from the centroid (the estate layout's first block reads 82–86).
+**Not built, said out loud.** The affluent "kept" look on ordinary buildings;
+shops as affluent victims (shops have no owners yet); a class weight in the C
+valve; the species-skinned mansion set; a progressive-tax OPTION switch (the
+multipliers are always on; an Options toggle is one line if the owner wants
+one). Open: MANSION_P 0.25 against the months a planned quarter waits; whether
+a mansion should ever rise inside a dense block (it cannot, by the crime law,
+and the rulings say the poor and the rich live where their streets afford);
+the centre bottleneck the first build measured (a first theft from the
+affluent needs a centre bed) stands whenever such a file exists.
 
 ## 10. Goals and pacing
 
@@ -2062,11 +2085,12 @@ scaled ×2 beside their twins.
 - `theme` (§3c) is the sixteenth; an all-zero `theme` is omitted from the
   hash the same way, so a town with no landmark hashes as it did before the
   landmarks, and a save without the array loads to zeros (plain blocks).
-- `estate` (§9f) is the twentieth (after `since` and `cam`); an all-zero
-  `estate` is left out of the SAVE as well as the hash (as `civicSize` is), and
-  a household's `wealth` and a file's `victimClass` are written only when they
-  are not 0 — so a town with no estate and no class saves and hashes exactly
-  as it did before the arc.
+- `mansion` (§9f) is the twentieth (after `since` and `cam`); an all-zero
+  `mansion` is left out of the SAVE as well as the hash (as `civicSize` is),
+  and a file's `victimClass` is written only when it is not 0 — so a town with
+  no mansion and no class saves and hashes exactly as it did before the arc.
+  Class itself is DERIVED (`world.klass`, never saved), so no household field
+  joins the save.
 - `zoo.pref` — this browser's preferences (the cheat switch, §8): not a
   city, not saved with one, never read by the sim (the suite greps for it).
 
@@ -2079,7 +2103,7 @@ idx(world, tx, ty) → i ;  inBounds(world, tx, ty)
 // js/sim/tick.js
 tick(world) → { notices: [string], events: [eventRecord] }   // one month
 // js/sim/ops.js
-apply(world, op) → { ok, cost, reason, replaced, evicts, undoable }   // op.kind ∈ zone (with density)|road|rail|station|wall|bulldoze|tree|park|largePark|zoo|fire|police|centre|library|university|gallery|amphitheater|estate|use|rate|toggle|choice|cheat ; logs to world.log; deducts cash
+apply(world, op) → { ok, cost, reason, replaced, evicts, undoable }   // op.kind ∈ zone (with density)|road|rail|station|wall|bulldoze|tree|park|largePark|zoo|fire|police|centre|library|university|gallery|amphitheater|use|rate|toggle|choice|cheat ; logs to world.log; deducts cash
 undo(world) → { ok }
 costOf(world, op) → { cost, tiles }        // for the live strip
 // js/sim/fields.js — access, one standard (§6c)
@@ -2105,13 +2129,16 @@ KNOBS  // { LOCAL_SCALE, GROW_THRESH, SPROUT_P, VALVE_LAG, ... } — pre-registe
 // js/sim/save.js
 save(world) → string ; load(string) → world ; stateHash(world) → string (FNV over the saved JSON minus log)
 // js/sim/census.js
-census(world) → { P, W, J, Jc, Ji, F, U, Lab, shares, H, friendships, approval, native, byClass, taxShareByClass, estates, mansions }
+census(world) → { P, W, J, Jc, Ji, F, U, Lab, shares, H, friendships, approval, native, byClass, taxShareByClass, affluentLots, mansions }
 // js/sim/wealth.js — wealth and class (§9f)
-attainableClass(world, lot) → { cls, next, unmet: [{ rung, want }] }   // the ladder as the fields stand, read on the anchor
-classForArrival(world, lot) → 0 | 1 | 2       // what an arriving household takes; a mansion is 2 by construction
+siteOf(world, lot, footprint?) → { anchor, tiles, heart }              // where a site's ladder is read: a 3×3 at its heart, nature round its border
+attainableClass(world, lot, ctx?, footprint?) → { cls, next, unmet: [{ rung, want }] }   // the ladder as the fields stand
+computeClass(world)                            // world.klass on every R lot of its own or block anchor — tick step 1, refreshLast; never saved
 classAt(world, lot) → 0 | 1 | 2 ; classOfCitizen(world, c) → 0 | 1 | 2 ; estateName(world, lot) → "the Greyback estate" | "the empty mansion" | null
-estatesTick(world) → [line]                   // tick.js 4a: sprouts every plot whose ladder is complete; no RNG
-unbuildMansion(world, anchor)                 // blocks.splitLot calls it for an estate anchor instead of splitting into singles
+mansionWindow(world, lot) → { anchor, tiles } | null   // the 3×3 anchored at lot that could rise this month; lots.lotScore rolls it
+raiseMansion(world, win) → { anchor, tiles, keeper, displaced } ; mansionLine(world, res) → string   // lots.lotsTick, as it merges a block
+// js/sim/citizens.js
+displaceFrom(world, tiles, keep) → n           // everyone on tiles but keep: rehomed within REHOME_RADIUS road tiles, a tent, or gone
 // js/sim/justice.js
 arrestChance(world, cen, f, culprit) → 0..0.95   // the ONE formula the monthly roll is made against (+ ARREST_PRIORITY[f.victimClass])
 // js/walkers.js
@@ -2119,7 +2146,7 @@ createWalkers(world) → { update(dtSeconds, viewport), list() → [{ id, citize
 // js/render.js
 createRenderer(canvas, world, art) → { draw(camera, hover, walkers, overlays), invalidate(), pick(sx, sy) → [tx, ty]|null }
 // js/art/index.js
-art.building(zone, tier, variant, side = 1, theme = 0) /* variant: the tile's whole byte — & 1 the mirror, >> 1 the shop kind for C tier 1 */ / art.mansion(variant, character) / art.estatePlot(variant) / art.civic(kind) / art.road(mask, busy) / art.crossing(roadMask, railMask, busy) / art.ground(kind, variant) / art.tree(kind)
+art.building(zone, tier, variant, side = 1, theme = 0) /* variant: the tile's whole byte — & 1 the mirror, >> 1 the shop kind for C tier 1 */ / art.mansion(variant, character) / art.civic(kind) / art.road(mask, busy) / art.crossing(roadMask, railMask, busy) / art.ground(kind, variant) / art.tree(kind)
 art.citizen(species, facing, frame, age) / art.overlay(kind, frame)   // each → { rows, anchor } (rasterised lazily by the renderer)
 ```
 

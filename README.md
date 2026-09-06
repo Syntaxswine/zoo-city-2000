@@ -58,9 +58,12 @@ The build remote on the left is the key: `1` Residential, `2` Commercial,
 `3` Industrial, `4` Meat, `5` Road, `6` Wall, `7` Rail, `8` Station, `9`
 Tree, `E` Camera, `0` Park, `G` Large Park, `Z` Zoo (prison), `V` Pacification, `P` Police, `F` Fire, `I` Inspect,
 `B` Bulldoze, the four public buildings — `K` Library, `Y` University, `M` Gallery, `T` Amphitheater (knowledge
-raises the town's capacity; culture lifts mood and land value; a University reaches half the map's tiles, an Amphitheater an eighth) — and `Q` Estate,
-a 3×3 plot that stays chalk until culture, knowledge, a park, a shop, clean air, quiet streets, land value 80 and nature are all met at it, then raises
-a mansion for one ultrawealthy household (their tax is ×5, their burglaries are worked first and sentenced a step harder; the card lists what the plot waits for). `H` changes density and `U` opens the use-zoning checklist. WASD and the
+raises the town's capacity; culture lifts mood and land value; a University reaches half the map's tiles, an Amphitheater an eighth).
+There is no tool for a mansion: every street is in poverty, modest or affluent by what stands near it, and where a 3×3 of
+housing sits on an affluent address — an Amphitheater's culture, knowledge, a park, a shop within six road tiles, clean air,
+quiet streets, land value 80 and trees or water beside it — a mansion rises on its own, like a storey, and one household keeps
+the house (their tax is ×5, their burglaries are worked first and sentenced a step harder; every lot's card says what its
+street affords and what the next class needs). `H` changes density and `U` opens the use-zoning checklist. WASD and the
 arrows only pan. `Backspace` or `Ctrl+Z` undoes; `Ctrl+S` opens save-as and
 `L` opens the saves list. The generated help line in the game carries the
 remaining pause, speed, overlay, news, zoom, new-city and menu keys.

@@ -29,8 +29,8 @@ function anyWater(world) {
 
 function lowerTier(world, i) {
   if (world.tier[i] <= 0) return;
-  dissolve(world, i); // a block comes apart before one of its tiles loses a storey (blocks.js); an ESTATE's dissolve takes every tier to 0 already (wealth.unbuildMansion)
-  if (world.tier[i] > 0) world.tier[i]--; // guarded: a Uint8 storey count under a mansion must not wrap to 255
+  dissolve(world, i); // a block comes apart before one of its tiles loses a storey (blocks.js); a MANSION comes apart into cottages first
+  if (world.tier[i] > 0) world.tier[i]--; // guarded: a Uint8 storey count must never wrap to 255
   const cap = capacityOf(world, i);
   if (world.zone[i] === ZONE.R) evictFromLot(world, i, cap);
   else fireFromLot(world, i, cap);
@@ -59,7 +59,7 @@ function toRubble(world, i) {
  * gutted — tier 0, but clear ground, not rubble, so it rebuilds next month.
  */
 function saveFromFire(world, i) {
-  if (world.estate[anchorOf(world, i)]) return; // a mansion has no storey to spare (SPEC §9f): the engine saved the house whole
+  if (world.mansion[anchorOf(world, i)]) return; // a mansion has no storey to spare (SPEC §9f): the engine saved the house whole
   if (world.tier[i] > 0) lowerTier(world, i);
 }
 

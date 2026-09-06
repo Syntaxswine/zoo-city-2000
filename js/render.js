@@ -533,10 +533,9 @@ export function createRenderer(canvas, initialWorld, art) {
             const fill = (world.zone[i] === ZONE.R ? world.occupants[i] : world.staff[i]) / (capacityOf(world, i) || 1);
             const character = { lit: lightLevel(fill), majority: world.majority[i], seed: i, wear: wearLevel(buildingAge(world,i)) };
             // A MANSION (SPEC §9f) is an R block by every rule but the picture: its own family, the same lights and mark.
-            standing = world.estate[i] ? art.mansion(world.variant[i], character) : art.building(world.zone[i], world.tier[i], world.variant[i], sideOf(world, i), world.theme[i], character);
+            standing = world.mansion[i] ? art.mansion(world.variant[i], character) : art.building(world.zone[i], world.tier[i], world.variant[i], sideOf(world, i), world.theme[i], character);
           }
-        } else if (world.estate[i] === 1 && !world.rubble[i]) standing = art.estatePlot(world.variant[i]); // the estate plot, chalk (SPEC §9f): its wall, its gate and its board stand on the anchor
-        else if (world.civic[i] === CIVIC.PARK) standing = art.civic("park", civicSideOf(world, i));
+        } else if (world.civic[i] === CIVIC.PARK) standing = art.civic("park", civicSideOf(world, i));
         else if (world.civic[i] === CIVIC.LARGE_PARK) standing = art.civic("largePark", civicSideOf(world, i));
         else if (world.civic[i] === CIVIC.ZOO) standing = art.civic("zoo", 3);
         else if (world.civic[i] === CIVIC.FIRE) standing = art.civic("fire", civicSideOf(world, i));

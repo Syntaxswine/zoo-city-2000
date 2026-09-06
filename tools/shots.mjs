@@ -23,7 +23,7 @@ import { art } from "../js/art/index.js";
 import { MARKS, characterSprite } from "../js/art/building-character.js";
 import { LARGE_CIVICS } from "../js/art/civics-large.js";
 import { KNOWLEDGE_CIVICS } from "../js/art/civics-knowledge.js";
-import { MANSION, ESTATE_PLOT } from "../js/art/estate.js";
+import { MANSION } from "../js/art/mansion.js";
 import { BUILDINGS, PARK, ZOO, FIRE_STATION, POLICE_STATION, PACIFICATION_CENTRE, OVERLAYS } from "../js/art/buildings.js";
 import { BLOCKS } from "../js/art/blocks.js";
 import { LANDMARK_ART } from "../js/art/landmarks.js";
@@ -129,9 +129,9 @@ function sheets(z) {
   // Knowledge and culture (SPEC §9e): the four, and their 2× twins.
   out.push(sheet("sheet-civics-knowledge.png", Object.entries(KNOWLEDGE_CIVICS).map(([kind, sprite]) => ({ sprite, label: `${kind} ${sprite.footprint[0]}x${sprite.footprint[1]}` })), { cols: 2, cellW: 224, cellH: 198, groundY: 139, z }));
   out.push(sheet("sheet-civics-knowledge-hires.png", Object.entries(KNOWLEDGE_CIVICS).map(([kind, sprite]) => ({ sprite: art.hires(sprite), label: `${kind} hires` })), { cols: 2, cellW: 448, cellH: 396, groundY: 278, z: 1 }));
-  // Wealth and class (SPEC §9f): the estate plot and the mansion, both variants, the mansion lit and marked, and the 2× twins.
-  out.push(sheet("sheet-estate.png", [...ESTATE_PLOT, ...MANSION, characterSprite(MANSION[0], { lit: 3, majority: 11 }), characterSprite(MANSION[1], { lit: 2, majority: 3 })].map((sprite) => ({ sprite, label: sprite.name })), { cols: 2, cellW: 224, cellH: 198, groundY: 139, z }));
-  out.push(sheet("sheet-estate-hires.png", [...ESTATE_PLOT, ...MANSION].map((sprite) => ({ sprite: art.hires(sprite), label: `${sprite.name} hires` })), { cols: 2, cellW: 448, cellH: 396, groundY: 278, z: 1 }));
+  // Wealth and class (SPEC §9f): the mansion, both variants, lit and marked (a wolf's and a fox's), and the 2× twins.
+  out.push(sheet("sheet-mansion.png", [...MANSION, characterSprite(MANSION[0], { lit: 3, majority: 11 }), characterSprite(MANSION[1], { lit: 2, majority: 3 })].map((sprite) => ({ sprite, label: sprite.name })), { cols: 2, cellW: 224, cellH: 198, groundY: 139, z }));
+  out.push(sheet("sheet-mansion-hires.png", MANSION.map((sprite) => ({ sprite: art.hires(sprite), label: `${sprite.name} hires` })), { cols: 2, cellW: 448, cellH: 396, groundY: 278, z: 1 }));
 
   // The hi-res set (js/art/hires.js): a 1× sprite scaled ×2 beside its 2× twin, at zoom 1 so the sheet IS the comparison.
   {

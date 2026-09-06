@@ -8,7 +8,7 @@ import { served, edgeRoads , commuteTime, rides, fireExposure } from "./fields.j
 import { landmarkOf } from "./landmarks.js";
 import { needOf, needsContext } from "./needs.js";
 import { USE, USE_BIT_OF, USE_SPECIES } from "./use.js";
-import { classOfCitizen, ESTATE } from "./wealth.js";
+import { classOfCitizen, CLASS } from "./wealth.js";
 
 export const ageMonths = (world, c) => world.tick - c.born;
 export const ageYears = (world, c) => Math.floor((world.tick - c.born) / 12);
@@ -111,10 +111,10 @@ export function census(world) {
   let riders = 0;
   let commuteN = 0;
   let commuteSum = 0;
-  // WEALTH (SPEC §9f): animals by their household's class, the R tax base each class carries (× TAX_CLASS), the estates.
+  // WEALTH (SPEC §9f): animals by the class at home, the R tax base each class carries (× TAX_CLASS), the affluent addresses, the mansions.
   const byClass = [0, 0, 0];
   const taxBaseByClass = [0, 0, 0];
-  let estates = 0, mansions = 0;
+  let mansions = 0, affluentLots = 0;
   const byId = world._byId || (world._byId = new Map());
   byId.clear();
   for (const c of citizens) byId.set(c.id, c);
@@ -212,10 +212,10 @@ export function census(world) {
       else Ji += jobs;
     }
     if (world.zone[i] === ZONE.M && world.tier[i] > 0 && !isPart(world, i)) markets++; // a block is one hall
-    if (world.estate[i] === ESTATE.PLOT) estates++;
-    else if (world.estate[i] === ESTATE.MANSION) mansions++;
+    if (world.mansion[i]) mansions++;
+    if (world.zone[i] === ZONE.R && !isPart(world, i) && world.klass[i] === CLASS.AFFLUENT) affluentLots++;
     if (world.big[i] === 2) blocks2++;
-    else if (world.big[i] === 3 && !world.estate[i]) { blocks3++; const lm = landmarkOf(world.theme[i]); if (lm) { landmarks++; landmarkCounts[lm.name] = (landmarkCounts[lm.name] || 0) + 1; } } // an estate is a 3×3 R block and NOT one of the grown blocks
+    else if (world.big[i] === 3 && !world.mansion[i]) { blocks3++; const lm = landmarkOf(world.theme[i]); if (lm) { landmarks++; landmarkCounts[lm.name] = (landmarkCounts[lm.name] || 0) + 1; } } // a mansion is a 3×3 R block and NOT one of the grown blocks
     if (world.cam[i]) cams++;
     // The watched share is over OCCUPIED HOMES, not over tiles: a camera
     // pointed at a field costs the town nothing, and should not.
@@ -307,8 +307,8 @@ export function census(world) {
     parks, largeParks, zoos, largeParksNoRoad, fireStationsNoRoad, policeStationsNoRoad, centresNoRoad, lots, roads, walls, tunnels, usePred, usePrey, useSpecies: useBySpecies, railTiles, stations, riders, commuteN, meanCommute: commuteN ? commuteSum / commuteN : 0, lotsNoRoad,
     fireStations, policeStations, cams, watchedHomes, occupiedHomes, watchedShare: occupiedHomes ? watchedHomes / occupiedHomes : 0, burning,
     blocks2, blocks3, // the 2×2 and 3×3 blocks standing (anchors; SPEC §3b)
-    // wealth and class (SPEC §9f): animals by class, the R tax base and its shares by class, estate plots waiting and mansions standing
-    byClass, taxBaseByClass, taxShareByClass: (() => { const s = taxBaseByClass[0] + taxBaseByClass[1] + taxBaseByClass[2]; return s ? taxBaseByClass.map((b) => b / s) : [0, 0, 0]; })(), estates, mansions,
+    // wealth and class (SPEC §9f): animals by the class at home, the R tax base and its shares by class, affluent addresses and mansions standing
+    byClass, taxBaseByClass, taxShareByClass: (() => { const s = taxBaseByClass[0] + taxBaseByClass[1] + taxBaseByClass[2]; return s ? taxBaseByClass.map((b) => b / s) : [0, 0, 0]; })(), affluentLots, mansions,
     landmarks, landmarkCounts, // the 3×3s that rose as a species' landmark, and which by name (SPEC §3c)
     // What covering the town is WORTH: the multiplier on how often a fire is
     // rolled at all, 1 in a town with no cover. The rules tab shows it, and it

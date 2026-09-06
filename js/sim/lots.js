@@ -12,7 +12,7 @@ import { evictFromLot, fireFromLot } from "./citizens.js";
 import { mergeWindow, windowFill, mergeLots, splitLot } from "./blocks.js";
 import { landmarkOf, landmarkLine } from "./landmarks.js";
 import { shopOf } from "./shops.js";
-import { ESTATE, attainableClass, estateName } from "./wealth.js";
+import { attainableClass, estateName, mansionWindow, raiseMansion, mansionLine } from "./wealth.js";
 
 const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
 
@@ -33,8 +33,8 @@ export const REASON = Object.freeze({
   FLOODED: "flooded",
   EMPTY: "zoned, waiting for demand",
   PART: "part of the block",
-  ESTATE: "an estate plot — the mansion rises when every rung of the ladder is met",
-  MANSION: "a mansion — one household of the ultrawealthy; it neither grows nor decays",
+  MANSION: "a mansion — one household of the affluent; it neither grows nor decays",
+  MANSION_RISING: "a mansion is rising — the address is affluent",
 });
 
 /** Citizens housed within Chebyshev 5 (shops want customers); a block's are spread over its footprint. */
@@ -102,15 +102,14 @@ export function lotScore(world, i) {
   if (world.flooded[i]) { out.reason = REASON.FLOODED; return out; }
   const access = served(world, i);
   out.access = access;
-  // An ESTATE (SPEC §9f, wealth.js) never grows, decays or merges by this rule: its mansion sprouts in wealth.estatesTick when
-  // the ladder is met and comes down as a block does (fire, flood, the bulldozer). Unserved it says NO_ROAD like any lot,
-  // because no road means no mansion; otherwise its own reason, p 0, so lotsTick rolls nothing here.
-  if (world.estate[i]) {
+  // A standing MANSION (SPEC §9f, wealth.js) never grows, decays or merges by this rule: its own reason, p 0, so lotsTick
+  // rolls nothing here; it comes down as a block does (fire, flood, the bulldozer). Unserved it says NO_ROAD like any lot.
+  if (world.mansion[i]) {
     const cap = capacityOf(world, i);
     out.maxTier = 3;
     out.fill = cap ? world.occupants[i] / cap : 0;
     out.score = 0;
-    out.reason = !access ? REASON.NO_ROAD : world.estate[i] === ESTATE.MANSION ? REASON.MANSION : REASON.ESTATE;
+    out.reason = !access ? REASON.NO_ROAD : REASON.MANSION;
     return out;
   }
   const valve = world.valves[z === ZONE.R ? "R" : z === ZONE.C ? "C" : z === ZONE.M ? "M" : "I"];
@@ -154,6 +153,14 @@ export function lotScore(world, i) {
     return out;
   }
   if (!access) { out.reason = REASON.NO_ROAD; return out; }
+  // A MANSION RISES (SPEC §9f) where the ADDRESS is affluent and demand is positive: the 3×3 of housing anchored at this lot,
+  // nine R lots of their own, at MANSION_P·score a month (a storey's sprouting rate — the address has done the work a
+  // storey's fill does) — before any storey here, because the address's class is what the ground is for (the owner: "it
+  // happens naturally like when the building upgrades to an apartment building").
+  if (z === ZONE.R && score > KNOBS.GROW_THRESH) {
+    const win = mansionWindow(world, i);
+    if (win) { out.reason = REASON.MANSION_RISING; out.p = KNOBS.MANSION_P * score; out.mansion = win; return out; }
+  }
   if (tier < max && score > KNOBS.GROW_THRESH) {
     if (z === ZONE.R && smog) { out.reason = REASON.SMOG; return out; }
     if (tier > 0 && fill < KNOBS.FILL_TO_GROW) { out.reason = REASON.WAITING_FILL; return out; }
@@ -200,6 +207,7 @@ export function lotsTick(world) {
   let decayed = 0;
   let merged = 0;
   const landmarks = []; // the lines: a 3×3 that rose as a landmark this month (SPEC §3c)
+  const mansions = []; // the lines: a mansion that rose this month (SPEC §9f)
   const rng = world.rng;
   for (let i = 0; i < n; i++) {
     if (world.zone[i] === ZONE.NONE) continue;
@@ -219,6 +227,13 @@ export function lotsTick(world) {
           world.events.log.push({ t: world.tick, id: "landmark", line });
         }
       }
+    } else if (s.mansion) {
+      if (rng.chance(s.p)) {
+        const res = raiseMansion(world, s.mansion); // the tiles it claims are parts when the loop reaches them
+        const line = mansionLine(world, res);
+        mansions.push(line);
+        world.events.log.push({ t: world.tick, id: "mansion", line });
+      }
     } else if (s.decay) {
       if (rng.chance(s.p)) {
         if (sideOf(world, i) > 1) {
@@ -234,7 +249,7 @@ export function lotsTick(world) {
       }
     }
   }
-  return { grew, decayed, merged, landmarks };
+  return { grew, decayed, merged, landmarks, mansions };
 }
 
 /** Data for the hover card. A block's part reports its ANCHOR's building (`part` names the tile asked about). */
@@ -252,8 +267,8 @@ export function lotReport(world, at) {
     mark: buildingMark(world, i),
     landmark: landmarkOf(world.theme[i]), // the roster row a 3×3 rose as, or null (SPEC §3c)
     shop: shopOf(world, i), // a tier-1 C lot's kind and keeper, or null (SPEC §12.2d)
-    estate: world.estate[i], // WEALTH (SPEC §9f): 0 · 1 an estate plot · 2 a mansion
-    klass: z === ZONE.R ? attainableClass(world, i) : null, // the ladder as it stands: { cls, next, unmet: [{ rung, need }] }
+    mansion: world.mansion[i], // WEALTH (SPEC §9f): 1 on a mansion's anchor
+    klass: z === ZONE.R ? attainableClass(world, i) : null, // the ladder as it stands: { cls, next, unmet: [{ rung, want }] }
     estateName: estateName(world, i), // "the Greyback estate" for a mansion with a family, "the empty mansion", or null
     zone: z,
     tier: world.tier[i],
@@ -286,7 +301,7 @@ export function lotReport(world, at) {
     const hh = new Map();
     for (const c of world.citizens) {
       if (c.home !== i) continue;
-      const h = hh.get(c.household) || { id: c.household, surname: c.surname, wealth: (world.hhById && world.hhById.get(c.household)?.wealth) | 0, members: [] };
+      const h = hh.get(c.household) || { id: c.household, surname: c.surname, members: [] };
       h.members.push(c);
       hh.set(c.household, h);
     }

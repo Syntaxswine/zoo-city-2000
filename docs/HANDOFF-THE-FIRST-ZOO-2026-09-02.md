@@ -2598,3 +2598,116 @@ the centroid; growth-made mansions, the affluent "kept" look, shops as
 victims and a species-skinned mansion set are not built, by the proposal's
 own sequencing; the owner's control city for the class dynamic at the owner's
 scale.
+
+
+## 33. The owner's eight answers, and the wealth arc rebuilt the same evening (session 18, 2026-09-05)
+
+§32's build shipped as `8979d8f` in the afternoon on the proposal's defaults.
+In the evening the owner answered the eight decisions in one message, and two
+of the answers change the shape: *"class based on the opportunities near
+you"* and *"if there are enough positive things near you it happens naturally
+like when the building upgrades to an apartment building."* So this is a
+rebuild, not a patch, and §32 is kept as the record of the first shape.
+
+**The rulings, and what each did** (verbatim in the proposal's rulings note):
+*"poverty, modest, affluent"* → the three classes renamed from the bottom:
+POVERTY is the street with none of the amenities, MODEST the middle, AFFLUENT
+the mansion class; "ultrawealthy" is gone from the code and the lines. *"class
+based on the opportunities near you"* → class is what the ADDRESS affords this
+month — `world.klass`, derived by `wealth.computeClass` after the fields, never
+saved; `hh.wealth`, inheritance and "old money in a cottage" are gone. *"it
+happens naturally like when the building upgrades"* → the Estate tool, its op,
+its chalk plot and the plot sprite are removed; a mansion RISES from any 3×3
+of R lots of their own whose SITE is affluent, rolled by `lots.lotScore` at
+`MANSION_P` 0.25·score a month like a storey (`wealth.mansionWindow`,
+`raiseMansion`; the largest household that fits keeps the house, everyone
+else on the nine lots is moved out by `citizens.displaceFrom`). *"less people
+are homed in the same area"* → MANSION_CAP 8 stands. *"the option for a
+progressive tax is a wonderful idea"* → TAX_CLASS [1, 2, 5] stands, always on.
+The rungs (§6, *"i'm not sure what this is asking"*) stand as the proposal's
+gates. *"i like the art you picked"* → `js/art/mansion.js` stays; the species
+set is a later arc. *"just to the home, yes harsher punishment"* → as built.
+
+**One refinement the measurement forced.** The first rebuilt probe read a
+3×3's ladder at its north-west corner and no mansion rose in 360 months: air
+failed 330 of them and land value 335, on TRAFFIC — a ring road puts up to 30
+pollution on the tile beside it — and the tree beside the corner counted for
+nothing at the heart. So a 3×3 site is read at its HEART (one tile in from the
+kerb) and its nature is counted round the BORDER of the footprint
+(`wealth.siteOf`, `natureBeside`); a lot of its own is read at itself as
+before. The suite pins both: the window's centre is MODEST as a lot (no tree
+beside it) and AFFLUENT as a site; 30 pollution on the kerb tile does not touch
+the window and 30 at its heart does.
+
+**Numbers.** 912 checks (58 in `tools/check-wealth.mjs`: every rung bites, the
+heart read, the class field and its movement with the street, the window
+anchored at its corner only and decided by the whole ladder, the rise through
+the tick with the keeper kept and the other family moved out to a cottage
+within twelve road tiles and never onto the window, the standing mansion, the
+one-household rule, the real arrival path, the progressive tax and the shares,
+save → load → twelve months, fire off and on the beat, the cottages a broken
+mansion becomes, five sentences, the neutral town). Eighteen mutants: 16
+caught on the first sweep; one survivor was a suite gap — no check made the
+whole ladder the deciding factor once the cheap heart rungs passed — closed by
+one check (17 of 18); the eighteenth is EQUIVALENT — counting a site's own
+tiles for nature can never change a result, because a zoned tile is never
+water or a tree — and is recorded here rather than papered over. The six
+published mayor rigs byte-identical (`c055aba5` · `882a48c7` · `ecb5a902` ·
+`2ced10f8` · `46520f05` · `461784c9`): without culture no address leaves
+poverty, and without an affluent window no roll is drawn.
+
+**Measured (`tools/wealthprobe.mjs`).** The bare amenities at a High block's
+corner raise no mansion in thirty years, and the reason is the game's own law
+since session 1: inside a High block the heart of any 3×3 reads crime 100 —
+0.4 per animal in the 3×3, 3 per jobless adult, 40 × the town's unemployed
+share — and pollution 10–19 from the pig tenements beside it, land value 63–71
+as the centroid drifts inward. The quarter a player would PLAN — the housing
+within two of the window repainted LOW, a Large Park within five, a police
+station within eight, one corner shop zoned on the ring road, the Library and
+Gallery within five of the heart — raised the mansion in month 26 on the
+estate layout, seed 7: the corner shop had to grow (shops bound 19 months,
+streets 8), the Scrapleys (4 raccoons) kept the house and 26 animals were
+moved out, and the heart read land value 83–86, pollution 0, crime 0–2 for the
+rest of the run. Its price is the quarter's upkeep, §2,250 a year: a town of
+~700 (1,337 in the plain rig — low density and nine tiles of park cost housing)
+spent years 15–26 in the red. At year 30: 652 in poverty, 74 modest carrying
+24% of the R tax, 1 affluent carrying 1% — the raccoons' cubs left at sixteen,
+one old raccoon kept the mansion, and nobody joins a lived-in one. Balanced:
+never (no 3×3 for an Amphitheater in a 5×5 interior; a works opens next
+door). Justice, four seeds of the planned quarter with a station, a prison, a
+centre and a hall: mansions on 3 of 4 (months 15, 26, 16); two files from an
+affluent address in 120 town-years, both KILLINGS of mansion residents, both
+cleared, both sentenced to the hall as ruled; a mansion was a hot lot in 0
+mansion-months (crime at most 25), so no burglary ever reached one; the
+centre's six beds still held 10 plain and 2 modest murder files waiting.
+
+**Browser (the fixture `docs/fixtures/mansion-quarter.json`, imported with
+`zoo.importText`).** The mansion's card: *(11,10) Mansion · 3×3 mansion — the
+Russet estate · occ 5/8 · a mansion: one household, up to 8, on nine tiles ·
+class here affluent · R tax ×5 · Russet: Rusby (fox) · …*; a cottage's card:
+*(4,10) R High tier 1 cottage · class here: poverty · R tax ×1 — modest needs a
+Park or Large Park within 4 · land value 56 of at least 60*; Census *class at
+home 194 · 0 · 5 · R tax share 85% · 0% · 15% · affluent addresses · mansions
+1 · 1*; Budget *— and the affluent, ×5*; Rules W1 with its live line; the
+palette's twenty-two buttons and no Estate; both zooms; zero console errors
+after the marker.
+
+**Symptom-keyed traps, for whoever comes next.**
+
+| what you see | what it is |
+|---|---|
+| an affluent-looking quarter and no mansion for years | read the corner's card: the binding rung is usually SHOPS (a shop within 6 ROAD tiles must exist and be built) or STREETS (density is crime — a 3×3 inside a High block reads 100); zone the housing round it Low, and a corner shop |
+| a mansion whose card says "the street has come down since it rose" | by design: the mansion stands; its class follows the street this month, and so does its tax |
+| a family that was affluent last month reading modest at the same address | class is the ADDRESS's, monthly — a works opened, a tenement filled the 3×3, the shop closed; the card names the rung |
+| a test family that makes its own street poverty | a jobless adult is 3 crime in its 3×3 (6 for a carnivore) and the town's unemployed share is 40 more everywhere — fixture families are cubs, or adults with a job |
+| a window that never rises though every field rung passes at the heart | the whole ladder decides after the cheap check: the tree beside the border, the shop on the road; `mansionWindow` returns null and the card says which |
+| every mayor rig's hash moves after touching `openFile` or a saved record | a field saved under `events` or in a household changes the JSON — write it only when non-zero, or derive it |
+| a Write refused as "modified since read" after a patch | the patch tool touched the file; Read it again (or route the rewrite through a scratch copy and `cp`) |
+| a chained Bash that silently skipped `git rm` | an earlier `&&` link failed; check `git status` for `D` lines before assuming a deletion staged |
+
+**Left open, said out loud.** MANSION_P 0.25 against the months a planned
+quarter waits (26 here); TAX_CLASS [1, 2, 5] (an Options switch is one line if
+the owner wants the progressive tax off); a mansion can never rise inside a
+dense block by the crime law — the owner may or may not want that; the
+species-skinned mansion set the owner welcomes; the affluent "kept" look; shops
+as victims; the centre bottleneck whenever an affluent theft file exists.
