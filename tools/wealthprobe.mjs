@@ -13,7 +13,7 @@
 // the justice tally, every file by the class at the victim's address and how
 // it ended. Passive: exit 0 always, annotate, never judge.
 //
-//   node tools/wealthprobe.mjs [--layout estate|balanced] [--seed 7] [--years 30] [--at 0] [--bare | --dense] [--university]
+//   node tools/wealthprobe.mjs [--layout estate|balanced] [--seed 7] [--years 30] [--at 0] [--bare | --dense]
 //                              [--without culture,knowledge,park,nature,low,largePark,police] [--stations] [--tax 1,2,5] [--clear] [--csv]
 // --tax sets TAX_CLASS for the run, to weigh the progressive tax against the class histogram it multiplies. --clear lets the
 // graft take BUILT housing (lots of their own, evicting as the bulldozer does) where there is no chalk — the way a player
@@ -26,12 +26,15 @@
 // factor should be what amenities are near it" — so the street is a point off now and the amenities are the score. --bare
 // grafts only the four amenities and the tree, and measures that; --dense is the same graft named for the question it asks
 // — does a mansion rise INSIDE the dense block? — and both tally what a rise costs the street: how many animals were moved
-// out, and how many households were camping the month it rose and a year on. --university adds the second knowledge point.
+// out, and how many households were camping the month it rose and a year on. The graft is the owner's CHECKLIST for the
+// affluent house — an Amphitheater, a University, a Library and a Gallery in reach, a Large Park within five, a police and a
+// fire station's cover, a shop within ten road tiles — the default and --dense graft all of it (--dense leaves the housing
+// High); --bare grafts the four buildings and a park only, a control that should never rise.
 //   node tools/wealthprobe.mjs --justice [--seeds 1,2,3,4] [--years 30] [--layout estate]
 //
 // The probe pays for its own instruments (the buildings' cost is added to the
 // treasury before each purchase) so the mayor's books are the mayor's.
-import { createWorld, ZONE, TERRAIN, idx, inBounds, isPart } from "../js/sim/world.js";
+import { createWorld, ZONE, TERRAIN, idx, inBounds, isPart, anchorOf } from "../js/sim/world.js";
 import { createMayor } from "./mayor.mjs";
 import { tick } from "../js/sim/tick.js";
 import { apply } from "../js/sim/ops.js";
@@ -49,30 +52,35 @@ const without = new Set((arg("--without", "") || "").split(",").filter(Boolean))
 const csv = flag("--csv");
 const bare = flag("--bare") || flag("--dense");
 const clear = flag("--clear");
-if (bare) for (const k of ["low", "largePark", "police"]) without.add(k);
+if (flag("--bare")) for (const k of ["low", "largePark", "police", "fire", "shops"]) without.add(k);
+if (flag("--dense")) without.add("low");
 const justice = flag("--justice");
 if (arg("--tax", null)) KNOBS.TAX_CLASS = arg("--tax").split(",").map(Number);
 const seeds = justice ? (arg("--seeds", "1,2,3,4")).split(",") : [arg("--seed", "7")];
 
-/** R chalk: zoned R, unbuilt, not in a block, dry — or, with --clear, any R lot of its own the bulldozer could take. */
-const chalk = (w, i) => w.zone[i] === ZONE.R && (w.tier[i] === 0 || clear) && w.big[i] === 0 && !w.mansion[i] && !w.rubble[i] && w.terrain[i] !== TERRAIN.WATER && !w.civic[i] && !w.road[i];
-/** A side×side footprint of R chalk at exactly (tx, ty), with a road touching it unless `needRoad` is false; true or false. */
-function chalkAt(w, tx, ty, side, needRoad) {
+/** Dry ground with nothing civic on it, no road, no rubble, never a mansion's. */
+const ground = (w, i) => !w.rubble[i] && w.terrain[i] !== TERRAIN.WATER && !w.civic[i] && !w.road[i] && !w.mansion[anchorOf(w, i)];
+/** THE CORNER's ground: R chalk (zoned R, unbuilt, not in a block) — or, with --clear, any R tile the bulldozer could take, tenements and blocks included. */
+const rChalk = (w, i) => ground(w, i) && w.zone[i] === ZONE.R && (clear || (w.tier[i] === 0 && w.big[i] === 0));
+/** An AMENITY's ground: unzoned land or R chalk — or, with --clear, anything the bulldozer could take (a player carving a quarter into a full block does). */
+const chalk = (w, i) => ground(w, i) && (clear || w.zone[i] === ZONE.NONE || (w.zone[i] === ZONE.R && w.tier[i] === 0 && w.big[i] === 0));
+/** A side×side footprint of `pred` ground at exactly (tx, ty), with a road touching it unless `needRoad` is false; true or false. */
+function chalkAt(w, tx, ty, side, needRoad, pred = chalk) {
   if (!inBounds(w, tx, ty) || !inBounds(w, tx + side - 1, ty + side - 1)) return false;
   let touches = false;
   for (let y = 0; y < side; y++) for (let x = 0; x < side; x++) {
     const i = idx(w, tx + x, ty + y);
-    if (!chalk(w, i)) return false;
+    if (!pred(w, i)) return false;
     if (w.roadDist[i] === 1) touches = true;
   }
   return touches || !needRoad;
 }
-/** The nearest side×side footprint of R chalk to (nx, ny) that `ok` accepts, searched in rings; { tx, ty } or null. */
-function findChalk(w, side, nx, ny, maxD, needRoad = true, ok = () => true) {
+/** The nearest side×side footprint of `pred` ground to (nx, ny) that `ok` accepts, searched in rings; { tx, ty } or null. */
+function findChalk(w, side, nx, ny, maxD, needRoad = true, ok = () => true, pred = chalk) {
   for (let d = 0; d <= maxD; d++) for (let dy = -d; dy <= d; dy++) for (let dx = -d; dx <= d; dx++) {
     if (Math.max(Math.abs(dx), Math.abs(dy)) !== d) continue;
     const tx = nx + dx, ty = ny + dy;
-    if (chalkAt(w, tx, ty, side, needRoad) && ok(tx, ty)) return { tx, ty };
+    if (chalkAt(w, tx, ty, side, needRoad, pred) && ok(tx, ty)) return { tx, ty };
   }
   return null;
 }
@@ -88,7 +96,7 @@ function graft(w, kind, tx, ty, side) {
 function graftQuarter(w, sx, sy) {
   computeFields(w);
   const where = {};
-  const e = findChalk(w, 3, sx, sy, 30); // the corner: a 3×3 of R chalk touching a road, nearest the start — the housing stays HERS
+  const e = findChalk(w, 3, sx, sy, 30, true, () => true, rChalk); // the corner: a 3×3 of R touching a road, nearest the start — the housing stays HERS
   if (!e) return null;
   where.corner = e;
   const ax = e.tx, ay = e.ty;
@@ -101,19 +109,7 @@ function graftQuarter(w, sx, sy) {
     where.low = r.ok ? { tx: ax - 2, ty: ay - 2, tiles: n } : null;
     computeFields(w);
   }
-  // Then the tree and the park — they want the tiles BESIDE the corner, which the campuses would otherwise take.
-  if (!without.has("nature")) {
-    for (const [dx, dy] of [[-1, -1], [0, -1], [1, -1], [-1, 0], [1, 0], [-1, 1], [0, 1], [1, 1]]) {
-      const x = ax + dx, y = ay + dy;
-      if (!inBounds(w, x, y)) continue;
-      const i = idx(w, x, y);
-      if (w.terrain[i] === TERRAIN.TREE || w.terrain[i] === TERRAIN.WATER) { where.nature = { tx: x, ty: y, already: true }; break; }
-      if (!chalk(w, i) || !clearOfWindow(1)(x, y)) continue;
-      apply(w, { kind: "bulldoze", x0: x, y0: y, x1: x, y1: y });
-      w.cash += KNOBS.COST.tree;
-      if (apply(w, { kind: "tree", x0: x, y0: y, x1: x, y1: y }).ok) { where.nature = { tx: x, ty: y }; break; }
-    }
-  }
+  // Then the park — it wants a tile near the corner, which the campuses would otherwise take.
   if (!without.has("park")) { const p = findChalk(w, 1, ax, ay, KNOBS.CLASS_PARK_RADIUS, false, clearOfWindow(1)); if (p) { where.park = graft(w, "park", p.tx, p.ty, 1); computeFields(w); } }
   // The SMALL buildings next, because their reach is short (five from every tile) and the greedy 3×3s would take their chalk:
   // a Library within five of the window's heart, a Gallery likewise; then one corner shop zoned on the ring road (a player
@@ -121,17 +117,23 @@ function graftQuarter(w, sx, sy) {
   // park), the police station within reach (−60 crime), and the Amphitheater anywhere within twelve (its reach is an eighth
   // of the map).
   const hx = ax + 1, hy = ay + 1;
+  // A side×side footprint at (tx, ty) whose nearest tile is within r of the window's HEART, where the checklist is read (the Large
+  // Park's five; a station's cover reaches six beyond its footprint; a Library or Gallery reaches five from every tile).
+  const near = (side, r) => (tx, ty) => clearOfWindow(side)(tx, ty) && Math.max(tx > hx ? tx - hx : hx > tx + side - 1 ? hx - (tx + side - 1) : 0, ty > hy ? ty - hy : hy > ty + side - 1 ? hy - (ty + side - 1) : 0) <= r;
   if (!without.has("knowledge")) { const l = findChalk(w, 2, hx, hy, 5, true, clearOfWindow(2)); if (l) { where.library = graft(w, "library", l.tx, l.ty, 2); computeFields(w); } }
   if (!without.has("culture")) { const g = findChalk(w, 2, hx, hy, 5, true, clearOfWindow(2)); if (g) { where.gallery = graft(w, "gallery", g.tx, g.ty, 2); computeFields(w); } }
   if (!without.has("shops")) {
     const s = findChalk(w, 1, ax, ay, 4, true, clearOfWindow(1));
     if (s) { apply(w, { kind: "bulldoze", x0: s.tx, y0: s.ty, x1: s.tx, y1: s.ty }); w.cash += KNOBS.COST.zoneC; const r = apply(w, { kind: "zone", zone: ZONE.C, x0: s.tx, y0: s.ty, x1: s.tx, y1: s.ty, density: 3 }); where.shop = r.ok ? s : null; computeFields(w); }
   }
-  if (!without.has("largePark")) { const lp = findChalk(w, 3, ax, ay, 5, false, clearOfWindow(3)); if (lp) { where.largePark = graft(w, "largePark", lp.tx, lp.ty, 3); computeFields(w); } }
-  if (!without.has("police")) { const ps = findChalk(w, 3, ax, ay, 8, true, clearOfWindow(3)); if (ps) { where.police = graft(w, "police", ps.tx, ps.ty, 3); computeFields(w); } }
+  // The two stations first — they need a road, the park does not — wherever their cover reaches the heart; then the Large Park
+  // with its nearest tile within five of the heart.
+  if (!without.has("police")) { const ps = findChalk(w, 3, hx, hy, 9, true, near(3, 6)); if (ps) { where.police = graft(w, "police", ps.tx, ps.ty, 3); computeFields(w); } }
+  if (!without.has("fire")) { const fs = findChalk(w, 3, hx, hy, 9, true, near(3, 6)); if (fs) { where.fire = graft(w, "fire", fs.tx, fs.ty, 3); computeFields(w); } }
+  if (!without.has("largePark")) { const lp = findChalk(w, 3, hx, hy, 7, false, near(3, 5)); if (lp) { where.largePark = graft(w, "largePark", lp.tx, lp.ty, 3); computeFields(w); } }
   if (!without.has("culture")) { const am = findChalk(w, 3, ax, ay, 12, true, clearOfWindow(3)); if (am) { where.amphitheater = graft(w, "amphitheater", am.tx, am.ty, 3); computeFields(w); } }
-  if (flag("--university")) { const u = findChalk(w, 3, ax, ay, 12, true, clearOfWindow(3)); if (u) { where.university = graft(w, "university", u.tx, u.ty, 3); computeFields(w); } }
-  where.upkeep = (where.largePark ? KNOBS.UPKEEP_LARGE_PARK : 0) + (where.police ? KNOBS.UPKEEP_STATION : 0) + (where.amphitheater ? KNOBS.UPKEEP_AMPHITHEATER : 0) + (where.gallery ? KNOBS.UPKEEP_GALLERY : 0) + (where.library ? KNOBS.UPKEEP_LIBRARY : 0) + (where.park ? KNOBS.UPKEEP_PARK : 0) + (where.university ? KNOBS.UPKEEP_UNIVERSITY : 0);
+  if (!without.has("knowledge")) { const u = findChalk(w, 3, ax, ay, 12, true, clearOfWindow(3)); if (u) { where.university = graft(w, "university", u.tx, u.ty, 3); computeFields(w); } }
+  where.upkeep = (where.largePark ? KNOBS.UPKEEP_LARGE_PARK : 0) + (where.police ? KNOBS.UPKEEP_STATION : 0) + (where.fire ? KNOBS.UPKEEP_STATION : 0) + (where.amphitheater ? KNOBS.UPKEEP_AMPHITHEATER : 0) + (where.gallery ? KNOBS.UPKEEP_GALLERY : 0) + (where.library ? KNOBS.UPKEEP_LIBRARY : 0) + (where.park ? KNOBS.UPKEEP_PARK : 0) + (where.university ? KNOBS.UPKEEP_UNIVERSITY : 0);
   computeFields(w);
   return where;
 }
@@ -209,7 +211,7 @@ const where = (r) => Object.entries(r.where || {}).filter(([k]) => k !== "upkeep
 if (!justice) {
   const seed = seeds[0];
   const r = runOne(seed);
-  console.log(`wealthprobe — layout ${layout} · seed ${seed} · ${bare ? "the four amenities and a tree" : "a planned quarter (low density, large park, police, culture, knowledge, park, tree)"} grafted at year ${at}${without.size && !bare ? ` · without ${[...without].join(",")}` : ""}`);
+  console.log(`wealthprobe — layout ${layout} · seed ${seed} · ${flag("--bare") ? "the four buildings and a park only, a control" : flag("--dense") ? "the affluent checklist grafted into the dense block, the housing left High" : "the planned quarter: the affluent checklist, the housing round it repainted Low"} grafted at year ${at}${without.size && !bare ? ` · without ${[...without].join(",")}` : ""}`);
   if (!r.where) console.log("  NOWHERE TO PUT THE QUARTER — no 3×3 of R chalk touching a road; nothing measured");
   else {
     console.log(`  landed: ${where(r)}`);
