@@ -17,6 +17,7 @@
 // changes nothing, so it is a preference and the sim never hears of it.
 
 import { createWorld } from "./sim/world.js";
+import { zoomCamera } from "./iso/zoom.js";
 import { tick, dateOf } from "./sim/tick.js";
 import { apply, undo } from "./sim/ops.js";
 import { save, load } from "./sim/save.js";
@@ -254,18 +255,8 @@ app.cycleOverlay = () => {
   app.ui.refresh();
 };
 app.zoomAt = (dir, sx, sy) => {
-  const z = dir > 0 ? 2 : 1;
-  if (z === app.camera.zoom) return;
-  // Keep the point under the cursor (or the centre) fixed.
-  const v = app.renderer.view;
-  const px = sx == null ? app.camera.x : sx / v.zoom + v.left;
-  const py = sy == null ? app.camera.y : sy / v.zoom + v.top;
-  const cw = canvas.width, ch = canvas.height;
-  const fx = sx == null ? 0.5 : sx / cw;
-  const fy = sy == null ? 0.5 : sy / ch;
-  app.camera.zoom = z;
-  app.camera.x = px - (fx - 0.5) * (cw / z);
-  app.camera.y = py - (fy - 0.5) * (ch / z);
+  if (!zoomCamera(app.camera, dir, canvas.width, canvas.height, sx, sy)) return;
+  app.input.syncCamera();
   app.ui.refresh();
 };
 

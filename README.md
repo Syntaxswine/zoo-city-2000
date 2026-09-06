@@ -70,6 +70,17 @@ arrows only pan. `Backspace` or `Ctrl+Z` undoes; `Ctrl+S` opens save-as and
 `L` opens the saves list. The generated help line in the game carries the
 remaining pause, speed, overlay, news, zoom, new-city and menu keys.
 
+Scroll, use `+` / `−`, or press the two zoom buttons to step through **1×,
+2×, 3× and 4×**. The original 1× sprites are preserved. At 2×, buildings
+gain masonry, window frames, roof seams and door detail, and all fourteen
+citizen species gain finer faces, coats and clothing. At 3×/4× the game uses
+a 4× detail raster, keeping the same building footprints and animal foot
+positions. Existing ages, poses, individual looks and carried items remain.
+
+`npm run check` includes the close-up audit. Run `node tools/check-closeups.mjs`
+alone to check every solid recipe and 2,688 citizen combinations and generate
+before/after sheets in `out/closeups/` (old left, new right).
+
 Inspect a citizen and use **Star** to keep them in Census → People, or **Follow**
 to track their walks and train rides. Stars persist in this browser for that city;
 dragging, panning or selecting a build tool stops following. Personal life-event

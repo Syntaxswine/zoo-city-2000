@@ -19,17 +19,13 @@
 //           a frame is nothing, and there is no second sort anywhere.
 //
 // Camera = { x, y, zoom }: the projection-space point under the canvas
-// centre and an integer zoom (1 or 2). Sprites are rasterised once from
+// centre and an integer zoom (1 through 4). Sprites are rasterised once from
 // their text rows (format.rasterize) and cached per (sprite, tint).
 //
-// THE HI-RES SET (SPEC §12.6). At zoom 2 every sprite that has a 2× twin
-// (art.hires: every box solid and every ground diamond — not the animals,
-// trees or glyphs, which are hand-drawn) is drawn from its 2× rows at one
-// device pixel per sprite pixel, under a transform of zoom/2, with its
-// anchor on the same projection point placeAt put the 1× anchor on; a
-// sprite without a twin is drawn as before, scaled by the zoom. The static
-// ground layer is built at 2× too, so the roads and the grass sharpen with
-// the buildings. S below is that factor: 1 at zoom 1, 2 at zoom 2.
+// S is the detail raster scale: 1 at zoom 1, 2 at zoom 2, 4 at zoom 3/4.
+// Solids, ground and citizens use their detailed twins with a zoom/S
+// transform. All anchors land on the original world point. Ground buffers
+// rebuild when S changes; sprites without twins retain their original art.
 
 import { lightLevel } from "./art/building-character.js";
 import { buildingAge, wearLevel } from "./sim/building-age.js";
@@ -153,29 +149,22 @@ export function createRenderer(canvas, initialWorld, art) {
   }
 
   // ---- the hi-res set --------------------------------------------------------------
-  const hiOf = new Map(); // sprite → its 2× twin or null (art.hires renders lazily and caches; this saves the call)
-  function hi(sprite) {
-    if (!art.hires) return null;
-    let h = hiOf.get(sprite);
-    if (h === undefined) { h = art.hires(sprite); hiOf.set(sprite, h); }
-    return h;
-  }
-  const hiScaleFor = (zoom) => (zoom >= 2 ? 2 : 1);
+  const hiScaleFor = (zoom) => (zoom >= 3 ? 4 : zoom >= 2 ? 2 : 1);
   /**
    * Blit `sprite` on context `c` whose device transform is projection × base.z
    * + (base.tx, base.ty), with its rows' top-left at projection (sx, sy) — what
-   * placeAt returns. With S = 2 and a twin, the twin's rows go down instead at
-   * base.z / 2, positioned so ITS anchor sits on the same projection point.
+   * placeAt returns. A twin is drawn at base.z / S, positioned so its anchor
+   * sits on the same projection point.
    */
   function blitScaled(c, base, S, sprite, sx, sy, tint) {
-    const h = S === 2 ? hi(sprite) : null;
+    const h = S > 1 && art.hires ? art.hires(sprite, S) : null;
     if (!h) {
       c.setTransform(base.z, 0, 0, base.z, base.tx, base.ty);
       c.drawImage(raster(sprite, tint), sx, sy);
       return;
     }
-    c.setTransform(base.z / 2, 0, 0, base.z / 2, base.tx, base.ty);
-    c.drawImage(raster(h, tint), 2 * (sx + sprite.anchor[0]) - h.anchor[0], 2 * (sy + sprite.anchor[1]) - h.anchor[1]);
+    c.setTransform(base.z / S, 0, 0, base.z / S, base.tx, base.ty);
+    c.drawImage(raster(h, tint), S * (sx + sprite.anchor[0]) - h.anchor[0], S * (sy + sprite.anchor[1]) - h.anchor[1]);
   }
 
   // ---- geometry -------------------------------------------------------------------
@@ -442,7 +431,7 @@ export function createRenderer(canvas, initialWorld, art) {
     }
   }
 
-  /** Needs are screen-space labels: fixed 10px type at zoom 1 and zoom 2. */
+  /** Needs use fixed screen-space type, attached above the scaled head. */
   function drawBubbles(list) {
     const speaking = [];
     for (const w of list || []) {
@@ -463,7 +452,8 @@ export function createRenderer(canvas, initialWorld, art) {
       const base = art.bubble(tw + 8, 15);
       const [px, py] = toScreen(w.tx, w.ty);
       const headX = (px - view.left) * view.zoom;
-      const headY = (py + HALF_H - view.top) * view.zoom - (w.age === "cub" ? 16 : 24);
+      const person = art.citizen(w.species, w.facing, w.frame, w.age, { look: w.look, hat: w.hat, carry: w.carry });
+      const headY = (py + HALF_H - view.top - person.anchor[1]) * view.zoom - 5;
       // Normally the bubble is above the walker. Near the top edge its tail
       // moves to the top and the body goes below. Horizontal clamping chooses
       // a cached tail offset so an on-screen head remains the exact anchor;
@@ -504,7 +494,7 @@ export function createRenderer(canvas, initialWorld, art) {
     const waterTint = waterTints[Math.floor(clock * 4) % 6];
     const vl = view.left - TILE_W, vt = view.top - TILE_H, vr = view.left + view.w + TILE_W, vb = view.top + view.h + TILE_H;
     for (const [sx, sy] of water) if (sx > vl && sx < vr && sy > vt && sy < vb) blitScaled(ctx, base, S, waterSprite, sx - HALF_W, sy, waterTint);
-    // The ground layer was built at G.S device px per projection px (needsRebuild remakes it when the zoom crosses 2).
+    // The ground layer was built at G.S device px per projection px (needsRebuild remakes it when the detail scale changes).
     ctx.setTransform(z / G.S, 0, 0, z / G.S, base.tx, base.ty);
     ctx.drawImage(ground, G.left * G.S, G.top * G.S);
     ctx.setTransform(z, 0, 0, z, base.tx, base.ty);

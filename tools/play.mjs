@@ -74,7 +74,7 @@ const FPS = num("--fps", 12);
 const FOLLOW = parseFollow(argv);
 const FILM_YEAR = arg("--film-year", null) == null ? null : num("--film-year", 0);
 if (FILM_YEAR != null && (!Number.isInteger(FILM_YEAR) || FILM_YEAR < 2000 || FILM_YEAR > 2200)) throw Error("--film-year expects a year from 2000 to 2200");
-if (![W,H].every(n=>Number.isInteger(n)&&n>=64&&n<=4096) || ![1,2].includes(ZOOM) || !Number.isFinite(FPS) || FPS<=0 || FPS>120 || !Number.isInteger(FILM) || FILM<0 || FILM>10000) throw Error("invalid frame dimensions, zoom, fps or film count");
+if (![W,H].every(n=>Number.isInteger(n)&&n>=64&&n<=4096) || ![1,2,3,4].includes(ZOOM) || !Number.isFinite(FPS) || FPS<=0 || FPS>120 || !Number.isInteger(FILM) || FILM<0 || FILM>10000) throw Error("invalid frame dimensions, zoom, fps or film count");
 if (OUT === ROOT) throw Error("--out must be a dedicated output directory");
 const OVERLAY = arg("--overlay", "off");
 const KEEP = flag("--keep");

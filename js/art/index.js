@@ -25,7 +25,7 @@
 //                                       | 'sack' 0 open (falling) | 1 tied | 2 tied, wriggling
 //   art.zot(kind)                       'noroad' | 'smog' | 'nojob' | 'nodemand'
 //   art.waterTint(frame)                key map for the water cycle, frame mod WATER_FRAMES (4)
-//   art.hires(sprite)                   the sprite's 2× twin from its recipe (hires.js), or null for a hand-drawn one; the renderer uses it at zoom 2
+//   art.hires(sprite, scale=2)          a 2×/4× detailed twin of a solid, ground or citizen; null for sprites without a detail kit
 //   art.bubble(w, h)                    reserved for Part A
 //   art.portrait(species, opts)         16×16 face; opts.age/look/expression
 //   art.mark(species)                   6×6 stamp for the majority residents/staff

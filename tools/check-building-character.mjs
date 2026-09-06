@@ -33,13 +33,13 @@ export function checkBuildingCharacter(check) {
   let lightPixels = 0, markPixels = 0;
   for (const base of bases) {
     if (characterSprite(base, {}) !== base) cacheBad.push(base.name);
-    for (const scale of [1, 2]) {
-      let previous = scale === 1 ? base : art.hires(base);
+    for (const scale of [1, 2, 4]) {
+      let previous = scale === 1 ? base : art.hires(base, scale);
       let n = 0;
       for (const lit of [1, 2, 3]) {
         const lo = characterSprite(base, { lit, seed: 27 });
         if (characterSprite(base, { lit, seed: 27 }) !== lo) cacheBad.push(base.name);
-        const next = scale === 1 ? lo : art.hires(lo);
+        const next = scale === 1 ? lo : art.hires(lo, scale);
         for (const [x, y] of differences(previous, next)) {
           if (!["=", "H"].includes(inkAt(previous, x, y)) || inkAt(next, x, y) !== "-") lightBad.push(`${base.name}@${scale}: non-glass changed`);
           n++;
@@ -49,7 +49,7 @@ export function checkBuildingCharacter(check) {
       if (!n) lightBad.push(`${base.name}@${scale}: no visible lights`);
       lightPixels += n;
     }
-    // Every plan at both resolutions, plus all species across all four R2 and
+    // Every plan at all three resolutions, plus all species across all four R2 and
     // C2 plans. The latter catches a small mark hidden by a projecting bay.
     const majorityCases = /^([RC]2-)/.test(base.name) ? SPECIES.map((s, n) => n + 1) : [1];
     for (const majority of majorityCases) {
@@ -59,8 +59,8 @@ export function checkBuildingCharacter(check) {
       if (base.tags.includes("R") && !RECIPES.get(base).boxes.some(b => b.faces.glazing &&
         at[0] >= b.a0 && at[0] <= b.a1 && Math.abs(at[1] - b.b1 - .1) < 1e-8 && at[2] >= b.c0 && at[2] < b.c1))
         markBad.push(`${base.name}: residential mark is not on a facade`);
-      for (const scale of [1, 2]) {
-        const original = scale === 1 ? base : art.hires(base), sprite = scale === 1 ? marked : art.hires(marked);
+      for (const scale of [1, 2, 4]) {
+        const original = scale === 1 ? base : art.hires(base, scale), sprite = scale === 1 ? marked : art.hires(marked, scale);
         const diff = differences(original, sprite);
         if (!diff.length) markBad.push(`${base.name}/${majority}@${scale}: invisible`);
         markPixels += diff.length;
@@ -75,8 +75,8 @@ export function checkBuildingCharacter(check) {
       }
     }
   }
-  check("buildings E: all plans, blocks, landmarks and shops gain only monotone glass light at both resolutions", !lightBad.length, lightBad.slice(0, 8).join("; "));
-  check("buildings E: every plan's mark is visible and confined to its socket at both resolutions", !markBad.length, markBad.slice(0, 8).join("; "));
+  check("buildings E: all plans, blocks, landmarks and shops gain only monotone glass light at all three resolutions", !lightBad.length, lightBad.slice(0, 8).join("; "));
+  check("buildings E: every plan's mark is visible and confined to its socket at all three resolutions", !markBad.length, markBad.slice(0, 8).join("; "));
   check("buildings E: species stamps remain inside the building footprint prism", !prismBad.length, prismBad.slice(0, 8).join("; "));
   check("buildings E: cached appearances reuse sprites and an empty unlit building keeps its base", !cacheBad.length);
   const W = createWorld({ seed: "people-e" });
@@ -88,5 +88,5 @@ export function checkBuildingCharacter(check) {
   W.citizens = []; recountMajority(W);
   check("buildings E: Inspect names residents on R, staff on C, and removes the mark after vacancy",
     r?.species === "rabbit" && r.line === "a warren door — rabbits live here" && c?.species === "fox" && c.line === "a brush weathervane — foxes work here" && lotReport(W, home).mark === null && lotReport(W, job).mark === null);
-  console.log(`buildings E: ${bases.length} plans, ${lightPixels} light pixels, ${markPixels} mark pixels checked at both resolutions`);
+  console.log(`buildings E: ${bases.length} plans, ${lightPixels} light pixels, ${markPixels} mark pixels checked at all three resolutions`);
 }

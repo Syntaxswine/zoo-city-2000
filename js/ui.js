@@ -168,7 +168,8 @@ export function createUI(app) {
     mk("btnLoad", "L", "load", "L: open named saves on the slot list", () => app.load());
     mk("btnOverlay", "O", "overlay", "O: cycle land value / pollution / crime / dread / use / road access / lot score / camera cover / knowledge / culture overlays", () => app.cycleOverlay());
     mk("btnNews", "R", "news", "R: the news — every dispatch this city ever made, oldest first; ← → step one at a time", () => app.news.toggle());
-    mk("btnZoom", "+", "zoom", "+ / −: zoom ×1 / ×2", () => app.zoomAt(app.camera.zoom === 1 ? 1 : -1));
+    mk("btnZoomOut", "−", "zoom out", "Zoom out (− or scroll down)", () => app.zoomAt(-1));
+    mk("btnZoom", "+", "zoom in", "Zoom in: ×1 / ×2 / ×3 / ×4 (+ or scroll up)", () => app.zoomAt(1));
     sep();
     mk("btnNew", "N", "new city", "N: found a new city / load a saved one", () => openNewCity());
     mk("btnMenu", "Esc", "menu", "Esc: the title screen — new game, continue, load, save, options", () => app.title.open());
@@ -275,13 +276,15 @@ export function createUI(app) {
     const w = world();
     const d = dateOf(w);
     const sp = app.paused ? `paused (×${app.speed})` : `×${app.speed}`;
-    dom.clock.textContent = `${d.label} · ${sp}${app.overlays !== "off" ? ` · overlay: ${app.overlays}` : ""}${app.camera.zoom === 2 ? " · ×2" : ""}`;
+    dom.clock.textContent = `${d.label} · ${sp}${app.overlays !== "off" ? ` · overlay: ${app.overlays}` : ""}${app.camera.zoom > 1 ? ` · zoom ×${app.camera.zoom}` : ""}`;
     const pauseBtn = $("#btnPause");
     pauseBtn.classList.toggle("on", app.paused);
     pauseBtn.lastElementChild.textContent = app.paused ? "resume" : "pause";
     pauseBtn.title = app.paused ? "Space: resume (the speed keys only set the speed while paused)" : "Space: pause";
     $("#btnOverlay").classList.toggle("on", app.overlays !== "off");
-    $("#btnZoom").classList.toggle("on", app.camera.zoom === 2);
+    $("#btnZoom").classList.toggle("on", app.camera.zoom > 1);
+    $("#btnZoom").disabled = app.camera.zoom >= 4;
+    $("#btnZoomOut").disabled = app.camera.zoom <= 1;
   }
 
   // The unread count rides on the button, and the button goes ink-filled while

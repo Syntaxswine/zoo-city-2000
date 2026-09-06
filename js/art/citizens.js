@@ -62,6 +62,7 @@ import { SPECIES_BY_ID } from "../sim/species.js";
 export const FACINGS = Object.freeze(["se", "ne", "sw", "nw"]);
 export const FRAMES = Object.freeze(["stand", "stepA", "stepB", "idle"]);
 export const AGES = Object.freeze(["adult", "elder", "cub"]);
+export const CITIZEN_DETAILS = new WeakMap();
 /**
  * The species the KIT covers — those with a head overlay below — not every
  * row of the sim's species table. The table can grow ahead of the art; the
@@ -1377,6 +1378,9 @@ export function citizenSprite(species, facing = "se", frame = 0, age = "adult", 
   const h = rows.length;
   const anchor = ag === "cub" ? [4, 11] : [6 + (carry ? CARRY_OX : 0), h - 1];
   s = defineSprite({ name: `citizen-${key}`, rows, anchor, tags: ["citizen", species, ag] });
+  CITIZEN_DETAILS.set(s, { species, facing: f, age: ag, frame: fr,
+    lift: (hat ? 4 : 0) + (carry === "sack" ? CARRY_LIFT : 0),
+    ox: carry ? CARRY_OX : 0, eyes: FACE_EYES[species] });
   CACHE.set(key, s);
   return s;
 }

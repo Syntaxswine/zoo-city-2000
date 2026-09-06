@@ -1,59 +1,53 @@
-// hires.js — THE HI-RES SET. SPEC §12.6.
-//
-// The owner (2026-09-03): "i'd also like a more high res sprite set for
-// when the camera is zoomed in." Nothing here is drawn twice. Every built
-// thing in the city is boxes and every ground tile is a predicate on world
-// units (solid.js, terrain.js), and both keep the RECIPE they were made
-// from (solid.RECIPES); this module samples the same recipe at HI_SCALE
-// pixels per 1× pixel — a 128 × 64 tile — and hands back a sprite twice
-// the size with its anchor on the same world point. A face edge lands where
-// the 1× edge landed; a door, a window, a storey are the same door at twice
-// the resolution; brick grain, the meat stripe and the grass dither, keyed
-// on screen pixels, get finer — which is what a zoomed-in camera is for.
-//
-// What has no recipe stays hand-drawn and is scaled by the renderer as it
-// always was: the animals, the trees, the zots, the fire, the sacks, the
-// tents. The organic exception (SPEC §0.5) is an exception here too.
-//
-// Rendered lazily and cached per sprite: the first zoom-2 frame pays for
-// what it sees, and the registry is never touched.
+// Lazy close-up levels: 2x at zoom 2, 4x at zoom 3/4. Generated buildings
+// gain architectural skins and citizens use the semantic detail kit.
+// The original sprite, footprint, anchor point and registry stay intact.
+// Trees, standalone props and glyphs retain their hand-authored base art.
 
 import { RECIPES } from "./solid.js";
 import { renderRecipe } from "./buildings.js";
 import { diamond, TILE_ANCHOR } from "./terrain.js";
 import { defineSprite, toRows } from "./format.js";
+import { detailedRecipe } from "./architecture-detail.js";
+import { detailedCitizen } from "./citizen-detail.js";
 
 export const HI_SCALE = 2;
 
 const CACHE = new WeakMap();
 
-/** The 2× twin of a sprite — { rows, anchor, w, h, footprint, tags, scale } — or null for a hand-drawn one. */
-export function hires(sprite) {
+/** A detailed twin at scale 2 or 4, or null when the sprite has no detail kit. */
+export function hires(sprite, scale = HI_SCALE) {
   if (!sprite) return null;
-  if (CACHE.has(sprite)) return CACHE.get(sprite);
+  if (scale !== 2 && scale !== 4) throw new RangeError("Detail scale must be 2 or 4");
+  let cache = CACHE.get(sprite);
+  if (!cache) CACHE.set(sprite, cache = new Map());
+  if (cache.has(scale)) return cache.get(scale);
   const recipe = RECIPES.get(sprite);
   let hi = null;
   if (recipe && recipe.boxes) {
-    const r = renderRecipe(recipe, HI_SCALE);
+    const r = renderRecipe(detailedRecipe(recipe), scale);
     hi = Object.freeze({
-      ...defineSprite({ name: `${sprite.name}@${HI_SCALE}x`, rows: toRows(r.grid), anchor: r.anchor, footprint: sprite.footprint, tags: [...sprite.tags, "hires"] }),
-      scale: HI_SCALE,
+      ...defineSprite({ name: `${sprite.name}@${scale}x`, rows: toRows(r.grid), anchor: r.anchor, footprint: sprite.footprint, tags: [...sprite.tags, "hires"] }),
+      scale,
     });
   } else if (recipe && recipe.diamond) {
     hi = Object.freeze({
-      ...defineSprite({ name: `${sprite.name}@${HI_SCALE}x`, rows: diamond(recipe.diamond, HI_SCALE), anchor: [TILE_ANCHOR[0] * HI_SCALE, TILE_ANCHOR[1] * HI_SCALE], footprint: sprite.footprint, tags: [...sprite.tags, "hires"] }),
-      scale: HI_SCALE,
+      ...defineSprite({ name: `${sprite.name}@${scale}x`, rows: diamond(recipe.diamond, scale), anchor: TILE_ANCHOR.map(n => n * scale), footprint: sprite.footprint, tags: [...sprite.tags, "hires"] }),
+      scale,
     });
+  } else if (sprite.tags.includes("citizen")) {
+    const rows = detailedCitizen(sprite, scale);
+    if (rows) hi = Object.freeze({ ...defineSprite({ name: `${sprite.name}@${scale}x`, rows,
+      anchor: sprite.anchor.map(n => n * scale), footprint: sprite.footprint, tags: [...sprite.tags, "hires"] }), scale });
   }
-  CACHE.set(sprite, hi);
+  cache.set(scale, hi);
   return hi;
 }
 
 /** Every sprite in `list` ([{ name, sprite }]) that has a twin, with it — for the audit and the sheet. */
-export function allHires(list) {
+export function allHires(list, scale = HI_SCALE) {
   const out = [];
   for (const { name, sprite } of list) {
-    const hi = hires(sprite);
+    const hi = hires(sprite, scale);
     if (hi) out.push({ name, sprite, hi });
   }
   return out;

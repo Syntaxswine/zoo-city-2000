@@ -6050,7 +6050,7 @@ if (existsSync(artIndex)) {
     const names = new Set(twins.map((t) => t.name));
     const solidsAndGround = list.filter(({ sprite }) => (sprite.tags || []).some((t) => ["building", "civic", "ground", "block", "wall", "station", "bridge", "road", "rail", "chalk", "grass", "water", "kerb", "rubble"].includes(t)) && !/^tree-|^overlay-fire|^overlay-rubble/.test(sprite.name));
     const missing = solidsAndGround.filter(({ name }) => !names.has(name)).map((n) => n.name);
-    check("hires: every solid and every ground diamond has a twin; the animals and trees do not", missing.length === 0 && !hires(art.citizen("rabbit", "se", 0, "adult")) && !hires(art.tree("round")), missing.slice(0, 8).join(", "));
+    check("hires: solids, ground and citizens have twins; trees retain their original art", missing.length === 0 && !!hires(art.citizen("rabbit", "se", 0, "adult")) && !hires(art.tree("round")), missing.slice(0, 8).join(", "));
     let overhang2 = [];
     for (const { name, sprite, hi } of twins) {
       const tags = sprite.tags || [];
