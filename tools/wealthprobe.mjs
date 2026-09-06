@@ -13,15 +13,20 @@
 // the justice tally, every file by the class at the victim's address and how
 // it ended. Passive: exit 0 always, annotate, never judge.
 //
-//   node tools/wealthprobe.mjs [--layout estate|balanced] [--seed 7] [--years 30] [--at 0] [--bare | --dense]
-//                              [--without culture,knowledge,park,nature,low,largePark,police] [--stations] [--csv]
+//   node tools/wealthprobe.mjs [--layout estate|balanced] [--seed 7] [--years 30] [--at 0] [--bare | --dense] [--university]
+//                              [--without culture,knowledge,park,nature,low,largePark,police] [--stations] [--tax 1,2,5] [--clear] [--csv]
+// --tax sets TAX_CLASS for the run, to weigh the progressive tax against the class histogram it multiplies. --clear lets the
+// graft take BUILT housing (lots of their own, evicting as the bulldozer does) where there is no chalk — the way a player
+// carves a quarter into a full block at --at 5 — so the window's tenements are hers and full when the mansion comes.
 //
 // THE QUARTER A PLAYER WOULD PLAN (default): the housing round the window repainted LOW density, a Large Park within five and
 // a police station within reach as well — because the first run showed the law: inside a High block the heart of any 3×3
-// reads crime 100 (density is crime, Micropolis's own rule) and pollution from the pig tenements beside it, so no window
-// there is ever affluent. --bare grafts only the four amenities and the tree, and measures that; --dense is the same graft
-// named for the question it asks — does a mansion rise INSIDE the dense block? — and both tally what a rise costs the
-// street: how many animals were moved out, and how many households were camping the month it rose and a year on.
+// reads crime 100 (density is crime, Micropolis's own rule) and pollution from the pig tenements beside it, so under the
+// first ladder no window there was ever affluent. The owner, on that: "mansions should rise in dense blocks too. the biggest
+// factor should be what amenities are near it" — so the street is a point off now and the amenities are the score. --bare
+// grafts only the four amenities and the tree, and measures that; --dense is the same graft named for the question it asks
+// — does a mansion rise INSIDE the dense block? — and both tally what a rise costs the street: how many animals were moved
+// out, and how many households were camping the month it rose and a year on. --university adds the second knowledge point.
 //   node tools/wealthprobe.mjs --justice [--seeds 1,2,3,4] [--years 30] [--layout estate]
 //
 // The probe pays for its own instruments (the buildings' cost is added to the
@@ -32,7 +37,7 @@ import { tick } from "../js/sim/tick.js";
 import { apply } from "../js/sim/ops.js";
 import { computeFields } from "../js/sim/fields.js";
 import { KNOBS } from "../js/sim/rules.js";
-import { rungsFor, siteOf } from "../js/sim/wealth.js";
+import { rungsFor, siteOf, attainableClass } from "../js/sim/wealth.js";
 
 const args = process.argv.slice(2);
 const arg = (k, d) => { const i = args.indexOf(k); return i >= 0 && args[i + 1] != null ? args[i + 1] : d; };
@@ -43,12 +48,14 @@ const at = Number(arg("--at", 0));
 const without = new Set((arg("--without", "") || "").split(",").filter(Boolean));
 const csv = flag("--csv");
 const bare = flag("--bare") || flag("--dense");
+const clear = flag("--clear");
 if (bare) for (const k of ["low", "largePark", "police"]) without.add(k);
 const justice = flag("--justice");
+if (arg("--tax", null)) KNOBS.TAX_CLASS = arg("--tax").split(",").map(Number);
 const seeds = justice ? (arg("--seeds", "1,2,3,4")).split(",") : [arg("--seed", "7")];
 
-/** R chalk: zoned R, unbuilt, not in a block, dry. */
-const chalk = (w, i) => w.zone[i] === ZONE.R && w.tier[i] === 0 && w.big[i] === 0 && !w.rubble[i] && w.terrain[i] !== TERRAIN.WATER && !w.civic[i] && !w.road[i];
+/** R chalk: zoned R, unbuilt, not in a block, dry — or, with --clear, any R lot of its own the bulldozer could take. */
+const chalk = (w, i) => w.zone[i] === ZONE.R && (w.tier[i] === 0 || clear) && w.big[i] === 0 && !w.mansion[i] && !w.rubble[i] && w.terrain[i] !== TERRAIN.WATER && !w.civic[i] && !w.road[i];
 /** A side×side footprint of R chalk at exactly (tx, ty), with a road touching it unless `needRoad` is false; true or false. */
 function chalkAt(w, tx, ty, side, needRoad) {
   if (!inBounds(w, tx, ty) || !inBounds(w, tx + side - 1, ty + side - 1)) return false;
@@ -123,12 +130,17 @@ function graftQuarter(w, sx, sy) {
   if (!without.has("largePark")) { const lp = findChalk(w, 3, ax, ay, 5, false, clearOfWindow(3)); if (lp) { where.largePark = graft(w, "largePark", lp.tx, lp.ty, 3); computeFields(w); } }
   if (!without.has("police")) { const ps = findChalk(w, 3, ax, ay, 8, true, clearOfWindow(3)); if (ps) { where.police = graft(w, "police", ps.tx, ps.ty, 3); computeFields(w); } }
   if (!without.has("culture")) { const am = findChalk(w, 3, ax, ay, 12, true, clearOfWindow(3)); if (am) { where.amphitheater = graft(w, "amphitheater", am.tx, am.ty, 3); computeFields(w); } }
-  where.upkeep = (where.largePark ? KNOBS.UPKEEP_LARGE_PARK : 0) + (where.police ? KNOBS.UPKEEP_STATION : 0) + (where.amphitheater ? KNOBS.UPKEEP_AMPHITHEATER : 0) + (where.gallery ? KNOBS.UPKEEP_GALLERY : 0) + (where.library ? KNOBS.UPKEEP_LIBRARY : 0) + (where.park ? KNOBS.UPKEEP_PARK : 0);
+  if (flag("--university")) { const u = findChalk(w, 3, ax, ay, 12, true, clearOfWindow(3)); if (u) { where.university = graft(w, "university", u.tx, u.ty, 3); computeFields(w); } }
+  where.upkeep = (where.largePark ? KNOBS.UPKEEP_LARGE_PARK : 0) + (where.police ? KNOBS.UPKEEP_STATION : 0) + (where.amphitheater ? KNOBS.UPKEEP_AMPHITHEATER : 0) + (where.gallery ? KNOBS.UPKEEP_GALLERY : 0) + (where.library ? KNOBS.UPKEEP_LIBRARY : 0) + (where.park ? KNOBS.UPKEEP_PARK : 0) + (where.university ? KNOBS.UPKEEP_UNIVERSITY : 0);
   computeFields(w);
   return where;
 }
-/** Every rung unmet for EITHER class at the corner's WINDOW — the 3×3 read as a mansion would be (at its heart, nature round its border) — what binds the mansion, whatever the card's next rung is. */
-const allUnmet = (w, a) => { const site = siteOf(w, a, [0, 1, 2].flatMap((dy) => [0, 1, 2].map((dx) => a + dx + dy * w.w))); const seen = new Set(); for (const k of [1, 2]) for (const r of rungsFor(w, site, k)) if (!r.ok) seen.add(r.rung); return [...seen]; };
+/** The nine tiles of the 3×3 anchored at a. */
+const nineOf = (w, a) => [0, 1, 2].flatMap((dy) => [0, 1, 2].map((dx) => a + dx + dy * w.w));
+/** Every opportunity the corner's WINDOW lacks and every drag on it — the 3×3 read as a mansion would be (at its heart, nature round its border) — what keeps the mansion, whatever the card's next class is. */
+const allUnmet = (w, a) => { const { opp, drag } = rungsFor(w, siteOf(w, a, nineOf(w, a))); return [...opp.filter((o) => o.have < o.worth).map((o) => (o.have ? `${o.rung} ${o.have}/${o.worth}` : o.rung)), ...drag.filter((d) => d.on).map((d) => d.rung)]; }; // "knowledge 1/2": had in part
+/** The window's points this month — the mansion's own once it stands. */
+const pointsAt = (w, a) => attainableClass(w, a, null, w.mansion[a] ? null : nineOf(w, a)).points;
 
 function runOne(seed) {
   const world = createWorld({ seed });
@@ -184,7 +196,7 @@ function runOne(seed) {
       for (let i = 0; i < world.w * world.h; i++) if (world.zone[i] === ZONE.R && !isPart(world, i) && world.tier[i] > 0) lots[world.klass[i]]++;
       const heart = corner >= 0 ? corner + 1 + world.w : -1; // the window's heart: where its ladder is read
       rows.push({ year: (t + 1) / 12, P: c.P, by: c.byClass, share: c.taxShareByClass, cash: world.cash, mansions: c.mansions, lots, lv: heart >= 0 ? world.lv[heart] : 0, pol: heart >= 0 ? world.pol[heart] : 0, crime: heart >= 0 ? world.crime[heart] : 0,
-        unmet: corner >= 0 && !risen.length ? allUnmet(world, corner).join("+") : "" });
+        points: corner >= 0 ? pointsAt(world, corner) : 0, unmet: corner >= 0 && !risen.length ? allUnmet(world, corner).join(" · ") : "" });
     }
   }
   const byClass = { 0: { n: 0, arrested: 0, cold: 0, open: 0, waited: {} }, 1: { n: 0, arrested: 0, cold: 0, open: 0, waited: {} }, 2: { n: 0, arrested: 0, cold: 0, open: 0, waited: {} } };
@@ -201,15 +213,15 @@ if (!justice) {
   if (!r.where) console.log("  NOWHERE TO PUT THE QUARTER — no 3×3 of R chalk touching a road; nothing measured");
   else {
     console.log(`  landed: ${where(r)}`);
-    console.log(`  the ladder's binding rungs at the corner — months unmet before the first mansion (${r.monthsWaiting} months): ${Object.entries(r.unmetMonths).sort((a, b) => b[1] - a[1]).map(([k, v]) => `${k} ${v}`).join(" · ") || "none"}`);
+    console.log(`  what the corner's window lacked, and what dragged on it — months before the first mansion (${r.monthsWaiting} months): ${Object.entries(r.unmetMonths).sort((a, b) => b[1] - a[1]).map(([k, v]) => `${k} ${v}`).join(" · ") || "none"}`);
     console.log(`  mansions: ${r.risen.length ? r.risen.map((m) => `month ${m.t} at (${m.anchor % r.world.w},${(m.anchor / r.world.w) | 0}) — ${m.displaced} moved out; ${m.campers} household${m.campers === 1 ? "" : "s"} camping that month, ${r.campersByMonth[m.t + 12] ?? "—"} a year on`).join(" · ") : "NONE ROSE"}`);
     if (r.risen.length) console.log(`  what the rises cost the street: ${r.risen.reduce((s, m) => s + m.displaced, 0)} animals moved out over ${r.risen.length} mansion${r.risen.length === 1 ? "" : "s"}`);
     for (const m of r.risen.slice(0, 3)) console.log(`    ${m.line}`);
   }
-  if (csv) { console.log("year,P,poverty,modest,affluent,sharePoverty,shareModest,shareAffluent,cash,mansions,lotsPoverty,lotsModest,lotsAffluent,lv,pol,crime,unmet"); for (const x of r.rows) console.log([x.year, x.P, ...x.by, ...x.share.map((s) => s.toFixed(3)), x.cash, x.mansions, ...x.lots, x.lv, x.pol, x.crime, x.unmet].join(",")); }
+  if (csv) { console.log("year,P,poverty,modest,affluent,sharePoverty,shareModest,shareAffluent,cash,mansions,lotsPoverty,lotsModest,lotsAffluent,lv,pol,crime,points,unmet"); for (const x of r.rows) console.log([x.year, x.P, ...x.by, ...x.share.map((s) => s.toFixed(3)), x.cash, x.mansions, ...x.lots, x.lv, x.pol, x.crime, x.points, x.unmet].join(",")); }
   else {
-    console.log(" yr     P  poverty modest  affl | tax share p/m/a | lots p/m/a  |   cash  | mans |  heart LV pol crime  unmet");
-    for (const x of r.rows) console.log(`${String(x.year).padStart(3)} ${String(x.P).padStart(5)} ${String(x.by[0]).padStart(8)} ${String(x.by[1]).padStart(6)} ${String(x.by[2]).padStart(5)} | ${x.share.map((s) => `${Math.round(100 * s)}%`.padStart(4)).join(" ")} | ${x.lots.map((n) => String(n).padStart(3)).join(" ")} | ${String(x.cash).padStart(7)} | ${String(x.mansions).padStart(4)} | ${String(x.lv).padStart(9)} ${String(x.pol).padStart(3)} ${String(x.crime).padStart(5)}  ${x.unmet}`);
+    console.log(" yr     P  poverty modest  affl | tax share p/m/a | lots p/m/a  |   cash  | mans |  heart LV pol crime pts  lacking / dragging");
+    for (const x of r.rows) console.log(`${String(x.year).padStart(3)} ${String(x.P).padStart(5)} ${String(x.by[0]).padStart(8)} ${String(x.by[1]).padStart(6)} ${String(x.by[2]).padStart(5)} | ${x.share.map((s) => `${Math.round(100 * s)}%`.padStart(4)).join(" ")} | ${x.lots.map((n) => String(n).padStart(3)).join(" ")} | ${String(x.cash).padStart(7)} | ${String(x.mansions).padStart(4)} | ${String(x.lv).padStart(9)} ${String(x.pol).padStart(3)} ${String(x.crime).padStart(5)} ${String(x.points).padStart(3)}  ${x.unmet}`);
   }
   const last = r.rows[r.rows.length - 1];
   console.log(`end: P ${last.P} · ${last.by[0]} in poverty · ${last.by[1]} modest carrying ${Math.round(100 * last.share[1])}% of the R tax · ${last.by[2]} affluent carrying ${Math.round(100 * last.share[2])}% · ${last.mansions} mansion${last.mansions === 1 ? "" : "s"} · cash ${fmt(last.cash)}`);
@@ -238,5 +250,5 @@ if (!justice) {
   console.log(`of the cold files, the roll had SUCCEEDED and the sentence waited for somewhere to serve it: poverty ${waited(0)} · modest ${waited(1)} · affluent ${waited(2)}`);
   console.log(`wrongful arrests ${wrongful}, ${near} within 4 of a mansion`);
   console.log(`the affluent files were: ${Object.entries(causes[2]).map(([k, v]) => `${k} ${v}`).join(" · ") || "none"} · the poverty ones: ${Object.entries(causes[0]).map(([k, v]) => `${k} ${v}`).join(" · ")} · a mansion was a hot lot in ${hot} mansion-months, crime at most ${crimeMax}`);
-  if (!tot[2].n) console.log("NOTE: no file from an affluent address was ever opened — a burglary picks a HOT lot (crime > CRIME_HIGH) and an affluent address's own rungs keep its crime at 25 or under; the priority is real in the roll and rare in the street. The suite pins the roll and the sentence directly.");
+  if (!tot[2].n) console.log("NOTE: no file from an affluent address was ever opened in these seeds; the priority is real in the roll — the suite pins the roll and the sentence directly.");
 }

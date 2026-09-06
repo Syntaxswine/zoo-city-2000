@@ -153,10 +153,11 @@ export function lotScore(world, i) {
     return out;
   }
   if (!access) { out.reason = REASON.NO_ROAD; return out; }
-  // A MANSION RISES (SPEC §9f) where the ADDRESS is affluent and demand is positive: the 3×3 of housing anchored at this lot,
-  // nine R lots of their own, at MANSION_P·score a month (a storey's sprouting rate — the address has done the work a
-  // storey's fill does) — before any storey here, because the address's class is what the ground is for (the owner: "it
-  // happens naturally like when the building upgrades to an apartment building").
+  // A MANSION RISES (SPEC §9f) where the ADDRESS is affluent and demand is positive: the 3×3 of housing anchored at this lot
+  // or block anchor — nine R tiles, lots of their own or whole blocks lying inside it — at MANSION_P·score a month (a storey's
+  // sprouting rate — the address has done the work a storey's fill does) — before any storey or merge here, because the
+  // address's class is what the ground is for (the owner: "it happens naturally like when the building upgrades to an
+  // apartment building"; "mansions should rise in dense blocks too").
   if (z === ZONE.R && score > KNOBS.GROW_THRESH) {
     const win = mansionWindow(world, i);
     if (win) { out.reason = REASON.MANSION_RISING; out.p = KNOBS.MANSION_P * score; out.mansion = win; return out; }
@@ -268,7 +269,7 @@ export function lotReport(world, at) {
     landmark: landmarkOf(world.theme[i]), // the roster row a 3×3 rose as, or null (SPEC §3c)
     shop: shopOf(world, i), // a tier-1 C lot's kind and keeper, or null (SPEC §12.2d)
     mansion: world.mansion[i], // WEALTH (SPEC §9f): 1 on a mansion's anchor
-    klass: z === ZONE.R ? attainableClass(world, i) : null, // the ladder as it stands: { cls, next, unmet: [{ rung, want }] }
+    klass: z === ZONE.R ? attainableClass(world, i) : null, // the ladder as it stands: { cls, next, points, max, nextAt, cultureShort, have, drags, unmet }
     estateName: estateName(world, i), // "the Greyback estate" for a mansion with a family, "the empty mansion", or null
     zone: z,
     tier: world.tier[i],

@@ -346,3 +346,48 @@ had to grow first, the Scrapleys (4 raccoons) kept the house and 26 animals were
 moved out; the quarter's upkeep is §2,250 a year. So the arc reads, in the
 owner's own frame: the poor live in the dense blocks, the modest near a gallery
 and a park, and the affluent where a player has planned for them.
+
+## Owner ruling — 2026-09-05 (night): dense blocks too; the amenities are the biggest factor
+
+On the rebuild's measurement — *no mansion ever rose inside a dense block,
+because the heart of any 3×3 in a High block reads crime 100 by the game's own
+density law* — the owner: *"mansions should rise in dense blocks too. the
+biggest factor should be what amenities are near it."*
+
+**What changed.** The ladder of GATES (§3, as built) is a ladder of POINTS:
+culture at home (a Gallery 2, an Amphitheater 4), knowledge at home (a Library
+1, a University 2), a park within 4 (a Park 1, a Large Park 2), a standing shop
+within 6 road tiles (1), water or trees beside the plot (1) — ten in all — less
+one point each for smoke (pollution over 40), a hot street (crime over 60) and a
+meat hall's dread, never more than three. MODEST at 3 points; AFFLUENT at 7 and
+culture at home, the owner's morning PREREQUISITE, whatever the points. Land
+value is no longer a rung: it is the tax's and already the sum of these things.
+So the amenities decide and the street only drags: a 3×3 in a dense block,
+crime 100 at its heart, is one point down and affluent all the same when an
+Amphitheater, a University, a park and a shop are near it. The window admits
+whole blocks lying inside it — a 2×2 within, or the 3×3 block that IS it, so
+the apartment block becomes the mansion (the owner's evening image). The card
+says the points and what they are made of; Rules W1 and the MANSION line say
+the same.
+
+**What it measured** (`tools/wealthprobe.mjs`, estate layout, seed 7, thirty
+years). The bare amenities at a High block's corner (`--dense`): under the
+gates no mansion in thirty years; under the points the mansion in MONTH 1, on
+empty chalk, 7 points. One Amphitheater reaches an eighth of the map, so its
+town is MODEST almost to the last address and pays ×2: cash §203,294 at year 30
+against §5,839 in the plain rig, −§338 with no class tax (`--tax 1,1,1`),
+§122,806 at ×1.5. The same graft carved into the FULL block at year 5 (`--at 5
+--clear`) reads 6 of 10 for 300 months — no tile left beside it for a tree, the
+streets −1 — and no mansion; with a University (`--university`) THREE rise in
+months 61, 64 and 75, 95 + 151 + 173 animals moved out, households in tents 26
+→ 61 a year on, the town down from 677 to 436 by year 30, 293 of them affluent
+carrying 86% of the R tax. Justice, four seeds: 15 files from affluent
+addresses in 120 town-years (was 1), all cleared, 8 to the centre and 8 to the
+hall — the priority policing is real in the street now that mansions stand in
+dense blocks (hot lots in 272 mansion-months).
+
+**Open for the owner.** TAX_CLASS modest ×2 against a class that is now
+town-wide (one number); MANSION_P 0.25 against three mansions in fourteen
+months hollowing a quarter and a third of a town into tents (a rate, a cap per
+quarter or a fill rule — one knob each); a mansion rises on EMPTY chalk the
+month the amenities land, before anyone lives there.

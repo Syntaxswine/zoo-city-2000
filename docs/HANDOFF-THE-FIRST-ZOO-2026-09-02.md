@@ -2711,3 +2711,117 @@ the owner wants the progressive tax off); a mansion can never rise inside a
 dense block by the crime law — the owner may or may not want that; the
 species-skinned mansion set the owner welcomes; the affluent "kept" look; shops
 as victims; the centre bottleneck whenever an affluent theft file exists.
+
+
+## 34. "Mansions should rise in dense blocks too" — the ladder becomes points (session 18, 2026-09-05, night)
+
+§33 reported that no mansion could rise inside a dense block, because the
+heart of any 3×3 in a High block reads crime 100 by the game's own density law
+and the ladder was hard gates. The owner, on that: *"mansions should rise in
+dense blocks too. the biggest factor should be what amenities are near it."*
+Two commits: `4100662` first — the probe learns to tally what a rise costs the
+street (animals moved out, households camping that month and a year on) and
+names the dense-block run `--dense`, measured under the old law (NONE ROSE;
+streets 347, land value 328, air 301 of 360 months) so the change is
+attributable — then the law.
+
+**The rule now.** `attainableClass` COUNTS the positive things in reach of the
+address as POINTS: culture at home (a Gallery's 2, an Amphitheater's 4),
+knowledge at home (a Library's 1, a University's 2), a park within 4 (a Park 1,
+a Large Park 2 — the better, never both), a standing shop within 6 road tiles
+(1), water or trees beside the plot (1): ten. The street DRAGS one point each,
+never more than three: smoke (pollution over `DRAG_POL` 40), a hot street
+(crime over `DRAG_CRIME` 60, the burglary's own line), a meat hall's dread.
+MODEST at `CLASS_MIN` 3; AFFLUENT at 7 AND culture at home
+(`CLASS_CULTURE_MIN` — the owner's morning word was PREREQUISITE). Land value
+is not a rung any more: it is the tax's, and it was already the sum of these
+same things. The window admits whole blocks lying inside it — a 2×2 within, or
+the 3×3 block that IS it: the apartment block becomes the mansion, and its
+households, who live on its anchor, are the ones the keeper is chosen from.
+`pointsLine` says what is there ("7 of 10 points — an Amphitheater, a Library,
+a Park, trees or water beside; 1 off for the streets (crime 100)"),
+`waitingLine` what the next class wants ("2 more points: a University's
+knowledge (+1 more) · …"; "3 more points and culture at home: …"); the card,
+Rules W1 and the MANSION line carry them. The cheap questions at the heart come
+first (culture, then the MOST the address could score), and the whole ladder
+decides.
+
+**Numbers.** 68 checks in `tools/check-wealth.mjs` (922 in all): every
+opportunity and every drag bites, the shop is a point and not a gate, culture
+is the prerequisite whatever the points (a fixture with everything but culture
+stays MODEST even with the affluent line lowered to its points), the heart and
+the border, the class field and its movement, the window decided by the whole
+ladder and standing without an Amphitheater (a Gallery, a University, a Large
+Park, a shop and a tree are 8), NINE FULL TENEMENTS (crime over the line by
+density alone, the window a point down and affluent, 192 rabbits moved out and
+the six foxes keeping the house), the formed 3×3 block as the window, a 2×2
+wholly inside admitted and one straddling the edge refused, the tax, the
+Census, fire and rubble, dissolve, five sentences. Sixteen mutants: 15 caught
+on the first sweep; the survivor (a straddling block admitted) was a FIXTURE
+fault — the straddling block held the window's anchor, so the part rule
+answered before the straddle rule could; re-anchored, 16 of 16. The six
+published mayor rigs byte-identical (`c055aba5` · `882a48c7` · `ecb5a902` ·
+`2ced10f8` · `46520f05` · `461784c9`): without culture or a park an address has
+two points at most, and nobody leaves poverty.
+
+**Measured (`tools/wealthprobe.mjs`, estate layout, seed 7, thirty years).**
+`--dense` (the four amenities and a tree at the first High block's corner, at
+year 0): the mansion in MONTH 1, on EMPTY chalk — 7 of 10 points, an
+Amphitheater, a Library, a Park, a tree; the shop not yet built and an empty
+street with no drag — "Nobody lived on the nine lots; the house stands empty".
+Its town at year 30: 1,129 animals, 0 in poverty, 1,034 modest carrying 72% of
+the R tax, 95 affluent carrying 28%. ONE AMPHITHEATER MAKES A MODEST TOWN: it
+reaches an eighth of the map, so every address under it has 4 points and pays
+×2 — cash §203,294 at year 30 against §5,839 in the plain estate rig, −§338
+with `--tax 1,1,1` (the same town, no class tax), §122,806 with `--tax
+1,1.5,5`. `--at 5 --clear` (the same graft carved into the FULL block, the
+tenements hers and full): 6 of 10 for 300 months — an Amphitheater, a Library,
+a Park, a shop, no tile beside it free for a tree, the streets −1 at crime 100
+— one point short, no mansion. `--at 5 --clear --university`: THREE mansions in
+months 61, 64 and 75 — the Sowerbys (5 pigs) kept the first and 95 animals
+were moved out, the Pipkins (7 mice) the second and 151, the Fangleys (7
+wolves) the third and 173, 419 in all; households in tents 26 the month of the
+first rise and 61 a year on, then 70 → 120 and 120 → 116; the town fell from
+677 animals at year 5 to 436 at year 30, 293 of them affluent carrying 86% of
+the R tax; a mansion was a hot lot in 171 mansion-months. The PLANNED quarter:
+month 12 (the Ursins, 2 bears; 2 moved out) where the gates took 26; 156
+affluent carrying 51%. `--dense --justice`, four seeds with a station: mansions
+on 3 of 4 seeds (months 1, 0, 6), 14 moved out; FIFTEEN files from affluent
+addresses (8 burglaries, 7 killings) against one in 120 town-years under the
+gates — all cleared (modest 43%, poverty 24%), 8 to the centre, 8 to the hall
+as ruled; hot lots in 272 mansion-months.
+
+**Browser (`docs/fixtures/mansion-quarter.json`).** Census *class at home 106
+· 88 · 5 · R tax share 33% · 56% · 11% · affluent addresses · mansions 1 · 1*
+(the cottages the Amphitheater reaches are modest now); Budget *— of which the
+modest, ×2 §1,484 · — and the affluent, ×5 §288*; Rules W1's formula is the
+points law and its live line agrees; the cards — the mansion at (10,9): *a
+mansion: one household, up to 8, on nine tiles · class here affluent · R tax ×5
+· 8 of 10 points — an Amphitheater, a Library, a Park, a shop, trees or water
+beside*; a two-storey at (3,9): *class here: modest · R tax ×2 · 4 of 10 points
+— an Amphitheater — affluent needs 3 more points: knowledge at home — a Library
+(+1) or a University (+2) in reach · a Park (+1) or a Large Park (+2) within 4 ·
+a shop within 6 road tiles (+1) · water or trees beside the plot (+1)*; a 2×2
+terrace court at (21,9): *class here: poverty · R tax ×1 · 1 of 10 points — a
+shop — modest needs 2 more points: culture at home — a Gallery (+2) or an
+Amphitheater (+4) in reach · …*; zero console errors after the marker.
+
+**Symptom-keyed traps, for whoever comes next.**
+
+| what you see | what it is |
+|---|---|
+| a whole town turns modest the month an Amphitheater opens, and the R income doubles | it reaches an eighth of the map (§9e, the owner's ruling); every address under it has 4 points ≥ CLASS_MIN 3 and pays TAX_CLASS ×2 — the number to tune is one knob |
+| a mansion rose on empty chalk the month the amenities landed | an empty street has no drag, and MANSION_P rolls from the first month; "Nobody lived on the nine lots" |
+| three mansions in a year and a hundred households in tents | each rise moves every tenant out; rehoming looks within 12 road tiles and a full block has no room — tents, then they leave |
+| a window in a full block that never rises though every amenity is near | the tree: no tile beside a full block is free for one, and the streets cost a point; a University or a Large Park is the point instead — the card says which |
+| `needs: no simulation module reads walker need` flags a sim file | the pin greps `\.need\b`; a result field called `need` trips it — the class result says `nextAt` and `cultureShort` |
+| a mutant survives the check written for it | read the fixture, not the check: the straddling block held the window's anchor, so `isPart` refused the window before the straddle rule was asked |
+| the probe says NOWHERE TO PUT THE QUARTER at `--at 5` | a full block has no chalk; `--clear` lets the graft take built lots of their own, evicting as the bulldozer does |
+| `zoo.world()` is not a function | `zoo.world` is the object; the card is `#card`, pinned through `zoo.input.state.pinned` |
+
+**Left open, said out loud.** TAX_CLASS [1, 2, 5] against the histogram it
+now multiplies (the table above; the modest multiplier is one number for the
+owner); MANSION_P 0.25 against three mansions in fourteen months (a rate, a cap
+per quarter, or a fill rule — each one knob); a mansion on EMPTY chalk; the
+species-skinned mansion set; the centre bottleneck whenever an affluent theft
+file exists.
