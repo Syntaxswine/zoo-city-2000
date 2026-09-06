@@ -18,7 +18,7 @@
 //                                       | 'kerb' side 0..3 (N E S W)
 //   art.chalk(zone, high)               the same, spelled out
 //   art.tree(kind)                      'round' | 'tall' | 'willow' or 0..2
-//   art.citizen(species, facing, frame, age, opts)   opts.look, opts.hat, opts.carry 'sack'
+//   art.citizen(species, facing, frame, age, opts)   opts.look, opts.suit, opts.hat, opts.carry 'sack'|'cart'
 //   art.camera(yaw)                     a security camera, yaw 0 | 1 (which drawn face wears the lens)
 //   art.overlay(kind, frame)            'scaffold' | 'fire' 0..1 | 'flood' | 'rubble' | 'camera' 0..1
 //                                       | 'tent' | 'hat' | 'meeting' | 'plaza' | 'cursor' | 'ghost'

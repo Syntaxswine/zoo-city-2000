@@ -58,6 +58,7 @@
 import { defineSprite, part, blank, stamp, toRows, remap, mirror, T } from "./format.js";
 import { keysOf, colourOf } from "./palette.js";
 import { SPECIES_BY_ID } from "../sim/species.js";
+import { suitBody } from "./suits.js";
 
 export const FACINGS = Object.freeze(["se", "ne", "sw", "nw"]);
 export const FRAMES = Object.freeze(["stand", "stepA", "stepB", "idle"]);
@@ -1169,12 +1170,17 @@ const CLASS_OF = {};
 for (const k of "wxyz") CLASS_OF[k] = "fur";
 for (const k of "&^") CLASS_OF[k] = "shirt";
 for (const k of "qrstu") CLASS_OF[k] = "shell";
-function mirrorLit(rows) {
+function mirrorLit(rows, suit = false) {
   const flipped = mirror(rows);
   return flipped.map((r, y) =>
     r
       .split("")
       .map((c, x) => {
+        if (suit && "<>?".includes(c)) {
+          const original = rows[y][x];
+          if ("<>?".includes(original)) return original;
+          return c === "?" ? ">" : c === ">" ? "?" : c;
+        }
         const cls = CLASS_OF[c];
         if (!cls) return c;
         const o = rows[y][x];
@@ -1242,7 +1248,7 @@ function normLook(opts = {}) {
   return { shade, mark };
 }
 
-function composeAdult(species, facing, frame, elder, hat, carry = false) {
+function composeAdult(species, facing, frame, elder, hat, carry = false, suit = false) {
   const lift = (hat ? 4 : 0) + (carry === "sack" ? CARRY_LIFT : 0);
   const ox = carry ? CARRY_OX : 0;
   const H = 20 + lift;
@@ -1261,13 +1267,13 @@ function composeAdult(species, facing, frame, elder, hat, carry = false) {
   if (tail && tail[3]) put(tail[0], tail[1], tail[2]);
   const shellBehind = species === "tortoise" && facing === "se";
   if (shellBehind) put(SHELL.se[0], SHELL.se[1], SHELL.se[2]);
-  put(body, 0, 8);
+  put(suit ? suitBody(body, facing) : body, 0, 8);
   if (species === "hawk") put(WINGS, 0, 9);
   if (PATCHES[species]) for (const [x, y, w, h] of PATCHES[species]) patchFur(g, x + ox, y + lift, w, h, "+");
   if (tail && !tail[3]) put(tail[0], tail[1], tail[2]);
   const head = HEAD[species][facing];
   if (shellBehind) {
-    put(PLASTRON, 3, 9);
+    if (!suit) put(PLASTRON, 3, 9);
     put(head, 0, 0);
   } else if (species === "tortoise") {
     put(head, 0, 0);
@@ -1286,10 +1292,11 @@ function composeAdult(species, facing, frame, elder, hat, carry = false) {
   return toRows(g); // AUTHORED keys — mirrored and remapped by citizenSprite
 }
 
-function composeCub(species, facing, frame) {
+function composeCub(species, facing, frame, suit = false) {
   const g = blank(8, 12);
   const idle = frame === 3;
-  stamp(g, CUB_BODY_SE[idle ? 0 : frame], 0, 7);
+  const body = CUB_BODY_SE[idle ? 0 : frame];
+  stamp(g, suit ? suitBody(body, facing, true) : body, 0, 7);
   stamp(g, CUB_HEAD[facing], 0, 2);
   const mark = CUB_MARK[species];
   if (mark) stamp(g, mark[0], mark[1], mark[2]);
@@ -1335,7 +1342,8 @@ const PORTRAIT_CACHE = new Map();
 /**
  * The composed, cached citizen sprite. `facing` 'se'|'ne'|'sw'|'nw' (or an
  * index into FACINGS), `frame` 0..2 (or 'stand'|'stepA'|'stepB'), `age`
- * 'adult'|'elder'|'cub' (or years). `opts.hat` adds the centenary hat;
+ * 'adult'|'elder'|'cub' (or years). `opts.suit` dresses an affluent citizen;
+ * `opts.hat` adds the centenary hat;
  * `opts.carry` may be `sack` or `cart` (adults and elders only); the sack
  * goes over the shoulder and the cart stays on the ground. The grid widens
  * to 18 and the anchor
@@ -1348,18 +1356,19 @@ export function citizenSprite(species, facing = "se", frame = 0, age = "adult", 
   const ag = normAge(species, age);
   const look = normLook(opts);
   const hat = !!opts.hat && ag !== "cub";
+  const suit = !!opts.suit;
   const carry = (opts.carry === "sack" || opts.carry === "cart") && ag !== "cub" ? opts.carry : false;
   // Shade is itself a stable hash bit, so tying glasses to it gives exactly
   // half of elder looks glasses without making a mark toggle change pixels
   // outside that species' declared mark box.
   const glasses = ag === "elder" && look.shade === 1;
-  const key = `${species}|${f}|${fr}|${ag}|s${look.shade}m${look.mark}g${glasses ? 1 : 0}|${hat ? "h" : ""}${carry === "sack" ? "s" : carry === "cart" ? "r" : ""}`;
+  const key = `${species}|${f}|${fr}|${ag}|s${look.shade}m${look.mark}g${glasses ? 1 : 0}|${hat ? "h" : ""}${carry === "sack" ? "s" : carry === "cart" ? "r" : ""}${suit ? "|suit" : ""}`;
   let s = CACHE.get(key);
   if (s) return s;
   const authored = f === "sw" ? "se" : f === "nw" ? "ne" : f;
-  let rows = ag === "cub" ? composeCub(species, authored, fr) : composeAdult(species, authored, fr, ag === "elder", hat, carry);
+  let rows = ag === "cub" ? composeCub(species, authored, fr, suit) : composeAdult(species, authored, fr, ag === "elder", hat, carry, suit);
   // Mirror the AUTHORED grid (so the light stays upper-left), THEN skin it.
-  if (f === "sw" || f === "nw") rows = mirrorLit(rows);
+  if (f === "sw" || f === "nw") rows = mirrorLit(rows, suit);
   if (ag === "cub" && look.mark) rows = cubCoatTreatment(rows, f === "sw" || f === "nw");
   if (ag !== "cub" && look.mark) {
     const g = rows.map((r) => r.split(""));
@@ -1378,7 +1387,7 @@ export function citizenSprite(species, facing = "se", frame = 0, age = "adult", 
   const h = rows.length;
   const anchor = ag === "cub" ? [4, 11] : [6 + (carry ? CARRY_OX : 0), h - 1];
   s = defineSprite({ name: `citizen-${key}`, rows, anchor, tags: ["citizen", species, ag] });
-  CITIZEN_DETAILS.set(s, { species, facing: f, age: ag, frame: fr,
+  CITIZEN_DETAILS.set(s, { species, facing: f, age: ag, frame: fr, suit,
     lift: (hat ? 4 : 0) + (carry === "sack" ? CARRY_LIFT : 0),
     ox: carry ? CARRY_OX : 0, eyes: FACE_EYES[species] });
   CACHE.set(key, s);

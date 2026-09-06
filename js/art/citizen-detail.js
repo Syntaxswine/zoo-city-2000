@@ -6,7 +6,7 @@ import { rampOf, shift } from "./palette.js";
 export function detailedCitizen(sprite, scale) {
   const info = CITIZEN_DETAILS.get(sprite);
   if (!info) return null;
-  const { species, age, lift, ox, facing } = info;
+  const { species, age, lift, ox, facing, suit } = info;
   const cub = age === "cub", west = facing === "sw" || facing === "nw";
   const front = facing === "se" || facing === "sw";
   const at = (x, y) => sprite.rows[y]?.[x] || ".";
@@ -31,12 +31,18 @@ export function detailedCitizen(sprite, scale) {
         else if ((x * 3 + y * 5) % 11 === 0 && u < 0.25 && v > 0.5) ink = shift(key, 1);
         if (y >= sprite.h - 2 && u > 0.6 && v > 0.6 && at(x + 1, y) !== ".") ink = shift(key, -1);
       }
-      if (shirt) {
+      if (shirt && !suit) {
         const centre = sprite.w / 2 + (west ? -0.5 : 0.5);
         if (Math.abs(x + u - centre) < 0.22) ink = "%";
         if (front && Math.abs(x + u - centre - 0.5) < 0.2 && (y + v - lift) % 2 < 0.35) ink = "(";
         if (at(x, y - 1) !== "&" && at(x, y - 1) !== "^" && v < 0.25) ink = "*";
         if (at(x, y + 1) !== "&" && at(x, y + 1) !== "^" && v > 0.6) ink = "%";
+      }
+      if (suit && ramp === "slate" && y >= (cub ? 7 : lift + 8)) {
+        // Fine stitching, pocket welt and a pressed trouser crease.
+        if (localY >= (cub ? 9 : 14) && u < 0.25 && at(x - 1, y) === key) ink = shift(key, 1);
+        if (front && !cub && localY === 11 && x === (west ? sprite.w - ox - 5 : ox + 4) && v < 0.25) ink = "^";
+        if (at(x + 1, y) === "." && u > 0.6) ink = shift(key, -1);
       }
       if (species === "tortoise" && ramp === "earth" && localY >= 8) {
         if ((x + Math.floor(y / 2)) % 3 === 0 && u < 0.25 || y % 3 === 0 && v < 0.25) ink = "r";

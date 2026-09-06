@@ -77,6 +77,12 @@ citizen species gain finer faces, coats and clothing. At 3×/4× the game uses
 a 4× detail raster, keeping the same building footprints and animal foot
 positions. Existing ages, poses, individual looks and carried items remain.
 
+Affluent citizens wear charcoal suits with white shirts, burgundy ties and
+dress shoes. Their outfit follows their home's current class, including
+when they move or the address changes class. All fourteen species, cubs and
+elders share the suit option at every zoom level; tails, wings, shells and
+carried items retain their usual layering.
+
 `npm run check` includes the close-up audit. Run `node tools/check-closeups.mjs`
 alone to check every solid recipe and 2,688 citizen combinations and generate
 before/after sheets in `out/closeups/` (old left, new right).

@@ -6307,9 +6307,13 @@ if (existsSync(artIndex)) {
 
   const renderSrcD = readFileSync(path.join(ROOT, "js", "render.js"), "utf8");
   const citizenCalls = renderSrcD.match(/art\.citizen\(/g) || [];
-  const lookArgs = renderSrcD.match(/art\.citizen\([^\n]+look:/g) || [];
+  const lookArgs = renderSrcD.match(/art\.citizen\([^\n]+(?:look:|citizenAppearance\(world,)/g) || [];
+  const { citizenAppearance } = await import("../js/citizen-appearance.js");
+  const storedLook = { shade: 1, mark: 1 };
+  const appearance = citizenAppearance({ byId: new Map() }, { look: storedLook, hat: true, carry: "sack" });
   check("looks: normal, tent, prey and picking render paths all pass their stored look",
-    citizenCalls.length >= 5 && lookArgs.length === citizenCalls.length, `${lookArgs.length}/${citizenCalls.length} look-bearing calls`);
+    citizenCalls.length >= 5 && lookArgs.length === citizenCalls.length && appearance.look === storedLook && appearance.hat === true && appearance.carry === "sack",
+    `${lookArgs.length}/${citizenCalls.length} look-bearing calls; shared appearance preserves look and accessories`);
   const specD = readFileSync(path.join(ROOT, "SPEC.md"), "utf8");
   check("looks: SPEC records the cub-resolution, portrait and idle contracts", /### 12\.3b/.test(specD) && /shade-only/i.test(specD) && /paintPortrait/.test(specD));
 }

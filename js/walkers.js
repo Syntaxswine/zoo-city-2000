@@ -189,6 +189,7 @@ export function createWalkers(initialWorld) {
     const w = {
       id,
       citizen: c ? c.id : null,
+      appearanceCitizen: opts.appearanceCitizen ?? null,
       kind,
       species,
       age,
@@ -331,6 +332,7 @@ export function createWalkers(initialWorld) {
       age: staff ? ageOf(staff) : "adult",
       name: staff ? `${staff.name} ${staff.surname}` : "the hall cart",
       look: staff ? art.look(staff.id) : undefined,
+      appearanceCitizen: staff?.id ?? null,
     };
     const w = make("cart", real, [out, back], opts);
     w.carry = "cart";
@@ -390,7 +392,10 @@ export function createWalkers(initialWorld) {
     const facing = dx > 0 ? "nw" : dx < 0 ? "se" : dy > 0 ? "ne" : "sw";
     // `v` is a compact record because justice has already removed the victim;
     // the pure id hash preserves the exact coat that stood here while alive.
-    w.prey = { species: v.species, age, look: art.look(v.id), name: v.name, tx: bx + dx * PREY_STEP, ty: by + dy * PREY_STEP, facing };
+    // The case already records class before removal, so the visual replay
+    // retains the victim's outfit without changing the save or simulation.
+    const appearanceClass = world.events.files.find(f => f.victimId === v.id && f.cause === "killing")?.victimClass || 0;
+    w.prey = { id: v.id, appearanceClass, species: v.species, age, look: art.look(v.id), name: v.name, tx: bx + dx * PREY_STEP, ty: by + dy * PREY_STEP, facing };
     w.preyName = v.name; // outlives w.prey: the card names who is in the sack all the way home
     return add(w) ? "ok" : "drop";
   }

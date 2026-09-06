@@ -27,6 +27,8 @@
 // transform. All anchors land on the original world point. Ground buffers
 // rebuild when S changes; sprites without twins retain their original art.
 
+import { citizenAppearance } from "./citizen-appearance.js";
+
 import { lightLevel } from "./art/building-character.js";
 import { buildingAge, wearLevel } from "./sim/building-age.js";
 import { toScreen, toWorld, pickTile, HALF_H, HALF_W, TILE_W, TILE_H } from "./iso/iso.js";
@@ -452,7 +454,7 @@ export function createRenderer(canvas, initialWorld, art) {
       const base = art.bubble(tw + 8, 15);
       const [px, py] = toScreen(w.tx, w.ty);
       const headX = (px - view.left) * view.zoom;
-      const person = art.citizen(w.species, w.facing, w.frame, w.age, { look: w.look, hat: w.hat, carry: w.carry });
+      const person = art.citizen(w.species, w.facing, w.frame, w.age, citizenAppearance(world, w));
       const headY = (py + HALF_H - view.top - person.anchor[1]) * view.zoom - 5;
       // Normally the bubble is above the walker. Near the top edge its tail
       // moves to the top and the body goes below. Horizontal clamping chooses
@@ -586,17 +588,17 @@ export function createRenderer(canvas, initialWorld, art) {
       if (w.tent) {
         if (!world.campers.some(cp => cp.id === w.id)) continue;
         const ttx = Math.floor(w.tx), tty = Math.floor(w.ty);
-        items.push({ sprite: art.citizen(w.species, w.facing, w.frame, w.age, { look: w.look }), tx: ttx + 0.82, ty: tty + 0.55, kind: "walker" });
+        items.push({ sprite: art.citizen(w.species, w.facing, w.frame, w.age, citizenAppearance(world, w)), tx: ttx + 0.82, ty: tty + 0.55, kind: "walker" });
         continue;
       }
       // On a bridge the deck sits DECK_TOP px above the water plane (roads.js);
       // shots.mjs lifted its walkers, the renderer did not — they stood in the river.
       const wi = Math.floor(w.ty) * world.w + Math.floor(w.tx);
       const onBridge = world.road[wi] === ROAD.BRIDGE || (world.rail[wi] && world.terrain[wi] === TERRAIN.WATER);
-      items.push({ sprite: art.citizen(w.species, w.facing, w.frame, w.age, { look: w.look, hat: w.hat, carry: w.carry }), tx: w.tx, ty: w.ty, kind: "walker", walker: w, dy: onBridge ? -DECK_TOP : w.riding ? -3 : 0 }); // a rider sits up on the train
+      items.push({ sprite: art.citizen(w.species, w.facing, w.frame, w.age, citizenAppearance(world, w)), tx: w.tx, ty: w.ty, kind: "walker", walker: w, dy: onBridge ? -DECK_TOP : w.riding ? -3 : 0 }); // a rider sits up on the train
       if (w.kind === "cart" && w.leg >= 1 && w.companion) {
         const p = w.companion;
-        items.push({ sprite: art.citizen(p.species, w.facing, w.frame, p.age, { look: p.look }), tx: w.tx + 0.24, ty: w.ty + 0.12, kind: "walker", dy: onBridge ? -DECK_TOP : w.riding ? -3 : 0 });
+        items.push({ sprite: art.citizen(p.species, w.facing, w.frame, p.age, citizenAppearance(world, p)), tx: w.tx + 0.24, ty: w.ty + 0.12, kind: "walker", dy: onBridge ? -DECK_TOP : w.riding ? -3 : 0 });
       }
       if (w.glyph === "meeting" && w.standUntil > 0) items.push({ sprite: meet, tx: w.tx, ty: w.ty, kind: "walker", z: 1000, dy: -24 });
       if (w.kind === "predation" && w.bag != null && w.prey) {
@@ -606,7 +608,7 @@ export function createRenderer(canvas, initialWorld, art) {
         const p = w.prey;
         if (w.bag < BAG_FALL) {
           const u = w.bag / BAG_FALL;
-          items.push({ sprite: art.citizen(p.species, p.facing, 0, p.age, { look: p.look }), tx: p.tx, ty: p.ty, kind: "walker" });
+          items.push({ sprite: art.citizen(p.species, p.facing, 0, p.age, citizenAppearance(world, p)), tx: p.tx, ty: p.ty, kind: "walker" });
           items.push({ sprite: art.overlay("sack", 0), tx: p.tx, ty: p.ty, kind: "walker", z: 999, dy: -Math.round(22 * (1 - u * u)) });
         } else {
           items.push({ sprite: art.overlay("sack", 1 + (Math.floor(w.bag * 8) & 1)), tx: p.tx, ty: p.ty, kind: "walker" });
@@ -641,7 +643,7 @@ export function createRenderer(canvas, initialWorld, art) {
     let bd = Infinity;
     for (const w of list || []) {
       if (w.tent) continue;
-      const sp = art.citizen(w.species, w.facing, w.frame, w.age, { look: w.look, hat: w.hat, carry: w.carry });
+      const sp = art.citizen(w.species, w.facing, w.frame, w.age, citizenAppearance(world, w));
       const [nx, ny] = toScreen(w.tx, w.ty);
       const fx = nx, fy = ny + HALF_H; // feet on the ground centre
       const left = fx - sp.anchor[0], top = fy - sp.anchor[1];
