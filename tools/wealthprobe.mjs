@@ -13,13 +13,15 @@
 // the justice tally, every file by the class at the victim's address and how
 // it ended. Passive: exit 0 always, annotate, never judge.
 //
-//   node tools/wealthprobe.mjs [--layout estate|balanced] [--seed 7] [--years 30] [--at 0] [--bare]
+//   node tools/wealthprobe.mjs [--layout estate|balanced] [--seed 7] [--years 30] [--at 0] [--bare | --dense]
 //                              [--without culture,knowledge,park,nature,low,largePark,police] [--stations] [--csv]
 //
 // THE QUARTER A PLAYER WOULD PLAN (default): the housing round the window repainted LOW density, a Large Park within five and
 // a police station within reach as well — because the first run showed the law: inside a High block the heart of any 3×3
 // reads crime 100 (density is crime, Micropolis's own rule) and pollution from the pig tenements beside it, so no window
-// there is ever affluent. --bare grafts only the four amenities and the tree, and measures that.
+// there is ever affluent. --bare grafts only the four amenities and the tree, and measures that; --dense is the same graft
+// named for the question it asks — does a mansion rise INSIDE the dense block? — and both tally what a rise costs the
+// street: how many animals were moved out, and how many households were camping the month it rose and a year on.
 //   node tools/wealthprobe.mjs --justice [--seeds 1,2,3,4] [--years 30] [--layout estate]
 //
 // The probe pays for its own instruments (the buildings' cost is added to the
@@ -40,7 +42,7 @@ const years = Number(arg("--years", 30));
 const at = Number(arg("--at", 0));
 const without = new Set((arg("--without", "") || "").split(",").filter(Boolean));
 const csv = flag("--csv");
-const bare = flag("--bare");
+const bare = flag("--bare") || flag("--dense");
 if (bare) for (const k of ["low", "largePark", "police"]) without.add(k);
 const justice = flag("--justice");
 const seeds = justice ? (arg("--seeds", "1,2,3,4")).split(",") : [arg("--seed", "7")];
@@ -135,7 +137,8 @@ function runOne(seed) {
   const sx = world.start.tx, sy = world.start.ty;
   let where = null, corner = -1;
   const unmetMonths = {}; let monthsWaiting = 0;
-  const risen = []; // { t, anchor, line }
+  const risen = []; // { t, anchor, line, displaced, campers }
+  const campersByMonth = []; // households in tents each month — what a rise costs the street shows here a year on
   const rows = [];
   const files = new Map(); const sentences = { 0: {}, 1: {}, 2: {} }; const seenLog = new Set(); let wrongful = 0, wrongfulNearMansion = 0;
   const causes = { 0: {}, 1: {}, 2: {} }; let hotMansionMonths = 0, mansionCrimeMax = 0;
@@ -143,13 +146,15 @@ function runOne(seed) {
     mayor.month(t);
     if (t === at * 12 && !where) { where = graftQuarter(world, sx, sy); corner = where && where.corner ? idx(world, where.corner.tx, where.corner.ty) : -1; }
     tick(world);
+    campersByMonth[t] = world.campers.length;
     const c = world.last.census;
     if (corner >= 0 && !risen.length) { monthsWaiting++; for (const rung of allUnmet(world, corner)) unmetMonths[rung] = (unmetMonths[rung] || 0) + 1; }
     for (const e of world.events.log) {
       if (e.id !== "mansion" || seenLog.has(`m:${e.t}:${e.line}`)) continue;
       seenLog.add(`m:${e.t}:${e.line}`);
       const m = e.line.match(/risen at \((\d+),(\d+)\)/);
-      risen.push({ t: e.t, anchor: m ? idx(world, Number(m[1]), Number(m[2])) : -1, line: e.line });
+      const d = e.line.match(/(\d+) animals? (?:was|were) moved out/);
+      risen.push({ t: e.t, anchor: m ? idx(world, Number(m[1]), Number(m[2])) : -1, line: e.line, displaced: d ? Number(d[1]) : 0, campers: world.campers.length });
     }
     // Files: catch each while it is still in events.files (they are purged after FILE_MONTHS), then follow it to its end.
     for (const f of world.events.files) {
@@ -184,7 +189,7 @@ function runOne(seed) {
   }
   const byClass = { 0: { n: 0, arrested: 0, cold: 0, open: 0, waited: {} }, 1: { n: 0, arrested: 0, cold: 0, open: 0, waited: {} }, 2: { n: 0, arrested: 0, cold: 0, open: 0, waited: {} } };
   for (const rec of files.values()) { const b = byClass[rec.victimClass]; b.n++; if (!rec.ended) b.open++; else if (rec.ended.startsWith("cold-waiting-")) { b.cold++; const k = rec.ended.slice(13); b.waited[k] = (b.waited[k] || 0) + 1; } else b[rec.ended]++; }
-  return { world, where, corner, rows, unmetMonths, monthsWaiting, risen, byClass, sentences, wrongful, wrongfulNearMansion, causes, hotMansionMonths, mansionCrimeMax };
+  return { world, where, corner, rows, unmetMonths, monthsWaiting, risen, campersByMonth, byClass, sentences, wrongful, wrongfulNearMansion, causes, hotMansionMonths, mansionCrimeMax };
 }
 
 const fmt = (n) => Number(n).toLocaleString("en-US");
@@ -197,7 +202,8 @@ if (!justice) {
   else {
     console.log(`  landed: ${where(r)}`);
     console.log(`  the ladder's binding rungs at the corner — months unmet before the first mansion (${r.monthsWaiting} months): ${Object.entries(r.unmetMonths).sort((a, b) => b[1] - a[1]).map(([k, v]) => `${k} ${v}`).join(" · ") || "none"}`);
-    console.log(`  mansions: ${r.risen.length ? r.risen.map((m) => `month ${m.t} at (${m.anchor % r.world.w},${(m.anchor / r.world.w) | 0})`).join(" · ") : "NONE ROSE"}`);
+    console.log(`  mansions: ${r.risen.length ? r.risen.map((m) => `month ${m.t} at (${m.anchor % r.world.w},${(m.anchor / r.world.w) | 0}) — ${m.displaced} moved out; ${m.campers} household${m.campers === 1 ? "" : "s"} camping that month, ${r.campersByMonth[m.t + 12] ?? "—"} a year on`).join(" · ") : "NONE ROSE"}`);
+    if (r.risen.length) console.log(`  what the rises cost the street: ${r.risen.reduce((s, m) => s + m.displaced, 0)} animals moved out over ${r.risen.length} mansion${r.risen.length === 1 ? "" : "s"}`);
     for (const m of r.risen.slice(0, 3)) console.log(`    ${m.line}`);
   }
   if (csv) { console.log("year,P,poverty,modest,affluent,sharePoverty,shareModest,shareAffluent,cash,mansions,lotsPoverty,lotsModest,lotsAffluent,lv,pol,crime,unmet"); for (const x of r.rows) console.log([x.year, x.P, ...x.by, ...x.share.map((s) => s.toFixed(3)), x.cash, x.mansions, ...x.lots, x.lv, x.pol, x.crime, x.unmet].join(",")); }
@@ -213,18 +219,19 @@ if (!justice) {
 } else {
   console.log(`wealthprobe --justice — layout ${layout} · seeds ${seeds.join(",")} · ${years} y · a fire and a police station from year 2, a prison, a centre and a hall (the mayor's --stations --zoo 2 --pacify --markets 1)`);
   const tot = { 0: { n: 0, arrested: 0, cold: 0, open: 0, waited: {} }, 1: { n: 0, arrested: 0, cold: 0, open: 0, waited: {} }, 2: { n: 0, arrested: 0, cold: 0, open: 0, waited: {} } };
-  const sent = { 0: {}, 2: {} }; let wrongful = 0, near = 0, mansions = 0, seedsWith = 0; const causes = { 0: {}, 1: {}, 2: {} }; let hot = 0, crimeMax = 0;
+  const sent = { 0: {}, 2: {} }; let wrongful = 0, near = 0, mansions = 0, seedsWith = 0, displaced = 0; const causes = { 0: {}, 1: {}, 2: {} }; let hot = 0, crimeMax = 0;
   for (const seed of seeds) {
     const r = runOne(seed);
     for (const k of [0, 1, 2]) { for (const f of ["n", "arrested", "cold", "open"]) tot[k][f] += r.byClass[k][f]; for (const [s, n] of Object.entries(r.byClass[k].waited)) tot[k].waited[s] = (tot[k].waited[s] || 0) + n; }
     for (const k of [0, 2]) for (const [s, n] of Object.entries(r.sentences[k])) sent[k][s] = (sent[k][s] || 0) + n;
     for (const k of [0, 1, 2]) for (const [cz, n] of Object.entries(r.causes[k])) causes[k][cz] = (causes[k][cz] || 0) + n;
     wrongful += r.wrongful; near += r.wrongfulNearMansion; mansions += r.risen.length; if (r.risen.length) seedsWith++; hot += r.hotMansionMonths; crimeMax = Math.max(crimeMax, r.mansionCrimeMax);
+    displaced += r.risen.reduce((s, m) => s + m.displaced, 0);
     const last = r.rows[r.rows.length - 1];
     console.log(`  seed ${seed}: ${r.risen.length ? `${r.risen.length} mansion${r.risen.length === 1 ? "" : "s"} (first month ${r.risen[0].t})` : "no mansion"} · y30 class ${last.by.join("/")} · files poverty ${r.byClass[0].n} / modest ${r.byClass[1].n} / affluent ${r.byClass[2].n}`);
   }
   const pct = (a, b) => (b ? `${Math.round(100 * a / b)}%` : "—");
-  console.log(`mansions rose on ${seedsWith} of ${seeds.length} seeds, ${mansions} in all`);
+  console.log(`mansions rose on ${seedsWith} of ${seeds.length} seeds, ${mansions} in all; ${displaced} animals were moved out to make room`);
   console.log(`clearance (arrested / files that ended): poverty ${pct(tot[0].arrested, tot[0].arrested + tot[0].cold)} of ${tot[0].n} · modest ${pct(tot[1].arrested, tot[1].arrested + tot[1].cold)} of ${tot[1].n} · affluent ${pct(tot[2].arrested, tot[2].arrested + tot[2].cold)} of ${tot[2].n}`);
   console.log(`sentences: plain ${Object.entries(sent[0]).map(([k, v]) => `${k} ${v}`).join(" · ") || "none"} · from the affluent ${Object.entries(sent[2]).map(([k, v]) => `${k} ${v}`).join(" · ") || "none"}`);
   const waited = (k) => Object.entries(tot[k].waited).map(([s, n]) => `${n} waiting for ${s === "centre" ? "a centre bed" : s === "hall" ? "a hall" : "a cell"}`).join(", ") || "none";
