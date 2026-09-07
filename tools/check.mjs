@@ -7574,6 +7574,7 @@ if (existsSync(walkersPath)) {
 
 { const { checkCivicCampuses } = await import("./check-civic-campuses.mjs"); checkCivicCampuses(check); }
 { const { checkGenerations } = await import("./check-generations.mjs"); checkGenerations(check); } // SPEC §7.2, §7.5, §7.11 — temperament, weddings, companions, the full-home litter
+{ const { checkMigration } = await import("./check-migration.mjs"); checkMigration(check); } // SPEC §7.2, §7.4 — homed, burnedAt, the tent before the road, the push
 { const { checkKnowledgeCulture } = await import("./check-knowledge-culture.mjs"); checkKnowledgeCulture(check); } // SPEC §9e
 { const { checkWealth } = await import("./check-wealth.mjs"); checkWealth(check); } // SPEC §9f
 

@@ -63,7 +63,7 @@ export function toPlain(world) {
     valves: { ...world.valves }, festivalBonus: world.festivalBonus,
     citizens: world.citizens.filter((c) => !c.dead).map(plainCitizen),
     deaths: (world.deaths || []).map((entry) => Array.isArray(entry) ? entry.slice() : { ...entry }),
-    households: world.households.filter((h) => !h.gone).map((h) => ({ id: h.id, members: h.members.slice(), home: h.home, species: h.species, surname: h.surname, arrived: h.arrived, notice: h.notice || 0, ...(h.companions ? { companions: true } : {}) })), // companions (SPEC §7.2) only when true: a town without them saves and hashes as it did
+    households: world.households.filter((h) => !h.gone).map((h) => ({ id: h.id, members: h.members.slice(), home: h.home, species: h.species, surname: h.surname, arrived: h.arrived, notice: h.notice || 0, ...(h.companions ? { companions: true } : {}), ...(h.homed != null && h.homed !== h.arrived ? { homed: h.homed } : {}), ...(h.burnedAt != null ? { burnedAt: h.burnedAt } : {}) })), // companions (SPEC §7.2) only when true, homed only when it differs from arrived, burnedAt only when set (§7.4): a town without them saves and hashes as it did
     campers: world.campers.map((c) => ({ ...c })),
     nextId: world.nextId, nextHouseholdId: world.nextHouseholdId,
     events: JSON.parse(JSON.stringify({ ...world.events, log: world.events.log.slice(-200) })),
@@ -108,7 +108,7 @@ export function fromPlain(o) {
     ...citizenDefaults(), ...c,
     friends: (c.friends || []).slice(), life: (c.life || []).map((e) => e.slice()), path: null, stale: false,
   }));
-  world.households = o.households.map((h) => ({ ...h, members: h.members.slice() }));
+  world.households = o.households.map((h) => ({ ...h, members: h.members.slice(), homed: h.homed ?? h.arrived })); // an old save's household took its home when it arrived, for all the push knows (SPEC §7.4)
   world.names = { ...(o.names || {}) };
   world.legacy = Array.isArray(o.legacy) ? o.legacy.filter((row) => typeof row === "string") : [];
   migrateLegacyNames(world);

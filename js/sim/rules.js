@@ -127,6 +127,19 @@ export const KNOBS = {
   LEAVE_P_EMP: 0.015,
   LEAVE_FRIEND_DAMP: 0.2,
   FRICTION_P: 0.004,
+  // The PUSH (SPEC §7.4; the owner, 2026-09-07: "it should take more than just a fire for people to
+  // leave, it would have to be a combination of factors"). Nine grievances read at home each month,
+  // weighted; at LEAVE_THRESH a household may leave. Unread until the push lands in place of
+  // FRICTION_P (the next commit); the fields it reads, hh.homed and hh.burnedAt, are stamped now.
+  LEAVE_THRESH: 3,          // weighted grievances before a household may leave
+  LEAVE_P: 0.05,            // a month per point at or over: p = LEAVE_P · (score − LEAVE_THRESH + 1) · roots
+  LEAVE_W_ACUTE: 2,         // a lost job; a burned home
+  LEAVE_W_CHRONIC: 1,       // no friends, low mood, crime, smoke, dread, crowding, taxes
+  LEAVE_MOOD_LOW: 40,       // mean mood under this is a grievance
+  LEAVE_TAX_OVER: 1,        // the R rate this many points above neutral is a grievance
+  LEAVE_BURNED_MONTHS: 12,  // a burned home counts for this long
+  LEAVE_ROOTS_YEARS: 10,    // roots = 1 / (1 + years at this home / LEAVE_ROOTS_YEARS)
+  LEAVE_NATIVE_DAMP: 0.5,   // × when a town-born adult lives under the roof
   BIRTH_DIV: 96,
   BIRTH_FULL_MULT: 0.25,
   // The twelve temperaments (temper.js, SPEC §7.11): the multiplier a pair puts on a courtship weight and a friendship roll.

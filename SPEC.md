@@ -575,8 +575,17 @@ Binsworth). The card says "the Burrowes family, 4 rabbits".
 
 ### 7.2 Households — the owner of arrivals, births and departures
 ```
-{ id, members: [ids], home: lot|−1, species (of arrival) }
+{ id, members: [ids], home: lot|−1, species (of arrival), surname, arrived, notice,
+  companions?, homed?, burnedAt? }
 ```
+- **`homed`** (2026-09-07) — the tick the household took its CURRENT home, stamped
+  by `placeHousehold` on every real move (an arrival, a cub's first home, a
+  rehome, a camper rehoused); a put-back on the same lot keeps it; a wedding's
+  host keeps its own. Saved only when it differs from `arrived`; an old save
+  loads it as `arrived`. Not `since`, which is the building-age tile array.
+  **`burnedAt`** — the tick the home was on fire or in rubble at the no-ghosts
+  pass, carried through the rehome or the tent; saved only when set. Both are
+  read by the push (§7.4).
 - Households ARRIVE single-species, 2–4 citizens (2 adults + 0–2 children).
 - They leave together (emigration is per household, rolled once).
 - Births need 2 fertile adults in the household; p = litter/96 per month. A
@@ -634,6 +643,9 @@ SCOUT   (a species' arrival weight ≥ 2× base and it has no residents): ONE
 LEAVE  (V_R <= 0): per household per month
         p = (anyUnemployed ? 0.06 : 0.015) · (−V_R) · (1 − 0.2·meanFriends) · (1.5 − meanMood/100)
 FRICTION: 0.4% of FRIENDLESS adults' households per month wander off regardless
+HOMELESS (the no-ghosts pass): a home that is rubble, a road or gone → rehome within
+        12 road tiles, else a TENT (as the evicted and the displaced; 2026-09-07 — a
+        fire alone moves nobody out of town), else leave ("homeless" in the archive)
 ```
 
 ### 7.5 Friendships and mood

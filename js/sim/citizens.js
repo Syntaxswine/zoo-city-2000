@@ -120,8 +120,16 @@ export function createHousehold(world, species, size) {
   return hh;
 }
 
-export function placeHousehold(world, hh, lot) {
+/**
+ * `moved` (default true) stamps `hh.homed`, the tick the household took THIS home — the push's
+ * roots read it (SPEC §7.4; the owner, 2026-09-07: leaving takes a combination, damped by years at
+ * home). A put-back on the same lot (the dread rehome that found nowhere better, an eviction that
+ * kept the lot) passes false: nobody moved, the roots stand. Saved only when it differs from
+ * `arrived`; an old save loads it as `arrived`. NOT `since`, which is the building-age tile array.
+ */
+export function placeHousehold(world, hh, lot, moved = true) {
   hh.home = lot;
+  if (moved) hh.homed = world.tick;
   for (const id of hh.members) {
     const c = world.byId.get(id);
     c.home = lot;
@@ -522,7 +530,7 @@ export function evictFromLot(world, i, newCap) {
     moving.home = -1;
     if (!allowed) allowed = lotsWithinRoad(world, i, KNOBS.REHOME_RADIUS);
     const to = bestHome(world, householdSpecies(world, moving), moving.members.length, false, allowed);
-    if (to >= 0) { placeHousehold(world, moving, to); if (to !== i) for (const id of moving.members) remember(world, world.byId.get(id), KIND.MOVED, to); }
+    if (to >= 0) { placeHousehold(world, moving, to, to !== i); if (to !== i) for (const id of moving.members) remember(world, world.byId.get(id), KIND.MOVED, to); }
     else if (!startCamping(world, moving)) removeHousehold(world, moving, "evicted", i);
   }
 }
@@ -711,10 +719,16 @@ export function citizensTick(world, cen, dem) {
   out.rehomed += rehouseCampers(world);
 
   // 0. No ghosts: a household whose home is no longer a standing R lot is
-  //    rehomed or leaves (rubble, a road, a bulldoze that missed a step).
+  //    rehomed, pitches a tent, or leaves (rubble, a road, a bulldoze that
+  //    missed a step). A home on fire or in rubble stamps `hh.burnedAt` (SPEC
+  //    §7.4: the push's `burned` grievance, carried through the rehome or the
+  //    tent). The tent comes before the road, as it does for the evicted and
+  //    the displaced — the owner (2026-09-07): "it should take more than just a
+  //    fire for people to leave".
   for (const hh of world.households) {
     if (hh.gone || hh.home < 0) continue;
     const i = hh.home;
+    if (world.burning[i] || world.rubble[i]) hh.burnedAt = tick;
     if (world.zone[i] === ZONE.R && world.tier[i] > 0 && !world.rubble[i]) continue;
     const moving = detachPresent(world, hh);
     if (!moving) continue;
@@ -722,7 +736,7 @@ export function citizensTick(world, cen, dem) {
     moving.home = -1;
     const to = bestHome(world, householdSpecies(world, moving), moving.members.length, false);
     if (to >= 0) { placeHousehold(world, moving, to); for (const id of moving.members) remember(world, world.byId.get(id), KIND.MOVED, to); }
-    else removeHousehold(world, moving, "homeless", i);
+    else if (!startCamping(world, moving)) removeHousehold(world, moving, "homeless", i);
   }
 
   // 0b. The player's line (use-zoning, SPEC §7.8): a household whose lot no
@@ -867,7 +881,7 @@ export function citizensTick(world, cen, dem) {
     moving.home = -1;
     const to = bestHome(world, householdSpecies(world, moving), moving.members.length, false, allowed);
     if (to >= 0 && world.dread[to] < world.dread[from]) { placeHousehold(world, moving, to); for (const id of moving.members) remember(world, world.byId.get(id), KIND.MOVED, to); out.rehomed++; }
-    else placeHousehold(world, moving, from);
+    else placeHousehold(world, moving, from, false); // nowhere better: the same door, the same roots
   }
 
   // 4. Job search (≤ 64 per tick, id order, rotating start). Stale paths first.
