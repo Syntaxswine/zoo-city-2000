@@ -191,8 +191,8 @@ skill to act on. The owner's twelve, with the three owed and the two rulings:
 
 | division | employer | field | base | skill acts on |
 |---|---|---|---|---|
-| commercial low | tier-1 shops (the eleven kinds) | customers counted round the shop | 7 walking tiles | the reach, 5–10 |
-| commercial high | arcade / emporium tiers 2–3 | the same | 7 walking | the reach |
+| commercial low | tier-1 shops (the eleven kinds) | customers: the local five-tile count PLUS rail customers within a 24-step shopping budget (`js/sim/commercial-customers.js`, landed by another hand the same day — see the note below) | 5 Chebyshev + 24 steps by rail | the local radius, 4–7, or the budget — §5 q8 |
+| commercial high | arcade / emporium tiers 2–3 | the same | the same | the same |
 | industrial low / high | works / mill / foundry by tier | none exists today — see §5 q4 | — | — |
 | meat (kills are deeds) | halls | customers (carnivores near); dread is a smell | 7 walking; `DREAD_RADIUS` Chebyshev | reach grows; dread shrinks a tile |
 | zoo & pacification | prison, centre | CITYWIDE, no shadow | — | beds (the open centre bottleneck) |
@@ -203,6 +203,19 @@ skill to act on. The owner's twelve, with the three owed and the two rulings:
 | health / sanitation (owed) | new | cover: health; mess emission cut | 7 walking | the reach |
 | cemetery (owed) | no workers | CITYWIDE: the archive's reader | — | none |
 | parks | no workers | none | — | none (§4) |
+
+**A note on the commercial row.** While this was being written, `c39c8ee` ("Let
+rail-connected commercial districts attract distant customers") replaced the
+shop's flat five-tile resident count with `commercialCustomers`: the same local
+count plus RAIL customers — every home within `C_SHOP_TRAVEL` 24 equivalent
+walking steps whose route to the shop actually rides a train, weighted
+`C_RAIL_CUSTOMER_WEIGHT` 0.04 and fading to zero at the budget, capped at
+`C_RAIL_CUSTOMER_CAP` 80. That is the owner's "rail counts as free travel"
+built for shops before this arc opened, in a different shape: a route that only
+WALKS beyond five tiles counts for nothing, and the ride is priced at the
+commuter's 2/9, not zero. The skill reach for commercial therefore acts on
+whichever of the two the owner names (§5 q8); the walking-tile rule in §3c is
+written for the SERVICES, whose fields are Chebyshev floods today.
 
 Kin pairs (low/high, library/university, gallery/amphitheater, zoo/centre) share
 experience at one half, so a shop that grows from low to high under its crew does
@@ -289,6 +302,9 @@ somebody walks to.
    needs its own consumer: fewer natural deaths in cover, an epidemic event the
    cover resists, or litters lost. A ruling, not a default.
 7. **Deeds** — the list, and the months each is worth.
+8. **Commercial's reach** now that shops count rail customers within a 24-step
+   budget: does a veteran crew widen the local five-tile count, the budget, or
+   both?
 
 ## 6. Instruments (run from the repo root; all passive, exit 0)
 
