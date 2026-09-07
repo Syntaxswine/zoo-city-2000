@@ -33,7 +33,7 @@ export const KIND_OF_CIVIC = Object.freeze(Object.fromEntries(Object.entries(CIV
 export function civicJobs(c) {
   switch (c) {
     case CIVIC.ZOO: return KNOBS.ZOO_JOBS;
-    case CIVIC.LARGE_PARK: return KNOBS.LARGE_PARK_JOBS;
+    // A Large Park offers none: parks have no workers (the owner, 2026-09-07). Its twelve were a leftover from when the garden was the zoo; save.js lets a saved city's park hands go at load.
     case CIVIC.CENTRE: return KNOBS.CENTRE_JOBS;
     case CIVIC.FIRE: case CIVIC.POLICE: return KNOBS.STATION_JOBS;
     case CIVIC.LIBRARY: return KNOBS.LIBRARY_JOBS;
@@ -431,7 +431,7 @@ export function jobsOf(world, i) {
 
 /** Which demand a job site counts toward: C (zoo, stations and the centre count as C), I, or M (the meat halls — their own valve). */
 export function jobZone(world, i) {
-  if (world.zone[i] === ZONE.C || world.civic[i] === CIVIC.LARGE_PARK || isCivicEmployer(world.civic[i])) return ZONE.C;
+  if (world.zone[i] === ZONE.C || isCivicEmployer(world.civic[i])) return ZONE.C;
   if (world.zone[i] === ZONE.I) return ZONE.I;
   if (world.zone[i] === ZONE.M) return ZONE.M;
   return ZONE.NONE;

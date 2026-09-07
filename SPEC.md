@@ -105,7 +105,7 @@ One lot = one tile = one building. Tiers 0..3 (0 = zoned, empty).
 | R citizens | 4 | 10 | 24 |
 | C jobs | 3 | 8 | 20 |
 | I jobs | 4 | 10 | 24 |
-| Large Park (3×3 civic; legacy 2×2) | 12 C-type jobs | | |
+| Large Park (3×3 civic; legacy 2×2) | no jobs — parks have no workers (the owner, 2026-09-07); the twelve it once listed were a leftover from when the garden was the zoo | | |
 | Zoo prison (3×3 civic) | 8 C-type jobs; 24 beds | | |
 
 `maxTier` is the density brush: Low = 1, High = 3 (one byte per lot; the

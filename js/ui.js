@@ -472,7 +472,6 @@ export function createUI(app) {
         else lines.push(el("div", "dim", `class here: ${CLASS_NAME[k.cls]} · R tax ×${KNOBS.TAX_CLASS[k.cls]} · ${haveLine(k)}${k.next != null ? ` — ${CLASS_NAME[k.next]} needs ${waitingLine(k)}` : " — a mansion may rise on a 3×3 of housing anchored here"}`));
       }
     }
-    if (rep.civic === CIVIC.LARGE_PARK) head.append(el("span", "", `  jobs ${rep.staff}/${rep.jobs}`));
     // Knowledge and culture (SPEC §9e): the building says what it costs, what it reaches on THIS map, and why it is silent.
     if (rep.civic === CIVIC.LIBRARY || rep.civic === CIVIC.UNIVERSITY || rep.civic === CIVIC.GALLERY || rep.civic === CIVIC.AMPHITHEATER) {
       const reach = campusReach(w, rep.ty * w.w + rep.tx);

@@ -4060,7 +4060,14 @@ function cameraJusticeWorld(){
     const H = clone();
     const hat = (x, y) => y * H.w + x;
     apply(H, { kind: "zone", zone: ZONE.R, x0: 12, y0: 8, x1: 13, y1: 8, density: 3 });
-    const rz = apply(H, { kind: "largePark", tx: 20, ty: 8 });
+    // PARKS HAVE NO WORKERS (the owner, 2026-09-07): the employer two tiles off the road is the prison zoo now, and it is
+    // built the way a player reaches that state — touching a road stub, the stub then bulldozed — because every employer
+    // must touch a road to be built at all. (This fixture used to be a Large Park, from the days the garden was the zoo
+    // and kept twelve jobs; a park hires nobody.)
+    H.cash += KNOBS.COST.zoo + KNOBS.COST.road + KNOBS.COST.bulldoze;
+    apply(H, { kind: "road", tiles: [hat(20, 7)] });
+    const rz = apply(H, { kind: "zoo", tx: 20, ty: 8 });
+    apply(H, { kind: "bulldoze", x0: 20, y0: 7, x1: 20, y1: 7, what: "road" });
     for (const j of [hat(12, 8), hat(13, 8)]) H.tier[j] = 3;
     computeFields(H);
     recountRosters(H);

@@ -58,6 +58,14 @@ export function checkCivicCampuses(check) {
   const before=stateHash(w);
   check('campus: a map edge or blocked far corner refuses the entire purchase',
     !apply(w,{kind:'largePark',tx:39,ty:39}).ok && !apply(w,{kind:'largePark',tx:8,ty:8}).ok && stateHash(w)===before);
+  { // PARKS HAVE NO WORKERS (the owner, 2026-09-07): a Large Park offers no jobs, and a city saved while it offered twelve lets those hands go at load.
+    const pw=empty(); road(pw,9,10); road(pw,9,11); road(pw,9,12);
+    const pp=apply(pw,{kind:'largePark',tx:10,ty:10}); const pa=at(pw,10,10); computeFields(pw);
+    check('large park: offers no jobs and counts none in the census — parks have no workers', pp.ok && jobsOf(pw,pa)===0 && census(pw).J===0, `jobs ${jobsOf(pw,pa)} · J ${census(pw).J}`);
+    const hand=resident(pw); hand.job=pa; hand.hired=pw.tick; pw.staff[pa]++; // a hand from a save made while the park employed
+    const copy=load(save(pw)); const cc=copy.byId.get(hand.id);
+    check('large park: a saved city lets its park hands go at load, silently', cc.job===-1 && cc.hired===-1 && copy.staff[pa]===0 && (cc.life||[]).every((e)=>e[1]!==4), `job ${cc.job} · hired ${cc.hired} · staff ${copy.staff[pa]} · life ${JSON.stringify(cc.life||[])}`);
+  }
   const legacy=empty(); legacy.civic[at(legacy,5,5)]=CIVIC.LARGE_PARK;
   for(const [x,y] of [[6,5],[5,6],[6,6]]) legacy.civic[at(legacy,x,y)]=CIVIC.LARGE_PARK_PART;
   legacy.civic[at(legacy,9,9)]=CIVIC.FIRE;

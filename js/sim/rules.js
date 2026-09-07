@@ -13,7 +13,7 @@ export const KNOBS = {
   R_CAP: [0, 4, 10, 24],
   C_JOBS: [0, 3, 8, 20],
   I_JOBS: [0, 4, 10, 24],
-  LARGE_PARK_JOBS: 12,
+  // (No LARGE_PARK_JOBS: parks have no workers — the owner, 2026-09-07. The twelve a Large Park listed were a leftover from when the garden was the zoo.)
   ZOO_JOBS: 8,
   ZOO_BEDS: 24,
   UPKEEP_ZOO: 1500,

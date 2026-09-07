@@ -6,7 +6,7 @@
 // id maps. Paths are re-derived BEFORE the first tick so a loaded city and
 // the straight run see the same traffic — the save/load hash invariant.
 
-import { createWorld } from "./world.js";
+import { createWorld, jobsOf } from "./world.js";
 import { makeRng } from "./rng.js";
 import { computeFields, recountRosters, commutePath, doorsOf } from "./fields.js";
 import { citizenDefaults, rebuildMaps } from "./citizens.js";
@@ -146,6 +146,7 @@ export function load(json) {
 /** Rebuild everything derived, in the order the tick expects. */
 export function rebuildDerived(world) {
   rebuildMaps(world);
+  releaseOrphanJobs(world);
   world.roadsDirty = true;
   world.wallsDirty = true;
   recountRosters(world);
@@ -204,4 +205,26 @@ export function stateHash(world, { news = true } = {}) {
 /** The simulation identity with the saved news feed removed (Part F proof). */
 export function stateHashNoNews(world) {
   return stateHash(world, { news: false });
+}
+
+/**
+ * PARKS HAVE NO WORKERS (the owner, 2026-09-07): the Large Park's twelve jobs
+ * were a leftover from when the garden was the zoo, and civicJobs offers none
+ * now. A city saved before that ruling may still hold animals whose job is a
+ * park. They are let go here, silently and at once - a rule changed, nothing
+ * happened to them, so no LOST_JOB chapter - before recountRosters counts the
+ * staff and before the paths are rebuilt. Runs on every load; the sim never
+ * mints a job at a site that offers none, so it is a no-op on a current city.
+ * Returns how many were released, for the suite.
+ */
+export function releaseOrphanJobs(world) {
+  let released = 0;
+  for (const c of world.citizens) {
+    if (c.dead || c.job < 0 || jobsOf(world, c.job) > 0) continue;
+    c.job = -1;
+    c.path = null;
+    c.hired = -1;
+    released++;
+  }
+  return released;
 }
