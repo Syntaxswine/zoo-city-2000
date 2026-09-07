@@ -626,6 +626,112 @@ with teeth and no roots, and it is the number to balance against.
   is what keeps the doors swinging. Every rig hash moves; `leaveprobe --rule
   none` before and after is its measure.
 
+### 10d. The build, scoped — RULED 2026-09-07 night, WRITTEN PLAN ONLY
+
+The owner's rulings: threshold **3**; roots **yes, by years at this home and a
+town-born adult**; the factors **the nine as measured**; and *"written plan
+only, we are about to compact after its scoped"*. Build from this page.
+
+**Knobs** (`rules.js`, in place of `FRICTION_P`, which is struck — a friendless
+house is one grievance and moves nobody alone):
+
+```text
+LEAVE_THRESH: 3           weighted grievances before a household may leave
+LEAVE_P: 0.05             a month per point at or over: p = LEAVE_P · (score − LEAVE_THRESH + 1) · roots
+LEAVE_W_ACUTE: 2          a lost job; a burned home
+LEAVE_W_CHRONIC: 1        no friends, low mood, crime, smoke, dread, crowding, taxes
+LEAVE_MOOD_LOW: 40        mean mood under this is a grievance
+LEAVE_TAX_OVER: 1         the R rate this many points above neutral is a grievance
+LEAVE_BURNED_MONTHS: 12   a burned home counts for this long
+LEAVE_ROOTS_YEARS: 10     roots = 1 / (1 + years at this home / LEAVE_ROOTS_YEARS)
+LEAVE_NATIVE_DAMP: 0.5    × when a town-born adult lives under the roof
+```
+
+**State** (on the household; saved only when set; old saves take the defaults):
+`hh.homed`, the tick the household took its current home — set in
+`placeHousehold` on every move, a wedding's host keeps its own, default on load
+= `arrived`; NOT `since` (`world.since` is the building-age tile array).
+`hh.burnedAt`, the tick the home was lost to fire (rubble or burning at step
+0), carried through the rehome or the tent.
+
+**The factors** — `leaveScore(world, hh)` exported from `citizens.js`, the
+probe's `profile` moved into the sim and read the same way; a camping
+household (home −1) reads only the five that need no lot: unemployed,
+friendless, low mood, burned, taxed.
+
+| factor | read | weight |
+|---|---|---|
+| unemployed | a present adult `isWorker` with `job < 0` | acute 2 |
+| burned | `tick − hh.burnedAt ≤ LEAVE_BURNED_MONTHS` | acute 2 |
+| friendless | adults present and every one with no friend | chronic 1 |
+| low mood | mean `mood` of present members `< LEAVE_MOOD_LOW` | chronic 1 |
+| crime | `crime[home] > CRIME_HIGH` | chronic 1 |
+| smoke | `pol[home] >` the label species' `polTol` | chronic 1 |
+| dread | a herbivore label and `dread[home] ≥ REHOME_DREAD` | chronic 1 |
+| crowded | `occupants[home] > capacityOf(home)` | chronic 1 |
+| taxed | `rates.R > neutralRate(P) + LEAVE_TAX_OVER` | chronic 1 |
+
+`roots = 1 / (1 + (tick − hh.homed) / 12 / LEAVE_ROOTS_YEARS) × (a present
+town-born adult ? LEAVE_NATIVE_DAMP : 1)`.
+
+**Where.**
+1. `citizens.js` step 6 "Departures and friction": keep the `V_R ≤ 0` downturn
+   roll (it pitches a tent). Replace the friction line with the push: score at
+   or over `LEAVE_THRESH` → `p = LEAVE_P · (score − LEAVE_THRESH + 1) · roots`;
+   on the roll, `out.left += n`, the MOVED AWAY notice, `world.departures.push`
+   for the walker layer, `removeHousehold(world, hh, "left")` (the archive's
+   existing cause). NOTHING DRAWS under the threshold. Camping households are
+   evaluated too, on the tent's five.
+2. `citizens.js` step 0 "No ghosts": when the home is rubble or burning, set
+   `moving.burnedAt = world.tick`; then `if (to >= 0) place… else if
+   (!startCamping(world, moving)) removeHousehold(…, "homeless", i)` — the tent
+   before the road, as the evicted and the displaced already have.
+3. `placeHousehold`: `hh.homed = world.tick`; `joinHousehold`'s host keeps its own.
+4. `save.js`: `homed` saved when `≠ arrived`, `burnedAt` when set; load defaults.
+5. `rules.js`: the knobs above; card C2 keeps the camps; a new card C5 "Moving
+   away takes a combination" with the table as its formula and
+   `${last.left} left last tick · N households at the threshold now` live.
+6. The line, in `citizensTick`'s notices on the ZONED OUT pattern: *"MOVED AWAY
+   — the Burrowes (4 rabbits) left (12,8): no work, no friends and the
+   smoke."* — the reasons in prose: no work · no friends · low spirits · the
+   crime · the smoke · the dread · the crowding · the taxes · the fire.
+7. `SPEC.md` §7.4: LEAVE rewritten as the push, FRICTION struck, HOMELESS → a
+   tent first; §7.2 the two fields. `tools/leaveprobe.mjs`: `--rule none` reads
+   the sim's own push; `--rule push` zeroes `LEAVE_P` for the old shadow.
+8. Checks (`tools/check-generations.mjs`, or `check-migration.mjs` registered
+   beside it): (a) one grievance never moves anyone — a friendless single
+   (score 1) and an unemployed couple (2) stay 24 months at `LEAVE_P` 1; (b)
+   three moves — a lost job + no friends + low mood leaves within twelve months
+   at `LEAVE_P` 1, and the line reads "no work, no friends and low spirits";
+   (c) roots — export `leaveChance(world, hh)` and assert it a third at twenty
+   years in the home and half again with a town-born adult; (d) a burned-out
+   family with a home in reach is rehomed and carries `burnedAt`; with none it
+   CAMPS, not removed, and a burned-out camping family with no work (2 + 2)
+   leaves within twelve months at `LEAVE_P` 1; (e) `homed` and `burnedAt`
+   survive a save and a load, and a town without them hashes as it did; (f) the
+   six-month continuation hash; (g) THE FALSIFIER — `--set LEAVE_P=0` on the
+   mayor's rigs (disasters off, thirty years, `breedprobe --rule none`) must
+   hash balanced **`16dfcc5a`** and estate **`564c8f1a`**, which is today's tree
+   with `FRICTION_P=0` (measured 2026-09-07 night); the tent-before-removal
+   change touches no rig, homeless being 0 on both.
+
+**Two commits**, the byte-identical one first: (1) the fields, the tent before
+the road, the knobs unread, the card, the SPEC — rigs unmoved; (2) the push in
+place of friction, the checks, the measurements.
+
+**Measured before and after**: `leaveprobe --rule none` on both rigs, sixty
+years, disasters on — departures by cause and the factor histogram; the
+ninety-year balanced town's arrivals and departures per decade; the estate's
+population against its control (today 1,646).
+
+**Acceptance**: suite green; the falsifier holds; balanced departures 800 to
+1,400 per sixty years (today 630, all friction); the estate keeps at least 80%
+of its control population at sixty years — that is the roots damp's job, and
+if it fails, raise `LEAVE_ROOTS_YEARS` before touching a weight; a fire alone
+moves nobody (check d); no household in the archive left with fewer than three
+weighted grievances the month before (the probe asserts it over a rig run); at
+ninety years both arrivals and departures per decade stay above zero.
+
 ## 9. The commute is not the benefit (the owner's round 5, second ruling)
 
 *"i am ok with people traveling to work further than the range of the benefit

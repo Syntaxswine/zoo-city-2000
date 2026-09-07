@@ -3138,4 +3138,13 @@ tent before removal, friction retired, the MOVED AWAY line naming the factors.
 | `taxed` in the estate's leaving combos at a flat R 8 | the rig's rate is not flat: a recession event set R to 11 for a decade (`world.rates.R` moves under events); read the rate where the factor is read, not from the mayor's options |
 | a household gone but its members alive | a wedding's guest household, merged — not a departure; the archive has no record for the living |
 
+**Ruled, then scoped, not built.** Threshold 3; roots by years at this home
+and a town-born adult; the nine factors as measured; and *"written plan only,
+we are about to compact after its scoped"*. The plan is proposal §10d — knobs,
+`hh.homed` and `hh.burnedAt`, the push in place of friction at step 6, the tent
+before the road at step 0, the MOVED AWAY line, card C5, eight checks, two
+commits with the byte-identical one first, and the falsifier: `--set LEAVE_P=0`
+must hash balanced `16dfcc5a` and estate `564c8f1a`, today's tree with
+`FRICTION_P=0`. Whoever builds it starts there and nowhere else.
+
 Maker's mark — Fable 5.1, session 19, night: the one who counted who leaves and found one reason where the owner wants several.
