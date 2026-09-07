@@ -4307,8 +4307,8 @@ function cameraJusticeWorld(){
     // construction - and it was wrong. An exact list fails in both directions:
     // a module that stops asking, and a module that starts. (wealth.js does
     // not ask: a mansion rises through lotScore, which has already asked.)
-    check("access: and the OLD predicate is gone, not merely unused — `hasAccess` is nowhere under js/, and five sim modules import `served`: blocks, census, events, justice and lots; ops uses the shared touchesRoad placement rule",
-      !anyHasAccess && served5.join(" ") === "blocks.js census.js events.js justice.js lots.js" && /touchesRoad/.test(readFileSync(path.join(ROOT,"js/sim/ops.js"),"utf8")),
+    check("access: the OLD predicate is gone — `hasAccess` is nowhere under js/, and six sim modules import `served`: blocks, census, events, justice, lots and police-actions; ops uses shared touchesRoad placement",
+      !anyHasAccess && served5.join(" ") === "blocks.js census.js events.js justice.js lots.js police-actions.js" && /touchesRoad/.test(readFileSync(path.join(ROOT,"js/sim/ops.js"),"utf8")),
       `${served5.length} sim modules import served: ${served5.join(" ")}`);
   }
 
@@ -5760,7 +5760,11 @@ check("no Math.random under js/", mathRandom.length === 0, mathRandom.join(", ")
     refreshCost() { costs.push("restore"); },
   };
   const { createPalette } = await import("../js/palette.js");
-  const palette = createPalette({ input: fakeInput, ui: { setCost: (text, refused) => costs.push(`${text}:${refused}`) }, art });
+  const policeOps = [], policeFlashes = [];
+  let policeModal = false;
+  fakeInput.state = { pinnedCitizen: null };
+  const paletteApp = { world: { civic: new Uint8Array(1) }, input: fakeInput, ui: { setCost: (text, refused) => costs.push(`${text}:${refused}`), modalOpen: () => policeModal, flash: text => policeFlashes.push(text) }, art, doOp: op => policeOps.push(op) };
+  const palette = createPalette(paletteApp);
   paletteRef = palette;
   let clickParity = palette.buttons.size === 22;
   for (const tool of TOOLS) {
@@ -5797,6 +5801,20 @@ check("no Math.random under js/", mathRandom.length === 0, mathRandom.join(", ")
     clickParity && semanticActive && focusHoverStable && made.filter((e) => e.tagName === "CANVAS").length === 22
       && costs.some((x) => x === "cost:bulldoze:true") && costs.filter((x) => x === "restore").length === 24,
     JSON.stringify({ buttons: palette.buttons.size, canvases: made.filter((e) => e.tagName === "CANVAS").length, selected, costs: costs.length, semanticActive, focusHoverStable }));
+  const policePanel = made.find(e => e.className === "police-actions");
+  const interviewButton = made.find(e => e.dataset.action === "interview");
+  const collectButton = made.find(e => e.dataset.action === "collect");
+  const hiddenInitially = policePanel.hidden;
+  paletteApp.world.civic[0] = CIVIC.POLICE; palette.refresh();
+  const shownWithStation = !policePanel.hidden;
+  interviewButton.events.click();
+  const promptsSelection = fakeInput.tool === "inspect" && policeFlashes.length === 1 && !policeOps.length;
+  fakeInput.state.pinnedCitizen = 42;
+  interviewButton.events.click(); collectButton.events.click();
+  policeModal = true; collectButton.events.click();
+  paletteApp.world = { civic: new Uint8Array(1) }; palette.refresh();
+  check("police remote: hidden before a station and after changing cities; selection and modal gating send exactly the two citizen commands",
+    hiddenInitially && shownWithStation && policePanel.hidden && promptsSelection && JSON.stringify(policeOps) === JSON.stringify([{kind:"interview",citizenId:42},{kind:"collect",citizenId:42}]));
 
   const html = readFileSync(path.join(ROOT, "index.html"), "utf8");
   const css = readFileSync(path.join(ROOT, "css", "field.css"), "utf8");

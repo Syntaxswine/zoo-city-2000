@@ -11,7 +11,8 @@ import { buildingSnapshot, syncBuildingAge } from "./building-age.js";
 import { KNOBS } from "./rules.js";
 import { TERRAIN, ROAD, ZONE, CIVIC, CIVIC_SIDE, CIVIC_OF_KIND, idx, inBounds, anchorOf, footprintOf, civicAnchorOf, civicTiles } from "./world.js";
 import { post, canSpend, exitReceivership } from "./budget.js";
-import { clearLot, invalidatePaths, releaseJob, replanStale } from "./citizens.js";
+import { clearLot, invalidatePaths, releaseJob, replanStale, compact } from "./citizens.js";
+import { policeAction } from "./police-actions.js";
 import { resolveChoice } from "./events.js";
 import { refreshLast } from "./tick.js";
 import { computeOcclusion } from "./reach.js";
@@ -367,6 +368,15 @@ export function apply(world,op,options) {
   return result;
 }
 function applyOperation(world, op, { log = true } = {}) {
+  if (op.kind === "interview" || op.kind === "collect") {
+    const result = policeAction(world, op);
+    if (!result.ok) return result;
+    if (log) world.log.push({ t: world.tick, op: { kind: op.kind, citizenId: op.citizenId } });
+    world.undoStack = []; // tile snapshots cannot undo changed custody, deaths, or an interview roll
+    compact(world);
+    refreshLast(world);
+    return result;
+  }
   // Non-tile ops first.
   if (op.kind === "rate") {
     const v = Math.max(0, Math.min(20, Math.round(op.value)));

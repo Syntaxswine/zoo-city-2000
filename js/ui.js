@@ -1001,6 +1001,7 @@ export function createUI(app) {
   }
 
   function refresh() {
+    app.palette?.refresh();
     refreshClock();
     refreshBars();
     refreshStats();

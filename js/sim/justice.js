@@ -362,14 +362,12 @@ function exonerate(world, culprit, notices) {
 }
 
 /**
- * Convict `c` for file `f`. Exported so the suite can force one. The sentence
+ * Resolve the sentence and available destination without modifying the city. The sentence
  * table: lighter crimes → zoo prison; murder / second theft → centre;
  * third theft or theft after pacification → meat hall. No destination
  * with capacity leaves the case open, without recording a conviction.
  */
-export function arrest(world, f, c, wrongful, notices, opts = {}) {
-  const ev = world.events;
-  const tick = world.tick;
+export function sentenceFor(world, f, c, opts = {}) {
   const theft = f.cause === "burglary" || f.cause === "theft";
   const thefts = (c.thefts || 0) + (theft ? 1 : 0);
   const murder = f.cause === "killing" || f.cause === "murder";
@@ -378,10 +376,18 @@ export function arrest(world, f, c, wrongful, notices, opts = {}) {
   // murder of the affluent, already the centre, becomes the hall. The counter records what happened (thefts); the step is on the SENTENCE.
   const harsher = (f.victimClass || 0) === CLASS.AFFLUENT && (theft || murder);
   const steps = thefts + (harsher && theft ? 1 : 0);
-  const sentence = (theft && steps >= 3) || (theft && c.fixed) || (murder && harsher) ? "hall"
-    : murder || (theft && steps === 2) ? "centre" : "zoo";
+  const sentence = opts.sentence || ((theft && steps >= 3) || (theft && c.fixed) || (murder && harsher) ? "hall"
+    : murder || (theft && steps === 2) ? "centre" : "zoo");
   const market = sentence === "hall" ? hallReach(world, c.home, KNOBS.MEAT_ROAD, { space: true }) : null;
   const destination = sentence === "hall" ? market?.hall ?? -1 : custodyWithBed(world, c.home, sentence === "zoo" ? CIVIC.ZOO : CIVIC.CENTRE);
+  return { theft, thefts, murder, harsher, sentence, destination };
+}
+
+/** Convict `c` for file `f`, preserving custody, family, ledger and case consequences. */
+export function arrest(world, f, c, wrongful, notices, opts = {}) {
+  const ev = world.events;
+  const tick = world.tick;
+  const { theft, thefts, murder, harsher, sentence, destination } = sentenceFor(world, f, c, opts);
   if (destination < 0) {
     // A missing/full building never becomes an invisible prison or a different sentence.
     // Keep the case open; the ordinary case clock and future arrests still apply.
@@ -405,7 +411,7 @@ export function arrest(world, f, c, wrongful, notices, opts = {}) {
   ev.arrests.push({ tick, tile: f.tile, citizenId: c.id, name: nameOf(c), culpritId: f.culpritId, culpritName: culprit ? nameOf(culprit) : "", wrongful, cause: f.cause, exonerated: false, hard: !!opts.minor && !minor });
   if (ev.arrests.length > 200) ev.arrests.splice(0, ev.arrests.length - 200);
   if (!wrongful) exonerate(world, c, notices);
-  const why = `for the ${f.cause} at ${addressOf(world, f.tile)}`;
+  const why = opts.ordered ? "by the mayor's collection order" : `for the ${f.cause} at ${addressOf(world, f.tile)}`;
   const still = wrongful && culprit && !culprit.dead ? ` ${nameOf(culprit)} is still at ${at(world, culprit.home)}.` : "";
   const tail = wrongful ? ` ${c.name} was at home on Tuesday; it was the wrong animal.${still}` : "";
   const home = c.home;
@@ -419,7 +425,7 @@ export function arrest(world, f, c, wrongful, notices, opts = {}) {
     post(world, "cut", KNOBS.SOLD_PRICE);
     receiveMeat(world, destination, "convicted", 1);
     ev.justice.sold++;
-    const because = murder ? "Murder of the affluent." : thefts >= 3 ? "Third theft." : c.fixed ? "An offence after pacification." : "A second theft from the affluent.";
+    const because = opts.ordered ? "The collection sentence was the meat hall." : murder ? "Murder of the affluent." : thefts >= 3 ? "Third theft." : c.fixed ? "An offence after pacification." : "A second theft from the affluent.";
     line = `SOLD — ${nameOf(c)} was convicted ${why} and sold at the meat hall at ${at(world, destination)}. ${because}${tail}`;
   } else {
     const months = sentence === "centre" ? KNOBS.PACIFY_MONTHS : minor ? KNOBS.TRESPASS_MONTHS : KNOBS.CELLS_MONTHS;

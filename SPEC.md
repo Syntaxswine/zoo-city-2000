@@ -886,6 +886,31 @@ school.
 
 ---
 
+## Police remote actions (`js/sim/police-actions.js`)
+
+The remote shows **Interview** and **Collect** only while a police station exists.
+Inspect a citizen first, then press either button. An operational, road-served
+police station is required; missing citizens and citizens already in custody are
+refused without a random draw.
+
+Interview catches a citizen with an unresolved case with probability 90%; an
+innocent citizen is wrongfully collected with probability 5%. Previous convictions
+alone do not establish guilt. A failed interview releases the citizen without a
+new charge. Collect skips that interview roll.
+
+Both paths use the existing sentence (including prior thefts and affluent-victim
+escalation) as the starting point: 60% normal, 20% one step harsher, 10% one step
+lighter, 10% meat hall. The ladder is Zoo prison → Pacification Centre → meat hall;
+steps clamp at the ends. An innocent citizen starts at jail. All existing custody,
+pacification, death, family, ledger, and wrongful-conviction effects still apply.
+If the chosen destination is unavailable/full, the citizen remains free and the
+news explains the missing facility. No alternate sentence is substituted.
+
+One interview and at most one collection attempt per citizen per month prevent
+same-month rerolls. These limits live in saved `events.policeMonth`, independently
+of the truncated news feed. Commands consume the saved simulation RNG and are
+input-log replayable; they clear construction undo history and cannot be undone.
+
 ## 9b. Services — fire and police (`js/sim/fields.js`, `events.js`)
 
 The owner: *"police and fire is noticeably absent."* Two 1×1 civics, §500

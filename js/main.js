@@ -146,6 +146,7 @@ app.doOp = (op) => {
     app.renderer.invalidate();
     app.walkers.notify();
     app.ui.refresh();
+    if (res.notices?.length) app.ui.flash(res.notices.join(" "));
     // ops.js reports what a tile op did to people and chalk: a road over
     // empty zoned lots unzones them (no refund; Backspace undoes), and a bulldoze
     // that turns animals out is not undoable (undo restores tiles, never people).

@@ -264,6 +264,8 @@ export const KNOBS = {
   ARREST_COVER: 0.18,       // … and a scene on a beat is worked harder still
   ARREST_PRIOR: 0.05,
   WRONGFUL_P: 0.05,         // the owner's 5%: the wrong animal, random by proximity
+  INTERVIEW_GUILTY_P: 0.9,
+  INTERVIEW_INNOCENT_P: 0.05,
   WRONGFUL_RADIUS: 4,
   // Custody and the sentence.
   CELLS_MONTHS: 3,

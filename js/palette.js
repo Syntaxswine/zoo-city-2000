@@ -2,6 +2,7 @@
 
 import { TOOLS, spriteForTool } from "./tools.js";
 import { paintSprite } from "./render.js";
+import { hasPolice } from "./sim/police-actions.js";
 
 const fit = (canvas, sprite) => {
   const scale = Math.min(34 / sprite.w, 28 / sprite.h, 1);
@@ -67,6 +68,41 @@ export function createPalette(app) {
     buttons.set(tool.id, button);
   }
 
+  const police = document.createElement("div");
+  police.className = "police-actions";
+  const policeHeading = document.createElement("h2");
+  policeHeading.textContent = "Police";
+  const actions = document.createElement("div");
+  actions.className = "palette-grid";
+  const hint = document.createElement("p");
+  hint.className = "note";
+  hint.textContent = "Inspect a citizen, then Interview or Collect.";
+  for (const [kind, label, description] of [
+    ["interview", "Interview", "Interrogate the selected citizen: 90% catch chance for an unresolved crime; 5% wrongful collection for an innocent citizen. Once per month."],
+    ["collect", "Collect", "Collect the selected citizen: 60% normal sentence, 20% harsher, 10% lighter, 10% meat hall. No undo."],
+  ]) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "palette-tool";
+    button.dataset.action = kind;
+    button.textContent = label;
+    button.title = description;
+    button.addEventListener("click", () => {
+      if (app.ui.modalOpen()) return;
+      const citizenId = app.input.state.pinnedCitizen;
+      if (citizenId == null) {
+        app.input.setTool("inspect");
+        app.ui.flash("Click a citizen to select them, then press Interview or Collect.");
+        return;
+      }
+      app.doOp({ kind, citizenId });
+    });
+    actions.append(button);
+  }
+  police.append(policeHeading, actions, hint);
+  host.append(police);
+  const refresh = () => { police.hidden = !hasPolice(app.world); };
+
   function setTool(id) {
     for (const [toolId, button] of buttons) {
       const active = toolId === id;
@@ -76,5 +112,6 @@ export function createPalette(app) {
   }
 
   setTool(app.input.tool);
-  return { setTool, buttons };
+  refresh();
+  return { setTool, buttons, refresh };
 }
