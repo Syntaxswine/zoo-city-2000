@@ -7,8 +7,10 @@
 
 import { KIND } from "./life.js";
 import { legacyOf, personName } from "./legacy.js";
+import { isPredPrey } from "./species.js";
+import { aTemper } from "./temper.js";
 
-export const STORY_PREFIXES = Object.freeze(["OBITUARY", "LITTER", "CENTENARY"]);
+export const STORY_PREFIXES = Object.freeze(["OBITUARY", "LITTER", "CENTENARY", "WEDDING"]);
 
 const liveOrLegacy = (world, id) => world.byId?.get(Number(id)) || legacyOf(world, id);
 const ids = (world, values) => [...new Set(values.map(Number)
@@ -85,6 +87,25 @@ export function storyTick(world) {
     const who = ids(world, [...litter.parents, ...newborns]);
     if (!who.length) continue;
     publish(world, `story-litter:${key}`, `LITTER — A litter of ${litter.n} to the ${litter.surname} family of ${at(world, litter.home)}.`, who);
+  }
+
+  // A wedding (SPEC §7.2) leaves one WED chapter on each partner, the arg the other's id: two
+  // witnesses to ONE line, keyed by the pair. It flashes — the owner's procession moment.
+  const wed = new Set();
+  for (const e of world.lifeEvents) {
+    if (e?.kind !== KIND.WED || !Number.isInteger(e.arg)) continue;
+    const a = Math.min(Number(e.id), e.arg);
+    const b = Math.max(Number(e.id), e.arg);
+    const key = `${a}-${b}`;
+    if (wed.has(key)) continue;
+    wed.add(key);
+    const ca = liveOrLegacy(world, a);
+    const cb = liveOrLegacy(world, b);
+    if (!ca || !cb) continue;
+    const hh = world.hhById?.get(ca.household);
+    const companions = !!hh?.companions;
+    const line = `WEDDING — ${personName(world, a)} (${ca.species}, ${aTemper(ca)}) and ${personName(world, b)} (${cb.species}, ${aTemper(cb)})${companions ? ", companions," : ""} keep house at ${at(world, ca.home)}.${isPredPrey(ca.species, cb.species) ? " Predator and prey." : ""}${companions ? " No litters from that house." : ""}`;
+    if (publish(world, `story-wedding:${key}`, line, [a, b])) flash.push(line);
   }
 
   // events.js owns the plaque/gameplay fact; this is its sole news writer.

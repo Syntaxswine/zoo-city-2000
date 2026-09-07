@@ -50,6 +50,9 @@ export function temperOf(c) {
   return Math.floor((u < 0 ? u + 1 : u) * TEMPER_COUNT) % TEMPER_COUNT;
 }
 export const temperName = (c) => TEMPERS[temperOf(c)].name;
+/** "a Grumbler", "an Idler" — the name with its article, for a line of prose. */
+export const withArticle = (name) => `${/^[AEIOU]/.test(name) ? "an" : "a"} ${name}`;
+export const aTemper = (c) => withArticle(temperName(c));
 
 /** "alike" · "kindred" · "crossed" · "plain" — the relation between two temperament indices. */
 export function relation(a, b) {
@@ -74,5 +77,5 @@ export function describeTemper(t) {
     if (r === 1) kin.push(TEMPERS[o].name + "s");
     else if (r === -1) cross = TEMPERS[o].name + "s";
   }
-  return `a ${TEMPERS[t].name} — ${TEMPERS[t].line}; kindred with ${kin.join(" and ")}, crossed with ${cross}`;
+  return `${withArticle(TEMPERS[t].name)} — ${TEMPERS[t].line}; kindred with ${kin.join(" and ")}, crossed with ${cross}`;
 }

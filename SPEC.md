@@ -579,17 +579,33 @@ Binsworth). The card says "the Burrowes family, 4 rabbits".
 ```
 - Households ARRIVE single-species, 2–4 citizens (2 adults + 0–2 children).
 - They leave together (emigration is per household, rolled once).
-- Births need 2 fertile adults in the household and headroom in the lot;
-  p = litter/96 per month. A FULL home has no litter: the ×0.25 crowding push
-  toward a tier-up that this line once promised was never wired (`KNOBS.BIRTH_FULL_MULT`
-  exists and nothing reads it — measured 2026-09-07; wire it or strike it is the
-  owner's call, docs/PROPOSAL-GENERATIONS-AND-SKILLS-2026-09-07.md §8). Cub species
-  = a random parent's species.
+- Births need 2 fertile adults in the household; p = litter/96 per month. A
+  FULL home breeds at ×0.25 (`BIRTH_FULL_MULT`) and goes OVER capacity — the
+  Caesar crowding push toward a tier-up (a fill above 1 satisfies FILL_TO_GROW;
+  `vacantR` counts only true headroom, Σ max(0, cap − occupants)). Promised here
+  from the start, unwired until the owner's word on 2026-09-07 ("wire it"). A
+  COMPANION household (below) keeps no litter. Cub species = a random parent's
+  species; the cub takes the household's surname.
 - At 16 a child SPLITS into a new one-member household and looks for a home
-  within 12 road tiles; if none, stays (counted as an adult in W). NOTHING MERGES
-  HOUSEHOLDS — the "move-in at 16" this section used to gesture at does not exist,
-  so mixed households never form and the town's own children never have children
-  (100% of native adults live alone at 60 years; the same proposal, §2c and §8).
+  within 12 road tiles; if none, stays (counted as an adult in W).
+- **Weddings (2026-09-07; `citizens.weddings`, `joinHousehold`).** A SINGLE — the
+  only present adult of a housed household with nobody in a pen — courts at
+  `WED_P` 1/12 a month within `REHOME_RADIUS` 12 road tiles. One courtship in
+  `WED_CROSS_P` 10 looks across the predator line (the owner: "about as rare as
+  gay villagers"); otherwise its own species, or anyone but predator and prey
+  when none is in reach. Among those the twelve temperaments weigh the choice
+  (§7.11). Whichever lot has room HOSTS the other household — every present
+  member moves, a widow's cubs included; the host keeps its surname and species
+  label; the guest household is gone; a stale commute is re-planned by the tick.
+  No room, no wedding. One couple in `WED_COMPANIONS_P` 10 are COMPANIONS and
+  keep no litter (the owner's "10% gay", in a sim with no sex: a flag on the
+  household, saved only when true). The two befriend; both get a WED chapter
+  ("Married X in 2031"); story.js writes the WEDDING line and flashes it.
+  Nothing parts a household but death, and the survivor is single again.
+  Measured before it landed (docs/PROPOSAL-GENERATIONS-AND-SKILLS-2026-09-07.md
+  §8): births rise by half, the fourth generation is alive at sixty years, the
+  town is 53–65% town-born, and population itself moves within a few percent —
+  size is jobs and homes; the rule decides who fills them.
 - **Removal rule (the dangling-id law):** when a citizen dies or emigrates, it
   is removed from every friend's `friends` list, from its household's
   `members`, from its lot's occupant count and its job's staff count, in the
@@ -622,8 +638,9 @@ FRICTION: 0.4% of FRIENDLESS adults' households per month wander off regardless
 
 ### 7.5 Friendships and mood
 - Each tick 200 sampled citizens (id order, rotating window) roll
-  `p = 0.05·affinity` to befriend a co-worker, a neighbour (home within
-  Chebyshev 1) or a fellow park-goer (both within 4 of the same park).
+  `p = 0.05·affinity·compat` to befriend a co-worker, a neighbour (home within
+  Chebyshev 1) or a fellow park-goer (both within 4 of the same park); `compat`
+  is the temperaments' multiplier (§7.11: kindred 1.5, alike 1.25, crossed 0.5).
   Affinity 1.0 same or allied, 0.7 neutral, 0.4 wary (fox–rabbit, fox–mouse,
   owl–mouse); **raccoon 1.2 with everyone — the glue species.** Friends cap
   at 4; oldest link is dropped.
@@ -706,7 +723,9 @@ roads (§1 a changed tile; one undo step). **A gate, on purpose** — it is the 
 not the species' preference (§7.6's "weights never gates" is about what
 species want): `vacantLots` and `searchJob` skip what does not admit, so
 every arrival, move-out, rehome and hire goes through it. A lot repainted
-against its occupants gives the household `ZONED_OUT_MONTHS` 3 of notice
+against ANY of its occupants — a wedding (§7.2) can put two species under one
+roof, and `householdSpecies` lists them, so `bestHome` admits a lot only when
+it admits every one — gives the household `ZONED_OUT_MONTHS` 3 of notice
 (`hh.notice`, saved), then rehomes within 12 road tiles under the gate or
 leaves town ("ZONED OUT — …", `last.zonedOut`); its workers are released at
 the next tick's stale pass and search again. Nobody moves in the month of

@@ -683,7 +683,7 @@ export function createUI(app) {
       const homeS = c.home >= 0 ? `(${c.home % w.w},${(c.home / w.w) | 0})` : "none";
       const jobS = c.job >= 0 ? `(${c.job % w.w},${(c.job / w.w) | 0})` : isWorker(w, c) ? `none${c.jobless ? ` — ${c.jobless} months looking` : ""}` : "—";
       const hh = w.hhById?.get(c.household);
-      lines.push(el("div", "", `${hh ? `the ${hh.surname} household${c.home >= 0 ? `, ${CLASS_NAME[w.klass[anchorOf(w, c.home)]]}` : ""} · ` : ""}home ${homeS} · job ${jobS} · mood ${Math.round(c.mood)}`));
+      lines.push(el("div", "", `${hh ? `the ${hh.surname} household${hh.companions ? ", companions" : ""}${c.home >= 0 ? `, ${CLASS_NAME[w.klass[anchorOf(w, c.home)]]}` : ""} · ` : ""}home ${homeS} · job ${jobS} · mood ${Math.round(c.mood)}`));
       const status = [];
       const camp = w.campers.find(cp => cp.householdId === c.household);
       if (camp) status.push("camping at (" + camp.tile % w.w + "," + Math.floor(camp.tile / w.w) + ") — waiting for housing and economic recovery");

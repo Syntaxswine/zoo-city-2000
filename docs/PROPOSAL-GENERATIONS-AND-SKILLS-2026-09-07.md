@@ -48,6 +48,16 @@ household-merge rule — now the prerequisite of this whole arc).
    the service. i'm even potentially ok with people commuting further than they
    should to commercial, industrial, and meat jobs if the demand is high enough,
    but that would need to be balanced very carefully"* (§8, §9).
+6. Asked "do you have more questions before we begin?", four rulings on the
+   pairing, the reach, the full home and the stretch: *"1 but lets add 12
+   personality types. also i am ok with predator and prey marrying, but it should
+   be about as rare as gay villagers. lets say 10% gay, 10% cross pred prey
+   relationships."* (1 = the same species preferred); the reach follows *"The
+   best hand on the crew"*; the full home: *"Wire it"*; the stretch: *"Not
+   now"*. Then on the twelve: *"Twelve types rolled at birth, never inherited"*,
+   acting on *"Courtship: who marries whom"* and *"Friendship: who befriends
+   whom"*; and on sex: *"No sex: ten percent of weddings are companions who
+   never breed"*. Step 0 was built on these the same evening (§7, §8e).
 
 ## 1. The thesis
 
@@ -295,13 +305,10 @@ somebody walks to.
 
 ## 5. Open for the owner
 
-1. **The merge rule's shape** (§2c; measured in §8) — the prerequisite. The
-   recommendation: courtship within 12 road tiles, the same species preferred
-   and anyone but predator and prey otherwise, a whole household moving to the
-   lot with room, p = 1/12 a month. The owner's rulings: the pairing (same /
-   preferred / any — it decides whether a quarter of the town's households are
-   mixed, or seven in a hundred, or none), the wait, and whether a household
-   ever parts again.
+1. ~~**The merge rule's shape**~~ RULED (round 6) and BUILT (§8e): the same
+   species preferred; predator and prey at one courtship in ten; one couple in
+   ten companions, who keep no litter; the twelve temperaments weigh the
+   choice; a household parts only by death.
 2. **The generation credit** — 24 months per practised generation, capped where?
    Uncapped, a fifth-generation mouse is master at birth; that may be the point.
 3. **University and Amphitheater** — their ranges are untouched (ruled). Do their
@@ -313,7 +320,9 @@ somebody walks to.
    shrinks the smoke (a smell, Chebyshev, cheap); (b) a goods link — works supply
    shops within N walking tiles, rail free, and supplied shops grow — a new arc
    that would give industry a benefit field for the first time.
-5. **Crew mean vs the keeper alone** for the tile rule.
+5. ~~**Crew mean vs the keeper alone**~~ RULED (round 6): *the best hand on the
+   crew* sets the reach — one master carries a green crew; the reach never
+   drops while the master stays.
 6. **Health's channel** — lifespan is rolled at birth (`deathAge`), so a clinic
    needs its own consumer: fewer natural deaths in cover, an epidemic event the
    cover resists, or litters lost. A ruling, not a default.
@@ -321,19 +330,15 @@ somebody walks to.
 8. **Commercial's reach** now that shops count rail customers within a 24-step
    budget: does a veteran crew widen the local five-tile count, the budget, or
    both?
-9. **The commute stretch** (§9) — "commuting further than they should … if the
-   demand is high enough": build it at all, given that no rig shows a worker
-   stranded beyond 40 steps of an open job? If so, keyed to which demand — the
-   R valve (jobs over workers, the labour shortage) or the zone's own unfilled
-   share — and with the +10 commute mood term as its price?
+9. ~~**The commute stretch**~~ RULED (round 6): *not now*. The shape and its gate
+   stay in §9 for the day a real save shows a jobless animal beyond 40 steps.
 10. **The children who leave** (§8) — the surplus of a breeding town emigrates
     through FRICTION (a friendless household wanders off at 0.4% a month), 1,400
     to 1,700 animals in sixty years. Keep it as the OUT lever it already is, or
     damp it for natives (a town-born animal leaves its town less readily)?
-11. **The crowding push** (SPEC §7.2, corrected today) — the ×0.25 litter in a
-    full home that the SPEC promised was never wired (`BIRTH_FULL_MULT` is read
-    by nothing; a full home has no litter). Wire it, as the tier-up pressure it
-    was meant to be, or strike the knob?
+11. ~~**The crowding push**~~ RULED (round 6): *wire it* — a full home breeds at
+    ×0.25 and goes over capacity; built in step 0 (§8e). Its share of the
+    change is measured there.
 
 ## 6. Instruments (run from the repo root; all passive, exit 0)
 
@@ -347,9 +352,13 @@ node tools/commuteprobe.mjs --layout estate --civics --at-centre  # commute vs t
 
 ## 7. Build order (a sketch, none of it opened)
 
-0. **The merge rule**, the shape §8 recommends once the owner rules on the
-   pairing (its own commit; moves every rig's hash: births change;
-   `breedprobe --rule none` before and after is its measure).
+0. ~~**The merge rule**~~ BUILT 2026-09-07 in two commits — the twelve
+   temperaments as a read (`30be0b8`, byte-identical) and the rule (weddings,
+   companions, the cross-line courtship, the temperament multiplier on
+   friendships, the full-home litter). Every rig's hash moved: balanced
+   `c055aba5` → `12427ef4`, estate `2ced10f8` → `747d57d3`; with the five knobs
+   neutral (`--set WED_P=0 BIRTH_FULL_MULT=0 TEMPER_*=1`) the balanced rig hashes
+   `c055aba5` again, so the bump is exactly those rules (§8e).
 1. **The band as a READ** — card, census, ticker; `tick − hired`; hash-neutral.
 2. **Parents at birth + the family line on the card** (two ids, saved when present).
 3. **The keeper on the lot card + the succession line**; measure the cadence on
@@ -493,6 +502,39 @@ read, honestly:
 | the centre | — | a line ends |
 | the hall, the killing | — | an animal ends |
 | health (owed, §5 q6) | litters survive | — |
+
+### 8e. As built (2026-09-07, evening): the shadow became the rule
+
+The owner's round 6 changed the shape in three ways — the twelve
+temperaments weigh the choice; predator and prey marry at one courtship in ten;
+one couple in ten are COMPANIONS and keep no litter ("10% gay", in a sim with
+no sex) — and wired the full-home litter (×0.25, a home goes over capacity).
+SPEC §7.2, §7.5, §7.11 are the law now; `tools/check-generations.mjs` holds 21
+checks. Measured with the sim's own rule (`breedprobe --rule none`), sixty
+years, against §8b's control:
+
+| 60 years | balanced, today | balanced, built | estate, today | estate, built |
+|---|---|---|---|---|
+| arrived; left | 5,395; 2,244 | 2,527; **770** | 3,672; 1,706 | 1,707; **447** |
+| born (with a town-born parent) | 1,394 (4) | **2,447 (1,276)** | 1,315 (2) | **2,046 (1,113)** |
+| died | 2,205 | 2,019 | 1,594 | 1,408 |
+| population; town-born | 2,318; 32% | 2,163; **77%** | 1,665; 35% | 1,874; **78%** |
+| deepest generation | 2 | 4 | 2 | 4 |
+| weddings; companion households; mixed households | — | 1,979; 57 of 747; 118 | — | 1,444; 46 of 618; 44 |
+
+At ninety years the balanced town is 94% town-born, generation SIX is alive,
+nobody has arrived for two decades and nobody has left (the R valve sits at
+zero: jobs and homes are full of the town's own). **Departures collapse** —
+2,244 → 770 and 1,706 → 447 — because a wedding befriends the pair and a
+household with a friend never rolls friction; the OUT lever of §8 q10 is
+largely closed by the rule itself. Attribution, balanced: weddings off
+(`--set WED_P=0`) leaves the full-home litter alone — born 1,753 (4), 35%
+town-born, generation 2; the full-home litter off (`--set BIRTH_FULL_MULT=0`)
+leaves the weddings alone — born 2,072 (972), 66% town-born, generation 4. So
+the wedding is the lineage and the crowding push is a sixth of the births.
+On the estate with a station and a centre: pacified 2 in sixty years, 14
+litters lost in one decade — the bite is real per animal and the centre is
+still rarely used (§8c stands).
 
 ## 9. The commute is not the benefit (the owner's round 5, second ruling)
 

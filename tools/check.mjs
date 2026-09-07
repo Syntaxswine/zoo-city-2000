@@ -245,13 +245,14 @@ let homeNotR = 0;
 for (let i = 0; i < world.w * world.h; i++) {
   if (occ[i] !== world.occupants[i]) occBad++;
   if (staff[i] !== world.staff[i]) staffBad++;
-  if (occ[i] > capacityOf(world, i) && world.zone[i] === ZONE.R) overCap++;
+  // Over capacity is LEGAL on a standing home holding a town-born animal: the full-home litter (SPEC §7.2, wired 2026-09-07) is the one thing that may put a lot over, and a cub is what it puts there. Anything else over is a bug.
+  if (occ[i] > capacityOf(world, i) && world.zone[i] === ZONE.R && !(world.tier[i] > 0 && world.citizens.some((c) => !c.dead && c.home === i && c.native))) overCap++;
   if (staff[i] > jobsOf(world, i)) overJobs++;
   if (occ[i] > 0 && world.zone[i] !== ZONE.R) homeNotR++;
 }
 check("occupant counts equal recount", occBad === 0, `${occBad}`);
 check("staff counts equal recount", staffBad === 0, `${staffBad}`);
-check("no lot over capacity", overCap === 0, `${overCap}`);
+check("no lot over capacity but by the full-home litter (a standing home holding a town-born animal)", overCap === 0, `${overCap}`);
 check("no job site over its jobs", overJobs === 0, `${overJobs}`);
 check("homes are R lots", homeNotR === 0, `${homeNotR}`);
 // paths
@@ -5574,7 +5575,7 @@ check("no Math.random under js/", mathRandom.length === 0, mathRandom.join(", ")
   const obit61 = obituary[0].line;
   const obit100 = obit61.replace("OBITUARY —", "OBITUARY 100 —").replace(", 61,", ", 100,");
   check("story: prefixes classify consistently and ordinary stories never flash",
-    STORY_PREFIXES.join() === "OBITUARY,LITTER,CENTENARY"
+    STORY_PREFIXES.join() === "OBITUARY,LITTER,CENTENARY,WEDDING"
       && FEV.TICKER_BAD.test(obit61) && !FEV.TICKER_GOOD.test(obit61) && !FEV.TICKER_FLASH.test(obit61)
       && FEV.TICKER_BAD.test(obit100) && FEV.TICKER_FLASH.test(obit100)
       && FEV.TICKER_GOOD.test(litter[0].line) && !FEV.TICKER_BAD.test(litter[0].line) && !FEV.TICKER_FLASH.test(litter[0].line)
@@ -6673,9 +6674,9 @@ if (existsSync(artIndex)) {
     if (b === 2 || b === 3) { anchors++; for (const j of W.footprintOf(M, i)) if (M.zone[j] !== M.zone[i] || M.tier[j] !== 3 || (j !== i && (!W.isPart(M, j) || W.anchorOf(M, j) !== i))) badParts++; }
     else if (b & W.PART) { const an = W.anchorOf(M, i); if (!(M.big[an] === 2 || M.big[an] === 3)) badParts++; }
     if (W.isPart(M, i) && (M.occupants[i] || M.staff[i])) onParts++;
-    if (M.zone[i] === ZONE.R && M.occupants[i] > capacityOf(M, i)) overCap++;
+    if (M.zone[i] === ZONE.R && M.occupants[i] > capacityOf(M, i) && !(M.tier[i] > 0 && M.citizens.some((c) => !c.dead && c.home === i && c.native))) overCap++; // the full-home litter may put a standing home over (SPEC §7.2); nothing else may
   }
-  check("blocks: the balanced mayor raises a 2×2 within four years, every part points at a live anchor of its zone at tier 3, nobody is on a part, nobody over capacity",
+  check("blocks: the balanced mayor raises a 2×2 within four years, every part points at a live anchor of its zone at tier 3, nobody is on a part, nobody over capacity but by the full-home litter",
     cen.blocks2 + cen.blocks3 >= 1 && anchors === cen.blocks2 + cen.blocks3 && badParts === 0 && onParts === 0 && overCap === 0,
     `2×2 ${cen.blocks2} · 3×3 ${cen.blocks3} · bad ${badParts} · on parts ${onParts} · over ${overCap}`);
   check("blocks: the Rules tab has the block rule and reads the census", (await import("../js/sim/rules.js")).RULES.some((r) => r.id === "G5" && /2×2/.test(r.live(M))));

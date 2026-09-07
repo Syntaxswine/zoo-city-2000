@@ -3058,3 +3058,54 @@ proposal (q11: wire the push or strike the knob).
 | an experiment's merge pass leaves a household `gone` but still listed | `compact(world)` only runs when `world._removed` is set; set it and call `compact` yourself after the pass |
 
 Maker's mark — Fable 5.1, session 19, later: the one who married the town off in a shadow and watched it become its own.
+
+## 38. Step zero built — the wedding, the companions, the twelve temperaments, the full home (session 19, 2026-09-07, evening)
+
+**The owner's round six, on "do you have more questions before we begin?"**
+The pairing: *"1 but lets add 12 personality types. also i am ok with predator
+and prey marrying, but it should be about as rare as gay villagers. lets say
+10% gay, 10% cross pred prey relationships."* The reach: the best hand on the
+crew. The full home: wire it. The stretch: not now. Then: twelve types rolled
+at birth, never inherited, acting on courtship and friendship; and no sex —
+ten percent of weddings are companions who never breed.
+
+**Two commits, the instrument before the rule.** `30be0b8` is byte-identical:
+`js/sim/temper.js` — twelve temperaments READ from `hash01(id, born)` (no
+field, no migration, no draw; every old save has them), a symmetric table
+(kindred ×1.5 with two, crossed ×0.5 with one, alike ×1.25), the card line
+("a Grumbler — nothing is as it was; kindred with Stoics and Misers, crossed
+with Joiners"). The second commit is the rule: `citizens.weddings` — a single
+(the only adult at home) courts at 1/12 a month within 12 road tiles, one in
+ten across the predator line, else its own species, else anyone but predator
+and prey, the temperaments weighing the pick; `joinHousehold` moves the whole
+guest household to the lot with room (and never onto a lot the player's line
+forbids); one couple in ten `companions`, saved only when true; the two
+befriend; a WED chapter each; `story.js` writes and FLASHES the WEDDING line
+("… (cow, a Grumbler) and … (wolf, a Show-off) keep house at (26,13).
+Predator and prey."); `pairAffinity` × the temperaments; the full home breeds
+at ×0.25 and goes over capacity (`vacantR` is now Σ max(0, cap − occupants)).
+
+**Measured** (`breedprobe --rule none`, sixty years): balanced born 1,394 →
+2,447 (town-born-parented 4 → 1,276), 32% → 77% town-born, generation 4;
+estate 1,315 → 2,046, 35% → 78%; at ninety years 94% town-born and the sixth
+generation alive. Departures COLLAPSE (2,244 → 770; 1,706 → 447): a wedding
+befriends the pair, and a household with a friend never rolls friction. Rigs:
+balanced `c055aba5` → `12427ef4`, estate `2ced10f8` → `747d57d3`; with the five
+knobs neutral the balanced rig hashes `c055aba5` AGAIN — the bump is exactly
+the rules. Browser: 121 weddings in the log of a 30-year town, 36 companion
+households, the card and the news reader read as written.
+
+**Symptom-keyed traps, this build.**
+
+| what you see | what it is |
+|---|---|
+| the neutral-knob falsifier hashes differently (`37b170ed`, not `c055aba5`) | a full home at ×0 still DREW `rng.chance(0)` where the old rule `continue`d — nothing may draw where nothing can happen; skip the draw at ×0 and the byte-identity returns |
+| a fixture that refuses a wedding for want of room marries them on the third month | a hand-set cottage under positive demand GROWS a storey (capacity 10) — set `maxTier = 1` on fixture lots |
+| `lotReport(w, i).fill` is undefined | the fill lives under `report.score.fill` |
+| "use: nobody lives where the line forbids" goes red after the rule | TWO holes, one class: `joinHousehold` hosted a spouse onto a forbidden lot (it now refuses a host the line does not admit), and the zoning-out pass and every `bestHome` rehome asked the lot about the household's ONE species label — a cat married into a rabbit house was never noticed. `householdSpecies(world, hh)` lists every species under the roof, `bestHome` takes the list and admits a lot only when it admits all, the pass gives notice when any member is forbidden, and `buyPens` sells only pig and cow cubs (a cat cub under a pig roof is not pork). Walk every reader of `hh.species` when a household can hold two |
+| a check that names the exact lot a family must rehome to | it went to another admitting lot (the nearer, higher-scoring one); assert the CLAIM — admitted for every species, moved, together — not the address; and a check that reads a lot after ticks finds ARRIVALS in it — test `bestHome` on a fresh fixture without a tick |
+| "no lot over capacity" goes red | over capacity is LEGAL now on a standing home holding a town-born animal (the full-home litter); the two invariants say so and nothing else may put a lot over |
+| "a Idler" in the ticker | `withArticle()` in temper.js; the story line uses `aTemper(c)` |
+| the pinned card vanishes as soon as the pointer moves | the input loop re-hovers every frame; verify the card through the DOM (`updateHover` then read the text), and use the news reader for the screenshot |
+
+Maker's mark — Fable 5.1, session 19, evening: the one who let the town marry, and watched the last arrival never come.

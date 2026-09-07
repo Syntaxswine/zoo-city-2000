@@ -170,6 +170,7 @@ export function census(world) {
   let polSum = 0;
   let maxPol = 0;
   let rCap = 0;
+  let vacantSum = 0; // Σ max(0, capacity − occupants) over R lots: the true headroom (SPEC §7.2)
   let maxTraffic = 0;
   let lots = 0;
   let roads = 0;
@@ -249,7 +250,7 @@ export function census(world) {
     if (world.zone[i] !== ZONE.NONE) {
       lots++;
       if (!served(world, i)) lotsNoRoad++;
-      if (world.zone[i] === ZONE.R) rCap += capacityOf(world, i); // a block's anchor holds ×1.25 its lots; its parts hold nobody
+      if (world.zone[i] === ZONE.R) { const cap = capacityOf(world, i); rCap += cap; vacantSum += Math.max(0, cap - world.occupants[i]); } // a block's anchor holds ×1.25 its lots; its parts hold nobody; a home OVER capacity (the full-home litter, SPEC §7.2) frees nothing elsewhere
     }
     if (world.road[i] !== ROAD.NONE) roads++;
     if (world.rail[i] === 1) railTiles++;
@@ -320,7 +321,7 @@ export function census(world) {
     meanPol: polSum / n,
     maxPol,
     maxTraffic,
-    vacantR: Math.max(0, rCap - world.citizens.filter(c => !c.dead && c.home >= 0).length),
+    vacantR: vacantSum, // Σ max(0, capacity − occupants): equal to rCap − housed until a home passes capacity
     rCap,
     notables: notables(world),
   };

@@ -133,6 +133,10 @@ export const KNOBS = {
   TEMPER_KINDRED: 1.5,
   TEMPER_ALIKE: 1.25,
   TEMPER_CROSSED: 0.5,
+  // Weddings (citizens.weddings, SPEC §7.2; the owner, 2026-09-07).
+  WED_P: 1 / 12,            // a single courts once a year on average, within REHOME_RADIUS road tiles
+  WED_CROSS_P: 0.10,        // one courtship in ten looks across the predator line — "about as rare as gay villagers"
+  WED_COMPANIONS_P: 0.10,   // one couple in ten are companions and keep no litter — the owner's "10% gay", with no sex in the sim
   ADULT_AGE: 16,
   FRIEND_SAMPLES: 200,
   FRIEND_P: 0.05,
@@ -388,7 +392,7 @@ export const RULES = Object.freeze([
   },
   {
     id: "U1", title: "Use-zoning: the player's line admits",
-    formula: `Use is a checkbox mask on lots and roads: predator, prey, ${USE_SPECIES.join(", ")}; no checks is mixed and admits all, otherwise an animal is admitted when it matches ANY checked group or species — a GATE on homes and jobs; a repainted household has 3 months to rehome or leaves; a forbidden road step costs ×6 in the commute search`,
+    formula: `Use is a checkbox mask on lots and roads: predator, prey, ${USE_SPECIES.join(", ")}; no checks is mixed and admits all, otherwise an animal is admitted when it matches ANY checked group or species — a GATE on homes and jobs; a household with a member the lot no longer admits (a wedding can put two species under one roof) has 3 months to rehome, to a lot admitting every one of them, or leaves; a forbidden road step costs ×6 in the commute search`,
     live: (w) => { const by = w.last.census.useSpecies || {}; const one = Object.values(by).reduce((n, v) => n + (v || 0), 0); const kinds = Object.values(by).filter(Boolean).length; return `${w.last.census.usePred || 0} predator checks · ${w.last.census.usePrey || 0} prey checks · ${one} species checks (${kinds} kind${kinds === 1 ? "" : "s"})${w.last.zonedOut ? ` · ${w.last.zonedOut} zoned out last month` : ""}`; },
   },
   {
@@ -478,8 +482,13 @@ export const RULES = Object.freeze([
   },
   {
     id: "C3", title: "Live and grow together",
-    formula: "friendships form at work, next door and in parks (p = 0.05·affinity; predator–prey pairs 0.4, 0.7 if the predator is fixed) ; H = cross-species share, a predator–prey friendship counts twice — ONCE if the predator is fixed (the knife buys quiet, not the index) ; a funeral befriends the mourners",
+    formula: "friendships form at work, next door and in parks (p = 0.05·affinity·temperament; predator–prey pairs 0.4, 0.7 if the predator is fixed; the twelve temperaments kindred ×1.5, alike ×1.25, crossed ×0.5) ; H = cross-species share, a predator–prey friendship counts twice — ONCE if the predator is fixed (the knife buys quiet, not the index) ; a funeral befriends the mourners",
     live: (w) => `${w.last.census.friendships} friendships · ${w.last.census.predPrey} predator–prey · Zoo City index ${f2(w.last.census.H)} · approval ${Math.round(w.last.census.approval)}`,
+  },
+  {
+    id: "C4", title: "Weddings: a single courts within twelve road tiles",
+    formula: "a single (the only adult at home) courts at 1/12 a month within 12 road tiles: 1 in 10 looks across the predator line, else its own species, else anyone but predator and prey; the twelve temperaments weigh the choice (kindred ×1.5, alike ×1.25, crossed ×0.5); the lot with room hosts the other household; 1 couple in 10 are companions and keep no litter ; a FULL home breeds at ×0.25 and goes over capacity — the push toward a storey",
+    live: (w) => { const hhs = w.households.filter((h) => !h.gone); const mixed = hhs.filter((h) => new Set(h.members.map((id) => w.byId.get(id)?.species).filter(Boolean)).size > 1).length; return `${w.last.weddings || 0} wedding${w.last.weddings === 1 ? "" : "s"} last tick · ${hhs.filter((h) => h.companions).length} companion households · ${mixed} mixed households`; },
   },
   {
     id: "C4", title: "Prey flight",

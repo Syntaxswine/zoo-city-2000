@@ -8,7 +8,8 @@
 
 import { addCamp } from "./camps.js";
 import { KNOBS } from "./rules.js";
-import { SPECIES, SPECIES_BY_ID, NAME_PARTS, affinity, ARRIVING, PREY_OF, DIET_OF, isPredatorOf, admits } from "./species.js";
+import { SPECIES, SPECIES_BY_ID, NAME_PARTS, affinity, ARRIVING, PREY_OF, DIET_OF, isPredatorOf, isPredPrey, admits } from "./species.js";
+import { temperOf, compat } from "./temper.js";
 import { ZONE, CIVIC, TERRAIN, ROAD, idx, inBounds, capacityOf, jobsOf, jobZone, absent, civicAnchorOf } from "./world.js";
 import { useName } from "./use.js";
 import { doorsOf, edgeRoads, commutePath, dial, WALK, nodePath, commuteTime } from "./fields.js";
@@ -309,10 +310,24 @@ function vacantLots(world, species, size, allowed = null) {
   for (let i = 0; i < n; i++) {
     if (world.zone[i] !== ZONE.R || world.tier[i] === 0) continue;
     if (allowed && !allowed.has(i)) continue;
-    if (!admits(world.use[i], species)) continue; // the player's line — a gate, on purpose
+    if (!(Array.isArray(species) ? species.every((s) => admits(world.use[i], s)) : admits(world.use[i], species))) continue; // the player's line — a gate, on purpose, for EVERY species under the roof
     if (world.mansion[i] && world.occupants[i] > 0) continue; // a MANSION (SPEC §9f) holds ONE household: the next family waits for it to empty
     if (capacityOf(world, i) - world.occupants[i] >= size) out.push(i);
   }
+  return out;
+}
+
+/**
+ * The species a household holds, its label first — a wedding (SPEC §7.2) can put two under one
+ * roof, and every gate that asks "does this lot admit them" (the player's line, SPEC §7.8) must
+ * ask for ALL of them: bestHome takes the list and admits a lot only when it admits every one.
+ */
+export function householdSpecies(world, hh) {
+  const out = [];
+  for (const id of hh.members) { const c = world.byId.get(id); if (c && !c.dead && !out.includes(c.species)) out.push(c.species); }
+  if (!out.length) out.push(hh.species);
+  const k = out.indexOf(hh.species);
+  if (k > 0) { out.splice(k, 1); out.unshift(hh.species); }
   return out;
 }
 
@@ -320,7 +335,7 @@ function bestHome(world, species, size, strict, allowed = null) {
   let best = -1;
   let bestS = -Infinity;
   for (const i of vacantLots(world, species, size, allowed)) {
-    const s = homeScore(world, species, i, strict);
+    const s = homeScore(world, Array.isArray(species) ? species[0] : species, i, strict); // scored by the household's label; admitted for all (vacantLots)
     if (s > bestS) { bestS = s; best = i; }
   }
   return best;
@@ -388,6 +403,105 @@ function lotsWithinRoad(world, fromLot, maxRoad) {
   return set;
 }
 
+/**
+ * A WEDDING'S MOVE (SPEC §7.2, the owner 2026-09-07): every member of `guest` moves into `host`'s
+ * home and household the way placeHousehold moves a family — occupants, household ids, a stale
+ * commute for anyone with a job, a MOVED chapter — and the guest household is gone. The host keeps
+ * its surname (the cubs to come take it) and its species label. Returns false, touching nothing,
+ * when the host's lot has no room. A household with a member in a pen is never a guest (the pen
+ * keeps a return address): weddings() never offers one.
+ */
+export function joinHousehold(world, guest, host) {
+  const present = guest.members.filter((id) => { const c = world.byId.get(id); return c && !c.dead; });
+  if (capacityOf(world, host.home) - world.occupants[host.home] < present.length) return false;
+  // The player's line (SPEC §7.8) is a gate on homes: nobody marries onto a lot that does not admit it.
+  for (const id of present) if (!admits(world.use[host.home], world.byId.get(id).species)) return false;
+  for (const id of present) {
+    const c = world.byId.get(id);
+    if (c.home >= 0) world.occupants[c.home]--;
+    c.home = host.home;
+    c.household = host.id;
+    world.occupants[host.home]++;
+    host.members.push(id);
+    if (c.job >= 0) { c.path = null; c.stale = true; }
+    remember(world, c, KIND.MOVED, host.home);
+  }
+  guest.members = [];
+  guest.gone = true;
+  world.hhById.delete(guest.id);
+  world.campers = world.campers.filter((cp) => cp.householdId !== guest.id);
+  world._removed = (world._removed || 0) + 1;
+  return true;
+}
+
+/**
+ * WEDDINGS (SPEC §7.2; the owner, 2026-09-07: "we need levers for both migration as well as
+ * population growth"). A SINGLE — the only present adult of a housed household with nobody in a
+ * pen — courts at WED_P a month within REHOME_RADIUS road tiles, the reach a cub uses to find its
+ * first home. One courtship in WED_CROSS_P looks across the predator line ("about as rare as gay
+ * villagers"); otherwise its own species, or anyone but predator and prey when none is in reach.
+ * Among those the twelve temperaments weigh the choice (temper.js). Whichever lot has room hosts
+ * the other household; no room, no wedding. One couple in WED_COMPANIONS_P are companions and
+ * keep no litter. The two befriend and both get a WED chapter; story.js writes the line.
+ * Every draw is from world.rng in household order, and nothing draws where nothing can happen:
+ * fewer than two singles, no roll at all; nobody in reach, the courtship roll only; one
+ * candidate, no choice draw.
+ */
+function weddings(world, out) {
+  if (!(KNOBS.WED_P > 0)) return;
+  const rng = world.rng;
+  const singles = [];
+  for (const hh of world.households) {
+    if (hh.gone || hh.home < 0) continue;
+    let adult = null;
+    let adults = 0;
+    let penned = false;
+    for (const id of hh.members) {
+      const c = world.byId.get(id);
+      if (!c || c.dead) continue;
+      if (c.pen) { penned = true; break; }
+      if (absent(world, c)) continue;
+      if (ageYears(world, c) >= KNOBS.ADULT_AGE) { adults++; adult = c; }
+    }
+    if (penned || adults !== 1) continue;
+    singles.push({ c: adult, hh });
+  }
+  if (singles.length < 2) return;
+  const taken = new Set();
+  for (const s of singles) {
+    if (taken.has(s.hh.id)) continue;
+    if (!rng.chance(KNOBS.WED_P)) continue;
+    const allowed = lotsWithinRoad(world, s.hh.home, KNOBS.REHOME_RADIUS);
+    const near = singles.filter((o) => o !== s && !taken.has(o.hh.id) && allowed.has(o.hh.home));
+    if (!near.length) continue;
+    const cross = rng.chance(KNOBS.WED_CROSS_P);
+    let pool = cross ? near.filter((o) => isPredPrey(s.c.species, o.c.species)) : [];
+    if (!pool.length) pool = near.filter((o) => o.c.species === s.c.species);
+    if (!pool.length) pool = near.filter((o) => !isPredPrey(s.c.species, o.c.species));
+    if (!pool.length) continue;
+    let o = pool[0];
+    if (pool.length > 1) {
+      const ts = temperOf(s.c);
+      let total = 0;
+      const weights = pool.map((cand) => { const wgt = compat(ts, temperOf(cand.c)); total += wgt; return wgt; });
+      if (total > 0) {
+        let r = rng.next() * total;
+        o = pool[pool.length - 1];
+        for (let k = 0; k < pool.length; k++) { r -= weights[k]; if (r <= 0) { o = pool[k]; break; } }
+      }
+    }
+    const host = joinHousehold(world, s.hh, o.hh) ? o.hh : joinHousehold(world, o.hh, s.hh) ? s.hh : null;
+    if (!host) continue;
+    host.companions = rng.chance(KNOBS.WED_COMPANIONS_P);
+    taken.add(s.hh.id);
+    taken.add(o.hh.id);
+    befriend(world, s.c, o.c, out);
+    remember(world, s.c, KIND.WED, o.c.id);
+    remember(world, o.c, KIND.WED, s.c.id);
+    out.weddings++;
+  }
+}
+
 /** R decay: displaced households seek another home, then a campsite. */
 export function evictFromLot(world, i, newCap) {
   if (world.occupants[i] <= newCap) return;
@@ -407,7 +521,7 @@ export function evictFromLot(world, i, newCap) {
     }
     moving.home = -1;
     if (!allowed) allowed = lotsWithinRoad(world, i, KNOBS.REHOME_RADIUS);
-    const to = bestHome(world, moving.species, moving.members.length, false, allowed);
+    const to = bestHome(world, householdSpecies(world, moving), moving.members.length, false, allowed);
     if (to >= 0) { placeHousehold(world, moving, to); if (to !== i) for (const id of moving.members) remember(world, world.byId.get(id), KIND.MOVED, to); }
     else if (!startCamping(world, moving)) removeHousehold(world, moving, "evicted", i);
   }
@@ -431,7 +545,7 @@ export function displaceFrom(world, tiles, keep) {
     moving.home = -1;
     if (!allowed) { allowed = lotsWithinRoad(world, tiles[0], KNOBS.REHOME_RADIUS); for (const j of tiles) allowed.delete(j); }
     displaced += moving.members.length;
-    const to = bestHome(world, moving.species, moving.members.length, false, allowed);
+    const to = bestHome(world, householdSpecies(world, moving), moving.members.length, false, allowed);
     if (to >= 0) { placeHousehold(world, moving, to); for (const id of moving.members) remember(world, world.byId.get(id), KIND.MOVED, to); }
     else if (!startCamping(world, moving)) removeHousehold(world, moving, "displaced", from);
   }
@@ -462,7 +576,7 @@ export function clearLot(world, i) {
       world.occupants[i]--;
     }
     moving.home = -1;
-    const to = bestHome(world, moving.species, moving.members.length, false);
+    const to = bestHome(world, householdSpecies(world, moving), moving.members.length, false);
     if (to >= 0) { placeHousehold(world, moving, to); for (const id of moving.members) remember(world, world.byId.get(id), KIND.MOVED, to); }
     else removeHousehold(world, moving, "bulldozed", i);
   }
@@ -579,7 +693,7 @@ export function rehouseCampers(world) {
     const hh = world.hhById.get(cp.householdId);
     if (!hh || hh.gone || !hh.members.length) return false;
     if (world.valves.R <= 0) return true;
-    const lot = bestHome(world, hh.species, hh.members.length, false);
+    const lot = bestHome(world, householdSpecies(world, hh), hh.members.length, false);
     if (lot < 0) return true;
     placeHousehold(world, hh, lot);
     for (const id of hh.members) remember(world, world.byId.get(id), KIND.MOVED, lot);
@@ -590,7 +704,7 @@ export function rehouseCampers(world) {
 }
 
 export function citizensTick(world, cen, dem) {
-  const out = { arrived: 0, left: 0, births: 0, deaths: 0, notices: [], meetings: [], funerals: 0, littersLost: 0, rehomed: 0, zonedOut: 0, zonedOutLines: [] };
+  const out = { arrived: 0, left: 0, births: 0, weddings: 0, deaths: 0, notices: [], meetings: [], funerals: 0, littersLost: 0, rehomed: 0, zonedOut: 0, zonedOutLines: [] };
   const rng = world.rng;
   const tick = world.tick;
   world.meetings = out.meetings;
@@ -606,7 +720,7 @@ export function citizensTick(world, cen, dem) {
     if (!moving) continue;
     for (const id of moving.members) { const c = world.byId.get(id); c.home = -1; world.occupants[i]--; }
     moving.home = -1;
-    const to = bestHome(world, moving.species, moving.members.length, false);
+    const to = bestHome(world, householdSpecies(world, moving), moving.members.length, false);
     if (to >= 0) { placeHousehold(world, moving, to); for (const id of moving.members) remember(world, world.byId.get(id), KIND.MOVED, to); }
     else removeHousehold(world, moving, "homeless", i);
   }
@@ -617,7 +731,7 @@ export function citizensTick(world, cen, dem) {
   //     the month of the click, so a misclick and Z cost nothing.
   for (const hh of world.households) {
     if (hh.gone || hh.home < 0) continue;
-    if (admits(world.use[hh.home], hh.species)) { hh.notice = 0; continue; }
+    if (householdSpecies(world, hh).every((s) => admits(world.use[hh.home], s))) { hh.notice = 0; continue; } // every species under the roof (a wedding can mix two)
     if (!hh.members.some((id) => { const c = world.byId.get(id); return c && !c.dead && !c.pen; })) { hh.notice = 0; continue; }
     hh.notice = (hh.notice || 0) + 1;
     if (hh.notice < KNOBS.ZONED_OUT_MONTHS) continue;
@@ -629,7 +743,7 @@ export function citizensTick(world, cen, dem) {
     allowed.delete(from);
     for (const id of moving.members) { const c = world.byId.get(id); c.home = -1; world.occupants[from]--; }
     moving.home = -1;
-    const to = bestHome(world, moving.species, moving.members.length, false, allowed);
+    const to = bestHome(world, householdSpecies(world, moving), moving.members.length, false, allowed);
     if (to >= 0) { placeHousehold(world, moving, to); for (const id of moving.members) remember(world, world.byId.get(id), KIND.MOVED, to); out.rehomed++; moving.notice = 0; }
     else {
       const n = moving.members.length;
@@ -693,8 +807,13 @@ export function citizensTick(world, cen, dem) {
   const birthMult = world.events.active.reduce((m, e) => m * (e.birthMult || 1), 1);
   for (const hh of world.households) {
     if (hh.gone || hh.home < 0) continue;
+    if (hh.companions) continue; // companions keep no litter (SPEC §7.2: one wedding in ten — the owner's "10% gay")
     const cap = capacityOf(world, hh.home);
-    if (world.occupants[hh.home] >= cap) continue;
+    // A FULL home breeds at BIRTH_FULL_MULT and goes OVER capacity — the SPEC's crowding push toward a
+    // storey (a fill above 1 satisfies FILL_TO_GROW), promised in §7.2 and unwired until the owner's
+    // word on 2026-09-07. Nothing else lets occupants pass capacity; vacantR counts only true headroom.
+    const full = world.occupants[hh.home] >= cap;
+    if (full && !(KNOBS.BIRTH_FULL_MULT > 0)) continue; // at ×0 a full home draws NOTHING — the pre-2026-09-07 rule exactly (nothing draws where nothing can happen), so --set BIRTH_FULL_MULT=0 is the old sim to the byte
     let fertile = 0;
     let litter = 0;
     let parentSpecies = null;
@@ -714,7 +833,7 @@ export function citizensTick(world, cen, dem) {
       }
     }
     if (fertile < 2) { if (fertileAge >= 2) out.littersLost++; continue; }
-    const p = ((litter / fertile) / KNOBS.BIRTH_DIV) * birthMult;
+    const p = ((litter / fertile) / KNOBS.BIRTH_DIV) * birthMult * (full ? KNOBS.BIRTH_FULL_MULT : 1);
     if (rng.chance(p)) {
       const cub = newCitizen(world, parentSpecies, 0, hh.id, hh.surname, true);
       cub.home = hh.home;
@@ -727,6 +846,9 @@ export function citizensTick(world, cen, dem) {
       out.births++;
     }
   }
+
+  // 3a. Weddings (SPEC §7.2): a single adult courts within REHOME_RADIUS road tiles; the lot with room hosts.
+  weddings(world, out);
 
   // 3b. The smell: a herbivore household inside a meat hall's dread may move
   //     along the road (LEAVE never fires at V_R > 0 — measured 0/360 ticks —
@@ -743,7 +865,7 @@ export function citizensTick(world, cen, dem) {
     allowed.delete(from);
     for (const id of moving.members) { const c = world.byId.get(id); c.home = -1; world.occupants[from]--; }
     moving.home = -1;
-    const to = bestHome(world, moving.species, moving.members.length, false, allowed);
+    const to = bestHome(world, householdSpecies(world, moving), moving.members.length, false, allowed);
     if (to >= 0 && world.dread[to] < world.dread[from]) { placeHousehold(world, moving, to); for (const id of moving.members) remember(world, world.byId.get(id), KIND.MOVED, to); out.rehomed++; }
     else placeHousehold(world, moving, from);
   }
@@ -871,8 +993,9 @@ export function holdFuneral(world, mourners, out) {
 
 /** Affinity for a pair: a fixed predator is no longer wary company for its prey (0.7, not 0.4). */
 function pairAffinity(a, b) {
-  if ((isPredatorOf(a.species, b.species) && a.fixed) || (isPredatorOf(b.species, a.species) && b.fixed)) return KNOBS.FIXED_AFFINITY;
-  return affinity(a.species, b.species);
+  const temper = compat(temperOf(a), temperOf(b)); // the twelve temperaments (SPEC §7.11): kindred ×1.5, alike ×1.25, crossed ×0.5
+  if ((isPredatorOf(a.species, b.species) && a.fixed) || (isPredatorOf(b.species, a.species) && b.fixed)) return KNOBS.FIXED_AFFINITY * temper;
+  return affinity(a.species, b.species) * temper;
 }
 
 function befriend(world, a, b, out) {

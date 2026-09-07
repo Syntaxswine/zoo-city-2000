@@ -28,6 +28,10 @@
 // "Single" = a housed household with exactly ONE present adult, who is inside its species' fertile
 // window (a widowed parent with cubs counts; the partner joins the cubs). Fixed animals court like
 // anyone — the sim's littersLost then measures pacification's bite directly.
+//
+// SINCE 2026-09-07 THE SIM MARRIES ON ITS OWN (citizens.weddings, SPEC §7.2): --rule none is the
+// town as it runs, its weddings counted from world.last.weddings; the shadow rules zero WED_P so
+// the old comparison still means what it did. --set WED_P=0 runs the town with no weddings at all.
 import { createWorld, absent, capacityOf } from "../js/sim/world.js";
 import { createMayor } from "./mayor.mjs";
 import { tick } from "../js/sim/tick.js";
@@ -55,6 +59,7 @@ const markets = Number(arg("--markets", 0));
 // --set KEY=VALUE (repeatable): override a KNOB before the run — the A/B switch for a rule that
 // lives in the sim (e.g. --set WED_P=0 runs the town with the sim's own weddings off).
 for (let k = 0; k < args.length; k++) if (args[k] === "--set" && args[k + 1]) { const [key, v] = args[k + 1].split("="); if (!(key in KNOBS)) { console.log(`--set ${key}: no such knob`); process.exit(2); } KNOBS[key] = Number(v); }
+if (rule !== "none") KNOBS.WED_P = 0; // a shadow rule stands in for the sim's own weddings
 if (!["none", "lot", "court"].includes(rule)) { console.log(`--rule ${rule}: none, lot or court`); process.exit(2); }
 if (!["any", "same", "prefer"].includes(pair)) { console.log(`--pair ${pair}: any, same or prefer`); process.exit(2); }
 
@@ -199,7 +204,7 @@ for (let t = 0; t < years * 12; t++) {
   dec.vr += world.valves.R; dec.vac += L.census.vacantR; dec.n++;
   const pool = singles();
   for (const s of pool) if (!eligibleSince.has(s.c.id)) eligibleSince.set(s.c.id, world.tick);
-  if (rule !== "none") dec.weddings += courtship(pool);
+  dec.weddings += rule === "none" ? (L.weddings || 0) : courtship(pool);
   if ((t + 1) % 120 === 0 || t + 1 === years * 12) snapshot();
 }
 
@@ -215,4 +220,5 @@ console.log("");
 const totals = rows.reduce((a, r) => ({ arrived: a.arrived + r.arrived, left: a.left + r.left, births: a.births + r.births, deaths: a.deaths + r.deaths, nativeParent: a.nativeParent + r.nativeParent }), { arrived: 0, left: 0, births: 0, deaths: 0, nativeParent: 0 });
 console.log(`  state hash ${stateHash(world)} — the same rig, the same knobs, the same hash (a --set that changes nothing changes nothing)`);
 console.log(`  ${years} years: arrived ${totals.arrived} · left ${totals.left} · born ${totals.births} (${totals.nativeParent} with a town-born parent) · died ${totals.deaths} · P ${cen.P}, ${Math.round(100 * cen.native)}% town-born · deepest generation ${deepest}`);
+{ const hhs = world.households.filter((h) => !h.gone); const mixed = hhs.filter((h) => new Set(h.members.map((id) => world.byId.get(id)?.species).filter(Boolean)).size > 1).length; console.log(`  households ${hhs.length}: companions ${hhs.filter((h) => h.companions).length} · mixed-species ${mixed} · weddings by the sim's own rule over the run ${rows.reduce((a, r) => a + (rule === "none" ? r.weddings : 0), 0)} (WED_P ${KNOBS.WED_P.toFixed(3)}, cross ${KNOBS.WED_CROSS_P}, companions ${KNOBS.WED_COMPANIONS_P})`); }
 if (rule !== "none") console.log(`  weddings ${weddings.total}: same species ${weddings.same}, cross-species ${weddings.cross}; ${weddings.native} with a town-born partner (${weddings.bothNative} both); mean wait while single ${weddings.total ? (weddings.waitSum / (2 * weddings.total)).toFixed(1) : "—"} months`);

@@ -28,6 +28,7 @@ export const KIND = Object.freeze({
   ZONED_OUT: 15,
   LOST_CHILD: 16,
   BURGLED: 17,
+  WED: 18, // SPEC §7.2 (2026-09-07): the arg is the partner's id; one chapter on each
 });
 
 const KIND_IDS = new Set(Object.values(KIND));
@@ -88,6 +89,7 @@ export function lifeLines(world, c) {
       case KIND.ZONED_OUT: lines.push(`Zoned out of ${lotNow(world, arg)} in ${year}.`); break;
       case KIND.LOST_CHILD: lines.push(`Lost ${nameById(world, arg)} to the market in ${year}.`); break;
       case KIND.BURGLED: lines.push(`Burgled at ${lotNow(world, arg)} in ${year}.`); break;
+      case KIND.WED: lines.push(`Married ${nameById(world, arg)} in ${year}.`); break;
     }
   }
   return lines;

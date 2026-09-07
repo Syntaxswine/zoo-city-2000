@@ -412,7 +412,7 @@ function buyPens(world) {
   for (const hh of world.households) {
     if (hh.gone || hh.home < 0 || !["pig", "cow"].includes(hh.species)) continue;
     if (world.occupants[hh.home] < capacityOf(world, hh.home)) continue;
-    const cubs = hh.members.map((id) => world.byId.get(id)).filter((c) => c && !c.dead && !c.pen && !absent(world, c) && ageYears(world, c) < KNOBS.ADULT_AGE)
+    const cubs = hh.members.map((id) => world.byId.get(id)).filter((c) => c && !c.dead && !c.pen && !absent(world, c) && ageYears(world, c) < KNOBS.ADULT_AGE && ["pig", "cow"].includes(c.species)) // livestock only: a wedding (SPEC §7.2) can put a cat cub under a pig roof
       .sort((a, b) => ageYears(world, b) - ageYears(world, a) || a.id - b.id);
     if (!cubs.length) continue;
     const route = hallReach(world, hh.home, KNOBS.MEAT_ROAD, { penSpace: true });
