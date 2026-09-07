@@ -243,7 +243,7 @@ roadDist(i) = BFS distance (4-neighbour, through any tile) to the nearest road/b
 served(i)   = min roadDist over the SITE's footprint <= 3          §6c — one standard, for every rule that asks
 local_R = clamp((LV − Pol − 40) / LOCAL_SCALE, −0.3, 0.3)        LOCAL_SCALE = 200 (pre-registered knob; D0 used 60, judged too wide)
           growth REFUSED if Pol > 60                               (Micropolis DoResIn at 0..100 scale)
-local_C = 0.6·clamp(Rnear/80 − 0.5, −0.3, 0.3) + 0.4·(LV − 50)/200    Rnear = citizens housed within Chebyshev 5
+local_C = 0.6·clamp((Rnear + Rrail)/80 − 0.5, −0.3, 0.3) + 0.4·(LV − 50)/200    Rnear = citizens housed within Chebyshev 5
 local_I = 0.4·(50 − LV)/200                                        industry likes cheap land (SC2000's tier-3 frontage rule is GONE — §6c)
 score   = V_zone + local ;  if !served → score = −1 (reason NO_ROAD)
 maxTierByLV: R and C: LV < 30 → 1, < 60 → 2, else 3 ; I: 3.  Effective max = min(maxTierByLV, lot.maxTier)
@@ -261,6 +261,17 @@ SPLIT a block whose anchor would DECAY comes apart into tier-3 lots of its own; 
 LANDMARK (§3c, landmarks.js): when a 3×3 forms, the largest kin group among those now on its anchor (residents
       for R, staff for C/I) sets theme[anchor] once — kept until SPLIT — no roll, no RNG, no effect but the name and the picture.
 ```
+
+Commercial rail customers (`Rrail`) use the same shortest road/station/rail
+routes and species use-zone costs as commuters. Each resident outside the local
+five-tile catchment contributes `0.04 × (1 − journey/24)`, provided their shortest
+route includes a train and takes less than 24 equivalent walking steps. The
+total rail contribution is capped at 80 effective customers. Block residents
+are spread across their footprint; the nearby fraction is never counted twice.
+These are potential shoppers, not extra jobs or animated trips. The inspector
+shows local and weighted rail customers separately. This derived field is rebuilt
+after population or map fields refresh and is not saved.
+
 Reason codes returned by `lotScore()` (priority order): `PART` (a block's
 part — the report is the anchor's), `NO_ROAD`, `SMOG`, `NO_DEMAND`,
 `LV_CAP`, `DENSITY_CAP`, `WAITING_FILL`, `CAPPED` (V_R pinned by Cap),

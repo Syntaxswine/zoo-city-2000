@@ -6,12 +6,13 @@
 
 import { buildingMark } from "./building-marks.js";
 import { KNOBS } from "./rules.js";
-import { ZONE, CIVIC, idx, inBounds, capacityOf, jobsOf, isPart, civicAnchorOf, civicSideOf, anchorOf, footprintOf, sideOf, occAt, carnAtOf } from "./world.js";
+import { ZONE, CIVIC, idx, inBounds, capacityOf, jobsOf, isPart, civicAnchorOf, civicSideOf, anchorOf, footprintOf, sideOf, carnAtOf } from "./world.js";
 import { served, siteRoadDist, doorsOf, nearestRoad } from "./fields.js";
 import { evictFromLot, fireFromLot } from "./citizens.js";
 import { mergeWindow, windowFill, mergeLots, splitLot } from "./blocks.js";
 import { landmarkOf, landmarkLine } from "./landmarks.js";
 import { shopOf } from "./shops.js";
+import { commercialCustomers } from "./commercial-customers.js";
 import { attainableClass, estateName, mansionWindow, raiseMansion, mansionLine } from "./wealth.js";
 
 const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
@@ -36,24 +37,6 @@ export const REASON = Object.freeze({
   MANSION: "a mansion — one household of the affluent; it neither grows nor decays",
   MANSION_RISING: "a mansion is rising — the address is affluent",
 });
-
-/** Citizens housed within Chebyshev 5 (shops want customers); a block's are spread over its footprint. */
-function residentsNear(world, i, r = 5) {
-  const { w } = world;
-  const tx = i % w;
-  const ty = (i / w) | 0;
-  let sum = 0;
-  for (let dy = -r; dy <= r; dy++) {
-    for (let dx = -r; dx <= r; dx++) {
-      const xx = tx + dx;
-      const yy = ty + dy;
-      if (!inBounds(world, xx, yy)) continue;
-      const j = yy * w + xx;
-      if (world.zone[j] === ZONE.R) sum += occAt(world, j);
-    }
-  }
-  return sum;
-}
 
 /** Carnivores housed within Chebyshev r (a meat hall's customers); a block's are spread over its footprint. */
 function carnivoresNear(world, i, r = 5) {
@@ -121,7 +104,8 @@ export function lotScore(world, i) {
     local = clamp((lv - pol - 40) / KNOBS.LOCAL_SCALE, -KNOBS.LOCAL_CLAMP, KNOBS.LOCAL_CLAMP);
     smog = pol > KNOBS.SMOG_REFUSE;
   } else if (z === ZONE.C) {
-    local = 0.6 * clamp(residentsNear(world, i) / 80 - 0.5, -KNOBS.LOCAL_CLAMP, KNOBS.LOCAL_CLAMP) + 0.4 * ((lv - 50) / KNOBS.LOCAL_SCALE);
+    out.customers = commercialCustomers(world, i);
+    local = 0.6 * clamp(out.customers.total / 80 - 0.5, -KNOBS.LOCAL_CLAMP, KNOBS.LOCAL_CLAMP) + 0.4 * ((lv - 50) / KNOBS.LOCAL_SCALE);
     if (world.crime[i] > KNOBS.CRIME_HIGH) local -= KNOBS.CRIME_C_PENALTY; // shops need safe streets
   } else if (z === ZONE.M) {
     // A hall wants carnivores near and cheap ground; a grey market minds no crime.

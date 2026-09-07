@@ -117,6 +117,9 @@ export const KNOBS = {
   LV_LARGE_PARK_RADIUS: 5,  // from every tile of the park (reach.forEachWithinAll); the centre's van shadow the same
   LV_POL: 0.6,
   COMMUTE_MAX: 40,
+  C_SHOP_TRAVEL: 24,        // shopping journey budget, in equivalent walking steps
+  C_RAIL_CUSTOMER_WEIGHT: 0.04, // distant shoppers visit less often; fades to zero at the budget
+  C_RAIL_CUSTOMER_CAP: 80,  // effective customers, before the existing local-score clamp
   // citizens
   ARRIVE_GAIN: 0.10,
   ARRIVE_DIV: 3,
@@ -414,7 +417,7 @@ export const RULES = Object.freeze([
   },
   {
     id: "G2", title: "Local score: land value minus smog",
-    formula: "local_R = clamp((LV − Pol − 40)/200, ±0.3), refused if Pol > 60 ; local_C = 0.6·(customers) + 0.4·(LV−50)/200 ; local_I = 0.4·(50−LV)/200",
+    formula: "local_R = clamp((LV − Pol − 40)/200, ±0.3), refused if Pol > 60 ; local_C = 0.6·clamp(customers/80 − 0.5, ±0.3) + 0.4·(LV−50)/200 ; customers = residents within 5 tiles + rail visitors (4% of distant residents, fading to zero over 24 walking-equivalent steps; at most 80 extra). Only actual train routes count; nearby residents count once. local_I = 0.4·(50−LV)/200",
     live: (w) => `mean LV ${f1(w.last.census.meanLV)} · mean Pol ${f1(w.last.census.meanPol)}`,
   },
   {

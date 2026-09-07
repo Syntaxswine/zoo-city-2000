@@ -520,6 +520,7 @@ export function createUI(app) {
       const ls = Math.round((tot - vs) * 100) / 100;
       const parts = s.access ? `V_${ZONE_NAME[rep.zone]} ${f2(vs)} + local ${f2(ls)} = ${f2(tot)}` : "no road access → score −1";
       lines.push(el("div", "", `${arrow} ${s.reason} (${parts}${p})`));
+      if (s.customers) lines.push(el("div", "dim", `customer support: ${s.customers.local.toFixed(1)} nearby + ${s.customers.rail.toFixed(1)} by rail (weighted for journey time)`));
       // The block it could join (SPEC §3b): what it is waiting for, from the same window the rule reads.
       if (s.window && s.reason !== REASON.MERGING) lines.push(el("div", "dim", `a ${s.window.side}×${s.window.side} block forms here when its ${s.window.side * s.window.side} lots are ${Math.round(KNOBS.FILL_TO_GROW * 100)}% full together — now ${Math.round(s.window.fill * 100)}%${s.score > KNOBS.GROW_THRESH ? "" : " — and demand is positive"}`));
       else if (s.merge) lines.push(el("div", "dim", `joining ${s.merge.side * s.merge.side} lots into one ${s.merge.side}×${s.merge.side} building holding ×${KNOBS.BIG_BONUS} what they hold`));

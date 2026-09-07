@@ -591,6 +591,7 @@ export function computeCrime(world) {
 
 /** Everything derived from tiles + citizens, in order. */
 export function computeFields(world) {
+  world._commercialEpoch = (world._commercialEpoch || 0) + 1;
   if (world.wallsDirty) computeOcclusion(world);
   if (world.roadsDirty) computeRoadDist(world);
   computeStationDoors(world);
@@ -606,6 +607,7 @@ export function computeFields(world) {
 
 /** Recount occupants and staff from the citizen list (derived, never saved). */
 export function recountRosters(world) {
+  world._commercialEpoch = (world._commercialEpoch || 0) + 1;
   world.occupants.fill(0);
   world.staff.fill(0);
   world.carnAt.fill(0);
