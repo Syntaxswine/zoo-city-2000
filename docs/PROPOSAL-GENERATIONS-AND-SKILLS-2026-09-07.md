@@ -38,6 +38,16 @@ household-merge rule — now the prerequisite of this whole arc).
    commercial, industrial, meat, police fire, health sanitation, library,
    gallery. cemetery has no workers and is a city wide item like zoos and
    pacification."*
+5. On being told the town's own children never have children: *"you are
+   correct. right now any change in population comes from migration. we need
+   levers for both migration as well as population growth, the latter is
+   especially important because if there is no breeding then pacification is
+   mostly an empty threat."* and *"as far as the artists, and this goes for
+   police, firefighters, and educators, and other similar placed services, i am
+   ok with people traveling to work further than the range of the benefit of
+   the service. i'm even potentially ok with people commuting further than they
+   should to commercial, industrial, and meat jobs if the demand is high enough,
+   but that would need to be balanced very carefully"* (§8, §9).
 
 ## 1. The thesis
 
@@ -116,7 +126,8 @@ rule (BACKLOG L1, the wedding) is step zero of this arc.** Cheapest shape: a
 single adult who moves onto a lot holding another single fertile adult forms one
 household with them, any pairing that is not predator and prey; the wedding
 procession is the ticker moment; the litter's species is a random parent's, as
-today.
+today. §8 runs that shape and two others as a pass OUTSIDE the sim, for 60 and
+90 years, and recommends one.
 
 Once natives pair, generation time is set by the roster's fertile windows: mice,
 pigs and skunks ~20 years; cats, raccoons, rabbits 21–23; foxes, beavers, wolves
@@ -284,8 +295,13 @@ somebody walks to.
 
 ## 5. Open for the owner
 
-1. **The merge rule's shape** (§2c) — the prerequisite. Same-lot pairing of two
-   singles, or a partner who "sends for" one from outside, or both.
+1. **The merge rule's shape** (§2c; measured in §8) — the prerequisite. The
+   recommendation: courtship within 12 road tiles, the same species preferred
+   and anyone but predator and prey otherwise, a whole household moving to the
+   lot with room, p = 1/12 a month. The owner's rulings: the pairing (same /
+   preferred / any — it decides whether a quarter of the town's households are
+   mixed, or seven in a hundred, or none), the wait, and whether a household
+   ever parts again.
 2. **The generation credit** — 24 months per practised generation, capped where?
    Uncapped, a fifth-generation mouse is master at birth; that may be the point.
 3. **University and Amphitheater** — their ranges are untouched (ruled). Do their
@@ -305,6 +321,19 @@ somebody walks to.
 8. **Commercial's reach** now that shops count rail customers within a 24-step
    budget: does a veteran crew widen the local five-tile count, the budget, or
    both?
+9. **The commute stretch** (§9) — "commuting further than they should … if the
+   demand is high enough": build it at all, given that no rig shows a worker
+   stranded beyond 40 steps of an open job? If so, keyed to which demand — the
+   R valve (jobs over workers, the labour shortage) or the zone's own unfilled
+   share — and with the +10 commute mood term as its price?
+10. **The children who leave** (§8) — the surplus of a breeding town emigrates
+    through FRICTION (a friendless household wanders off at 0.4% a month), 1,400
+    to 1,700 animals in sixty years. Keep it as the OUT lever it already is, or
+    damp it for natives (a town-born animal leaves its town less readily)?
+11. **The crowding push** (SPEC §7.2, corrected today) — the ×0.25 litter in a
+    full home that the SPEC promised was never wired (`BIRTH_FULL_MULT` is read
+    by nothing; a full home has no litter). Wire it, as the tier-up pressure it
+    was meant to be, or strike the knob?
 
 ## 6. Instruments (run from the repo root; all passive, exit 0)
 
@@ -312,11 +341,15 @@ somebody walks to.
 node tools/tenureprobe.mjs --layout estate --years 30      # tenure, bands, keeper succession, who lives with a veteran
 node tools/lineageprobe.mjs --layout estate --years 60     # the ratchet as a shadow ledger; natives-never-breed
 node tools/reachprobe.mjs --layout estate --platform 2     # walking tiles vs Chebyshev; rail free vs priced
+node tools/breedprobe.mjs --layout balanced --rule court   # the household-merge candidates as a pass OUTSIDE the sim; the population ledger by decade (§8)
+node tools/commuteprobe.mjs --layout estate --civics --at-centre  # commute vs the benefit radius and the species' preference; the jobless' nearest open job (§9)
 ```
 
 ## 7. Build order (a sketch, none of it opened)
 
-0. **The merge rule** (its own commit; moves every rig's hash: births change).
+0. **The merge rule**, the shape §8 recommends once the owner rules on the
+   pairing (its own commit; moves every rig's hash: births change;
+   `breedprobe --rule none` before and after is its measure).
 1. **The band as a READ** — card, census, ticker; `tick − hired`; hash-neutral.
 2. **Parents at birth + the family line on the card** (two ids, saved when present).
 3. **The keeper on the lot card + the succession line**; measure the cadence on
@@ -326,3 +359,184 @@ node tools/reachprobe.mjs --layout estate --platform 2     # walking tiles vs Ch
    commit.
 5. **The ratchet** (inheritance at birth), then the school as fidelity.
 6. Health, sanitation, cemetery — each its own proposal.
+
+## 8. Population: the two levers, measured (the owner's round 5)
+
+*"right now any change in population comes from migration."* The ledger agrees,
+and says something worse: the town's NATURAL change is negative. Sixty years of
+the mayor's town, today's rules (`tools/breedprobe.mjs --rule none`):
+
+| 60 years, today | balanced | estate |
+|---|---|---|
+| arrived − left | 5,395 − 2,244 = **+3,151** | 3,672 − 1,706 = **+1,966** |
+| born − died | 1,394 − 2,205 = **−811** | 1,315 − 1,594 = **−279** |
+| born with a town-born parent | 4 | 2 |
+| population; town-born | 2,318; 32% | 1,665; 35% |
+| singles (one fertile-aged adult alone) | 575, of whom **557 share a lot with another single** | 416, of whom 414 |
+
+The four and the two are the loophole, not a rule: a cub that found no home at
+sixteen stayed, and the birth rule counts any two fertile adults in a household
+— it bred with a parent. And the last row is the supply: nearly every single
+already lives on a lot with another single. Nothing is missing but the rule.
+
+### 8a. What exists today
+
+- **Migration IN.** `households/month = 0.10 · V_R · vacant homes / 3`, where
+  `V_R = (jobs + seed − workers) / workers` plus the tax term, capped at
+  `1 − P/Cap`; `Cap = 1200 + 150·parks + 500·large parks + festival + 600·K −
+  400·watched share, × (1 + 0.5·H)`. Species by what was built. So the
+  player's levers already are: zone jobs (the R valve is a labour shortage),
+  zone homes, the R rate, parks and large parks, festivals, libraries, the
+  friendships index — and cameras, downward.
+- **Migration OUT.** At `V_R ≤ 0` a household rolls `(0.06 unemployed | 0.015) ·
+  −V_R · (1 − 0.2·friends) · (1.5 − mood/100)` — and since the camping arc that
+  roll moves the family to a TENT, not out of town. The only true emigration is
+  FRICTION: a household whose adults are all friendless wanders off at 0.4% a
+  month, at any valve. The OUT lever is therefore friendship — parks,
+  workplaces, wakes.
+- **Growth.** `p = litter/96` a month for a household with two fertile,
+  unfixed, present adults and headroom in the lot. Arrival couples only, since
+  natives never pair. The SPEC's ×0.25 litter in a full home was never wired
+  (`BIRTH_FULL_MULT` is read by nothing; SPEC §7.2 corrected today), and the
+  "move-in at 16" the same section gestured at never existed. Downward: a fixed
+  animal has no litter, the hall sells, the killing kills.
+
+### 8b. The experiment: three shapes of the merge rule, as a pass outside the sim
+
+`breedprobe` runs the mayor's town and, between ticks, moves whole households
+the way `placeHousehold` would (occupants, household ids, a stale commute, a
+MOVED chapter) — the sim's own birth rule does the rest. Nothing in the sim
+changed. A "single" is a housed household with exactly one present adult inside
+its fertile window; a widowed parent with cubs counts, and the partner joins the
+cubs. Fixed animals court like anyone, so the sim's own `littersLost` measures
+pacification's bite.
+
+| balanced, 60 years | today | `lot` (pair on your own lot) | `court any` | `court same` | `court prefer` |
+|---|---|---|---|---|---|
+| weddings; same : cross-species | — | 998; 211 : 787 | 1,200; 224 : 976 | 1,239; all same | 1,247; 936 : 311 |
+| mean wait while single | — | 34 months | 18 | 19 | 14 |
+| born (with a town-born parent) | 1,394 (4) | 1,901 (598) | 2,035 (878) | 2,173 (835) | 2,141 (922) |
+| arrived; left | 5,395; 2,244 | 3,952; 1,718 | 3,318; 1,552 | 3,764; 1,759 | 3,188; 1,511 |
+| population; town-born | 2,318; 32% | 2,100; 53% | 1,865; 63% | 2,077; 58% | 1,913; 65% |
+| deepest generation | 2 (the loophole) | 4 | 3 | 4 | 4 |
+
+`court` looks within `REHOME_RADIUS` 12 road tiles (the reach a cub already
+uses to find its first home) and the courting single moves in with the nearest
+eligible single, or is moved in with, whichever lot has room; `prefer` takes the
+same species when one is in reach and anyone but predator and prey otherwise;
+every rule rolls p = 1/12 a month per single. The estate says the same (`court
+any`: born 2,006 with 858 town-born-parented, population 1,725 against 1,665,
+63% town-born, generation 4; `court prefer`: 1,912 / 802 / 1,708 / 63% / 4).
+At 90 years (`court any`, balanced): born 3,680 against arrived 3,690, 84%
+town-born, the fifth generation alive, arrivals down to 82 a decade.
+
+**What it says.**
+
+1. **Births rise by half and the ratchet turns.** 1,394 → 1,900–2,170 births;
+   town-born parents 4 → 600–920; generation 4 at sixty years, 5 at ninety —
+   the arithmetic of §2c (a mouse line turns three generations in sixty years).
+2. **The town does not get bigger. It gets born here.** Population moves by
+   −20% to +2% while arrivals fall by a thousand to two thousand: births take
+   the vacancies migrants would have taken, because arrivals are `V_R ×
+   vacancies` and `V_R` is jobs over workers. **Size is set by jobs and homes;
+   the merge rule sets WHO fills them.** That is the owner's two levers as the
+   sim already draws them: migration and growth pull on the same rope, and the
+   rope is the R valve.
+3. **The pairing rule is the town's face, not its size.** Under `any`, 80% of
+   weddings are cross-species — a hawk and a cat, a pig and a mouse — because
+   the nearest single is usually another species; under `prefer` a quarter on
+   the balanced town and 7 in a hundred on the estate (where quarters are
+   species-sorted); under `same`, none. Births differ by under 10% between them.
+   The interspecies city is a ruling, not a parameter: q1.
+4. **The children leave.** `left` stays at 1,400–1,750 whatever the rule; at
+   ninety years the breeding town sheds 270 a decade against 82 arriving. That
+   is FRICTION — a town-born adult splits into a household of one at sixteen,
+   often friendless, and wanders off. It is the OUT lever working as written,
+   and it is the one that keeps a breeding town from bursting: q10.
+5. **The cheapest shape works.** `lot` — pair with a single already on your
+   lot, no search, no move — marries a thousand in sixty years, because 97% of
+   singles already have one there. It waits twice as long (34 months) and turns
+   the ratchet less (598 town-born-parented births against 878–922).
+6. **The loophole closes with the parent link.** Today's four births with a
+   town-born parent are cubs that stayed home and bred with a parent; §3a's two
+   parent ids on the cub let the merge rule and the birth rule refuse that.
+
+### 8c. Pacification, with teeth
+
+*"if there is no breeding then pacification is mostly an empty threat."* On the
+rig it is empty twice over: the centre's customers are murderers and second
+thieves, and the mayor's estate with a station and a centre fixes **three**
+animals in sixty years (litters lost: 10). What the rule gives each of those
+three is a LINE. The arithmetic per fixed animal, `(fertile end − age) × 12 ×
+litter/96` litters forgone: a wolf fixed at 25, 5.6; a cat at 18, 3.75; a fox at
+25, 3.75; a bear at 30, 1.9 — and its partner's as well, since a bitten
+household never pairs again, and under the ratchet every cub those litters would
+have had. With the collection controls that landed this morning (`93a502a`, the
+player orders a collection) pacification becomes a lever the player pulls, and
+the merge rule is what puts weight on it.
+
+### 8d. The shape recommended, and the levers it leaves the player
+
+Build `court prefer`: a single fertile-aged adult looks within 12 road tiles
+once a year on average, takes the nearest single of its own species, or anyone
+but predator and prey if none, and the household with room hosts the other;
+refuse a parent–child pair once the parent link exists; the wedding procession
+is the ticker's line and the funeral walk's cousin. Then the population levers
+read, honestly:
+
+| lever | up | down |
+|---|---|---|
+| jobs and homes (the R valve, the Cap) | migration AND growth — the rope | — |
+| the merge rule | who fills the homes: born here | — |
+| headroom (the tier of the home) | a litter needs a place | — |
+| friendship (parks, workplaces, wakes) | the children stay | friction: they leave |
+| the centre | — | a line ends |
+| the hall, the killing | — | an animal ends |
+| health (owed, §5 q6) | litters survive | — |
+
+## 9. The commute is not the benefit (the owner's round 5, second ruling)
+
+*"i am ok with people traveling to work further than the range of the benefit
+of the service."* That is the law already, and has been since the job search
+was written: a worker takes any open job within `COMMUTE_MAX` 40 walking steps
+(a ride step 2/9), scored `pref × 1/(1 + d/sp.commute) × noise` — the species'
+commute is a PREFERENCE (and +10 mood when met), never a gate, and nothing about
+hiring reads a station's radius or a campus's budget. Measured
+(`tools/commuteprobe.mjs`, thirty years, the probe paying for a full set of
+civics):
+
+| crew, balanced | n | steps median / p90 / max | live beyond the benefit radius | beyond own preference |
+|---|---|---|---|---|
+| police (Chebyshev 6) | 4 | 9 / 9 / 15 | 3 (75%) | 0 |
+| fire (6) | 4 | 7 / 13 / 13 | 2 (50%) | 0 |
+| library (5) | 4 | 9 / 11 / 13 | 4 (100%) | 0 |
+| gallery (5) | 4 | 6 / 17 / 18 | 3 (75%) | 0 |
+| university (a tile budget) | 11 | 8 / 21 / 21 | — | 0 |
+| amphitheater (a tile budget) | 8 | 5 / 11 / 11 | — | 0 |
+| zoo, centre (citywide) | 8, 4 | 3 / 4 / 8; 3 / 5 / 18 | — | 0 |
+| C (the shop's local 5) | 417 | 15 / 26 / 36 | 316 (76%) | 40 (10%) |
+| I | 887 | 7 / 24 / 37 | — | 93 (10%) |
+| M, two halls | 103 | 13 / 33 / 38 | — | 5 (5%) |
+
+The estate reads the same (library 75%, gallery 100%, C 82% beyond; I median 16
+steps, the quarters) with one line worth the whole table: **its hall hands are
+100% riders, 40 tiles from home, 27–30 steps of time** — rail already carries a
+commute across the map inside the 40-step budget, since a ride step costs 2/9.
+So under §3c the skill rule moves only the BENEFIT reach; a crew keeps hiring
+from forty steps, and an actor may live nowhere near the stage.
+
+*"commuting further than they should to commercial, industrial, and meat jobs
+if the demand is high enough … balanced very carefully."* The probe's other
+half asks what a longer budget would hire. On every rig at every sampled year
+the jobless are 0–34 and every one of them has an open job within 40 steps (the
+search hires 64 a month, so they are the queue), and every open lot has a
+jobless door within 40 where a jobless animal exists at all. **A stretch would
+hire nobody in the mayor's towns**; the towns are compact and rail does the
+stretching. It becomes a lever on a player's own layout — a dormitory quarter
+sixty steps from the mills — and the shape, if wanted, is the one the owner's
+sentence has: `budget = 40 × (1 + STRETCH × unfilled share of the zone)`,
+applied only when NO job sits inside the base budget (so a far job never
+outscores a near one), priced by the +10 commute mood term that already exists
+and by traffic. The gate before building it: the probe's jobless histogram on a
+real save must show a count beyond 40. Until it does, the knob is a promise
+with no consumer (q9).

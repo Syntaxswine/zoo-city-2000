@@ -580,11 +580,16 @@ Binsworth). The card says "the Burrowes family, 4 rabbits".
 - Households ARRIVE single-species, 2–4 citizens (2 adults + 0–2 children).
 - They leave together (emigration is per household, rolled once).
 - Births need 2 fertile adults in the household and headroom in the lot;
-  p = litter/96 per month, ×0.25 if the home is full (Caesar crowding push
-  toward a tier-up). Cub species = a random parent's species (mixed
-  households exist only via move-in at 16).
+  p = litter/96 per month. A FULL home has no litter: the ×0.25 crowding push
+  toward a tier-up that this line once promised was never wired (`KNOBS.BIRTH_FULL_MULT`
+  exists and nothing reads it — measured 2026-09-07; wire it or strike it is the
+  owner's call, docs/PROPOSAL-GENERATIONS-AND-SKILLS-2026-09-07.md §8). Cub species
+  = a random parent's species.
 - At 16 a child SPLITS into a new one-member household and looks for a home
-  within 12 road tiles; if none, stays (counted as an adult in W).
+  within 12 road tiles; if none, stays (counted as an adult in W). NOTHING MERGES
+  HOUSEHOLDS — the "move-in at 16" this section used to gesture at does not exist,
+  so mixed households never form and the town's own children never have children
+  (100% of native adults live alone at 60 years; the same proposal, §2c and §8).
 - **Removal rule (the dangling-id law):** when a citizen dies or emigrates, it
   is removed from every friend's `friends` list, from its household's
   `members`, from its lot's occupant count and its job's staff count, in the

@@ -3000,3 +3000,61 @@ its two checks read as they did. 924 checks; rigs byte-identical (balanced
 | lineage never turns twice, whatever the fidelity | not a knob: natives never pair (see above) |
 
 Maker's mark — Fable 5.1, session 19: the one who counted the generations and found one.
+
+## 37. Round five — the population levers and the commute ruling, measured (session 19, 2026-09-07, afternoon)
+
+**The owner's two rulings, verbatim in the proposal §0.** On the finding that
+the town's children never have children: *"right now any change in population
+comes from migration. we need levers for both migration as well as population
+growth, the latter is especially important because if there is no breeding
+then pacification is mostly an empty threat."* And on where a crew lives: *"i
+am ok with people traveling to work further than the range of the benefit of
+the service. i'm even potentially ok with people commuting further than they
+should to commercial, industrial, and meat jobs if the demand is high enough,
+but that would need to be balanced very carefully."*
+
+**Measured, not built** (proposal §8, §9; two new passive instruments).
+
+- `tools/breedprobe.mjs` runs the household-merge rule as a pass OUTSIDE the
+  sim — between ticks it moves whole households the way `placeHousehold` would
+  and lets the sim's own birth rule do the rest. Today's ledger: sixty years,
+  arrived 5,395 and left 2,244 against born 1,394 and died 2,205 — natural
+  change is NEGATIVE, and 557 of 575 singles already share a lot with another
+  single. Three shapes (pair on your own lot; court within 12 road tiles, any
+  species but predator and prey; the same species preferred): births rise to
+  1,900–2,170, town-born-parented births 4 → 600–920, generation 4 at sixty
+  years and 5 at ninety, the town 53–65% town-born (84% at ninety) — and the
+  POPULATION barely moves, because arrivals fall by a thousand to two thousand:
+  arrivals are `V_R × vacancies`, births take the vacancies. Size is jobs and
+  homes; the rule decides who fills them. Under `any` 80% of weddings are
+  cross-species (a hawk and a cat); under `prefer` a quarter (7% on the estate);
+  the interspecies city is a ruling, §5 q1. The children who cannot pair or
+  work leave through FRICTION (friendless households, 0.4% a month), 1,400–1,750
+  in sixty years — the OUT lever working as written (q10). Pacification on the
+  rig fires three times in sixty years; what the rule gives each is a LINE
+  (a wolf fixed at 25 forgoes 5.6 litters, and its partner's, and their cubs').
+- `tools/commuteprobe.mjs`: hiring already ignores the service radius — a
+  worker takes any open job within 40 walking steps, the species' commute is a
+  weight and a mood term. 50–100% of every civic crew lives beyond its benefit
+  radius; C crews 76–85% beyond the shop's local five; the estate's hall hands
+  ride 40 tiles inside the budget. The jobless are 0–34 at any sampled year and
+  every one has an open job within 40 steps; every open lot has a jobless door
+  within 40. The demand stretch the owner floated would hire nobody in the
+  mayor's towns; the shape and its gate are written down (q9).
+
+**Corrected: SPEC §7.2.** It promised a ×0.25 litter in a full home ("Caesar
+crowding push") — `KNOBS.BIRTH_FULL_MULT` exists and NOTHING reads it; a full
+home has no litter. It also said mixed households form "via move-in at 16" —
+no such rule exists. Both lines now say what the code does and point at the
+proposal (q11: wire the push or strike the knob).
+
+**Symptom-keyed traps, this round.**
+
+| what you see | what it is |
+|---|---|
+| a civic placed at the centre of the mayor's town, and the town then shrinks (P 977 against 2,138 at 30 years) | it sits on ground her plan would have opened as blocks; place beside the START road (her own convention) unless the start is at the map edge (the estate), and then read the commute table, not the population line — `commuteprobe --at-centre` says so on its own header |
+| `workers 500, employed 362, jobless 9` — the numbers do not add | the rest are CAMPING (home −1) in a downturn; count housed workers, or print the tents |
+| every probe run but the first writes to `/runs/…` and fails | a chain of `cd && S=… && node … &` backgrounds the WHOLE chain, so the variable never reaches the next command; put the matrix in a script file |
+| an experiment's merge pass leaves a household `gone` but still listed | `compact(world)` only runs when `world._removed` is set; set it and call `compact` yourself after the pass |
+
+Maker's mark — Fable 5.1, session 19, later: the one who married the town off in a shadow and watched it become its own.
