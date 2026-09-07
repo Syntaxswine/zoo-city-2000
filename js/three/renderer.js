@@ -4,37 +4,17 @@ import { isPart, sideOf, civicAnchorOf, civicSideOf, CIVIC } from '../sim/world.
 import { cameraAt, project, screenRay, hitBox, add, canStand, moveAnimal } from './space.js';
 import { lotScore } from '../sim/lots.js';
 import { useTint } from '../sim/use.js';
+import { box, tree, architecture, animalMesh, STRIDE } from './meshes.js';
 
 const COLORS = [[0.45,0.57,0.34],[0.65,0.72,0.46],[0.52,0.67,0.74],[0.76,0.57,0.36],[0.65,0.34,0.29]];
-const FACES = [
-  [[0,0,0],[0,1,0],[1,1,0],[1,0,0],0.72], [[1,0,1],[1,1,1],[0,1,1],[0,0,1],0.9],
-  [[0,0,1],[0,1,1],[0,1,0],[0,0,0],0.65], [[1,0,0],[1,1,0],[1,1,1],[1,0,1],0.84],
-  [[0,1,0],[0,1,1],[1,1,1],[1,1,0],1.12], [[0,0,1],[0,0,0],[1,0,0],[1,0,1],0.5]
-];
-function box(out, x, y, z, w, h, d, color) {
-  for (const face of FACES) for (const j of [0,1,2,0,2,3]) {
-    const p = face[j]; out.push(x+p[0]*w,y+p[1]*h,z+p[2]*d,...color.map(v => v*face[4]));
-  }
-}
-function animal(out, x, z, species, time, player = false) {
-  const fur = species === 'fox' ? [0.86,0.4,0.15] : species === 'bear' ? [0.43,0.29,0.2] : species === 'raccoon' ? [0.44,0.47,0.49] : [0.78,0.72,0.61];
-  const shirt = player ? [0.94,0.51,0.2] : [0.24,0.4,0.5];
-  const bob = Math.sin(time*9)*0.018;
-  box(out,x-.12,.18+bob,z-.09,.24,.25,.18,shirt);
-  box(out,x-.13,.43+bob,z-.12,.26,.23,.24,fur);
-  for (const s of [-1,1]) {
-    box(out,x+s*.07-.035,.65+bob,z-.04,.07,species==='rabbit'?.23:.09,.08,fur);
-    box(out,x+s*.065-.028,.04,z-.05+Math.sin(time*9+s)*.025,.056,.16,.1,[.19,.22,.25]);
-    box(out,x+s*.065-.019,.54+bob,z+.122,.038,.036,.01,[.08,.09,.09]);
-  }
-  box(out,x-.035,.48+bob,z+.13,.07,.045,.045,[.3,.2,.19]);
-}
 export function create3DRenderer(canvas, initialWorld, app) {
   const gl = canvas.getContext('webgl', {alpha:false, antialias:true});
   if (!gl) throw new Error('Zoo Thefttopia 2000 needs WebGL. Enable hardware acceleration and reload.');
   let world = initialWorld, dirty = true, staticCount = 0, boxes = [], camera, clock = 0;
   let yaw = Math.PI/4, pitch = .72, distance = 35, street = false, orbit = null;
-  let lastZoom = 1, overlayKey = '', overlayCount = 0;
+  let lastZoom = 1, overlayKey = '', overlayCount = 0, staticSignature = null;
+  let measuredFrames=0,measuredSeconds=0;
+  let shadowCenter=[initialWorld.w/2,0,initialWorld.h/2],shadowSpan=Math.max(initialWorld.w,initialWorld.h)*1.7,shadowStreet=false;
   const player = {x:0,z:0,species:'rabbit'}, held = new Set();
   const shader = (type, source) => {
     const s = gl.createShader(type); gl.shaderSource(s,source); gl.compileShader(s);
@@ -43,29 +23,105 @@ export function create3DRenderer(canvas, initialWorld, app) {
   };
   const program = gl.createProgram();
   gl.attachShader(program,shader(gl.VERTEX_SHADER,`
-    attribute vec3 position; attribute vec3 color;
+    attribute vec3 position; attribute vec3 color; attribute vec3 normal;
     uniform vec3 eye; uniform vec3 forward; uniform vec3 right; uniform vec3 up;
-    uniform float aspect; varying vec3 tint; varying float depth;
-    void main(){ vec3 p=position-eye; float z=dot(p,forward);
+    uniform float aspect; uniform vec3 offset; uniform float angle; uniform float phase; uniform float animated;
+    varying vec3 tint; varying float depth; varying vec3 worldPoint; varying vec3 worldNormal;
+    void main(){
+      mat3 turn=mat3(cos(angle),0.0,-sin(angle),0.0,1.0,0.0,sin(angle),0.0,cos(angle));
+      vec3 local=position;
+      local.z+=animated*step(local.y,0.22)*sin(phase+sign(local.x)*1.5708)*0.045;
+      worldPoint=turn*local+offset; worldNormal=turn*normal;
+      vec3 p=worldPoint-eye; float z=dot(p,forward);
       gl_Position=vec4(dot(p,right)*1.8/aspect,dot(p,up)*1.8,1.0008*z-0.160064,z);
       tint=color; depth=z; }`));
   gl.attachShader(program,shader(gl.FRAGMENT_SHADER,`
-    precision mediump float; varying vec3 tint; varying float depth;
-    void main(){ float fog=smoothstep(25.0,125.0,depth)*0.8;
-      gl_FragColor=vec4(mix(tint,vec3(0.66,0.76,0.78),fog),1.0); }`));
+    precision highp float; varying vec3 tint; varying float depth; varying vec3 worldPoint; varying vec3 worldNormal;
+    uniform vec3 eye; uniform sampler2D sunDepth; uniform float shadowOn; uniform vec2 worldSize;uniform vec3 shadowCenter;uniform float shadowSpan;
+    vec3 sunCoord(vec3 p){p-=shadowCenter;float span=max(worldSize.x,worldSize.y)*1.7;
+      return vec3(dot(p,vec3(.514496,0.0,-.857493))/shadowSpan,dot(p,vec3(-.74076,.503718,-.444457))/shadowSpan,dot(p,vec3(-.431934,-.863868,-.259161))/span)+.5;}
+    void main(){
+      vec3 n=normalize(worldNormal),sun=normalize(vec3(.5,1.0,.3)),sc=sunCoord(worldPoint+n*.035);
+      float shade=0.0;
+      for(int x=-1;x<=1;x++)for(int y=-1;y<=1;y++){
+        float stored=texture2D(sunDepth,sc.xy+vec2(float(x),float(y))/2048.0).r;
+        shade+=step(sc.z-(.0004+.0012*(1.0-max(0.0,dot(n,sun)))),stored)/9.0;
+      }
+      shade=mix(1.0,shade,shadowOn);
+      if(sc.x<.01||sc.x>.99||sc.y<.01||sc.y>.99)shade=1.0;
+      float diffuse=max(0.0,dot(n,sun));
+      vec3 light=vec3(.38,.43,.48)+vec3(.77,.68,.51)*diffuse*shade;
+      light+=vec3(.11,.12,.1)*max(0.0,n.y);
+      float spec=pow(max(0.0,dot(n,normalize(sun+normalize(eye-worldPoint)))),40.0)*.13*shade;
+      float grain=fract(sin(dot(floor(worldPoint*180.0),vec3(12.9898,78.233,35.719)))*43758.5453);
+      vec3 lit=tint*light*(.97+.045*grain)+spec;
+      float fog=smoothstep(18.0,105.0,depth)*.72;
+      gl_FragColor=vec4(mix(lit,vec3(.72,.81,.84),fog),1.0); }`));
   gl.linkProgram(program);
   if (!gl.getProgramParameter(program,gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(program));
   gl.useProgram(program); gl.enable(gl.DEPTH_TEST);
-  const locations = Object.fromEntries(['eye','forward','right','up','aspect'].map(n=>[n,gl.getUniformLocation(program,n)]));
-  const pos = gl.getAttribLocation(program,'position'), col = gl.getAttribLocation(program,'color');
+  const locations = Object.fromEntries(['eye','forward','right','up','aspect','offset','angle','phase','animated','sunDepth','shadowOn','worldSize','shadowCenter','shadowSpan'].map(n=>[n,gl.getUniformLocation(program,n)]));
+  const pos = gl.getAttribLocation(program,'position'), col = gl.getAttribLocation(program,'color'), normal = gl.getAttribLocation(program,'normal');
   const staticBuffer = gl.createBuffer(), dynamicBuffer = gl.createBuffer(), overlayBuffer = gl.createBuffer();
   function upload(buffer, data, usage) { gl.bindBuffer(gl.ARRAY_BUFFER,buffer); gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(data),usage); }
   function render(buffer, count) {
     gl.bindBuffer(gl.ARRAY_BUFFER,buffer); gl.enableVertexAttribArray(pos); gl.enableVertexAttribArray(col);
-    gl.vertexAttribPointer(pos,3,gl.FLOAT,false,24,0); gl.vertexAttribPointer(col,3,gl.FLOAT,false,24,12);
+    gl.vertexAttribPointer(pos,3,gl.FLOAT,false,36,0); gl.vertexAttribPointer(col,3,gl.FLOAT,false,36,12);
+    gl.enableVertexAttribArray(normal); gl.vertexAttribPointer(normal,3,gl.FLOAT,false,36,24);
     gl.drawArrays(gl.TRIANGLES,0,count);
   }
+  // Static city shadows are regenerated only when the city mesh changes.
+  const depthExtension=gl.getExtension('WEBGL_depth_texture');
+  const shadowTexture=gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D,shadowTexture);
+  for(const [key,value] of [[gl.TEXTURE_MIN_FILTER,gl.NEAREST],[gl.TEXTURE_MAG_FILTER,gl.NEAREST],[gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE],[gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE]])gl.texParameteri(gl.TEXTURE_2D,key,value);
+  let shadowFramebuffer=null,shadowProgram=null;
+  if(depthExtension){
+    gl.texImage2D(gl.TEXTURE_2D,0,gl.DEPTH_COMPONENT,2048,2048,0,gl.DEPTH_COMPONENT,gl.UNSIGNED_SHORT,null);
+    shadowFramebuffer=gl.createFramebuffer();gl.bindFramebuffer(gl.FRAMEBUFFER,shadowFramebuffer);
+    gl.framebufferTexture2D(gl.FRAMEBUFFER,gl.DEPTH_ATTACHMENT,gl.TEXTURE_2D,shadowTexture,0);
+    const colorTarget=gl.createRenderbuffer();gl.bindRenderbuffer(gl.RENDERBUFFER,colorTarget);
+    gl.renderbufferStorage(gl.RENDERBUFFER,gl.RGBA4,2048,2048);gl.framebufferRenderbuffer(gl.FRAMEBUFFER,gl.COLOR_ATTACHMENT0,gl.RENDERBUFFER,colorTarget);
+    if(gl.checkFramebufferStatus(gl.FRAMEBUFFER)!==gl.FRAMEBUFFER_COMPLETE)shadowFramebuffer=null;
+    gl.bindFramebuffer(gl.FRAMEBUFFER,null);
+    shadowProgram=gl.createProgram();
+    gl.attachShader(shadowProgram,shader(gl.VERTEX_SHADER,`attribute vec3 position;uniform vec2 worldSize;uniform vec3 shadowCenter;uniform float shadowSpan;
+      void main(){vec3 p=position-shadowCenter;float span=max(worldSize.x,worldSize.y)*1.7;
+      gl_Position=vec4(vec3(dot(p,vec3(.514496,0.0,-.857493))/shadowSpan,dot(p,vec3(-.74076,.503718,-.444457))/shadowSpan,dot(p,vec3(-.431934,-.863868,-.259161))/span)*2.0,1.0);}`));
+    gl.attachShader(shadowProgram,shader(gl.FRAGMENT_SHADER,'precision mediump float;void main(){gl_FragColor=vec4(1.0);}'));
+    gl.linkProgram(shadowProgram);
+    if(!gl.getProgramParameter(shadowProgram,gl.LINK_STATUS))throw new Error(gl.getProgramInfoLog(shadowProgram));
+  }else gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,1,1,0,gl.RGBA,gl.UNSIGNED_BYTE,new Uint8Array([255,255,255,255]));
+  function shadowPass(){
+    if(!shadowFramebuffer)return;
+    shadowStreet=street;shadowCenter=street?[player.x,0,player.z]:[world.w/2,0,world.h/2];shadowSpan=street?20:Math.max(world.w,world.h)*1.7;
+    gl.bindFramebuffer(gl.FRAMEBUFFER,shadowFramebuffer);gl.viewport(0,0,2048,2048);gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
+    gl.useProgram(shadowProgram);gl.uniform2f(gl.getUniformLocation(shadowProgram,'worldSize'),world.w,world.h);
+    gl.uniform3fv(gl.getUniformLocation(shadowProgram,'shadowCenter'),shadowCenter);gl.uniform1f(gl.getUniformLocation(shadowProgram,'shadowSpan'),shadowSpan);
+    const a=gl.getAttribLocation(shadowProgram,'position');gl.bindBuffer(gl.ARRAY_BUFFER,staticBuffer);
+    gl.enableVertexAttribArray(a);gl.vertexAttribPointer(a,3,gl.FLOAT,false,36,0);
+    gl.enable(gl.POLYGON_OFFSET_FILL);gl.polygonOffset(2,4);gl.drawArrays(gl.TRIANGLES,0,staticCount);gl.disable(gl.POLYGON_OFFSET_FILL);
+    gl.bindFramebuffer(gl.FRAMEBUFFER,null);gl.viewport(0,0,canvas.width,canvas.height);gl.useProgram(program);
+  }
+  const animals=new Map();
+  function drawAnimal(x,z,species,isPlayer,facing,time,id){
+    const distanceToEye=Math.hypot(x-camera.eye[0],z-camera.eye[2]);
+    if(street&&distanceToEye>28)return;
+    const detail=isPlayer||distanceToEye<10,key=`${species}:${isPlayer}:${detail}`;
+    let mesh=animals.get(key);
+    if(!mesh){const data=animalMesh(species,isPlayer,detail),buffer=gl.createBuffer();upload(buffer,data,gl.STATIC_DRAW);mesh={buffer,count:data.length/STRIDE};animals.set(key,mesh);}
+    const direction=isPlayer?player.angle||0:({se:0,sw:Math.PI/2,nw:Math.PI,ne:-Math.PI/2}[facing]||0);
+    gl.uniform3f(locations.offset,x,time?Math.sin(time*9+(id||0))*.009:0,z);
+    gl.uniform1f(locations.angle,direction);gl.uniform1f(locations.phase,time*9+(id||0));gl.uniform1f(locations.animated,time?1:0);
+    render(mesh.buffer,mesh.count);
+  }
   function rebuild() {
+    // Ticks invalidate overlays even when no geometry changed. Avoid regenerating
+    // hundreds of thousands of triangles merely because the calendar advanced.
+    let signature=`${world.w}:${world.h}:`;
+    for(const field of ['terrain','zone','civic','civicSize','road','rail','wall','cam','tier','big','rubble'])signature+=String.fromCharCode(...world[field]);
+    dirty=false;overlayKey='';
+    if(signature===staticSignature)return;
+    staticSignature=signature;
     const out=[]; boxes=[];
     for(let i=0;i<world.w*world.h;i++) {
       const x=i%world.w,z=Math.floor(i/world.w), water=world.terrain[i]===1;
@@ -88,28 +144,17 @@ export function create3DRenderer(canvas, initialWorld, app) {
       if(isPart(world,i) || (civic && civicAnchorOf(world,i)!==i)) continue;
       const park=civic===CIVIC.PARK || civic===CIVIC.LARGE_PARK;
       if ((world.terrain[i]===2 && !road && !zone && !civic) || park) {
-        box(out,x+.44,0,z+.44,.12,.55,.12,[.38,.27,.17]);
-        box(out,x+.18,.4,z+.18,.64,.65,.64,[.28,.46,.26]);
-        box(out,x+.28,1,z+.28,.44,.23,.44,[.37,.55,.29]);
+        tree(out,x,z,(x*3+z)%4);
       }
       if ((!world.tier[i] || !zone) && (!civic || park)) continue;
       const side=civic?civicSideOf(world,i):sideOf(world,i);
       const h=civic?1.1+side*.2:.45+world.tier[i]*.58;
-      const c=civic?([4,5,6,8].includes(civic)?[.55,.58,.59]:[.78,.73,.57]):COLORS[zone];
-      const b=[x+.1,0,z+.1,x+side-.1,h,z+side-.1]; boxes.push({b,tile:i});
-      box(out,b[0],0,b[2],side-.2,h,side-.2,c);
-      box(out,x+.06,h,z+.06,side-.12,.12,side-.12,zone===1?[.43,.29,.25]:[.36,.39,.39]);
-      for(let y=.3;y<h-.12;y+=.43) for(let k=.24;k<side-.2;k+=.38) {
-        box(out,x+k,y,z+.087,.16,.19,.018,[.87,.81,.53]);
-        box(out,x+k,y,z+side-.105,.16,.19,.018,[.87,.81,.53]);
-        box(out,x+.087,y,z+k,.018,.19,.16,[.55,.7,.72]);
-        box(out,x+side-.105,y,z+k,.018,.19,.16,[.55,.7,.72]);
-      }
-      box(out,x+side/2-.09,0,z+side-.09,.18,.28,.025,[.25,.26,.24]);
-      if(zone===3) box(out,x+.2,h,z+.2,.18,.6,.18,[.41,.36,.31]);
-      if(civic) box(out,x+side/2-.2,h+.12,z+side/2-.2,.4,.24,.4,civic===5?[.24,.4,.65]:[.76,.4,.27]);
+      const top=civic?.51:zone===3?.86:zone===1?.36:.3;
+      const b=[x+.04,0,z+.04,x+side-.04,h+top,z+side-.04]; boxes.push({b,tile:i});
+      architecture(out,x,z,side,h,zone,civic,i%7);
     }
-    upload(staticBuffer,out,gl.STATIC_DRAW); staticCount=out.length/6; dirty=false; overlayKey='';
+    upload(staticBuffer,out,gl.STATIC_DRAW); staticCount=out.length/STRIDE; dirty=false; overlayKey='';shadowPass();
+    canvas.dataset.sceneTriangles=String(staticCount/3);
   }
   const hud=document.createElement('div'); hud.className='three-hud';
   hud.innerHTML='<div class="three-modes"><button type="button" data-mode="city">CITY BUILDER</button><button type="button" data-mode="street">WALK THE CITY</button><select aria-label="Your animal"><option value="rabbit">Rabbit</option><option value="fox">Fox</option><option value="raccoon">Raccoon</option><option value="bear">Bear</option></select></div><div class="three-help"></div>';
@@ -134,6 +179,7 @@ export function create3DRenderer(canvas, initialWorld, app) {
     for(const [dx,dz,angle] of [[0,1,0],[1,0,Math.PI/2],[0,-1,Math.PI],[-1,0,-Math.PI/2]]) {
       if(canStand(world,player.x+dx,player.z+dz) && canStand(world,player.x+dx*2,player.z+dz*2)){yaw=angle;break;}
     }
+    player.angle=yaw+Math.PI;
     return true;
   }
   function setMode(next) {
@@ -180,7 +226,7 @@ export function create3DRenderer(canvas, initialWorld, app) {
     const speed=(street?(held.has('ShiftLeft')||held.has('ShiftRight')?3:1.5):distance*.45)*dt/Math.hypot(dx,dz);
     const x=(dx*Math.cos(yaw)+dz*Math.sin(yaw))*speed,z=(-dx*Math.sin(yaw)+dz*Math.cos(yaw))*speed;
     app.stopFollowing?.();
-    if(street)moveAnimal(world,player,x,z);
+    if(street){moveAnimal(world,player,x,z);player.angle=Math.atan2(x,z);}
     else {const p=toWorld(app.camera.x,app.camera.y);[app.camera.x,app.camera.y]=toScreen(p[0]+x,p[1]+z);}
   }
   function resize(){canvas.width=Math.max(1,canvas.clientWidth);canvas.height=Math.max(1,canvas.clientHeight);gl.viewport(0,0,canvas.width,canvas.height);}
@@ -197,16 +243,23 @@ export function create3DRenderer(canvas, initialWorld, app) {
   }
   function draw(c,hover,walkers,overlay,dt=1/60){
     if(gl.isContextLost())return;
+    measuredFrames++;measuredSeconds+=dt;
+    if(measuredFrames===60){canvas.dataset.frameMs=(measuredSeconds*1000/measuredFrames).toFixed(1);measuredFrames=0;measuredSeconds=0;}
     if(dirty)rebuild();
+    if(shadowStreet!==street||(street&&Math.hypot(player.x-shadowCenter[0],player.z-shadowCenter[2])>2))shadowPass();
     if(street&&!canStand(world,player.x,player.z)&&!spawn())setMode(false);
     if(c.zoom!==lastZoom){distance=Math.max(5,Math.min(85,distance*lastZoom/c.zoom));lastZoom=c.zoom;}
-    clock+=dt;syncCamera(c);gl.clearColor(.66,.76,.78,1);gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
+    clock+=dt;syncCamera(c);gl.clearColor(.72,.81,.84,1);gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
     gl.useProgram(program);
     for(const n of ['eye','forward','right','up'])gl.uniform3fv(locations[n],camera[n]);
-    gl.uniform1f(locations.aspect,camera.aspect);render(staticBuffer,staticCount);
+    gl.uniform1f(locations.aspect,camera.aspect);
+    gl.uniform3f(locations.offset,0,0,0);gl.uniform1f(locations.angle,0);gl.uniform1f(locations.animated,0);
+    gl.uniform2f(locations.worldSize,world.w,world.h);gl.uniform1f(locations.shadowOn,shadowFramebuffer?1:0);
+    gl.uniform3fv(locations.shadowCenter,shadowCenter);gl.uniform1f(locations.shadowSpan,shadowSpan);
+    gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,shadowTexture);gl.uniform1i(locations.sunDepth,0);
+    render(staticBuffer,staticCount);
     const out=[];
-    for(const w of walkers.list())animal(out,w.tx+.5,w.ty+.5,w.species,app.paused?0:clock);
-    if(street)animal(out,player.x,player.z,player.species,held.size?clock:0,true);
+
     if(!street&&hover?.tx>=0){
       const tiles=hover.drag?.tiles || [hover.ty*world.w+hover.tx];
       for(const tile of tiles){const i=typeof tile==='number'?tile:tile.i;if(i==null)continue;box(out,i%world.w,.06,Math.floor(i/world.w),1,.015,1,hover.drag?.refused?[.9,.25,.2]:[.85,.86,.46]);}
@@ -228,12 +281,15 @@ export function create3DRenderer(canvas, initialWorld, app) {
           if(overlay==='use'){const tint=useTint(value);if(!tint)continue;color=tint.match(/[\d.]+/g).slice(0,3).map(Number).map(v=>v/255);}
           box(mesh,i%world.w,.05,Math.floor(i/world.w),.96,.02,.96,color);
         }
-        upload(overlayBuffer,mesh,gl.STATIC_DRAW);overlayCount=mesh.length/6;overlayKey=overlay;
+        upload(overlayBuffer,mesh,gl.STATIC_DRAW);overlayCount=mesh.length/STRIDE;overlayKey=overlay;
       }
       render(overlayBuffer,overlayCount);
     }
     for(let i=0;i<world.burning.length;i++)if(world.burning[i])box(out,i%world.w+.25,.2,Math.floor(i/world.w)+.25,.5,1.5+Math.sin(clock*8)*.2,.5,[1,.4,.1]);
-    upload(dynamicBuffer,out,gl.DYNAMIC_DRAW);render(dynamicBuffer,out.length/6);
+    upload(dynamicBuffer,out,gl.DYNAMIC_DRAW);render(dynamicBuffer,out.length/STRIDE);
+    for(const w of walkers.list())drawAnimal(w.tx+.5,w.ty+.5,w.species,false,w.facing,app.paused?0:clock,w.id);
+    if(street)drawAnimal(player.x,player.z,player.species,true,null,held.size?clock:0,0);
+    gl.uniform3f(locations.offset,0,0,0); gl.uniform1f(locations.angle,0);gl.uniform1f(locations.animated,0);
   }
   function pick(x,y,c=app.camera){
     if(street)return null;if(dirty)rebuild();syncCamera(c);

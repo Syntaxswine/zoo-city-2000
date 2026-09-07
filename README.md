@@ -1,6 +1,10 @@
 # ZOO THEFTTOPIA 2000
 
-The 3D development branch of Zoo City 2000: build a city from above, then walk its streets as an animal. Both views run the same simulation. This is a playable first prototype, with simple low-poly buildings and characters.
+The 3D development branch of Zoo City 2000: build a city from above, then walk its streets as an animal. Both views run the same simulation. This playable prototype now uses detailed geometry, smooth character models and directional sun lighting.
+
+The close-up rabbit has 21,696 triangles, with separate facial features, ears, paws, clothing and shoes. All fourteen resident species have smooth models; distant residents use reduced geometry, and cached meshes are reused between frames. Buildings have framed windows, sills, cornices, pitched residential roofs, shop awnings, cylindrical factory chimneys and rooftop equipment. Trees use curved foliage meshes. A filtered 2048² shadow map covers the town and switches to a focused area around the player in street mode. Devices without depth-texture support retain the geometry and lighting without cast shadows. Character meshes receive building shadows; characters do not currently cast their own shadows.
+
+The supplied demo contains about 833,000 static scene triangles. The renderer skips static mesh and shadow regeneration when a simulation tick changes no geometry. These are stylized procedural models, not photorealistic scanned assets.
 
 Run `node tools/serve.mjs --port 8140`, open `http://localhost:8140`, and choose **Explore demo city** for a populated town, or **New game** to build from scratch. WebGL hardware acceleration is required. No dependencies or build step.
 
