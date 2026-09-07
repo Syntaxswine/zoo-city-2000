@@ -58,6 +58,9 @@ household-merge rule — now the prerequisite of this whole arc).
    acting on *"Courtship: who marries whom"* and *"Friendship: who befriends
    whom"*; and on sex: *"No sex: ten percent of weddings are companions who
    never breed"*. Step 0 was built on these the same evening (§7, §8e).
+7. On the built town closing at ninety years: *"migration should definitely be
+   bidirectional. it should take more than just a fire for people to leave, it
+   would have to be a combination of factors"* (§10).
 
 ## 1. The thesis
 
@@ -332,13 +335,20 @@ somebody walks to.
    both?
 9. ~~**The commute stretch**~~ RULED (round 6): *not now*. The shape and its gate
    stay in §9 for the day a real save shows a jobless animal beyond 40 steps.
-10. **The children who leave** (§8) — the surplus of a breeding town emigrates
-    through FRICTION (a friendless household wanders off at 0.4% a month), 1,400
-    to 1,700 animals in sixty years. Keep it as the OUT lever it already is, or
-    damp it for natives (a town-born animal leaves its town less readily)?
+10. ~~**The children who leave**~~ superseded by §10: friction is retired into
+    the push, and the roots damp is q13.
 11. ~~**The crowding push**~~ RULED (round 6): *wire it* — a full home breeds at
     ×0.25 and goes over capacity; built in step 0 (§8e). Its share of the
     change is measured there.
+12. **The push's threshold** (§10) — 3 of the weighted score is the
+    recommendation (about one household in a hundred a year on the mayor's
+    town; 2 is a churn machine, 4 is lumpy and rare).
+13. **Roots** (§10c) — damp the push by years at this home and by a town-born
+    adult under the roof? Without it the estate, chronically crime-and-smoke
+    and taxed through a recession, lost a third of itself in the shadow.
+14. **The factor list** — the nine measured (a lost job, no friends, low mood,
+    crime, smoke, dread, crowding, taxes above neutral, a burned home); any to
+    add — a killing next door, no park in reach, no station's cover?
 
 ## 6. Instruments (run from the repo root; all passive, exit 0)
 
@@ -348,6 +358,7 @@ node tools/lineageprobe.mjs --layout estate --years 60     # the ratchet as a sh
 node tools/reachprobe.mjs --layout estate --platform 2     # walking tiles vs Chebyshev; rail free vs priced
 node tools/breedprobe.mjs --layout balanced --rule court   # the household-merge candidates as a pass OUTSIDE the sim; the population ledger by decade (§8)
 node tools/commuteprobe.mjs --layout estate --civics --at-centre  # commute vs the benefit radius and the species' preference; the jobless' nearest open job (§9)
+node tools/leaveprobe.mjs --layout balanced --rule push --thresh 3 --set FRICTION_P=0   # who leaves today and why; the push as a shadow (§10)
 ```
 
 ## 7. Build order (a sketch, none of it opened)
@@ -535,6 +546,85 @@ the wedding is the lineage and the crowding push is a sixth of the births.
 On the estate with a station and a centre: pacified 2 in sixty years, 14
 litters lost in one decade — the bite is real per animal and the centre is
 still rarely used (§8c stands).
+
+## 10. Migration both ways: the push, measured (the owner's round 7)
+
+*"migration should definitely be bidirectional. it should take more than just a
+fire for people to leave, it would have to be a combination of factors."*
+
+### 10a. What removes a family today
+
+The OUT channels in the tree (`citizens.js`): FRICTION — a household whose
+adults are all friendless wanders off at 0.4% a month; HOMELESS — the home is
+rubble (a fire) or gone and nothing within 12 road tiles has room, and no tent
+is tried; EVICTED and DISPLACED — a storey lost or a mansion risen, no home, no
+tent; ZONED OUT — the player's line; REVOLT — the tax event walks 8% of the
+households out; and at V_R ≤ 0 the downturn roll pitches a TENT rather than
+leaving. `tools/leaveprobe.mjs` reads every departed animal's cause from the
+permanent archive and the factors that were wrong at home the month before.
+Disasters ON, sixty years:
+
+| today | balanced | estate |
+|---|---|---|
+| arrived | 2,468 | 1,553 |
+| left, every one by FRICTION | 630 | 450 |
+| homeless after a fire; evicted; revolted | 0; 0; 0 | 0; 0; 0 |
+| tents pitched in downturns | 28 | 121 |
+| population | 2,225 | 1,646 |
+
+At ninety years the balanced town takes 13 arrivals and loses 30 a decade:
+closed. Departures are single-cause — of the balanced town's ~260 leaving
+households, 134 had ONE thing wrong (no friends), 84 two, 41 three or more.
+**A fire alone moved nobody on either rig**, because a burned-out family always
+found a home within twelve road tiles; but the code path is there — a household
+whose home is rubble and finds nothing in reach is REMOVED, no tent tried, while
+the evicted and the displaced do try one. On a map fuller than the mayor's, that
+is "just a fire".
+
+### 10b. The push, as a shadow
+
+Nine factors read at home each month, each yes or no, weighted: a lost job 2 ·
+no adult with a friend 1 · mean mood under 40 1 · crime above `CRIME_HIGH` 1 ·
+pollution above the species' tolerance 1 · a herbivore household at
+`REHOME_DREAD` 1 · over capacity 1 · the R rate more than a point above neutral
+1 · the home burning or rubble within the year 2. Score at or above a THRESHOLD
+leaves at `p × (score − threshold + 1)` a month, through the sim's own removal;
+friction retired (friendless is a factor). Balanced, sixty years, p = 0.05:
+
+| threshold | left | arrived | population | the shape of it |
+|---|---|---|---|---|
+| today (friction only) | 630 | 2,468 | 2,225 | closed at ninety years |
+| 2 | 3,947 | 4,789 | 1,574 | a churn machine — two things wrong is most of a town |
+| **3** | **1,151** | **3,188** | **2,321** | about one household in a hundred a year; at ninety years 268 leave and 37 arrive a decade — the doors swing both ways |
+| 4 | 895 | 2,714 | 2,221 | lumpy and rare: 354 in one decade, 27 the next |
+| 3, friction kept | 1,642 | 3,322 | 2,076 | stacked; friction is the push's one-factor case and should go |
+
+Who leaves at 3: a lost job + no friends + low mood ×68, a lost job + no
+friends ×36, those two + crime ×36, low mood + crime + smoke ×29 — a
+combination every time, by construction. The ESTATE at 3 lost 3,981 of a town
+of 1,600 (arrived 3,972; population 1,121 against 1,646): its quarters sit at
+crime + smoke chronically, and a recession sent the rig's R rate to 11 against
+a neutral 8 for a decade — crime + smoke + taxed drained it. That is the rule
+with teeth and no roots, and it is the number to balance against.
+
+### 10c. The shape recommended
+
+- **The push at threshold 3, p 0.05, the nine factors as measured.** A single
+  grievance never moves anyone: not a fire, not a lost job, not an empty
+  friends list. Acute things weigh 2 (a lost job, a burned home), chronic
+  things 1 (crime, smoke, taxes, crowding), so a dense quarter under a bad
+  month leaves and a quarter that is merely dense stays.
+- **Roots** (q13): `p × 1/(1 + years at this home/10) × (a town-born adult
+  under the roof ? 0.5 : 1)` — long residents and the town's own children
+  leave less readily; measured at build against the estate's drain.
+- **The burned-out try a TENT** before they are removed, as the evicted do; the
+  tent is the `burned` factor for the push. Friction retired.
+- **The line**, in the register: *"MOVED AWAY — the Burrowes (4 rabbits) left
+  (12,8): no work, no friends, and the smoke."* — the factors named, so the
+  player reads what to fix. The family is archived as today.
+- Arrivals are already the pull (what was built, `V_R × vacancies`); the push
+  is what keeps the doors swinging. Every rig hash moves; `leaveprobe --rule
+  none` before and after is its measure.
 
 ## 9. The commute is not the benefit (the owner's round 5, second ruling)
 

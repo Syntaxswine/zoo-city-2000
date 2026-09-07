@@ -3109,3 +3109,33 @@ households, the card and the news reader read as written.
 | the pinned card vanishes as soon as the pointer moves | the input loop re-hovers every frame; verify the card through the DOM (`updateHover` then read the text), and use the news reader for the screenshot |
 
 Maker's mark — Fable 5.1, session 19, evening: the one who let the town marry, and watched the last arrival never come.
+
+## 39. Round seven — migration both ways, measured (session 19, 2026-09-07, night)
+
+The owner, on the built town closing at ninety years: *"migration should
+definitely be bidirectional. it should take more than just a fire for people
+to leave, it would have to be a combination of factors."* Measured, not built
+(proposal §10; `tools/leaveprobe.mjs`, passive, reads every departed animal's
+cause from the permanent archive and the nine factors wrong at home the month
+before, and runs a PUSH rule as a shadow through the sim's own removal).
+Today, disasters on, sixty years: balanced arrived 2,468 and lost 630, every
+one by FRICTION; homeless after a fire 0, evicted 0, revolted 0 — a fire alone
+moves nobody on the rigs because a burned-out family always finds a home
+within twelve road tiles, but the homeless path REMOVES a family with no tent
+tried where the evicted try one. Departures are single-cause: 134 households
+had one thing wrong, 84 two, 41 three or more. The push at threshold 3 (p 0.05
+× (score − 2)): 1,151 leave and 3,188 arrive in sixty years (268 out, 37 in a
+decade at ninety — the doors swing both ways); threshold 2 is a churn machine
+(3,947 gone), 4 is lumpy (354 in one decade, 27 the next). The estate at 3 lost
+3,981 of 1,600: crime + smoke chronically, and a recession put the rig's R rate
+at 11 against a neutral 8 for a decade — the number the roots damp (q13) must
+answer before it lands. Recommended: threshold 3, acute factors weigh 2 and
+chronic 1, roots by years at home and a town-born adult, the burned-out pitch a
+tent before removal, friction retired, the MOVED AWAY line naming the factors.
+
+| what you see | what it is |
+|---|---|
+| `taxed` in the estate's leaving combos at a flat R 8 | the rig's rate is not flat: a recession event set R to 11 for a decade (`world.rates.R` moves under events); read the rate where the factor is read, not from the mayor's options |
+| a household gone but its members alive | a wedding's guest household, merged — not a departure; the archive has no record for the living |
+
+Maker's mark — Fable 5.1, session 19, night: the one who counted who leaves and found one reason where the owner wants several.
