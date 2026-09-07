@@ -35,6 +35,7 @@ import { hallStock, hallYear } from "./sim/meat.js";
 import { needOf } from "./sim/needs.js";
 import { ACT, line as needLine } from "./sim/voice.js";
 import { lifeLines, memorial } from "./sim/life.js";
+import { temperOf, describeTemper } from "./sim/temper.js";
 import { legacyOf } from "./sim/legacy.js";
 import { starredNotices } from "./people.js";
 import { buildingAge } from "./sim/building-age.js";
@@ -675,6 +676,7 @@ export function createUI(app) {
       const sp = SPECIES_BY_ID[c.species];
       const title = el("div", "personname");
       title.append(el("b", "", `${c.name} ${c.surname}`), el("span", "dim", `  ${c.species}, ${y}${y >= sp.retire ? " (retired)" : y < KNOBS.ADULT_AGE ? " (cub)" : ""}`));
+      title.append(el("span", "dim", `  · ${describeTemper(temperOf(c))}`)); // the temperament (SPEC §7.11): read from the id and the birth tick, never stored
       if (pinned) title.append(el("span", "pin", "  pinned (Esc)"));
       head.append(portraitFor(id, c.species, y, c.mood), title);
       lines.push(head);

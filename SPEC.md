@@ -827,6 +827,35 @@ is 482 KB of JSON and builds in about 30 ms on the check host.
 citizen fields and restore them from the same defaults used at creation; the
 canonical state hash retains the expanded citizen shape and non-empty archive.
 
+### 7.11 Temperament — the twelve types (`js/sim/temper.js`; 2026-09-07)
+The owner: *"lets add 12 personality types"* — rolled at birth, never inherited,
+acting on who marries whom and who befriends whom. A temperament is READ, never
+stored: `temperOf(c) = floor(12 · hash01(c.id, c.born, salt))`, so every animal
+of every save has one and no field, migration or RNG draw is spent. The card
+prints it after the age: *"rabbit, 23 · a Grumbler — nothing is as it was;
+kindred with Stoics and Misers, crossed with Joiners"*.
+
+| # | temperament | the line | kindred with | crossed with |
+|---|---|---|---|---|
+| 0 | Busybody | knows what everyone had for breakfast | Gossip, Joiner | Hermit |
+| 1 | Hermit | keeps the curtains drawn | Stoic, Tinkerer | Busybody |
+| 2 | Joiner | on every committee | Busybody, Climber | Grumbler |
+| 3 | Grumbler | nothing is as it was | Stoic, Miser | Joiner |
+| 4 | Climber | eyes on the estate | Joiner, Show-off | Idler |
+| 5 | Idler | never once hurried | Dreamer, Miser | Climber |
+| 6 | Tinkerer | fixes what is not broken | Hermit, Dreamer | Show-off |
+| 7 | Gossip | the ticker's best source | Busybody, Show-off | Stoic |
+| 8 | Stoic | takes the weather as it comes | Hermit, Grumbler | Gossip |
+| 9 | Dreamer | plans a landmark | Idler, Tinkerer | Miser |
+| 10 | Miser | counts the tax twice | Grumbler, Idler | Dreamer |
+| 11 | Show-off | the mansion's future owner | Climber, Gossip | Tinkerer |
+
+`compat(a, b)`: alike ×1.25 (`TEMPER_ALIKE`), kindred ×1.5 (`TEMPER_KINDRED`),
+crossed ×0.5 (`TEMPER_CROSSED`), plain ×1 — symmetric by construction; each
+temperament is kindred with exactly two and crossed with exactly one, and the
+two lists never overlap. It multiplies the WEDDING's choice of partner (§7.2)
+and the FRIENDSHIP roll (§7.5). Nothing else reads it.
+
 ## 8. Budget (`js/sim/budget.js`), integer §, monthly slice of yearly figures
 
 ```

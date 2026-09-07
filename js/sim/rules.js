@@ -129,6 +129,10 @@ export const KNOBS = {
   FRICTION_P: 0.004,
   BIRTH_DIV: 96,
   BIRTH_FULL_MULT: 0.25,
+  // The twelve temperaments (temper.js, SPEC §7.11): the multiplier a pair puts on a courtship weight and a friendship roll.
+  TEMPER_KINDRED: 1.5,
+  TEMPER_ALIKE: 1.25,
+  TEMPER_CROSSED: 0.5,
   ADULT_AGE: 16,
   FRIEND_SAMPLES: 200,
   FRIEND_P: 0.05,

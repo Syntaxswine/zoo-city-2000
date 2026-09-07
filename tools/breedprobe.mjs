@@ -36,6 +36,7 @@ import { KNOBS } from "../js/sim/rules.js";
 import { ageYears } from "../js/sim/census.js";
 import { lotsWithinRoad, compact } from "../js/sim/citizens.js";
 import { KIND, remember } from "../js/sim/life.js";
+import { stateHash } from "../js/sim/save.js";
 
 const args = process.argv.slice(2);
 const arg = (k, d) => { const i = args.indexOf(k); return i >= 0 && args[i + 1] != null ? args[i + 1] : d; };
@@ -51,6 +52,9 @@ const showWeddings = Number(arg("--show", 0));
 const stations = flag("--stations");
 const pacify = flag("--pacify");
 const markets = Number(arg("--markets", 0));
+// --set KEY=VALUE (repeatable): override a KNOB before the run — the A/B switch for a rule that
+// lives in the sim (e.g. --set WED_P=0 runs the town with the sim's own weddings off).
+for (let k = 0; k < args.length; k++) if (args[k] === "--set" && args[k + 1]) { const [key, v] = args[k + 1].split("="); if (!(key in KNOBS)) { console.log(`--set ${key}: no such knob`); process.exit(2); } KNOBS[key] = Number(v); }
 if (!["none", "lot", "court"].includes(rule)) { console.log(`--rule ${rule}: none, lot or court`); process.exit(2); }
 if (!["any", "same", "prefer"].includes(pair)) { console.log(`--pair ${pair}: any, same or prefer`); process.exit(2); }
 
@@ -209,5 +213,6 @@ for (const r of rows) {
 }
 console.log("");
 const totals = rows.reduce((a, r) => ({ arrived: a.arrived + r.arrived, left: a.left + r.left, births: a.births + r.births, deaths: a.deaths + r.deaths, nativeParent: a.nativeParent + r.nativeParent }), { arrived: 0, left: 0, births: 0, deaths: 0, nativeParent: 0 });
+console.log(`  state hash ${stateHash(world)} — the same rig, the same knobs, the same hash (a --set that changes nothing changes nothing)`);
 console.log(`  ${years} years: arrived ${totals.arrived} · left ${totals.left} · born ${totals.births} (${totals.nativeParent} with a town-born parent) · died ${totals.deaths} · P ${cen.P}, ${Math.round(100 * cen.native)}% town-born · deepest generation ${deepest}`);
 if (rule !== "none") console.log(`  weddings ${weddings.total}: same species ${weddings.same}, cross-species ${weddings.cross}; ${weddings.native} with a town-born partner (${weddings.bothNative} both); mean wait while single ${weddings.total ? (weddings.waitSum / (2 * weddings.total)).toFixed(1) : "—"} months`);
