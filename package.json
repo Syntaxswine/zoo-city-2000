@@ -1,14 +1,14 @@
 {
-  "name": "zoo-city-2000",
+  "name": "zoo-thefttopia-2000",
   "version": "0.1.0",
   "private": true,
-  "description": "An isometric city builder where anthropomorphic animals live and grow together. Balance residential, commercial and industrial zoning, taxes, and whatever the year throws at you.",
+  "description": "A 3D animal city builder with a rotating build camera and street-level animal exploration, sharing the Zoo City 2000 simulation.",
   "type": "module",
   "license": "MIT",
   "engines": { "node": ">=22" },
   "scripts": {
     "serve": "node tools/serve.mjs",
-    "check": "node tools/check.mjs && node tools/check-closeups.mjs && node tools/check-suits.mjs && node tools/check-commercial-rail.mjs && node tools/check-police-actions.mjs",
+    "check": "node tools/check.mjs && node tools/check-closeups.mjs && node tools/check-suits.mjs && node tools/check-commercial-rail.mjs && node tools/check-police-actions.mjs && node tools/check-three.mjs",
     "playtest": "node tools/playtest.mjs",
     "shots": "node tools/shots.mjs"
   },

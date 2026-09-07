@@ -24,7 +24,7 @@ import { save, load } from "./sim/save.js";
 import { computeFields, recountRosters } from "./sim/fields.js";
 import { art } from "./art/index.js";
 import { toScreen, HALF_H } from "./iso/iso.js";
-import { createRenderer } from "./render.js";
+import { create3DRenderer } from "./three/renderer.js";
 import { createWalkers } from "./walkers.js";
 import { createInput } from "./input.js";
 import { createUI } from "./ui.js";
@@ -130,7 +130,7 @@ function adopt(world, name, { paused = false } = {}) {
   if (app.walkers) app.walkers.notify();
   if (world.events.choice) { app.paused = true; app.ui.showChoice(); }
   store.set(LAST, name);
-  document.title = `ZOO CITY 2000 — ${name}`;
+  document.title = `ZOO THEFTTOPIA 2000 — ${name}`;
 }
 
 app.newCity = ({ seed, noDisasters }) => {
@@ -235,6 +235,16 @@ app.importText = (text) => {
   app.ui.flash(`Imported as "${name}".`);
 };
 
+app.demo = async () => {
+  try {
+    const response = await fetch('./demo-city.json');
+    if (!response.ok) throw new Error('Demo city could not be loaded');
+    adopt(load(await response.text()), 'Thefttopia demo', { paused: false });
+    app.title.close();
+    app.ui.flash('Build this town or press F2 to walk its streets. Space pauses the city.');
+  } catch (error) { app.ui.flash(error.message); }
+};
+
 // ---- clock ------------------------------------------------------------------------------
 // The speed keys only set the speed; they never resume a pause (a paused
 // game stays paused until Space / the pause button — the clock says so).
@@ -325,6 +335,7 @@ function frameBody(now) {
     if (n === MAX_CATCHUP) app.acc = 0;
   }
   app.input.update(dt);
+  app.renderer.update(dt);
   clampCamera();
   app.input.syncCamera(); // a clamp/zoom can move the world tile under a still Inspect cursor
   if (!app.title.isOpen()) { // the painting covers the map; nothing to draw under it
@@ -359,7 +370,7 @@ function boot() {
   if (!world) { name = "zoo"; world = createWorld({ seed: name }); }
   app.world = world;
   app.cityName = name;
-  app.renderer = createRenderer(canvas, world, art);
+  app.renderer = create3DRenderer(canvas, world, app);
   app.walkers = createWalkers(world);
   app.ui = createUI(app);
   app.news = createNews(app); // after the UI: its close() refreshes the badge on the strip

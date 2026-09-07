@@ -38,7 +38,7 @@ export function createTitle(app) {
 
   // ---- the frame: mast, card, bar -------------------------------------------------
   const mast = el("div", "mast");
-  mast.append(el("h1", "", "ZOO CITY 2000"), el("div", "tag", "where animals live and grow together"));
+  mast.append(el("h1", "", "ZOO THEFTTOPIA 2000"), el("div", "tag", "where animals live and grow together"));
   const card = el("div", "modalbox wide tcard");
   card.hidden = true;
   const bar = el("div", "tbar");
@@ -57,6 +57,7 @@ export function createTitle(app) {
     return b;
   };
   mk("new", "New game", () => showPanel("new"));
+  mk("demo", "Explore demo city", () => app.demo());
   mk("continue", "Continue", () => close());
   mk("load", "Load", () => app.load());
   mk("save", "Save", () => app.save());

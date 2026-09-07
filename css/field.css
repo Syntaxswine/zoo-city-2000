@@ -1,3 +1,12 @@
+/* Shared city / street camera controls. */
+.three-hud { position:absolute; bottom:12px; left:50%; transform:translateX(-50%); z-index:4; width:max-content; max-width:calc(100% - 24px); padding:9px 12px; border:1px solid #9d9b88; background:#faf4e5ed; box-shadow:0 3px 15px #172a3230; text-align:center; }
+.three-modes { display:flex; justify-content:center; gap:6px; flex-wrap:wrap; }
+.three-modes button { padding:5px 9px; }
+.three-modes button[aria-pressed="true"] { background:#314c4b; color:#fff8e9; }
+.three-modes select { font:inherit; max-width:100px; }
+.three-help { margin-top:6px; font-size:10px; white-space:normal; }
+body.street-mode #palette, body.street-mode #bars { display:none; }
+body #title h1 { font-size:clamp(24px,4.5vw,64px); letter-spacing:.13em; }
 /* field.css — the field-guide chrome. Parchment, ink, one monospace, 1 px
    borders, uppercase letter-spaced headings, no glow, no big buttons, no
    animation in the chrome. The map canvas fills the window; a 300 px panel
@@ -36,7 +45,7 @@ body {
   flex-wrap: nowrap;
   white-space: nowrap;
 }
-h1 { font-size: 13px; margin: 0 6px 0 0; letter-spacing: 3px; font-weight: 600; flex: none; }
+h1 { font-size: 12px; margin: 0 6px 0 0; letter-spacing: 1px; font-weight: 600; flex: none; }
 h2 { font-size: 11px; margin: 10px 0 6px; font-weight: 600; letter-spacing: 2px; text-transform: uppercase; color: var(--dim); }
 h3 { font-size: 11px; margin: 8px 0 4px; font-weight: 600; letter-spacing: 2px; text-transform: uppercase; color: var(--dim); }
 #tools { display: flex; align-items: center; gap: 2px; flex: none; }
