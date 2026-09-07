@@ -2939,3 +2939,64 @@ like the park's five is one item away if the owner meant tiles; MANSION_P 0.25
 against the two years the shop binds; a mansion on EMPTY chalk the month the
 last item lands; the species-skinned mansion set; the centre bottleneck
 whenever an affluent theft file exists.
+
+## 36. Generations and skills — brainstormed, measured, one fix landed (session 19, 2026-09-07)
+
+The owner opened with freestone's generational growth and skills — *"i think
+[they] would translate well for zoo city 2000"* — and ruled three rounds in one
+sitting; every word is verbatim in
+[PROPOSAL-GENERATIONS-AND-SKILLS-2026-09-07.md](PROPOSAL-GENERATIONS-AND-SKILLS-2026-09-07.md)
+§0. Nothing of the design is built. The proposal carries the measurements, the
+design as ruled (two ladders; twelve divisions plus three owed; skill as ±
+tiles of reach in WALKING tiles with rail free; zoo, centre and cemetery
+citywide; parks nothing), the open questions (§5) and a build order (§7).
+
+**Measured before designing** (three passive instruments: `tools/tenureprobe.mjs`,
+`tools/lineageprobe.mjs`, `tools/reachprobe.mjs`):
+
+| fact | balanced | estate |
+|---|---|---|
+| median months at the current job | 93 | 82 |
+| workers who have held ONE job, ever | 83% | 90% |
+| masters by freestone's ten-year threshold at year 30 | 41% | 37% |
+| a lot's keeper changes once per | 23 lot-years | 19 lot-years |
+| lots with a four-year heir beside the keeper | 81% | 87% |
+| native adults living with no other adult, year 60 | 293 of 293 | 268 of 269 |
+| births with a town-born parent, of ~1,400 | 4 | 2 |
+| deepest generation, even at 90 years | 1 | 1 |
+| today's Chebyshev-6 police cover, homes | 30 | 13 |
+| 7 walking tiles, rail free | 15 | 12 |
+| 10 walking tiles, rail free | 30 | 17 |
+
+So: a flat master threshold makes masters common and species-stratified (bears,
+tortoises, owls; pigs and mice never) — the owner's answer is the lineage
+ratchet, knowledge compounding per GENERATION so short lives iterate faster;
+**natives never breed** (at sixteen a cub becomes a one-animal household and
+nothing merges households), so the wedding's household-merge rule (BACKLOG L1)
+is step zero of the whole arc; and "walking tiles, rail free" is the meat
+carts' Dial policy already in the tree — 7 walking tiles is today's cover on
+the owner's layout, and a station beside the FAR platform reaches 13 homes
+through the line that it reaches by no other measure.
+
+**Built: parks have no workers.** The Large Park's twelve jobs were a leftover
+from when the garden was the zoo (the owner's own diagnosis). `civicJobs` lists
+no Large Park; `jobZone` no longer counts a park as a C job site;
+`save.releaseOrphanJobs` lets a saved city's park hands go at load, silently;
+the card no longer prints a park's jobs. Two regressions in
+`tools/check-civic-campuses.mjs`, mutation-tested 2/2 (drop the repair → red;
+restore the twelve → both red). One access fixture in `tools/check.mjs` had been
+hiring at a Large Park; it is the prison zoo now, built the way a player reaches
+"two tiles off the road" (touching a road stub, then the stub bulldozed), and
+its two checks read as they did. 924 checks; rigs byte-identical (balanced
+`c055aba5`, estate `2ced10f8` — the mayor builds only 1×1 parks).
+
+**Symptom-keyed traps, for whoever comes next.**
+
+| what you see | what it is |
+|---|---|
+| a perl or sed edit reports success and the file is unchanged — or a statement appears on the FIRST line of a module | this tree is CRLF; a pattern anchored on `\n` misses, and a misfire can land at offset 0 (world.js was restored from git). Use an exact-match patch that normalises to LF and writes back in kind |
+| a probe that watches for cubs at `ageMonths === 0` sees no births | the tick counter has advanced by the time the citizens list is read; `c.native` alone is the birth signal |
+| the estate rig's police station covers nothing by any measure | the mayor's `--stations` puts it at the map edge; a reach number from it names a rig with no homes in reach — place the station yourself (`reachprobe --platform`) |
+| lineage never turns twice, whatever the fidelity | not a knob: natives never pair (see above) |
+
+Maker's mark — Fable 5.1, session 19: the one who counted the generations and found one.
