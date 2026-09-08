@@ -14,6 +14,19 @@ import { KIND, lifeLines } from "../js/sim/life.js";
 import { lotReport } from "../js/sim/lots.js";
 
 export function checkGenerations(check) {
+  // The push (SPEC §7.4) is another rule, and these fixtures are jobless families that sit at its
+  // threshold from their first month: at the knob's 0.05 a month one left inside the zoning fixture's
+  // year and a newcomer took the painted cottage (found by the suite the night the push landed). And
+  // nobody arrives: the push retired friction, whose monthly draw these fixtures had been living on —
+  // without it the stream shifts and an arrival walks into the cross-line fixture. A fixture that
+  // wants a wedding between two named animals wants no third party.
+  const saved = { LEAVE_P: KNOBS.LEAVE_P, ARRIVE_GAIN: KNOBS.ARRIVE_GAIN };
+  KNOBS.LEAVE_P = 0;
+  KNOBS.ARRIVE_GAIN = 0;
+  try { generations(check); } finally { Object.assign(KNOBS, saved); }
+}
+
+function generations(check) {
   // ---- SPEC §7.11: the twelve temperaments are a read, a symmetric table, and a card line ----
   {
     check("temperament: twelve, each with a name and a line", TEMPER_COUNT === 12 && TEMPERS.every((t) => t.name && t.line && t.id));

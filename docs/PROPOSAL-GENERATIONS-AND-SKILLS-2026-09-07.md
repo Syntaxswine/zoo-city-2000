@@ -358,7 +358,9 @@ node tools/lineageprobe.mjs --layout estate --years 60     # the ratchet as a sh
 node tools/reachprobe.mjs --layout estate --platform 2     # walking tiles vs Chebyshev; rail free vs priced
 node tools/breedprobe.mjs --layout balanced --rule court   # the household-merge candidates as a pass OUTSIDE the sim; the population ledger by decade (§8)
 node tools/commuteprobe.mjs --layout estate --civics --at-centre  # commute vs the benefit radius and the species' preference; the jobless' nearest open job (§9)
-node tools/leaveprobe.mjs --layout balanced --rule push --thresh 3 --set FRICTION_P=0   # who leaves today and why; the push as a shadow (§10)
+node tools/leaveprobe.mjs --layout estate --years 60 --seed 8                     # who leaves and why, by the sim's own push; the as-decided threshold line (§10e)
+node tools/leaveprobe.mjs --layout estate --set LEAVE_P=0                          # the control: nobody leaves
+node tools/leaveprobe.mjs --layout balanced --rule push --thresh 3 --push-p 0.05   # the OLD rootless shadow, the sim's push off (§10b)
 ```
 
 ## 7. Build order (a sketch, none of it opened)
@@ -370,6 +372,9 @@ node tools/leaveprobe.mjs --layout balanced --rule push --thresh 3 --set FRICTIO
    `c055aba5` → `12427ef4`, estate `2ced10f8` → `747d57d3`; with the five knobs
    neutral (`--set WED_P=0 BIRTH_FULL_MULT=0 TEMPER_*=1`) the balanced rig hashes
    `c055aba5` again, so the bump is exactly those rules (§8e).
+0b. ~~**The migration push**~~ BUILT 2026-09-07, late, in two commits (§10d,
+   §10e): the fields and the tent (`7e701e0`, rigs unmoved but for the two
+   saved fields), then the push in place of friction with roots set at 3 years.
 1. **The band as a READ** — card, census, ticker; `tick − hired`; hash-neutral.
 2. **Parents at birth + the family line on the card** (two ids, saved when present).
 3. **The keeper on the lot card + the succession line**; measure the cadence on
@@ -731,6 +736,81 @@ if it fails, raise `LEAVE_ROOTS_YEARS` before touching a weight; a fire alone
 moves nobody (check d); no household in the archive left with fewer than three
 weighted grievances the month before (the probe asserts it over a rig run); at
 ninety years both arrivals and departures per decade stay above zero.
+
+### 10e. BUILT and measured — 2026-09-07, late
+
+Two commits, as scoped: `7e701e0` (the fields, the tent before the road, the
+knobs unread — stripped of the two saved fields the rigs hash `16dfcc5a` /
+`564c8f1a`, today's tree to the byte; with them `52fde3b4` / `c3843687`) and
+the push itself. **The falsifier holds**: `--set LEAVE_P=0` returns `52fde3b4`
+and `c3843687` — the push draws nothing under the threshold, draw for draw.
+Suite green; fifteen mutants, fifteen caught (the loop's threshold, the
+chance's threshold, roots, the native damp, years from `arrived`, no work
+weighing chronic, a tent reading crime, the fire counting forever, the line,
+the archive cause, the threshold count, campers, the prose, the walker record,
+the record's reasons) on top of commit A's seven.
+
+**One knob moved from the scope: `LEAVE_ROOTS_YEARS` 10 → 3.** The plan said
+the roots damp answers the estate's drain, and it did not at 10 (§10d's
+"raise" meant "strengthen"; the damp is 1/(1 + years/LEAVE_ROOTS_YEARS), so
+strengthening is LOWERING it). Sixty years, disasters on, four seeds —
+arrived / left / P:
+
+| roots | balanced 7 · 8 · 9 · 10 | estate 7 · 8 · 9 · 10 |
+|---|---|---|
+| today (friction; seed 7) | 2,468 / 630 / 2,225 | 1,553 / 450 / 1,646 |
+| control `LEAVE_P=0` (nobody leaves) | — | 988 / 0 / **870** · 1,385 / 0 / 1,686 · 1,232 / 0 / 1,691 · 1,015 / 0 / **874** |
+| 10 (scoped) | 2,692 / 875 / 1,876 · 2,440 / 616 / 2,042 · 3,034 / 922 / 2,131 · 1,605 / 431 / 1,758 | 3,095 / 2,315 / 1,221 · 2,977 / 2,572 / 1,115 · 3,731 / 3,654 / 919 · 3,253 / 2,829 / 1,011 |
+| 5 | 2,424 / 531 / 2,057 (seed 7) | 2,633 / 2,279 / **660** · 2,812 / 1,970 / 1,531 · 2,564 / 2,222 / 1,075 · 3,877 / 3,683 / 979 |
+| **3 (set)** | 2,789 / 693 / 2,028 · 2,230 / 279 / 2,219 · 2,387 / 532 / 2,211 · 1,917 / 274 / 2,005 | 3,057 / 2,079 / **1,498** · 3,110 / 2,223 / **1,517** · 2,125 / 1,242 / **1,607** · 2,653 / 1,986 / **1,326** |
+
+What the table says. At 10 the estate drains on every seed (56–74% of its
+thriving controls). At 5 it is a coin toss (seed 7 fell off a cliff in one
+recession: 1,134 → 577 in a decade, 199 tents, 662 gone — a downturn makes
+every jobless house acute and the tent's five read no work + low spirits +
+no friends). At 3 it holds on all four: 90–95% of the controls that thrive
+(seeds 8, 9) and ABOVE the controls that collapse (seeds 7, 10, where with no
+door out the estate's economy seizes — no vacancies, no V_R, no arrivals after
+thirty years, P 870 at sixty and 564 at ninety). The estate rig is chaotic
+under disasters; a single-seed control is a coin, which is why four seeds. The
+push with roots at 3 is the STEADIER estate: 1,326–1,607 against a control of
+870–1,691.
+
+**The acceptance, re-stated honestly.** The 800–1,400 departures range in §10d
+was calibrated on the ROOTLESS shadow (1,151); roots at 10 already gave
+431–922 across seeds, and at 3 the balanced town loses 274–693 in sixty years
+— fewer than friction's 630 on seed 7, every one a combination and named. The
+owner's stated priority was roots against the drain; that is what 3 buys. The
+estate floor (≥ 80% of control) is met where the control means anything. A fire
+alone moves nobody (checks). NOBODY LEFT UNDER THREE as the sim decided it: 0
+of 370 (balanced) and 0 of 860 (estate) pushed households at 10, 0 of 298 and 0
+of 802 at 3 — the departure record now carries the score and the reasons as
+decided (the month-before read the probe also keeps lags it on 16–68: a home
+burned or a job lost between the read and the roll). The doors at ninety
+(balanced, seed 7, roots 3): arrivals by decade 1,282 · 566 · 161 · 188 · 284 ·
+308 · 261 · 6 · 0 and departures 213 · 135 · 90 · 185 · 33 · 37 · 165 · 21 · 29;
+P 2,485 against the no-push control's 2,407. The arrivals door shuts in the last
+two decades because the town is FULL (V_R ≤ 0, no vacancies), which is the
+pull's own law; the push kept it breathing through eight. The estate at ninety
+with the push: 1,262 (3,928 in, 3,457 out); its control: 564.
+
+What the town reads: *"MOVED AWAY — the Burroweses (4 rabbits) left (12,8): no
+work, no friends and the smoke."* — the surname pluralised as English does (a
+small helper, `theFamily`, also on the ZONED OUT line). Card C5 "Moving away
+takes a combination" with `N left last tick · M households at the threshold
+now`. The archive keeps "left town". `tools/leaveprobe.mjs --rule none` is now
+the sim's own push; `--rule push` zeroes `LEAVE_P` and runs the old shadow.
+
+Two traps for whoever tunes this next. A fixture shop DECAYS within the year
+and takes its jobs with it (so a "single with a job" is unemployed by month
+fourteen — the one-grievance fixtures use retired animals). An unpoliced
+fixture lot crosses `CRIME_HIGH` within the year, a second grievance the
+one-grievance claims must hold off (`CRIME_HIGH: 1000` in those fixtures), and
+a fixture with disasters on once burned the spare cottage and handed a couple
+the smoke. And the lesson under both: NO WORK IS NEVER ALONE FOR LONG — the
+mood rule puts a jobless adult at 30 within the month (BASE 50, NO_JOB −20),
+so a lost job is two points and low spirits follows it: a jobless household
+with no friend is at the threshold from its first month.
 
 ## 9. The commute is not the benefit (the owner's round 5, second ruling)
 

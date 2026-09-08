@@ -14,6 +14,7 @@ import { ZONE, CIVIC, TERRAIN, ROAD, idx, inBounds, capacityOf, jobsOf, jobZone,
 import { useName } from "./use.js";
 import { doorsOf, edgeRoads, commutePath, dial, WALK, nodePath, commuteTime } from "./fields.js";
 import { ageYears, ageMonths, isWorker } from "./census.js";
+import { neutralRate } from "./demand.js";
 import { DEATHS_MAX, KIND, remember } from "./life.js";
 import { archiveCitizen } from "./legacy.js";
 import { pluralSpecies } from "./landmarks.js";
@@ -711,8 +712,77 @@ export function rehouseCampers(world) {
   return housed;
 }
 
+// ---------------------------------------------------------------------------
+// THE PUSH (SPEC §7.4; the owner, 2026-09-07: "migration should definitely be
+// bidirectional. it should take more than just a fire for people to leave, it
+// would have to be a combination of factors"). Nine grievances read at home
+// each month, each yes or no, weighted — a lost job and a burned home acute
+// (LEAVE_W_ACUTE), the rest chronic (LEAVE_W_CHRONIC). At LEAVE_THRESH a
+// household may leave: p = LEAVE_P · (score − LEAVE_THRESH + 1) · roots a
+// month, roots = 1 / (1 + years at this home / LEAVE_ROOTS_YEARS), × LEAVE_NATIVE_DAMP
+// with a town-born adult under the roof. Nothing under the threshold draws: not
+// a fire, not a lost job, not an empty friends list. A camping household reads
+// the five that need no lot. FRICTION — a friendless house wandering off at
+// 0.4% a month — is retired into this as one grievance. Measured before it
+// landed (docs/PROPOSAL-GENERATIONS-AND-SKILLS-2026-09-07.md §10).
+// ---------------------------------------------------------------------------
+
+/** The nine, in the order the line names them. */
+export const LEAVE_FACTORS = Object.freeze(["unemployed", "friendless", "lowMood", "crime", "smoke", "dread", "crowded", "taxed", "burned"]);
+const LEAVE_ACUTE = new Set(["unemployed", "burned"]);
+/** The reasons in prose, for the MOVED AWAY line — the player reads what to fix. */
+export const LEAVE_REASONS = Object.freeze({ unemployed: "no work", friendless: "no friends", lowMood: "low spirits", crime: "the crime", smoke: "the smoke", dread: "the dread", crowded: "the crowding", taxed: "the taxes", burned: "the fire" });
+
+/** The grievances at home this month: { score, reasons, f, present, adults }, or null with nobody present. Pure. */
+export function leaveScore(world, hh, cen = world.last?.census) {
+  const present = hh.members.map((id) => world.byId.get(id)).filter((c) => c && !c.dead && !absent(world, c));
+  if (!present.length) return null;
+  const home = hh.home;
+  const adults = present.filter((c) => ageYears(world, c) >= KNOBS.ADULT_AGE);
+  let mood = 0;
+  for (const c of present) mood += c.mood;
+  const f = {
+    unemployed: adults.some((c) => isWorker(world, c) && c.job < 0),
+    friendless: adults.length > 0 && adults.every((c) => c.friends.length === 0),
+    lowMood: mood / present.length < KNOBS.LEAVE_MOOD_LOW,
+    crime: home >= 0 && world.crime[home] > KNOBS.CRIME_HIGH,
+    smoke: home >= 0 && world.pol[home] > SPECIES_BY_ID[hh.species].polTol,
+    dread: home >= 0 && DIET_OF[hh.species] === "herb" && world.dread[home] >= KNOBS.REHOME_DREAD,
+    crowded: home >= 0 && world.occupants[home] > capacityOf(world, home),
+    taxed: world.rates.R > neutralRate(cen ? cen.P : 0) + KNOBS.LEAVE_TAX_OVER,
+    burned: hh.burnedAt != null && world.tick - hh.burnedAt <= KNOBS.LEAVE_BURNED_MONTHS,
+  };
+  let score = 0;
+  const reasons = [];
+  for (const k of LEAVE_FACTORS) if (f[k]) { score += LEAVE_ACUTE.has(k) ? KNOBS.LEAVE_W_ACUTE : KNOBS.LEAVE_W_CHRONIC; reasons.push(k); }
+  return { score, reasons, f, present, adults };
+}
+
+/** The month's chance of leaving, with its parts: { ...leaveScore, years, native, roots, p }. p is 0 under the threshold. Pure. */
+export function leaveChance(world, hh, cen = world.last?.census) {
+  const s = leaveScore(world, hh, cen);
+  if (!s) return null;
+  const years = Math.max(0, world.tick - (hh.homed ?? hh.arrived)) / 12;
+  const native = s.adults.some((c) => c.native);
+  const roots = (1 / (1 + years / KNOBS.LEAVE_ROOTS_YEARS)) * (native ? KNOBS.LEAVE_NATIVE_DAMP : 1);
+  const p = s.score >= KNOBS.LEAVE_THRESH ? KNOBS.LEAVE_P * (s.score - KNOBS.LEAVE_THRESH + 1) * roots : 0;
+  return { ...s, years, native, roots, p };
+}
+
+/** "the Burroweses", "the Slyfields" — a family by its surname, in the plural. */
+export function theFamily(surname) {
+  return `the ${surname}${/s$/.test(surname) ? "es" : "s"}`;
+}
+
+/** "no work, no friends and the smoke" */
+export function leaveProse(reasons) {
+  const words = reasons.map((k) => LEAVE_REASONS[k] || k);
+  if (words.length <= 1) return words.join("");
+  return `${words.slice(0, -1).join(", ")} and ${words[words.length - 1]}`;
+}
+
 export function citizensTick(world, cen, dem) {
-  const out = { arrived: 0, left: 0, births: 0, weddings: 0, deaths: 0, notices: [], meetings: [], funerals: 0, littersLost: 0, rehomed: 0, zonedOut: 0, zonedOutLines: [] };
+  const out = { arrived: 0, left: 0, births: 0, weddings: 0, deaths: 0, notices: [], meetings: [], funerals: 0, littersLost: 0, rehomed: 0, zonedOut: 0, zonedOutLines: [], atThreshold: 0 };
   const rng = world.rng;
   const tick = world.tick;
   world.meetings = out.meetings;
@@ -764,7 +834,7 @@ export function citizensTick(world, cen, dem) {
       out.left += n;
       out.zonedOut += n;
       world.departures.push({ species: moving.species, surname: moving.surname, n, from });
-      out.zonedOutLines.push(`ZONED OUT — the ${moving.surname}s (${n === 1 ? moving.species : `${n} ${moving.species}s`}) left (${from % world.w},${(from / world.w) | 0}): the lot is ${useName(world.use[from])} use-zoned land now, and nothing within twelve road tiles would have them.`);
+      out.zonedOutLines.push(`ZONED OUT — ${theFamily(moving.surname)} (${n === 1 ? moving.species : `${n} ${pluralSpecies(moving.species)}`}) left (${from % world.w},${(from / world.w) | 0}): the lot is ${useName(world.use[from])} use-zoned land now, and nothing within twelve road tiles would have them.`);
       removeHousehold(world, moving, "zonedOut", from);
     }
   }
@@ -925,48 +995,47 @@ export function citizensTick(world, cen, dem) {
   }
   world.campers = world.campers.filter((c) => c.householdId || c.until > tick);
 
-  // 6. Departures and friction (per household).
+  // 6. Departures: the downturn (a tent, SPEC §7.4 DOWNTURN) and the push
+  //    (§7.4 PUSH; leaveChance above). Friction is gone — a friendless house is
+  //    one grievance and moves nobody alone. Nothing draws under the threshold,
+  //    so LEAVE_P 0 is the tree before the push, draw for draw.
   const VR = world.valves.R;
   for (const hh of world.households) {
-    if (hh.gone || hh.home < 0 || hh.members.length === 0) continue;
+    if (hh.gone || hh.members.length === 0) continue;
     const present = hh.members.map((id) => world.byId.get(id)).filter((c) => c && !c.dead && !absent(world, c));
     // A family whose only remaining member is in a hall pen has nobody at
     // home who can decide to leave, and must retain the household record.
     if (present.length === 0) continue;
-    let unemployed = false;
-    let friends = 0;
-    let mood = 0;
-    let friendless = 0;
-    let adults = 0;
-    for (const c of present) {
-      const worker = isWorker(world, c);
-      if (worker && c.job < 0) unemployed = true;
-      friends += c.friends.length;
-      mood += c.mood;
-      if (ageYears(world, c) >= KNOBS.ADULT_AGE) {
-        adults++;
-        if (c.friends.length === 0) friendless++;
+    if (hh.home >= 0 && VR <= 0) {
+      let unemployed = false;
+      let friends = 0;
+      let mood = 0;
+      for (const c of present) {
+        if (isWorker(world, c) && c.job < 0) unemployed = true;
+        friends += c.friends.length;
+        mood += c.mood;
       }
-    }
-    const nM = present.length;
-    const meanFriends = friends / nM;
-    const meanMood = mood / nM;
-    let p = 0;
-    if (VR <= 0) {
-      p = (unemployed ? KNOBS.LEAVE_P_UNEMP : KNOBS.LEAVE_P_EMP) * -VR * (1 - KNOBS.LEAVE_FRIEND_DAMP * meanFriends) * (1.5 - meanMood / 100);
-    }
-    if (adults > 0 && friendless === adults) p += KNOBS.FRICTION_P;
-    const bear = hh.species === "bear" ? 1 / 1.5 : 1;
-    if (p > 0 && rng.chance(Math.max(0, p * bear))) {
-      if (VR <= 0) {
+      const nM = present.length;
+      const meanFriends = friends / nM;
+      const meanMood = mood / nM;
+      const p = (unemployed ? KNOBS.LEAVE_P_UNEMP : KNOBS.LEAVE_P_EMP) * -VR * (1 - KNOBS.LEAVE_FRIEND_DAMP * meanFriends) * (1.5 - meanMood / 100);
+      const bear = hh.species === "bear" ? 1 / 1.5 : 1;
+      if (p > 0 && rng.chance(Math.max(0, p * bear))) {
         if (startCamping(world, hh)) out.notices.push("CAMPING — the " + hh.surname + " household is staying in a tent until the economy and housing recover.");
         continue;
       }
-      out.left += nM;
-      world.departures = world.departures || [];
-      world.departures.push({ species: hh.species, surname: hh.surname, n: nM, from: hh.home });
-      removeHousehold(world, hh, "left");
     }
+    const lc = leaveChance(world, hh, cen);
+    if (!lc || lc.score < KNOBS.LEAVE_THRESH) continue;
+    out.atThreshold++;
+    if (!(lc.p > 0) || !rng.chance(lc.p)) continue;
+    const n = present.length;
+    out.left += n;
+    world.departures = world.departures || [];
+    world.departures.push({ species: hh.species, surname: hh.surname, n, from: hh.home, score: lc.score, reasons: lc.reasons.slice() }); // the walker layer reads the first four; the probe reads the score as it was decided
+    const where = hh.home >= 0 ? `(${hh.home % world.w},${(hh.home / world.w) | 0})` : "their tent";
+    out.notices.push(`MOVED AWAY — ${theFamily(hh.surname)} (${n === 1 ? hh.species : `${n} ${pluralSpecies(hh.species)}`}) left ${where}: ${leaveProse(lc.reasons)}.`);
+    removeHousehold(world, hh, "left");
   }
 
   // 7. Friendships (200 samples, rotating window).

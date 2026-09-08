@@ -119,7 +119,7 @@ export function tick(world) {
   // leave a departed citizen named as the current oldest resident.
   cen.notables = notables(world);
   // 8. history, report, advisor, milestones
-  world.last = { staleAtJustice, census: cen, demand: dem, budget: bud.fig, grew: lots.grew, decayed: lots.decayed, arrived: cit.arrived, left: cit.left, births: cit.births, weddings: cit.weddings, deaths: cit.deaths, funerals: cit.funerals, littersLost: cit.littersLost, rehomed: cit.rehomed, zonedOut: cit.zonedOut };
+  world.last = { staleAtJustice, census: cen, demand: dem, budget: bud.fig, grew: lots.grew, decayed: lots.decayed, arrived: cit.arrived, left: cit.left, births: cit.births, weddings: cit.weddings, deaths: cit.deaths, funerals: cit.funerals, littersLost: cit.littersLost, rehomed: cit.rehomed, zonedOut: cit.zonedOut, atThreshold: cit.atThreshold };
   world.notices = notices;
   const month = world.tick % 12;
   if (month === 0) {
@@ -206,7 +206,7 @@ export function refreshLast(world) {
   const dem = peekDemand(world, cen);
   const fig = yearlyFigures(world);
   const prev = world.last || {};
-  world.last = { census: cen, demand: dem, budget: fig, grew: prev.grew || 0, decayed: prev.decayed || 0, arrived: prev.arrived || 0, left: prev.left || 0, births: prev.births || 0, weddings: prev.weddings || 0, deaths: prev.deaths || 0, funerals: prev.funerals || 0, littersLost: prev.littersLost || 0, rehomed: prev.rehomed || 0, zonedOut: prev.zonedOut || 0 };
+  world.last = { census: cen, demand: dem, budget: fig, grew: prev.grew || 0, decayed: prev.decayed || 0, arrived: prev.arrived || 0, left: prev.left || 0, births: prev.births || 0, weddings: prev.weddings || 0, deaths: prev.deaths || 0, funerals: prev.funerals || 0, littersLost: prev.littersLost || 0, rehomed: prev.rehomed || 0, zonedOut: prev.zonedOut || 0, atThreshold: prev.atThreshold || 0 };
   world.last.needs = needCensus(world);
   return world.last;
 }

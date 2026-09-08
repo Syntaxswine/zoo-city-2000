@@ -3148,3 +3148,35 @@ must hash balanced `16dfcc5a` and estate `564c8f1a`, today's tree with
 `FRICTION_P=0`. Whoever builds it starts there and nowhere else.
 
 Maker's mark — Fable 5.1, session 19, night: the one who counted who leaves and found one reason where the owner wants several.
+
+## 40. The push, built (session 19, 2026-09-07, late)
+
+Built from §10d in two commits. `7e701e0`: `hh.homed` (stamped by
+`placeHousehold` on every real move; a put-back on the same lot keeps it —
+the dread rehome that found nowhere better, an eviction that kept the lot)
+and `hh.burnedAt` (a home on fire or in rubble at the no-ghosts pass), saved
+only when they say something; the burned-out pitch a TENT before the road;
+the knobs unread. Stripped of the two fields the rigs hash today's `16dfcc5a`
+/ `564c8f1a`; with them `52fde3b4` / `c3843687` — and that pair is the
+falsifier the push returns at `--set LEAVE_P=0`, draw for draw. Then the push:
+`citizens.leaveScore` / `leaveChance` (nine grievances, acute 2 / chronic 1,
+threshold 3, p = 0.05 · (score − 2) · roots; a tent reads the five that need
+no lot), step 6 in place of friction (the downturn roll still pitches tents
+first), the MOVED AWAY line, card C5, `world.last.atThreshold`, the departure
+record carrying `score` and `reasons` as decided, `tools/check-migration.mjs`
+(22 checks; 7 + 15 mutants, all caught), `leaveprobe --rule none` reading the sim's
+own push. One knob moved from the scope: `LEAVE_ROOTS_YEARS` 10 → 3, measured
+on four seeds — at 10 the estate drained to 56–74% of its control, at 3 it
+holds 1,326–1,607 against controls of 870–1,691 (proposal §10e has the table).
+
+| what you see | what it is |
+|---|---|
+| "the Burrowess" | the surname plural — `theFamily(surname)` says "the Burroweses"; the mansion line and the walker label still say `${surname}s` (hash-moving text on the rigs; owed) |
+| the estate's control (`LEAVE_P=0`) at 870 on seed 7 and 1,686 on seed 8 | the estate rig is CHAOTIC under disasters — with no door out it can seize (no vacancies, no V_R, no arrivals after thirty years) and wither; a single-seed control is a coin; measure four |
+| a fixture single with a job is jobless by month fourteen | the fixture shop DECAYS and takes its jobs; the one-grievance fixtures use retired animals |
+| a fixture couple gains "the crime" or "the smoke" | an unpoliced lot crosses `CRIME_HIGH` within the year; a fixture with disasters on burned the spare cottage — `CRIME_HIGH: 1000` and `events.noDisasters` in those fixtures |
+| "left under the threshold" in the probe's month-before read | the profile lags the roll — a home burned or a job lost between the read and step 6; the AS-DECIDED count on the departure record is the law's number, and it is 0 |
+| §10d says roots by 10 | the scope as written; the knob is 3 (`LEAVE_ROOTS_YEARS`), and §10e says why it moved |
+| the arrivals door at ninety years reads 0 | the town is FULL (V_R ≤ 0) — the pull's law, not the push; eight decades of both doors before it |
+
+Maker's mark — Fable 5.1, session 19, late: the one who gave the town a reason to leave, and three years of roots to stay.

@@ -188,10 +188,15 @@ check("tick cost is not catastrophic (the printed number is the instrument; this
 // 78 to a year-12 fire it never had before and the receivership it brings
 // (tools/haloprobe.mjs; handoff §30). The town is in receivership at year
 // 15 now, and the cheat check below reads the mayor's OWN rates because of it.
-// 275-305 is +/-5%: a change that moves the town further than
+// The migration PUSH (2026-09-07, SPEC §7.4) reset 290 to 366: FRICTION (0.4%
+// of friendless households a month, the town's one steady exit) is retired,
+// and in a town this small the nine-grievance push with three-year roots
+// moves fewer animals than friction did — measured, and the number is in the
+// commit message, as this comment asks.
+// 348-384 is +/-5%: a change that moves the town further than
 // that is a FINDING, and re-baselining this line is a deliberate act with a
 // number in the commit message, not a nuisance to be widened away.
-check("the scripted city is still a town", world.citizens.length > 275 && world.citizens.length < 305, `${world.citizens.length} citizens after ${YEARS} years (the band is 275-305, \u00b15% of 290; moving it is a finding, and re-baselining is a decision)`);
+check("the scripted city is still a town", world.citizens.length > 348 && world.citizens.length < 384, `${world.citizens.length} citizens after ${YEARS} years (the band is 348-384, \u00b15% of 366; moving it is a finding, and re-baselining is a decision)`);
 
 // ledger
 let sum = 0;
@@ -322,10 +327,17 @@ function auditIds(w) {
   const { killTotal } = await import("../js/sim/justice.js");
   const saveP = KNOBS.KILL_P;
   const killings0 = F.events.killings;
-  KNOBS.KILL_P = 1 / killTotal(F); // exactly one killing this month (k = floor(1 + r))
-  tick(F);
-  KNOBS.KILL_P = saveP;
-  check("a forced month kills", F.events.killings > 0 && F.events.files.some((f) => f.cause === "killing"), `${F.events.killings}`);
+  // One killer is drawn a month at KILL_P = 1/killTotal (k = floor(1 + r)); a killer with no adult in reach kills nobody, so
+  // the month is forced again with one more draw each time, as the conviction rig below already does (the file of an old
+  // killing expires, so the claim is read against the count before the forced month, not against zero).
+  let forced = 0;
+  while (F.events.killings === killings0 && forced < 4) {
+    KNOBS.KILL_P = (forced + 1) / Math.max(1e-9, killTotal(F));
+    tick(F);
+    KNOBS.KILL_P = saveP;
+    forced++;
+  }
+  check("a forced month kills", F.events.killings > killings0 && F.events.files.some((f) => f.cause === "killing"), `${killings0} → ${F.events.killings} in ${forced} forced month${forced === 1 ? "" : "s"}`);
   // The walker layer's cue: one record per killing, the killer alive, the victim gone, named.
   const recs = F.predations || [];
   check("a killing publishes a predation record: the killer alive, the neighbour scrubbed and named", recs.length === F.events.killings - killings0 && recs.every((r) => F.byId.has(r.killer) && !F.byId.has(r.victim.id) && r.victimHome >= 0 && r.killerHome >= 0 && typeof r.victim.name === "string" && r.victim.name.length > 0 && typeof r.victim.species === "string"), `${recs.length} records for ${F.events.killings - killings0} killings`);
@@ -1041,8 +1053,9 @@ function cameraJusticeWorld(){
     }
     const cen = census(W);
     cen.policeStations = stations;
+    const arrests0 = W.events.arrests.length; // the scripted city may carry an arrest of its own from before the save; the trial counts only its own
     JU.filesTick(W, cen, []);
-    return { n: files.length, closed: files.filter((f) => f.closed).length, arrests: W.events.arrests.length };
+    return { n: files.length, closed: files.filter((f) => f.closed).length, arrests: W.events.arrests.length - arrests0 };
   };
   const dark = trial(0, 1);
   const lit = trial(KNOBS.CAM_EFFECT, 1);
@@ -1612,7 +1625,8 @@ function cameraJusticeWorld(){
   tick(G); // this one's census counts the riders
   const ridersG = G.citizens.filter((c) => c.path && rides(c.path));
   const quicker = ridersG.every((c) => { const w0 = roadPath(G, c.path[0] & 0x7fff, c.path[c.path.length - 1] & 0x7fff); return !w0 || commuteTime(c.path) <= w0.length - 1 + 1e-9; });
-  check("rail: riders on the scripted city, each no slower than the walk; the census counts them", ridersG.length > 0 && quicker && G.last.census.riders === ridersG.length && G.last.census.stations === 2, `riders ${ridersG.length} · census ${G.last.census.riders} · stations ${G.last.census.stations} · traffic ${trafficBefore} → ${(() => { let t = 0; for (let i = 0; i < G.w * G.h; i++) t += G.traffic[i]; return t; })()}`);
+  const cenG = census(G); // a fresh count: last.census is the tick's OPENING census, and a rider hired at that tick's job search is not in it
+  check("rail: riders on the scripted city, each no slower than the walk; the census counts them", ridersG.length > 0 && quicker && cenG.riders === ridersG.length && cenG.stations === 2, `riders ${ridersG.length} · census ${G.last.census.riders} · stations ${G.last.census.stations} · traffic ${trafficBefore} → ${(() => { let t = 0; for (let i = 0; i < G.w * G.h; i++) t += G.traffic[i]; return t; })()}`);
   const H = load(save(G));
   for (let t = 0; t < 12; t++) { tick(G); tick(H); }
   check("rail: save → load → 12 ticks with rail and riders hash-equals", stateHash(G) === stateHash(H), `${stateHash(G)} vs ${stateHash(H)}`);
@@ -6667,7 +6681,7 @@ if (existsSync(artIndex)) {
   const { createMayor } = await import("./mayor.mjs");
   const mayor = createMayor(M, { layout: "balanced" });
   for (let t = 0; t < 48; t++) { mayor.month(t); tick(M); }
-  const cen = M.last.census;
+  const cen = census(M); // a fresh count: last.census is the final tick's OPENING census, and a block that joined during that tick is not in it
   let badParts = 0, onParts = 0, overCap = 0, anchors = 0;
   for (let i = 0; i < M.w * M.h; i++) {
     const b = M.big[i];

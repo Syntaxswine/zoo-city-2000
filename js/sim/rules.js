@@ -126,11 +126,11 @@ export const KNOBS = {
   LEAVE_P_UNEMP: 0.06,
   LEAVE_P_EMP: 0.015,
   LEAVE_FRIEND_DAMP: 0.2,
-  FRICTION_P: 0.004,
-  // The PUSH (SPEC §7.4; the owner, 2026-09-07: "it should take more than just a fire for people to
-  // leave, it would have to be a combination of factors"). Nine grievances read at home each month,
-  // weighted; at LEAVE_THRESH a household may leave. Unread until the push lands in place of
-  // FRICTION_P (the next commit); the fields it reads, hh.homed and hh.burnedAt, are stamped now.
+  // The PUSH (SPEC §7.4; citizens.leaveChance; the owner, 2026-09-07: "it should take more than just
+  // a fire for people to leave, it would have to be a combination of factors"). Nine grievances read
+  // at home each month, weighted; at LEAVE_THRESH a household may leave. FRICTION_P (a friendless
+  // house wandering off at 0.4% a month) is retired into it as one grievance. LEAVE_P 0 is the tree
+  // before the push, draw for draw.
   LEAVE_THRESH: 3,          // weighted grievances before a household may leave
   LEAVE_P: 0.05,            // a month per point at or over: p = LEAVE_P · (score − LEAVE_THRESH + 1) · roots
   LEAVE_W_ACUTE: 2,         // a lost job; a burned home
@@ -138,7 +138,7 @@ export const KNOBS = {
   LEAVE_MOOD_LOW: 40,       // mean mood under this is a grievance
   LEAVE_TAX_OVER: 1,        // the R rate this many points above neutral is a grievance
   LEAVE_BURNED_MONTHS: 12,  // a burned home counts for this long
-  LEAVE_ROOTS_YEARS: 10,    // roots = 1 / (1 + years at this home / LEAVE_ROOTS_YEARS)
+  LEAVE_ROOTS_YEARS: 3,     // roots = 1 / (1 + years at this home / LEAVE_ROOTS_YEARS); scoped at 10, set at 3 when measured — at 10 the estate drained to 56–74% of its control across three seeds, at 3 it keeps 91–98% (proposal §10e)
   LEAVE_NATIVE_DAMP: 0.5,   // × when a town-born adult lives under the roof
   BIRTH_DIV: 96,
   BIRTH_FULL_MULT: 0.25,
@@ -502,6 +502,11 @@ export const RULES = Object.freeze([
     id: "C4", title: "Weddings: a single courts within twelve road tiles",
     formula: "a single (the only adult at home) courts at 1/12 a month within 12 road tiles: 1 in 10 looks across the predator line, else its own species, else anyone but predator and prey; the twelve temperaments weigh the choice (kindred ×1.5, alike ×1.25, crossed ×0.5); the lot with room hosts the other household; 1 couple in 10 are companions and keep no litter ; a FULL home breeds at ×0.25 and goes over capacity — the push toward a storey",
     live: (w) => { const hhs = w.households.filter((h) => !h.gone); const mixed = hhs.filter((h) => new Set(h.members.map((id) => w.byId.get(id)?.species).filter(Boolean)).size > 1).length; return `${w.last.weddings || 0} wedding${w.last.weddings === 1 ? "" : "s"} last tick · ${hhs.filter((h) => h.companions).length} companion households · ${mixed} mixed households`; },
+  },
+  {
+    id: "C5", title: "Moving away takes a combination",
+    formula: "nine grievances read at home each month — no work 2 · a burned home 2 · no friends 1 · low spirits (mood < 40) 1 · crime 1 · smoke 1 · dread 1 · crowding 1 · taxes (R rate > neutral + 1) 1; a tent reads the five that need no lot ; at 3 a household may leave: p = 0.05 · (score − 2) · roots a month, roots = 1/(1 + years at this home/3), halved with a town-born adult under the roof ; nothing under 3 moves anyone — not a fire, not a lost job, not an empty friends list ; the line names the reasons, the archive keeps them as \"left town\" ; a downturn (V_R ≤ 0) still pitches tents",
+    live: (w) => `${w.last.left} left last tick · ${w.last.atThreshold || 0} household${w.last.atThreshold === 1 ? "" : "s"} at the threshold now`,
   },
   {
     id: "C4", title: "Prey flight",

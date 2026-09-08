@@ -640,9 +640,25 @@ CAMPERS (V_R > 0 and vacantR == 0): up to 8 named campers with tents beside the
         edge road; they leave after 3 months. Unmet demand with a face.
 SCOUT   (a species' arrival weight ≥ 2× base and it has no residents): ONE
         scout of that species walks the roads for a month. Hint before earned.
-LEAVE  (V_R <= 0): per household per month
+DOWNTURN (V_R <= 0): per housed household per month — a TENT, never the road
         p = (anyUnemployed ? 0.06 : 0.015) · (−V_R) · (1 − 0.2·meanFriends) · (1.5 − meanMood/100)
-FRICTION: 0.4% of FRIENDLESS adults' households per month wander off regardless
+PUSH   (2026-09-07; `citizens.leaveChance`): nine grievances read at home each month,
+        each yes or no, weighted — no work (an adult worker with no job) 2 · a burned home
+        (`burnedAt` within LEAVE_BURNED_MONTHS 12) 2 · no friends (no adult has one) 1 ·
+        low spirits (mean mood < LEAVE_MOOD_LOW 40) 1 · crime (> CRIME_HIGH at home) 1 ·
+        smoke (pollution > the label species' tolerance) 1 · dread (a herbivore label at
+        REHOME_DREAD) 1 · crowding (over capacity) 1 · taxes (R rate > neutral +
+        LEAVE_TAX_OVER 1) 1. A camping household reads the five that need no lot.
+        score ≥ LEAVE_THRESH 3 → p = LEAVE_P 0.05 · (score − 3 + 1) · roots a month
+        roots = 1 / (1 + years at this home (`homed`) / LEAVE_ROOTS_YEARS 3)
+                × (a town-born adult under the roof ? LEAVE_NATIVE_DAMP 0.5 : 1)
+        NOTHING UNDER THE THRESHOLD DRAWS: not a fire, not a lost job, not an empty
+        friends list — LEAVE_P 0 is the tree before the push, draw for draw. The line
+        names the reasons ("MOVED AWAY — the Burrowes (4 rabbits) left (12,8): no work,
+        no friends and the smoke."); the archive keeps "left town"; the walker layer
+        gets the departure. FRICTION — 0.4% of friendless households a month wandering
+        off regardless — is retired into this as one grievance (2026-09-07). Measured
+        before it landed: docs/PROPOSAL-GENERATIONS-AND-SKILLS-2026-09-07.md §10.
 HOMELESS (the no-ghosts pass): a home that is rubble, a road or gone → rehome within
         12 road tiles, else a TENT (as the evicted and the displaced; 2026-09-07 — a
         fire alone moves nobody out of town), else leave ("homeless" in the archive)
