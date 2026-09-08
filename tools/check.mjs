@@ -5819,8 +5819,8 @@ check("no Math.random under js/", mathRandom.length === 0, mathRandom.join(", ")
     && palette.buttons.get("bulldoze").classList.contains("on")
     && [...palette.buttons].filter(([, b]) => b.attributes["aria-pressed"] === "true").length === 1;
   globalThis.document = priorDocument;
-  check("palette: twenty-eight accessible buttons paint once; pointer, click, cost preview and active state stay synchronized",
-    clickParity && semanticActive && focusHoverStable && made.filter((e) => e.tagName === "CANVAS").length === 28
+  check("palette: twenty-eight accessible emoji buttons; pointer, click, cost preview and active state stay synchronized",
+    clickParity && semanticActive && focusHoverStable && made.filter((e) => e.tagName === "CANVAS").length === 0
       && costs.some((x) => x === "cost:bulldoze:true") && costs.filter((x) => x === "restore").length === 30,
     JSON.stringify({ buttons: palette.buttons.size, canvases: made.filter((e) => e.tagName === "CANVAS").length, selected, costs: costs.length, semanticActive, focusHoverStable }));
   const policePanel = made.find(e => e.className === "police-actions");
