@@ -64,6 +64,7 @@ export function yearlyFigures(world) {
   let rails = 0, railBridges = 0;
   let stations = 0;
   let cams = 0;
+  let doctors = 0, hospitals = 0;
   let farms = 0, cemeteries = 0, sanitationWorks = 0, garbageDepots = 0;
   let libraries = 0, universities = 0, galleries = 0, amphitheaters = 0; // knowledge and culture (SPEC §9e): billed whether or not a road reaches them, like every civic
   const n = world.w * world.h;
@@ -76,6 +77,8 @@ export function yearlyFigures(world) {
     else if (world.road[i] === ROAD.BRIDGE) bridges++;
     tiers += world.tier[i];
     if (world.zone[i] === ZONE.M && world.tier[i] > 0 && !isPart(world, i)) markets++; // the licence inspects a hall, not its tiles
+    if (world.civic[i] === CIVIC.DOCTOR) doctors++;
+    if (world.civic[i] === CIVIC.HOSPITAL) hospitals++;
     if (world.civic[i] === CIVIC.FARM) farms++;
     if (world.civic[i] === CIVIC.CEMETERY) cemeteries++;
     if (world.civic[i] === CIVIC.SANITATION) sanitationWorks++;
@@ -93,10 +96,11 @@ export function yearlyFigures(world) {
   }
   let upkeepYr = KNOBS.UPKEEP_CITIZEN * citizens.length + KNOBS.UPKEEP_ROAD * roads + KNOBS.UPKEEP_BRIDGE * bridges + KNOBS.UPKEEP_TIER * tiers + KNOBS.UPKEEP_PARK * parks + KNOBS.UPKEEP_LARGE_PARK * largeParks + KNOBS.UPKEEP_ZOO * zoos + KNOBS.UPKEEP_STATION * (fireStations + policeStations) + KNOBS.UPKEEP_CENTRE * centres + KNOBS.UPKEEP_WALL * walls + KNOBS.UPKEEP_RAIL * (rails - railBridges) + KNOBS.UPKEEP_RAIL_BRIDGE * railBridges + KNOBS.UPKEEP_STATION_RAIL * stations + (licence ? KNOBS.UPKEEP_LICENCE * markets : 0) + (cams > 0 ? KNOBS.UPKEEP_CAM_NET : 0)
     + KNOBS.UPKEEP_LIBRARY * libraries + KNOBS.UPKEEP_UNIVERSITY * universities + KNOBS.UPKEEP_GALLERY * galleries + KNOBS.UPKEEP_AMPHITHEATER * amphitheaters;
+  upkeepYr += doctors * KNOBS.UPKEEP_DOCTOR + hospitals * KNOBS.UPKEEP_HOSPITAL;
   upkeepYr += farms * KNOBS.UPKEEP_FARM + cemeteries * KNOBS.UPKEEP_CEMETERY + sanitationWorks * KNOBS.UPKEEP_SANITATION + garbageDepots * KNOBS.UPKEEP_GARBAGE;
   const winter = world.events.active.find((e) => e.id === "bearWinter");
   if (winter) upkeepYr *= 0.8;
-  return { farms, cemeteries, sanitationWorks, garbageDepots, incomeYr: Math.round(incomeYr), upkeepYr: Math.round(upkeepYr), cutYr: Math.round(cutYr), taxByClass, fc, fi, fm, roads, bridges, parks, largeParks, zoos, fireStations, policeStations, centres, markets, walls, rails, railBridges, stations, cams, licence, libraries, universities, galleries, amphitheaters };
+  return { doctors, hospitals, farms, cemeteries, sanitationWorks, garbageDepots, incomeYr: Math.round(incomeYr), upkeepYr: Math.round(upkeepYr), cutYr: Math.round(cutYr), taxByClass, fc, fi, fm, roads, bridges, parks, largeParks, zoos, fireStations, policeStations, centres, markets, walls, rails, railBridges, stations, cams, licence, libraries, universities, galleries, amphitheaters };
 }
 
 /** The monthly slice: post tax and upkeep, apply receivership rules. */

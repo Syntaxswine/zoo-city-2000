@@ -34,16 +34,18 @@ export const TOOLS = Object.freeze([
   row(21, "gallery", "M", "Gallery", { kind: "gallery" }, { kind: "civic", args: ["gallery", 2] }, "place a 2×2 gallery beside a road; culture +4 mood and land value within 5 tiles of it"),
   row(22, "amphitheater", "T", "Amphitheater", { kind: "amphitheater" }, { kind: "civic", args: ["amphitheater", 3] }, "place a 3×3 amphitheater beside a road; culture +8 over the nearest eighth of the map's tiles"),
   row(23, "farm", "X", "Farm", { kind: "farm" }, { kind: "civic", args: ["farm", 2] }, "2×2 riverbank farm beside a road; feeds 25/50/100/200/400 villagers by chapter; 12 jobs"),
-  row(24, "cemetery", "C", "Cemetery", { kind: "cemetery" }, { kind: "civic", args: ["cemetery", 2] }, "2×2 citywide memorial; no workers or road required; inspect to search permanent citizen records"),
+  row(24, "cemetery", "C", "Cemetery", { kind: "cemetery" }, { kind: "civic", args: ["cemetery", 6] }, "6×6 citywide memorial; one per city; no workers or road required; inspect to search permanent citizen records"),
   row(25, "sanitation", "J", "Sanitation", { kind: "sanitation" }, { kind: "civic", args: ["sanitation", 3] }, "3×3 treatment works beside a road; serves 750 villagers within 7 tiles and halves household mess"),
   row(26, "garbage", "Q", "Garbage", { kind: "garbage" }, { kind: "civic", args: ["garbage", 2] }, "2×2 collection depot beside a road; serves 750 villagers within 10 tiles"),
+  row(27, "doctor", "[", "Doctor’s office", { kind: "doctor" }, { kind: "civic", args: ["doctor", 2] }, "2×2 beside a road; preventive care within 7 tiles; unlocks after Chapter 2"),
+  row(28, "hospital", "]", "Hospital", { kind: "hospital" }, { kind: "civic", args: ["hospital", 3] }, "3×3 beside a road; stronger preventive care over the nearest half of the map; Chapter 4"),
 ]);
 // There is no Estate tool (SPEC §9f): a mansion is never placed. It RISES, like a storey, where an address has become affluent —
 // the owner: "if there are enough positive things near you it happens naturally like when the building upgrades to an apartment building".
 
 export const TOOL_BY_ID = Object.freeze(Object.fromEntries(TOOLS.map((tool) => [tool.id, tool])));
 export const TOOL_BY_KEY = Object.freeze(Object.fromEntries(TOOLS.map((tool) => [tool.key.toUpperCase(), tool])));
-export const PLACE_TOOLS = Object.freeze(TOOLS.filter((tool) => ["farm", "cemetery", "sanitation", "garbage", "station", "park", "largePark", "zoo", "centre", "police", "fire", "library", "university", "gallery", "amphitheater"].includes(tool.op.kind)).map((tool) => tool.id));
+export const PLACE_TOOLS = Object.freeze(TOOLS.filter((tool) => ["doctor", "hospital", "farm", "cemetery", "sanitation", "garbage", "station", "park", "largePark", "zoo", "centre", "police", "fire", "library", "university", "gallery", "amphitheater"].includes(tool.op.kind)).map((tool) => tool.id));
 /**
  * Tools that get a GHOST under the cursor — the ground diamond
  * (`art.overlay("ghost")`), green where the tile will take the thing and red

@@ -165,7 +165,7 @@ export function costOf(world, op) {
   const tiles = [];
   // Every footprint a tile op writes — the four knowledge-and-culture kinds included: until session 18 the list stopped at
   // the centre, so a Library could be dropped on an occupied tent (found while building the wealth arc; fixed as seen).
-  if (["zone", "road", "rail", "station", "wall", "bulldoze", "tree", "park", "largePark", "zoo", "fire", "police", "centre", "library", "university", "gallery", "amphitheater", "farm", "cemetery", "sanitation", "garbage"].includes(op.kind)) {
+  if (["zone", "road", "rail", "station", "wall", "bulldoze", "tree", "park", "largePark", "zoo", "fire", "police", "centre", "library", "university", "gallery", "amphitheater", "farm", "cemetery", "sanitation", "garbage", "doctor", "hospital"].includes(op.kind)) {
     const side = CIVIC_SIDE[op.kind] || 1;
     const requested = op.tiles || (op.x0 != null ? rect(world, op) : Array.from({ length: side * side }, (_, k) => idx(world, op.tx + k % side, op.ty + Math.floor(k / side))));
     if (requested.some(i => campAt(world, i))) return { cost: 0, tiles, reason: "someone is camping here — provide housing before building" };
@@ -246,7 +246,8 @@ export function costOf(world, op) {
       }
       break;
     }
-    case "park": case "fire": case "police": case "centre": case "largePark": case "zoo": case "library": case "university": case "gallery": case "amphitheater": case "farm": case "cemetery": case "sanitation": case "garbage": {
+    case "park": case "fire": case "police": case "centre": case "largePark": case "zoo": case "library": case "university": case "gallery": case "amphitheater": case "farm": case "cemetery": case "sanitation": case "garbage": case "doctor": case "hospital": {
+      if (op.kind === "cemetery" && world.civic.includes(CIVIC.CEMETERY)) return { cost: 0, tiles: [], reason: "Only one cemetery is allowed per city" };
       const side = CIVIC_SIDE[op.kind]; // 1 the park · 2 the Library and the Gallery · 3 the campuses (world.js)
       for (let dy = 0; dy < side; dy++) for (let dx = 0; dx < side; dx++) {
         const tx = op.tx + dx, ty = op.ty + dy;
@@ -475,11 +476,11 @@ function applyOperation(world, op, { log = true } = {}) {
       case "tree":
         world.terrain[i] = TERRAIN.TREE;
         break;
-      case "park": case "fire": case "police": case "centre": case "largePark": case "zoo": case "library": case "university": case "gallery": case "amphitheater": case "farm": case "cemetery": case "sanitation": case "garbage": {
+      case "park": case "fire": case "police": case "centre": case "largePark": case "zoo": case "library": case "university": case "gallery": case "amphitheater": case "farm": case "cemetery": case "sanitation": case "garbage": case "doctor": case "hospital": {
         world.terrain[i] = TERRAIN.GRASS;
         const a = idx(world, op.tx, op.ty), dx = i % world.w - op.tx, dy = ((i / world.w) | 0) - op.ty;
         world.civic[i] = i === a ? CIVIC_OF_KIND[op.kind] : CIVIC.PART;
-        world.civicSize[i] = i === a ? CIVIC_SIDE[op.kind] : 128 | dx | dy << 2;
+        world.civicSize[i] = i === a ? CIVIC_SIDE[op.kind] : CIVIC_SIDE[op.kind] > 4 ? 192 | dx | dy << 3 : 128 | dx | dy << 2;
         civics = true;
         break;
       }

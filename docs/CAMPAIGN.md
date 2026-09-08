@@ -18,8 +18,8 @@ month. Farming improvements apply automatically to every existing farm.
 | --- | ---: | --- | ---: |
 | The River Settlement | 100 | Roads, Low residential, Low meat, farms, fire stations | 25 |
 | The Town | 500 | Police, cemeteries, Low commercial and industrial | 50 |
-| The City | 1,500 | Libraries, galleries, small and large parks, zoos, pacification centres, High R/C/I | 100 |
-| The Sanitation Crisis | 3,000 plus sanitation goals | Sanitation works and garbage depots | 200 |
+| The City | 1,500 | Doctors’ offices, libraries, galleries, small and large parks, zoos, pacification centres, High R/C/I | 100 |
+| The Sanitation Crisis | 3,000 plus sanitation goals | Hospitals, sanitation works and garbage depots | 200 |
 | The Metropolis | Open-ended | Every remaining tool, including High meat | 400 |
 
 Inspection, demolition, saving, undo, taxes and game controls remain available.
@@ -48,12 +48,39 @@ farm capacity supports all villagers.
 
 ## Cemeteries
 
-A cemetery is 2×2, costs §300 and §60/year, and has no workers, road
+A cemetery is 6×6, costs §300 and §60/year, and has no workers, road
 requirement or coverage radius. As specified in the generations proposal,
 it reads the permanent citywide archive. Inspect it to search remembered
 citizens by name, species or departure/death cause and open their records.
 The latest 200 matching records are shown; search covers the entire archive.
 Existing funeral friendship and mourning rules remain unchanged.
+Only one cemetery may exist per city, in both campaign and sandbox. It unlocks
+in Chapter 2. Older 2×2 cemeteries remain intact and count toward the limit;
+demolish and rebuild to use the new size. Demolition never deletes the archive.
+
+## Doctors and hospitals
+
+Doctors’ offices unlock when Chapter 2 completes: sustain 500 fed villagers
+for three months. Hospitals unlock at the beginning of Chapter 4.
+
+| Facility | Footprint | Build | Annual upkeep | Jobs | Coverage |
+| --- | --- | ---: | ---: | ---: | --- |
+| Doctor’s office | 2×2 | §600 | §180 | 4 | Seven tiles from the footprint |
+| Hospital | 3×3 | §4,000 | §1,200 | 16 | Nearest half of the map’s tiles, exactly like a university |
+
+Both require adjacent roads for placement, and road access and a dry,
+unburned footprint to operate. Coverage respects walls and gates. Selecting
+either tool shows existing coverage. As with other public services, there is
+no staffing gate. Healthcare also operates in sandbox cities.
+
+Each month living at home under medical coverage earns a small natural-lifespan
+extension: 0.01 months for a doctor or 0.03 for a hospital. Hospital care wins;
+overlapping facilities never stack. For example, ten years of hospital care
+earns 3.6 extra months. The total is capped at 3% of the citizen’s original
+natural lifespan. Earned care is saved per citizen and is retained after a move
+or service closure. Custody and livestock pens do not receive home-based care.
+This delays natural aging deaths only; it does not prevent violence or disasters.
+Illness and hospital admissions are not simulated in this version.
 
 ## Sanitation and garbage
 
@@ -87,7 +114,9 @@ the stability streak; the Rules tab explains all campaign mechanics.
 
 `flags.campaign` stores chapter, stable months, chapter entry tick, garbage and
 sewage. Normal civic arrays store the four buildings using appended IDs 13–16.
-Coverage and food are derived. Save/load validates campaign values and hashes
+Medical buildings append IDs 17–18; larger civic parts use a new offset flag
+while retaining support for older part bytes. Coverage and food are derived.
+Save/load validates campaign values and earned care bonuses and hashes
 them; older saves receive no campaign state. Replay uses the original founding
 mode and seed. New civics use code-native solids and the existing art pipeline.
 

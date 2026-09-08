@@ -5696,23 +5696,23 @@ check("no Math.random under js/", mathRandom.length === 0, mathRandom.join(", ")
   const HC = await import("./headless-canvas.mjs");
   HC.installCanvas();
 
-  const ids = ["R", "C", "I", "M", "road", "wall", "rail", "station", "tree", "park", "zoo", "centre", "police", "fire", "inspect", "bulldoze", "largePark", "camera", "library", "university", "gallery", "amphitheater", "farm", "cemetery", "sanitation", "garbage"];
-  const keys = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "Z", "V", "P", "F", "I", "B", "G", "E", "K", "Y", "M", "T", "X", "C", "J", "Q"];
-  const orders = Array.from({ length: 26 }, (_, i) => i + 1);
-  check("palette: the canonical registry has the owner's exact twenty-six tools, order and unique keys",
+  const ids = ["R", "C", "I", "M", "road", "wall", "rail", "station", "tree", "park", "zoo", "centre", "police", "fire", "inspect", "bulldoze", "largePark", "camera", "library", "university", "gallery", "amphitheater", "farm", "cemetery", "sanitation", "garbage", "doctor", "hospital"];
+  const keys = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "Z", "V", "P", "F", "I", "B", "G", "E", "K", "Y", "M", "T", "X", "C", "J", "Q", "[", "]"];
+  const orders = Array.from({ length: 28 }, (_, i) => i + 1);
+  check("palette: the canonical registry has the owner's exact twenty-eight tools, order and unique keys",
     JSON.stringify(TOOLS.map((t) => t.id)) === JSON.stringify(ids)
       && JSON.stringify(TOOLS.map((t) => t.key)) === JSON.stringify(keys)
       && JSON.stringify(TOOLS.map((t) => t.order)) === JSON.stringify(orders)
-      && new Set(TOOLS.map((t) => t.key.toUpperCase())).size === 26
+      && new Set(TOOLS.map((t) => t.key.toUpperCase())).size === 28
       && TOOLS.every((t) => TOOL_BY_ID[t.id] === t && TOOL_BY_KEY[t.key.toUpperCase()] === t));
-  const expectedKinds = ["zone", "zone", "zone", "zone", "road", "wall", "rail", "station", "tree", "park", "zoo", "centre", "police", "fire", "inspect", "bulldoze", "largePark", "camera", "library", "university", "gallery", "amphitheater", "farm", "cemetery", "sanitation", "garbage"];
+  const expectedKinds = ["zone", "zone", "zone", "zone", "road", "wall", "rail", "station", "tree", "park", "zoo", "centre", "police", "fire", "inspect", "bulldoze", "largePark", "camera", "library", "university", "gallery", "amphitheater", "farm", "cemetery", "sanitation", "garbage", "doctor", "hospital"];
   check("palette: every ordered row carries its exact operation and the four zones keep R/C/I/M identity",
     JSON.stringify(TOOLS.map((t) => t.op.kind)) === JSON.stringify(expectedKinds)
       && JSON.stringify(TOOLS.slice(0, 4).map((t) => t.op.zone)) === JSON.stringify([ZONE.R, ZONE.C, ZONE.I, ZONE.M])
       && TOOLS.every((t) => labelForOp(t.op) === t.label));
   check("palette: no build binding is WASD and place-tool classification is derived from the registry",
     TOOLS.every((t) => !["W", "A", "S", "D"].includes(t.key.toUpperCase()))
-      && JSON.stringify(PLACE_TOOLS) === JSON.stringify(["station", "park", "zoo", "centre", "police", "fire", "largePark", "library", "university", "gallery", "amphitheater", "farm", "cemetery", "sanitation", "garbage"]));
+      && JSON.stringify(PLACE_TOOLS) === JSON.stringify(["station", "park", "zoo", "centre", "police", "fire", "largePark", "library", "university", "gallery", "amphitheater", "farm", "cemetery", "sanitation", "garbage", "doctor", "hospital"]));
 
   const opsSrc = readFileSync(path.join(ROOT, "js", "sim", "ops.js"), "utf8");
   const costBody = opsSrc.slice(opsSrc.indexOf("export function costOf"), opsSrc.indexOf("function snapshot"));
@@ -5738,7 +5738,7 @@ check("no Math.random under js/", mathRandom.length === 0, mathRandom.join(", ")
       iconRows.push(`${tool.id}:${sprite.name}`);
     } catch (e) { spriteFailures++; iconRows.push(`${tool.id}:ERROR ${e.message}`); }
   }
-  const expectedSprites = ["R1-cottage-0", "C1-shop-0", "I1-shed-0", "M1-stall-0", "road-5", "wall-5", "rail-5", "station-ns", "tree-round", "park", "civic-zoo-3x3", "civic-centre-3x3", "civic-police-3x3", "civic-fire-3x3", "cursor", "rubble", "civic-largePark-3x3", "camera-0", "civic-library-2x2", "civic-university-3x3", "civic-gallery-2x2", "civic-amphitheater-3x3", "civic-farm-2x2", "civic-cemetery-2x2", "civic-sanitation-3x3", "civic-garbage-2x2"];
+  const expectedSprites = ["R1-cottage-0", "C1-shop-0", "I1-shed-0", "M1-stall-0", "road-5", "wall-5", "rail-5", "station-ns", "tree-round", "park", "civic-zoo-3x3", "civic-centre-3x3", "civic-police-3x3", "civic-fire-3x3", "cursor", "rubble", "civic-largePark-3x3", "camera-0", "civic-library-2x2", "civic-university-3x3", "civic-gallery-2x2", "civic-amphitheater-3x3", "civic-farm-2x2", "civic-cemetery-6x6", "civic-sanitation-3x3", "civic-garbage-2x2", "civic-doctor-2x2", "civic-hospital-3x3"];
   const scaled = HC.createCanvas(1, 1);
   const scaledSprite = spriteForTool(art, "R");
   paintSprite(scaled, scaledSprite, 2);
@@ -5750,7 +5750,7 @@ check("no Math.random under js/", mathRandom.length === 0, mathRandom.join(", ")
       for (let c = 0; c < 4; c++) if (scaled._data[p + c] !== scaled._data[q + c]) nearest = false;
     }
   }
-  check("palette: all twenty-six representative sprites resolve, paint nonblank once, and scale nearest-neighbour",
+  check("palette: all twenty-eight representative sprites resolve, paint nonblank once, and scale nearest-neighbour",
     spriteFailures === 0 && nearest && JSON.stringify(iconRows.map((row) => row.slice(row.indexOf(":") + 1))) === JSON.stringify(expectedSprites), iconRows.join(" · "));
 
   // A deliberately small DOM proves creation, click/focus parity and ARIA
@@ -5788,7 +5788,7 @@ check("no Math.random under js/", mathRandom.length === 0, mathRandom.join(", ")
   const paletteApp = { world: { civic: new Uint8Array(1) }, input: fakeInput, ui: { setCost: (text, refused) => costs.push(`${text}:${refused}`), modalOpen: () => policeModal, flash: text => policeFlashes.push(text) }, art, doOp: op => policeOps.push(op) };
   const palette = createPalette(paletteApp);
   paletteRef = palette;
-  let clickParity = palette.buttons.size === 26;
+  let clickParity = palette.buttons.size === 28;
   for (const tool of TOOLS) {
     const button = palette.buttons.get(tool.id);
     button.events.pointerenter();
@@ -5819,9 +5819,9 @@ check("no Math.random under js/", mathRandom.length === 0, mathRandom.join(", ")
     && palette.buttons.get("bulldoze").classList.contains("on")
     && [...palette.buttons].filter(([, b]) => b.attributes["aria-pressed"] === "true").length === 1;
   globalThis.document = priorDocument;
-  check("palette: twenty-six accessible buttons paint once; pointer, click, cost preview and active state stay synchronized",
-    clickParity && semanticActive && focusHoverStable && made.filter((e) => e.tagName === "CANVAS").length === 26
-      && costs.some((x) => x === "cost:bulldoze:true") && costs.filter((x) => x === "restore").length === 28,
+  check("palette: twenty-eight accessible buttons paint once; pointer, click, cost preview and active state stay synchronized",
+    clickParity && semanticActive && focusHoverStable && made.filter((e) => e.tagName === "CANVAS").length === 28
+      && costs.some((x) => x === "cost:bulldoze:true") && costs.filter((x) => x === "restore").length === 30,
     JSON.stringify({ buttons: palette.buttons.size, canvases: made.filter((e) => e.tagName === "CANVAS").length, selected, costs: costs.length, semanticActive, focusHoverStable }));
   const policePanel = made.find(e => e.className === "police-actions");
   const interviewButton = made.find(e => e.dataset.action === "interview");
@@ -5880,7 +5880,7 @@ check("no Math.random under js/", mathRandom.length === 0, mathRandom.join(", ")
   check("palette: input, palette and generated footer all read the one registry; build buttons are gone from the strip",
     /from "\.\/tools\.js"/.test(inputSrc) && /labelForOp\(op\)/.test(inputSrc)
       && /toolHelp\(\)/.test(uiSrc) && !/for \(const t of TOOLS\)/.test(uiSrc)
-      && /id="help"/.test(html) && toolHelp().split(" · ").length === 26);
+      && /id="help"/.test(html) && toolHelp().split(" · ").length === 28);
   check("palette: WASD has no command or news binding; S/D tap timing is gone; undo/save use their modifiers",
     !/case "Key[WASD]"/.test(newsSrc) && /case "ArrowRight"/.test(newsSrc)
       && !/TAP_MS|downAt|promoteHolds/.test(inputSrc) && /case "Backspace"/.test(inputSrc)

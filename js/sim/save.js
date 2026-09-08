@@ -32,6 +32,7 @@ function canonicalCitizen(c) {
   };
   // Optional in old saves/hashes: a penned animal carries the market state;
   // ordinary citizens retain the exact pre-H canonical shape.
+  if (c.careBonus) out.careBonus = c.careBonus;
   if (c.thefts) out.thefts = c.thefts;
   if (c.pen) { out.pen = true; out.penSince = c.penSince || 0; }
   if (c.burgled) out.burgled = true;
@@ -109,6 +110,7 @@ export function fromPlain(o) {
     ...citizenDefaults(), ...c,
     friends: (c.friends || []).slice(), life: (c.life || []).map((e) => e.slice()), path: null, stale: false,
   }));
+  for (const c of world.citizens) if (!Number.isFinite(c.careBonus) || c.careBonus < 0 || c.careBonus > c.deathAge * KNOBS.HEALTH_BONUS_MAX) throw new Error("Invalid health bonus");
   world.households = o.households.map((h) => ({ ...h, members: h.members.slice(), homed: h.homed ?? h.arrived })); // an old save's household took its home when it arrived, for all the push knows (SPEC §7.4)
   world.names = { ...(o.names || {}) };
   world.legacy = Array.isArray(o.legacy) ? o.legacy.filter((row) => typeof row === "string") : [];

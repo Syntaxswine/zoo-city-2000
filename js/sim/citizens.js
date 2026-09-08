@@ -11,7 +11,7 @@ import { KNOBS } from "./rules.js";
 import { SPECIES, SPECIES_BY_ID, NAME_PARTS, affinity, ARRIVING, PREY_OF, DIET_OF, isPredatorOf, isPredPrey, admits } from "./species.js";
 import { temperOf, compat } from "./temper.js";
 import { computeInfrastructure } from "./progression.js";
-import { ZONE, CIVIC, TERRAIN, ROAD, idx, inBounds, capacityOf, jobsOf, jobZone, absent, civicAnchorOf } from "./world.js";
+import { ZONE, CIVIC, TERRAIN, ROAD, idx, inBounds, capacityOf, jobsOf, jobZone, absent, civicAnchorOf, anchorOf } from "./world.js";
 import { useName } from "./use.js";
 import { doorsOf, edgeRoads, commutePath, dial, WALK, nodePath, commuteTime } from "./fields.js";
 import { ageYears, ageMonths, isWorker } from "./census.js";
@@ -70,6 +70,7 @@ export function citizenDefaults() {
     onLeave: false,
     hired: -1,
     grief: 0,
+    careBonus: 0,
     centenary: false,
     held: 0,
     heldAt: -1,
@@ -874,7 +875,12 @@ export function citizensTick(world, cen, dem) {
   // 2. Deaths, with the funeral rule.
   for (const c of world.citizens) {
     if (c.dead) continue;
-    if (ageMonths(world, c) < c.deathAge) continue;
+    // Preventive care earns a small, persistent benefit; overlapping services never stack.
+    const home = c.home >= 0 && !absent(world, c) ? anchorOf(world, c.home) : -1;
+    const cover = world.infrastructure?.covers;
+    const care = home >= 0 ? cover?.hospital[home] ? KNOBS.HOSPITAL_CARE : cover?.doctor[home] ? KNOBS.DOCTOR_CARE : 0 : 0;
+    if (care) c.careBonus = Math.min(c.deathAge * KNOBS.HEALTH_BONUS_MAX, (c.careBonus || 0) + care);
+    if (ageMonths(world, c) < c.deathAge + (c.careBonus || 0)) continue;
     const mourners = c.friends.slice();
     (world.naturalDeaths || (world.naturalDeaths = [])).push({
       id: c.id,

@@ -1,18 +1,18 @@
 // Campaign state lives in flags, so saves, undo boundaries and replay share it.
 import { CIVIC, TERRAIN, ZONE, civicTiles, anchorOf } from "./world.js";
 import { served } from "./fields.js";
-import { forEachWithinAll } from "./reach.js";
+import { forEachWithinAll, floodBudget } from "./reach.js";
 import { KNOBS } from "./rules.js";
 
 export const CHAPTERS = Object.freeze([
   { name: "The River Settlement", target: 100, story: "A road reaches the river. Lay out cottages and working farms; one farm feeds 25 villagers." },
   { name: "The Town", target: 500, story: "The settlement earns its name. Shops, workshops, police and cemeteries open; better tools and storage double each farm's harvest." },
-  { name: "The City", target: 1500, story: "Survival becomes civic life. Libraries, galleries, parks, zoos, pacification centres and high density are available. Irrigation doubles farm capacity." },
-  { name: "The Sanitation Crisis", target: 3000, story: "Density leaves a mark on the river. Build sanitation works and garbage depots. You have six months before waste accumulates; cleaner storage doubles farm capacity." },
+  { name: "The City", target: 1500, story: "Survival becomes civic life. Doctors’ offices, libraries, galleries, parks, zoos, pacification centres and high density are available. Irrigation doubles farm capacity." },
+  { name: "The Sanitation Crisis", target: 3000, story: "Density leaves a mark on the river. Build hospitals, sanitation works and garbage depots. You have six months before waste accumulates; cleaner storage doubles farm capacity." },
   { name: "The Metropolis", target: null, story: "The river city has learned to care for itself. Every tool is available, and mechanized farms support 400 villagers each. Its future is yours." },
 ]);
 const UNLOCK = { road: 0, R: 0, M: 0, farm: 0, fire: 0, inspect: 0, bulldoze: 0,
-  C: 1, I: 1, police: 1, interview: 1, collect: 1, cemetery: 1, library: 2, gallery: 2, park: 2, largePark: 2,
+  C: 1, I: 1, police: 1, interview: 1, collect: 1, cemetery: 1, doctor: 2, hospital: 3, library: 2, gallery: 2, park: 2, largePark: 2,
   zoo: 2, centre: 2, sanitation: 3, garbage: 3 };
 export const chapterOf = w => w.flags?.campaign?.chapter ?? 4;
 export const farmYield = w => KNOBS.FARM_CAPACITY[chapterOf(w)];
@@ -55,16 +55,18 @@ export function activeInfrastructure(w, i) {
 
 export function computeInfrastructure(w) {
   const n = w.w * w.h;
-  const covers = { sanitation: new Uint8Array(n), garbage: new Uint8Array(n) };
-  const counts = { farm: 0, sanitation: 0, garbage: 0 };
+  const covers = { doctor: new Uint8Array(n), hospital: new Uint8Array(n), sanitation: new Uint8Array(n), garbage: new Uint8Array(n) };
+  const counts = { doctor: 0, hospital: 0, farm: 0, sanitation: 0, garbage: 0 };
   const total = { ...counts };
   for (let i = 0; i < n; i++) {
-    const kind = ({ [CIVIC.FARM]: "farm", [CIVIC.SANITATION]: "sanitation", [CIVIC.GARBAGE]: "garbage" })[w.civic[i]];
+    const kind = ({ [CIVIC.DOCTOR]: "doctor", [CIVIC.HOSPITAL]: "hospital", [CIVIC.FARM]: "farm", [CIVIC.SANITATION]: "sanitation", [CIVIC.GARBAGE]: "garbage" })[w.civic[i]];
     if (!kind) continue;
     total[kind]++;
     if (!activeInfrastructure(w, i)) continue;
     counts[kind]++;
-    if (covers[kind]) forEachWithinAll(w, civicTiles(w, i), kind === "sanitation" ? KNOBS.SANITATION_RADIUS : KNOBS.INFRA_RADIUS, j => { covers[kind][j] = 1; });
+    const paint = j => { covers[kind][j] = 1; };
+    if (kind === "hospital") floodBudget(w, civicTiles(w, i), Math.ceil(n * KNOBS.KNOW_UNI_SHARE), paint);
+    else if (covers[kind]) forEachWithinAll(w, civicTiles(w, i), kind === "doctor" ? KNOBS.DOCTOR_RADIUS : kind === "sanitation" ? KNOBS.SANITATION_RADIUS : KNOBS.INFRA_RADIUS, paint);
   }
   let population = 0, housed = 0, sanitation = 0, garbage = 0;
   for (const c of w.citizens) {
