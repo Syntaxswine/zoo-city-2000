@@ -7,6 +7,7 @@ import { neutralRate } from "./demand.js";
 import { DIET_OF } from "./species.js";
 import { ZONE, anchorOf, footprintOf, absent } from "./world.js";
 import { hash01, seedFromString } from "./rng.js";
+import { chapterOf } from "./progression.js";
 import { ACT } from "./voice.js";
 import { KNOBS } from "./rules.js";
 
@@ -16,7 +17,7 @@ export const NEED_LOT_PTS = 6;
 export const NEED_REACH = 6;
 export const BUBBLES_MAX = 8;
 
-const ACTIONABLE_MOOD = new Set(["NO_JOB", "SMOKE", "FLIGHT", "DREAD", "CRIME", "VAN", "WATCHED"]);
+const ACTIONABLE_MOOD = new Set(["FOOD", "NO_JOB", "SMOKE", "FLIGHT", "DREAD", "CRIME", "VAN", "WATCHED"]);
 const LOT_NEED = new Map([
   [REASON.NO_ROAD, "NO_ROAD"],
   [REASON.CAPPED, "CAPPED"],
@@ -35,6 +36,9 @@ export function needOf(world, c, context = null) {
   if (c.home < 0 && world.campers?.some(cp => cp.householdId === c.household)) return { code: "ROOMS", arg: { camping: true }, act: "provide road-served housing and restore positive housing demand with jobs and affordable taxes" };
   const choices = [];
   const add = (code, points, arg = null) => {
+    const stage = chapterOf(world);
+    if (stage < 1 && ["SHOPS", "WORKS", "CRIME"].includes(code)) return;
+    if (stage < 2 && ["NO_PARK", "NO_CULTURE", "HIGH", "PASTURE", "VAN", "CAPPED"].includes(code)) return;
     if (!(points > 0) || !ACT[code]) return;
     choices.push({ code, points, arg, tie: hash01(c.id | 0, seedFromString(code), 0x4e454544) });
   };
@@ -103,7 +107,7 @@ export function needOf(world, c, context = null) {
   if (!best || best.points < NEED_MIN) return { code: "CONTENT", arg: null, act: ACT.CONTENT };
   // A capped town whose knowledge is not yet full (K < 1) has a second remedy; the code and its voice are CAPPED's.
   const act = best.code === "CAPPED" && (world.last?.census?.K ?? 1) < 1 ? `${ACT.CAPPED}, or bring a Library or University's reach to more homes` : ACT[best.code];
-  return { code: best.code, arg: best.arg, act };
+  return { code: best.code, arg: best.arg, act: best.code === "NO_JOB" && chapterOf(world) === 0 ? "build a riverbank farm beside a road; each offers 12 jobs" : act };
 }
 
 /** Shared scratch for callers evaluating more than one citizen. */

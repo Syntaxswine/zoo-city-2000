@@ -19,6 +19,7 @@
 //   createUI(app) → { refresh, onTick, setTool, setCost, flash, updateHover,
 //                     showChoice, hideChoice, openNewCity, closeModals, modalOpen, setWorld }
 
+import { campaignText, CHAPTERS, chapterOf, farmYield } from "./sim/progression.js";
 import { ZONE, CIVIC, TERRAIN, ROAD, ZONE_NAME, anchorOf } from "./sim/world.js";
 import { dateOf, characterLine } from "./sim/tick.js";
 import { eventTitle, TICKER_FLASH } from "./sim/events.js";
@@ -36,7 +37,7 @@ import { needOf } from "./sim/needs.js";
 import { ACT, line as needLine } from "./sim/voice.js";
 import { lifeLines, memorial } from "./sim/life.js";
 import { temperOf, describeTemper } from "./sim/temper.js";
-import { legacyOf } from "./sim/legacy.js";
+import { legacyOf, decodeLegacy } from "./sim/legacy.js";
 import { starredNotices } from "./people.js";
 import { buildingAge } from "./sim/building-age.js";
 import { paintPortrait } from "./render.js";
@@ -108,6 +109,8 @@ export function createUI(app) {
     let tiers = 0;
     for (let i = 0; i < w.w * w.h; i++) tiers += w.tier[i];
     const raw = [
+      ["farms", KNOBS.UPKEEP_FARM * fig.farms], ["cemeteries", KNOBS.UPKEEP_CEMETERY * fig.cemeteries],
+      ["sanitation works", KNOBS.UPKEEP_SANITATION * fig.sanitationWorks], ["garbage depots", KNOBS.UPKEEP_GARBAGE * fig.garbageDepots],
       ["animals", KNOBS.UPKEEP_CITIZEN * w.citizens.length], ["roads", KNOBS.UPKEEP_ROAD * fig.roads], ["bridges", KNOBS.UPKEEP_BRIDGE * fig.bridges],
       ["buildings", KNOBS.UPKEEP_TIER * tiers], ["parks", KNOBS.UPKEEP_PARK * fig.parks], ["large parks", KNOBS.UPKEEP_LARGE_PARK * fig.largeParks], ["zoos", KNOBS.UPKEEP_ZOO * fig.zoos],
       ["fire stations", KNOBS.UPKEEP_STATION * (fig.fireStations || 0)], ["police stations", KNOBS.UPKEEP_STATION * (fig.policeStations || 0)],
@@ -359,8 +362,9 @@ export function createUI(app) {
     add("animals", P.toLocaleString(), "", "this month's census");
     add("approval", `${appr}`, "", "mean mood");
     if (c) add("Zoo City index", hIndex(c), "", hTitle(c));
-    dom.banner.textContent = w.flags.receivership ? "RECEIVERSHIP — the county holds the books. Rates forced up; building frozen until cash ≥ 0." : "";
-    dom.banner.classList.toggle("on", !!w.flags.receivership);
+    dom.banner.textContent = w.flags.receivership ? "RECEIVERSHIP — the county holds the books. Rates forced up; building frozen until cash ≥ 0." : campaignText(w);
+    dom.banner.classList.toggle("on", true);
+    dom.banner.title = w.flags.campaign ? CHAPTERS[chapterOf(w)].story + " Milestones require three fed months. Chapter 4 also requires 90% sanitation and garbage coverage with backlog at most 25% of population." : "Existing saves retain unrestricted sandbox play.";
   }
 
   // The Zoo City index is a share of friendships; census.js fades it in over
@@ -431,6 +435,10 @@ export function createUI(app) {
     else if (rep.civic === CIVIC.LIBRARY) what = "Library";
     else if (rep.civic === CIVIC.UNIVERSITY) what = "University";
     else if (rep.civic === CIVIC.GALLERY) what = "Gallery";
+    else if (rep.civic === CIVIC.FARM) what = `Farm · supports ${farmYield(w)} villagers when road-served and not flooded`;
+    else if (rep.civic === CIVIC.CEMETERY) what = "Cemetery · citywide memorial archive";
+    else if (rep.civic === CIVIC.SANITATION) what = "Sanitation works · 750 villagers within 7 tiles · household mess −50%";
+    else if (rep.civic === CIVIC.GARBAGE) what = "Garbage depot · 750 villagers within 10 tiles";
     else if (rep.civic === CIVIC.AMPHITHEATER) what = "Amphitheater";
     else if (rep.mansion) what = "Mansion"; // wealth and class (SPEC §9f)
     else if (rep.zone === ZONE.M) what = `Meat market ${rep.maxTier === 1 ? "Low" : "High"}`;
@@ -472,6 +480,26 @@ export function createUI(app) {
         else if (k.cls === 2 && t === 0) lines.push(el("div", "", `class here: affluent · R tax ×${KNOBS.TAX_CLASS[2]} · ${haveLine(k)} — a mansion may rise on the 3×3 of housing anchored here`));
         else lines.push(el("div", "dim", `class here: ${CLASS_NAME[k.cls]} · R tax ×${KNOBS.TAX_CLASS[k.cls]} · ${haveLine(k)}${k.next != null ? ` — ${CLASS_NAME[k.next]} needs ${waitingLine(k)}` : " — a mansion may rise on a 3×3 of housing anchored here"}`));
       }
+    }
+    if (rep.civic === CIVIC.CEMETERY) {
+      const search = el("input"); search.type = "search";
+      search.placeholder = "Search remembered citizens";
+      search.setAttribute("aria-label", "Search the citywide memorial archive");
+      const results = el("div", "memorial-archive");
+      const records = (w.legacy || []).map(decodeLegacy).filter(Boolean).reverse();
+      const render = () => {
+        results.innerHTML = "";
+        const query = search.value.trim().toLowerCase();
+        const matches = records.filter(r => [r.name, r.species, r.cause].join(" ").toLowerCase().includes(query));
+        results.append(el("p", "dim", matches.length ? `Showing ${Math.min(200, matches.length)} of ${matches.length} records. Search to narrow the archive.` : "No matching records. Citizens are remembered here after death or departure."));
+        for (const rec of matches.slice(0, 200)) {
+          const row = el("div", "memorial");
+          row.append(personLink(rec, rec.name), el("span", "dim", ` · ${rec.species}, ${rec.age} · ${rec.cause} · ${dateOf(w, rec.end).label}`));
+          results.append(row);
+        }
+      };
+      search.addEventListener("input", render); render();
+      lines.push(search, results);
     }
     // Knowledge and culture (SPEC §9e): the building says what it costs, what it reaches on THIS map, and why it is silent.
     if (rep.civic === CIVIC.LIBRARY || rep.civic === CIVIC.UNIVERSITY || rep.civic === CIVIC.GALLERY || rep.civic === CIVIC.AMPHITHEATER) {
@@ -797,6 +825,16 @@ export function createUI(app) {
   }
 
   function renderRules(body, w) {
+    if (w.flags.campaign) {
+      const chapter = el("section", "campaign-guide");
+      chapter.append(el("b", "", `Chapter ${chapterOf(w) + 1} · ${CHAPTERS[chapterOf(w)].name}`));
+      chapter.append(el("p", "", CHAPTERS[chapterOf(w)].story));
+      chapter.append(el("p", "", "Reach 100 → 500 → 1,500 → 3,000 villagers. Hold each goal with enough food for three consecutive months. Earned tools stay unlocked."));
+      chapter.append(el("p", "", "Farms: 2×2, §100 plus tree clearing, §20/year and 12 jobs. Place beside a road, within three tiles of the river; isolated ponds do not count. Select Farm to highlight floodplain. Flooded or unserved farms stop producing. Each chapter automatically raises support: 25 → 50 → 100 → 200 → 400 villagers per farm. Food shortages pause births and new arrivals and lower mood."));
+      chapter.append(el("p", "", "Cemeteries: 2×2, §300, §60/year, no workers or road required. Inspect a cemetery to search the permanent citywide archive and open remembered citizens’ records."));
+      chapter.append(el("p", "", "Sanitation works: 3×3, §1,200, §240/year. Garbage depots: 2×2, §800, §180/year. Each offers eight jobs and serves up to 750 villagers: sanitation within seven tiles, garbage within ten. Sanitation also halves covered household mess, reduced proportionally when capacity is insufficient; select the tool to see existing coverage. Both need road access and dry ground. After Chapter 4's six-month grace period, each resident generates one unit of each waste per month. Spare service capacity clears accumulated waste; backlog raises residential pollution. Reach 90% coverage for BOTH services and reduce combined backlog to at most 25% of population to finish Chapter 4."));
+      body.append(chapter);
+    }
     body.append(el("p", "note", "Every equation the sim runs, with this month's numbers. Constants live in js/sim/rules.js. Traffic is a readout, not a gate; there is no wind."));
     const ol = el("ol", "rules");
     for (const r of RULES) {
@@ -1066,8 +1104,13 @@ export function createUI(app) {
     ndl.htmlFor = nd.id;
     row2.append(nd, ndl);
     box.append(row2);
+    const campaignRow = el("div", "row");
+    const sandbox = el("input"); sandbox.type = "checkbox"; sandbox.id = 'sandbox' + (++uid);
+    const sandboxLabel = el("label", "", " Sandbox — all tools, no chapter or food requirements"); sandboxLabel.htmlFor = sandbox.id;
+    campaignRow.append(sandbox, sandboxLabel); box.append(campaignRow);
+    box.append(el("p", "note", "Campaign: 100 → 500 → 1,500 → 3,000 villagers. Each chapter improves farms and unlocks new tools. Farms need a road and river floodplain."));
     const go = el("button", "primary", "FOUND THE CITY");
-    go.addEventListener("click", () => { app.newCity({ seed: seed.value.trim() || "zoo", noDisasters: nd.checked }); done(); });
+    go.addEventListener("click", () => { app.newCity({ seed: seed.value.trim() || "zoo", noDisasters: nd.checked, campaign: !sandbox.checked }); done(); });
     seed.addEventListener("keydown", (e) => { if (e.key === "Enter") go.click(); });
     const goRow = el("div", "btnrow found-actions");
     goRow.append(go);

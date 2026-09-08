@@ -15,14 +15,14 @@ export const ROAD = Object.freeze({ NONE: 0, ROAD: 1, BRIDGE: 2 });
 export const ZONE = Object.freeze({ NONE: 0, R: 1, C: 2, I: 3, M: 4 });
 // 9–12 are the knowledge-and-culture buildings (SPEC §9e, 2026-09-05): appended after the Zoo, never renumbered,
 // and never inferred from a footprint's size — a 2×2 Library and a legacy 2×2 Large Park share a side and nothing else.
-export const CIVIC = Object.freeze({ NONE: 0, PARK: 1, LARGE_PARK: 2, LARGE_PARK_PART: 3, FIRE: 4, POLICE: 5, CENTRE: 6, PART: 7, ZOO: 8, LIBRARY: 9, UNIVERSITY: 10, GALLERY: 11, AMPHITHEATER: 12 });
+export const CIVIC = Object.freeze({ NONE: 0, PARK: 1, LARGE_PARK: 2, LARGE_PARK_PART: 3, FIRE: 4, POLICE: 5, CENTRE: 6, PART: 7, ZOO: 8, LIBRARY: 9, UNIVERSITY: 10, GALLERY: 11, AMPHITHEATER: 12, FARM: 13, CEMETERY: 14, SANITATION: 15, GARBAGE: 16 });
 export const isStation = (c) => c === CIVIC.FIRE || c === CIVIC.POLICE; // coverage
 export const isKnowledgeCivic = (c) => c === CIVIC.LIBRARY || c === CIVIC.UNIVERSITY; // the knowledge field
 export const isCultureCivic = (c) => c === CIVIC.GALLERY || c === CIVIC.AMPHITHEATER; // the culture field
-export const isCivicEmployer = (c) => isStation(c) || c === CIVIC.CENTRE || c === CIVIC.ZOO || isKnowledgeCivic(c) || isCultureCivic(c); // jobs
+export const isCivicEmployer = (c) => c === CIVIC.FARM || c === CIVIC.SANITATION || c === CIVIC.GARBAGE || isStation(c) || c === CIVIC.CENTRE || c === CIVIC.ZOO || isKnowledgeCivic(c) || isCultureCivic(c); // jobs
 /** The footprint side a kind is BUILT at (ops.js): the small services 2×2, the campuses 3×3, the park 1×1. Legacy saves carry their own side in civicSize. */
-export const CIVIC_SIDE = Object.freeze({ park: 1, fire: 3, police: 3, centre: 3, largePark: 3, zoo: 3, library: 2, university: 3, gallery: 2, amphitheater: 3 });
-export const CIVIC_OF_KIND = Object.freeze({ park: CIVIC.PARK, fire: CIVIC.FIRE, police: CIVIC.POLICE, centre: CIVIC.CENTRE, largePark: CIVIC.LARGE_PARK, zoo: CIVIC.ZOO, library: CIVIC.LIBRARY, university: CIVIC.UNIVERSITY, gallery: CIVIC.GALLERY, amphitheater: CIVIC.AMPHITHEATER });
+export const CIVIC_SIDE = Object.freeze({ farm: 2, cemetery: 2, sanitation: 3, garbage: 2, park: 1, fire: 3, police: 3, centre: 3, largePark: 3, zoo: 3, library: 2, university: 3, gallery: 2, amphitheater: 3 });
+export const CIVIC_OF_KIND = Object.freeze({ farm: CIVIC.FARM, cemetery: CIVIC.CEMETERY, sanitation: CIVIC.SANITATION, garbage: CIVIC.GARBAGE, park: CIVIC.PARK, fire: CIVIC.FIRE, police: CIVIC.POLICE, centre: CIVIC.CENTRE, largePark: CIVIC.LARGE_PARK, zoo: CIVIC.ZOO, library: CIVIC.LIBRARY, university: CIVIC.UNIVERSITY, gallery: CIVIC.GALLERY, amphitheater: CIVIC.AMPHITHEATER });
 export const KIND_OF_CIVIC = Object.freeze(Object.fromEntries(Object.entries(CIVIC_OF_KIND).map(([k, v]) => [v, k])));
 /**
  * The jobs a civic anchor offers — EXPLICIT per kind. The knowledge-and-culture
@@ -32,6 +32,8 @@ export const KIND_OF_CIVIC = Object.freeze(Object.fromEntries(Object.entries(CIV
  */
 export function civicJobs(c) {
   switch (c) {
+    case CIVIC.FARM: return KNOBS.FARM_JOBS;
+    case CIVIC.SANITATION: case CIVIC.GARBAGE: return 8;
     case CIVIC.ZOO: return KNOBS.ZOO_JOBS;
     // A Large Park offers none: parks have no workers (the owner, 2026-09-07). Its twelve were a leftover from when the garden was the zoo; save.js lets a saved city's park hands go at load.
     case CIVIC.CENTRE: return KNOBS.CENTRE_JOBS;
@@ -52,7 +54,7 @@ export const idx = (w, tx, ty) => ty * w.w + tx;
 export const inBounds = (w, tx, ty) => tx >= 0 && ty >= 0 && tx < w.w && ty < w.h;
 
 /** A fresh, generated world. */
-export function createWorld({ seed = "zoo", w = 64, h = 64 } = {}) {
+export function createWorld({ seed = "zoo", w = 64, h = 64, campaign = false } = {}) {
   const seedNum = seedFromString(String(seed));
   const n = w * h;
   const world = {
@@ -132,6 +134,7 @@ export function createWorld({ seed = "zoo", w = 64, h = 64 } = {}) {
     hhById: new Map(),
   };
   for (let i = 0; i < n; i++) world.variant[i] = Math.floor(hash01(i % w, (i / w) | 0, seedNum) * 256);
+  if (campaign) world.flags.campaign = { chapter: 0, stable: 0, entered: 0, waste: 0, sewage: 0 };
   generateTerrain(world);
   placeStartingRoad(world);
   return world;

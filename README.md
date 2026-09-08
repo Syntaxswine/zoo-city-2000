@@ -8,6 +8,13 @@ hundredth birthday.
 
 **Play:** https://syntaxswine.github.io/zoo-city-2000/
 
+New cities begin a **five-chapter river settlement campaign**: sustain
+100 → 500 → 1,500 → 3,000 villagers to open successive tools, then build freely
+in the metropolis. Riverbank farms improve from 25 to 400 villagers supported
+per farm. Chapter 4 introduces sanitation, garbage collection and a cleanup
+goal. Choose Sandbox in New Game for unrestricted building; existing saves
+remain sandbox cities. See [the campaign guide](docs/CAMPAIGN.md).
+
 The population is not a number. It is a roster of named rabbits, mice,
 foxes, beavers, owls, bears, tortoises and raccoons, each with a home, a
 job, an age, friends and a mood. Buildings grow when the family in them is

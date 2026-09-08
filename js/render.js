@@ -34,6 +34,7 @@ import { buildingAge, wearLevel } from "./sim/building-age.js";
 import { toScreen, toWorld, pickTile, HALF_H, HALF_W, TILE_W, TILE_H } from "./iso/iso.js";
 import { paintScene, Z_BUILDING } from "./iso/painter.js";
 import { rasterize } from "./art/format.js";
+import { floodplain } from "./sim/progression.js";
 import { ZONE, CIVIC, TERRAIN, ROAD, capacityOf, isPart, anchorOf, sideOf, civicAnchorOf, civicSideOf } from "./sim/world.js";
 import { DECK_TOP } from "./art/roads.js";
 import { lotScore, REASON } from "./sim/lots.js";
@@ -359,12 +360,15 @@ export function createRenderer(canvas, initialWorld, art) {
     return _accessSeen;
   };
   function drawOverlay(mode, range) {
+    const fertile = mode === "farm" ? floodplain(world) : null;
     for (let ty = range.y0; ty <= range.y1; ty++) {
       for (let tx = range.x0; tx <= range.x1; tx++) {
         const i = ty * world.w + tx;
         if (world.terrain[i] === TERRAIN.WATER) continue;
         let fill = null;
-        if (mode === "lv") fill = `rgba(96,132,84,${(world.lv[i] / 100) * 0.65})`;
+        if (mode === "farm") fill = fertile[i] ? "rgba(195,165,52,0.38)" : null;
+        else if (mode === "sanitation" || mode === "garbage") fill = world.infrastructure?.covers[mode][i] ? "rgba(40,140,155,0.35)" : null;
+        else if (mode === "lv") fill = `rgba(96,132,84,${(world.lv[i] / 100) * 0.65})`;
         else if (mode === "pol") fill = world.pol[i] > 2 ? `rgba(128,72,40,${(world.pol[i] / 100) * 0.75})` : null;
         else if (mode === "crime") fill = world.crime[i] > 5 ? `rgba(150,50,70,${(world.crime[i] / 100) * 0.75})` : world.policeCov[i] ? "rgba(60,110,138,0.18)" : null;
         else if (mode === "dread") fill = world.dread[i] > 2 ? `rgba(110,40,70,${(world.dread[i] / 100) * 0.7})` : null;
@@ -475,7 +479,7 @@ export function createRenderer(canvas, initialWorld, art) {
   }
 
   // ---- the frame ---------------------------------------------------------------------------
-  function draw(camera, hover, walkers, overlays, dt = 1 / 60) {
+  function draw(camera, hover, walkers, overlays, dt = 1 / 60, tool = null) {
     clock += dt;
     if (canvas.width !== canvas.clientWidth || canvas.height !== canvas.clientHeight) resize();
     computeView(camera);
@@ -502,7 +506,8 @@ export function createRenderer(canvas, initialWorld, art) {
     ctx.setTransform(z, 0, 0, z, base.tx, base.ty);
 
     const range = tileRange(view);
-    if (overlays && overlays !== "off") drawOverlay(overlays, range);
+    if (["farm", "sanitation", "garbage"].includes(tool)) drawOverlay(tool, range);
+    else if (overlays && overlays !== "off") drawOverlay(overlays, range);
 
     // Everything that stands or moves, in the one order.
     const items = [];
@@ -536,6 +541,10 @@ export function createRenderer(canvas, initialWorld, art) {
         else if (world.civic[i] === CIVIC.LIBRARY) standing = art.civic("library", civicSideOf(world, i)); // knowledge and culture (SPEC §9e)
         else if (world.civic[i] === CIVIC.UNIVERSITY) standing = art.civic("university", civicSideOf(world, i));
         else if (world.civic[i] === CIVIC.GALLERY) standing = art.civic("gallery", civicSideOf(world, i));
+        else if (world.civic[i] === CIVIC.FARM) standing = art.civic("farm", civicSideOf(world, i));
+        else if (world.civic[i] === CIVIC.CEMETERY) standing = art.civic("cemetery", civicSideOf(world, i));
+        else if (world.civic[i] === CIVIC.SANITATION) standing = art.civic("sanitation", civicSideOf(world, i));
+        else if (world.civic[i] === CIVIC.GARBAGE) standing = art.civic("garbage", civicSideOf(world, i));
         else if (world.civic[i] === CIVIC.AMPHITHEATER) standing = art.civic("amphitheater", civicSideOf(world, i));
         else if (world.wall[i]) standing = world.road[i] !== ROAD.NONE || world.rail[i] ? art.tunnel(tunnelAxis(world, i)) : art.wall(wallMask(tx, ty)); // a wall stands; a tunnel stands over its road or rail
         else if (world.rail[i] === 2) standing = art.station(railAxis(tx, ty)); // the platform and shelter stand over the track

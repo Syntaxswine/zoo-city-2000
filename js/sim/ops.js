@@ -8,6 +8,7 @@
 
 import { campAt } from "./camps.js";
 import { buildingSnapshot, syncBuildingAge } from "./building-age.js";
+import { lockedReason, floodplain, computeInfrastructure } from "./progression.js";
 import { KNOBS } from "./rules.js";
 import { TERRAIN, ROAD, ZONE, CIVIC, CIVIC_SIDE, CIVIC_OF_KIND, idx, inBounds, anchorOf, footprintOf, civicAnchorOf, civicTiles } from "./world.js";
 import { post, canSpend, exitReceivership } from "./budget.js";
@@ -159,10 +160,12 @@ function refuseCrossings(world, lay, laying) {
  * functional."*
  */
 export function costOf(world, op) {
+  const locked = lockedReason(world, op);
+  if (locked) return { cost: 0, tiles: [], reason: locked };
   const tiles = [];
   // Every footprint a tile op writes — the four knowledge-and-culture kinds included: until session 18 the list stopped at
   // the centre, so a Library could be dropped on an occupied tent (found while building the wealth arc; fixed as seen).
-  if (["zone", "road", "rail", "station", "wall", "bulldoze", "tree", "park", "largePark", "zoo", "fire", "police", "centre", "library", "university", "gallery", "amphitheater"].includes(op.kind)) {
+  if (["zone", "road", "rail", "station", "wall", "bulldoze", "tree", "park", "largePark", "zoo", "fire", "police", "centre", "library", "university", "gallery", "amphitheater", "farm", "cemetery", "sanitation", "garbage"].includes(op.kind)) {
     const side = CIVIC_SIDE[op.kind] || 1;
     const requested = op.tiles || (op.x0 != null ? rect(world, op) : Array.from({ length: side * side }, (_, k) => idx(world, op.tx + k % side, op.ty + Math.floor(k / side))));
     if (requested.some(i => campAt(world, i))) return { cost: 0, tiles, reason: "someone is camping here — provide housing before building" };
@@ -243,7 +246,7 @@ export function costOf(world, op) {
       }
       break;
     }
-    case "park": case "fire": case "police": case "centre": case "largePark": case "zoo": case "library": case "university": case "gallery": case "amphitheater": {
+    case "park": case "fire": case "police": case "centre": case "largePark": case "zoo": case "library": case "university": case "gallery": case "amphitheater": case "farm": case "cemetery": case "sanitation": case "garbage": {
       const side = CIVIC_SIDE[op.kind]; // 1 the park · 2 the Library and the Gallery · 3 the campuses (world.js)
       for (let dy = 0; dy < side; dy++) for (let dx = 0; dx < side; dx++) {
         const tx = op.tx + dx, ty = op.ty + dy;
@@ -252,7 +255,11 @@ export function costOf(world, op) {
         if (world.terrain[i] === TERRAIN.WATER || world.road[i] || world.zone[i] || world.civic[i] || world.wall[i] || world.rail[i] || isBuilt(world, i)) return { cost: 0, tiles: [], reason: "the whole footprint needs clear ground" };
         add(i, (dx || dy ? 0 : C[op.kind]) + (world.terrain[i] === TERRAIN.TREE ? C.bulldozeTree : 0), dx || dy ? "civicPart" : op.kind);
       }
-      if (op.kind !== "park" && op.kind !== "largePark" && !touchesRoad(world, tiles.map(t => t.i))) return { cost: 0, tiles: [], reason: "the building must be adjacent to a road" };
+      if (op.kind === "farm") {
+        const fertile = floodplain(world);
+        if (!tiles.some(t => fertile[t.i])) return { cost: 0, tiles: [], reason: "farms need floodplain within 3 tiles of the river (isolated ponds do not count)" };
+      }
+      if (op.kind !== "park" && op.kind !== "largePark" && op.kind !== "cemetery" && !touchesRoad(world, tiles.map(t => t.i))) return { cost: 0, tiles: [], reason: "the building must be adjacent to a road" };
       break;
     }
     case "use": {
@@ -364,10 +371,12 @@ function snapshot(world, tiles) {
 /** Apply an op. Returns { ok, cost, reason }. */
 export function apply(world,op,options) {
   const before=buildingSnapshot(world),result=applyOperation(world,op,options);
-  if(result.ok)syncBuildingAge(world,before);
+  if(result.ok) { syncBuildingAge(world,before); computeInfrastructure(world); }
   return result;
 }
 function applyOperation(world, op, { log = true } = {}) {
+  const locked = lockedReason(world, op);
+  if (locked) return { ok: false, cost: 0, reason: locked };
   if (op.kind === "interview" || op.kind === "collect") {
     const result = policeAction(world, op);
     if (!result.ok) return result;
@@ -466,7 +475,7 @@ function applyOperation(world, op, { log = true } = {}) {
       case "tree":
         world.terrain[i] = TERRAIN.TREE;
         break;
-      case "park": case "fire": case "police": case "centre": case "largePark": case "zoo": case "library": case "university": case "gallery": case "amphitheater": {
+      case "park": case "fire": case "police": case "centre": case "largePark": case "zoo": case "library": case "university": case "gallery": case "amphitheater": case "farm": case "cemetery": case "sanitation": case "garbage": {
         world.terrain[i] = TERRAIN.GRASS;
         const a = idx(world, op.tx, op.ty), dx = i % world.w - op.tx, dy = ((i / world.w) | 0) - op.ty;
         world.civic[i] = i === a ? CIVIC_OF_KIND[op.kind] : CIVIC.PART;
@@ -581,6 +590,7 @@ export function undo(world) {
   replanStale(world, { release: false }); // an undo is an op: it rebuilds, and it fires nobody
   computeCamCover(world);
   computeKnowledgeCulture(world); // an undo can put a building or a road back
+  computeInfrastructure(world);
   resetMeatRoutes(world);
   post(world, "build", u.cost);
   world.log.push({ t: world.tick, op: { kind: "undo" } });

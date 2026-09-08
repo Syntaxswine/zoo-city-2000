@@ -6,6 +6,7 @@ import { hash01, seedFromString } from "./rng.js";
 import { DIET_OF } from "./species.js";
 
 export const ACT = Object.freeze({
+  FOOD: "build another riverbank farm or restore its road access",
   CONTENT: "no action needed",
   SHOPS: "zone C near homes",
   ROOMS: "zone R near a road",
@@ -37,6 +38,7 @@ export const ACT = Object.freeze({
 // Overrides may be a species id or diet. The default list is mandatory; an
 // override only changes voice, never which need the rules selected.
 export const LINES = Object.freeze({
+  FOOD: { default: ["the harvest is too small", "we need another working farm"] },
   CONTENT: { default: ["nothing to want today", "we're all right today"] },
   SHOPS: { default: ["wish there were shops nearby", "more shops would be nice"] },
   ROOMS: { default: ["my cousins need rooms", "there's no room for cousins"] },

@@ -145,4 +145,5 @@ sheet("citizen-poses", FACINGS.flatMap(f => AGES.map(a => art.citizen("fox", f, 
 sheet("buildings", [1, 2, 3, 4].flatMap(z => [1, 2, 3].map(t => art.building(z, t, 0))), 540, 330, 2);
 sheet("civics", ["fire", "police", "centre", "zoo", "largePark", "park"].map(k => art.civic(k, k === "park" ? 1 : 3)), 840, 340, 2, 2);
 sheet("knowledge-and-mansions", ["library", "gallery", "university", "amphitheater"].map(k => art.civic(k)).concat([art.mansion(0), art.mansion(1)]), 840, 380, 2, 2);
+sheet("infrastructure", ["farm", "cemetery", "sanitation", "garbage"].map(k => art.civic(k, k === "sanitation" ? 3 : 2)), 600, 300, 2, 2);
 console.log(`Close-up checks passed: ${JSON.stringify(stats)}; comparison sheets in out/closeups (old left, new right).`);

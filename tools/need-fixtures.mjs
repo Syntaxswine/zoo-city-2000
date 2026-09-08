@@ -46,6 +46,7 @@ export function needFixture(species = "tortoise") {
 }
 
 const CASES = Object.freeze({
+  FOOD: ["tortoise", ({ world }) => { world.flags.campaign = {chapter:0,stable:0,entered:0,waste:0,sewage:0}; world.infrastructure = {...world.infrastructure, food:0, population:1}; }],
   CONTENT: ["tortoise"],
   SHOPS: ["tortoise", ({ world }) => { world.last.demand.r.C = 1; }],
   ROOMS: ["tortoise", ({ world }) => { world.last.demand.r.R = 1; }],

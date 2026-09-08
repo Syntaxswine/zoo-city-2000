@@ -13,6 +13,7 @@
 // place that calls apply() + renderer.invalidate() + walkers.notify().
 
 import { idx, CIVIC_SIDE } from "./sim/world.js";
+import { lockedReason, chapterOf } from "./sim/progression.js";
 import { costOf, roadL } from "./sim/ops.js";
 import { pinTarget } from "./follow.js";
 import { TOOL_BY_ID, TOOL_BY_KEY, PLACE_TOOLS, GHOST_TOOLS, labelForOp } from "./tools.js";
@@ -22,7 +23,7 @@ const PAN_SPEED = 700; // projection px per second
 export function createInput(canvas, app) {
   const state = {
     tool: "R",
-    density: 3, // 3 High, 1 Low
+    density: app.world?.flags.campaign ? 1 : 3, // 3 High, 1 Low
     use: 0, // 16-bit checkbox union; zero is mixed (stable bits in sim/use.js)
     hover: null, // [tx, ty] | null
     lastHover: null, // last map tile, retained only for palette cost previews
@@ -56,6 +57,9 @@ export function createInput(canvas, app) {
     syncThoughts();
   }
   function setTool(id) {
+    if (chapterOf(app.world) < 2) state.density = 1;
+    const reason = lockedReason(app.world, { ...(TOOL_BY_ID[id]?.op || { kind: id }), density: state.density });
+    if (reason) { app.ui.flash(reason); return; }
     if (id !== "inspect") app.stopFollowing?.();
     if (id !== "use" && !TOOL_BY_ID[id]) throw new Error(`input: unknown tool '${id}'`);
     state.tool = id;
@@ -316,6 +320,7 @@ export function createInput(canvas, app) {
     if (tool) { setTool(tool.id); return; }
     switch (k) {
       case "h": case "H":
+        if (chapterOf(app.world) < 2) { app.ui.flash("High density unlocks in Chapter 3: The City."); break; }
         state.density = state.density === 3 ? 1 : 3;
         app.ui.setTool(state.tool, state.density);
         app.ui.flash(`Density: ${state.density === 3 ? "High (tiers to 3)" : "Low (cottages only)"}`);

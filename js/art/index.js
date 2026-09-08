@@ -38,6 +38,7 @@
 
 import { buildingSprite, civicSprite, overlaySprite, allBuildings } from "./buildings.js";
 import { allLargeCivics } from "./civics-large.js";
+import { allInfrastructureCivics } from "./civics-infrastructure.js";
 import { allKnowledgeCivics } from "./civics-knowledge.js";
 import { allBlocks } from "./blocks.js"; // registers the 2×2 and 3×3 families with buildings.js at load
 import { allLandmarks } from "./landmarks.js"; // registers the eleven landmarks (SPEC §3c)
@@ -158,7 +159,7 @@ export const art = Object.freeze({
 
 /** Every sprite the registry can hand out, named — the check.mjs audit walks this. */
 export function allSprites() {
-  const out = [...Object.values(MARKS).map(sprite => ({ name: sprite.name, sprite })), ...allBuildings(), ...allLargeCivics(), ...allKnowledgeCivics(), ...allBlocks(), ...allLandmarks(), ...allMansion(), ...allShops(), ...allRoads(), ...allWalls(), ...allRail(), ...allTerrain(), ...allCitizens(), ...BUBBLE_SAMPLES.map((sprite) => ({ name: sprite.name, sprite }))];
+  const out = [...Object.values(MARKS).map(sprite => ({ name: sprite.name, sprite })), ...allBuildings(), ...allLargeCivics(), ...allKnowledgeCivics(), ...allInfrastructureCivics(), ...allBlocks(), ...allLandmarks(), ...allMansion(), ...allShops(), ...allRoads(), ...allWalls(), ...allRail(), ...allTerrain(), ...allCitizens(), ...BUBBLE_SAMPLES.map((sprite) => ({ name: sprite.name, sprite }))];
   const seen = new Set();
   return out.filter(({ name }) => (seen.has(name) ? false : (seen.add(name), true)));
 }

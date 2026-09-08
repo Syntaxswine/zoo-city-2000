@@ -1,5 +1,10 @@
 # ZOO CITY 2000 — the specification
 
+**Campaign update (2026-09-08):** [Five-chapter campaign and infrastructure](docs/CAMPAIGN.md)
+defines the default new-game progression, riverbank farms, cemeteries,
+sanitation and garbage. Its chapter gates layer over the simulation below;
+existing saves and explicit sandbox games retain unrestricted tools.
+
 An isometric city builder where anthropomorphic animals live and grow together.
 The player zones residential, commercial and industrial land, lays roads, sets
 three tax rates, and copes with what the years throw at the town. The

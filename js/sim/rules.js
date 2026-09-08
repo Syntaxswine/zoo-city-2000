@@ -7,6 +7,22 @@
 import { USE_SPECIES } from "./use.js";
 
 export const KNOBS = {
+  // Narrative campaign and public infrastructure.
+  FARM_CAPACITY: [25, 50, 100, 200, 400],
+  FARM_JOBS: 12,
+  CHAPTER_MONTHS: 3,
+  INFRA_RADIUS: 10,
+  SANITATION_RADIUS: 7,
+  SANITATION_MESS_CUT: 0.5,
+  INFRA_CAPACITY: 750,
+  SANITATION_GRACE: 6,
+  SANITATION_GOAL: 0.9,
+  WASTE_GOAL: 0.25,
+  WASTE_MAX_MONTHS: 6,
+  UPKEEP_FARM: 20,
+  UPKEEP_CEMETERY: 60,
+  UPKEEP_SANITATION: 240,
+  UPKEEP_GARBAGE: 180,
   // cadence
   TICKS_PER_YEAR: 12,
   // capacities per tier (index 0..3)
@@ -174,7 +190,7 @@ export const KNOBS = {
   UPKEEP_PARK: 300,
   UPKEEP_LARGE_PARK: 1500,
   UPKEEP_STATION: 400,
-  COST: { zoneR: 5, zoneC: 8, zoneI: 8, zoneM: 12, road: 10, bridge: 40, bulldoze: 2, bulldozeTree: 4, tree: 4, park: 150, largePark: 2500, zoo: 2500, pond: 40, fire: 500, police: 500, centre: 1500, wall: 8, use: 1, rail: 20, railBridge: 60, station: 300, camera: 100, library: 1000, university: 4000, gallery: 800, amphitheater: 3000 },
+  COST: { farm: 100, cemetery: 300, sanitation: 1200, garbage: 800, zoneR: 5, zoneC: 8, zoneI: 8, zoneM: 12, road: 10, bridge: 40, bulldoze: 2, bulldozeTree: 4, tree: 4, park: 150, largePark: 2500, zoo: 2500, pond: 40, fire: 500, police: 500, centre: 1500, wall: 8, use: 1, rail: 20, railBridge: 60, station: 300, camera: 100, library: 1000, university: 4000, gallery: 800, amphitheater: 3000 },
   // ---- knowledge and culture (the owner, 2026-09-05; docs/PROPOSAL-KNOWLEDGE-CULTURE-2026-09-05.md, its review and the owner's ruling) ----
   // Four public buildings: Library 2×2 and University 3×3 give KNOWLEDGE, Gallery 2×2 and Amphitheater 3×3 give CULTURE.
   // C-type jobs, a road touching to build, served to operate. The owner ruled the reach: five tiles for the small

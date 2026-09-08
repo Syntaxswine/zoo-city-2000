@@ -1,5 +1,6 @@
 // tick.js — one month, in the order SPEC §1 states. The only orchestrator.
 
+import { sanitationTick, progressionTick, chapterOf } from "./progression.js";
 import { KNOBS } from "./rules.js";
 import { computeFields, recountRosters, computeStationDoors } from "./fields.js";
 import { census, needCensus, notables } from "./census.js";
@@ -45,6 +46,7 @@ export function tick(world) {
   // birthday the animal goes to market instead of becoming a new household.
   meatNotices.push(...penMaturityTick(world));
   notices.push(...meatNotices);
+  sanitationTick(world);
   // 1. fields
   computeFields(world);
   recountRosters(world);
@@ -131,7 +133,8 @@ export function tick(world) {
     });
     notices.push(...advisor(world, cen, dem, bud.fig));
   }
-  const ms = milestone(world, cen);
+  notices.push(...progressionTick(world));
+  const ms = world.flags.campaign ? null : milestone(world, cen);
   if (ms) notices.push(ms);
   // Every line the ticker shows goes into the log too, so a loaded city can
   // show its own history (rolled events already logged themselves).
@@ -253,10 +256,11 @@ function advisor(world, cen, dem, fig) {
   if (notable.oldest) report += ` Oldest resident: ${notable.oldest.name}, age ${notable.oldest.age}, at ${lotAt(world, notable.oldest.home)}.`;
   if (notable.largest) report += ` Largest household: the ${notable.largest.surname} family, ${notable.largest.size} animals at ${lotAt(world, notable.largest.home)}, including ${notable.largest.name}.`;
   out.push(report);
-  if (cen.P === 0 && lots === 0) out.push(`ADVISOR: zone R, C and I within ${KNOBS.ROAD_REACH} tiles of a road. Animals arrive when there are jobs.`);
+  if (world.flags.campaign && cen.P === 0) out.push("ADVISOR: build farms within three tiles of the river, touching a road. Zone Low residential nearby; sustain 100 fed villagers to unlock the town.");
+  if (!world.flags.campaign && cen.P === 0 && lots === 0) out.push(`ADVISOR: zone R, C and I within ${KNOBS.ROAD_REACH} tiles of a road. Animals arrive when there are jobs.`);
   if (world.valves.R > 0.3 && cen.vacantR < 10) out.push("ADVISOR: the animals want more housing.");
-  if (world.valves.C > 0.3 && lotsC < lotsR / 4) out.push("ADVISOR: the town wants shops.");
-  if (world.valves.I > 0.3 && lotsI < lotsR / 4) out.push("ADVISOR: the town wants industry.");
+  if (chapterOf(world) >= 1 && world.valves.C > 0.3 && lotsC < lotsR / 4) out.push("ADVISOR: the town wants shops.");
+  if (chapterOf(world) >= 1 && world.valves.I > 0.3 && lotsI < lotsR / 4) out.push("ADVISOR: the town wants industry.");
   if (cen.lotsNoRoad > 0) out.push(`ADVISOR: ${cen.lotsNoRoad} zoned lots have no road within ${KNOBS.ROAD_REACH} tiles.`);
   const maxRate = Math.max(world.rates.R, world.rates.C, world.rates.I);
   if (maxRate > dem.n + 3) out.push(`ADVISOR: taxes are well above the neutral ${dem.n.toFixed(1)}%. The animals are talking about leaving.`);

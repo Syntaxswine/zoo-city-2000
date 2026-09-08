@@ -7,6 +7,7 @@
 // the straight run see the same traffic — the save/load hash invariant.
 
 import { createWorld, jobsOf } from "./world.js";
+import { KNOBS } from "./rules.js";
 import { makeRng } from "./rng.js";
 import { computeFields, recountRosters, commutePath, doorsOf } from "./fields.js";
 import { citizenDefaults, rebuildMaps } from "./citizens.js";
@@ -70,7 +71,7 @@ export function toPlain(world) {
     ledger: { ...world.ledger },
     history: world.history.slice(),
     log: world.log.slice(),
-    flags: { ...world.flags },
+    flags: JSON.parse(JSON.stringify(world.flags)),
     rng: { sim: world.rng.state, names: world.rngNames.state },
     friendCursor: world._friendCursor || 0,
     jobCursor: world._jobCursor || 0,
@@ -130,6 +131,14 @@ export function fromPlain(o) {
   world.history = o.history.slice();
   world.log = o.log.slice();
   world.flags = { ...o.flags };
+  if (o.flags.campaign) {
+    const p = o.flags.campaign;
+    if (!Number.isInteger(p.chapter) || p.chapter < 0 || p.chapter > 4 ||
+        !Number.isInteger(p.stable) || p.stable < 0 || p.stable >= KNOBS.CHAPTER_MONTHS ||
+        !Number.isInteger(p.entered) || p.entered < 0 || p.entered > world.tick ||
+        !Number.isFinite(p.waste) || p.waste < 0 || !Number.isFinite(p.sewage) || p.sewage < 0) throw new Error("Invalid campaign state");
+    world.flags.campaign = { ...p };
+  }
   world.rng = makeRng(o.rng.sim);
   world.rngNames = makeRng(o.rng.names);
   world._friendCursor = o.friendCursor || 0;

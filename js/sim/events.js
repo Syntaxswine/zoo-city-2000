@@ -409,7 +409,7 @@ const prefixRx = (rows) => new RegExp(`^(?:${rows.map((r) => esc(r[1])).join("|"
 export const TICKER_BAD = prefixRx(NEWS_ALL.filter((r) => r[2] === "bad"));
 export const TICKER_GOOD = prefixRx(NEWS_ALL.filter((r) => r[2] === "good"));
 const FLASH_PREFIX = prefixRx(NEWS_ALL.filter((r) => r[3]));
-export const TICKER_FLASH = new RegExp(`${FLASH_PREFIX.source}|^OBITUARY 100 —`);
+export const TICKER_FLASH = new RegExp(`${FLASH_PREFIX.source}|^OBITUARY 100 —|^CHAPTER [1-5] —`);
 
 /** Resolve the choice card. */
 export function resolveChoice(world, accept) {

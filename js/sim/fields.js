@@ -4,6 +4,7 @@
 // changed) and never saved. Everything is O(tiles) (pollution is O(sources ×
 // radius²)); 4,096 tiles is microseconds.
 
+import { computeInfrastructure } from "./progression.js";
 import { KNOBS } from "./rules.js";
 import { TERRAIN, ROAD, ZONE, CIVIC, idx, inBounds, N4, isStation, isCivicEmployer, isKnowledgeCivic, isCultureCivic, absent, occAt, anchorOf, footprintOf, siteTiles, civicAnchorOf, civicTiles } from "./world.js";
 import { SPECIES_BY_ID, DIET_OF, admits } from "./species.js";
@@ -203,7 +204,10 @@ export function computePollution(world) {
     const tx = i % w;
     const ty = (i / w) | 0;
     const t = world.tier[i];
-    if (mess[i]) spread(world, e, i, mess[i], KNOBS.MESS_RADIUS);
+    if (mess[i]) {
+      const sanitation = world.infrastructure?.covers.sanitation[i] ? KNOBS.SANITATION_MESS_CUT * world.infrastructure.sanitationCapacityShare : 0;
+      spread(world, e, i, mess[i] * (1 - sanitation), KNOBS.MESS_RADIUS);
+    }
     if (world.zone[i] === ZONE.I && t > 0) spread(world, e, i, KNOBS.EMIT_I[t] * scrub, KNOBS.EMIT_I_RADIUS[t]);
     else if (world.zone[i] === ZONE.C && KNOBS.EMIT_C[t] > 0) spread(world, e, i, KNOBS.EMIT_C[t], KNOBS.EMIT_C_RADIUS[t]);
     if (world.road[i] !== ROAD.NONE) spread(world, e, i, KNOBS.EMIT_ROAD + Math.min(KNOBS.EMIT_TRAFFIC_MAX, world.traffic[i] / KNOBS.EMIT_TRAFFIC_DIV), KNOBS.EMIT_ROAD_RADIUS);
@@ -213,7 +217,10 @@ export function computePollution(world) {
     if (world.civic[i] === CIVIC.PARK) spread(world, e, i, KNOBS.EMIT_PARK, KNOBS.EMIT_PARK_RADIUS);
   }
   for (let i = 0; i < n; i++) {
-    world.pol[i] = Math.max(0, Math.min(100, Math.round(e[i] + smog)));
+    const campaign = world.flags.campaign;
+    const waste = campaign && campaign.chapter >= 3 && world.zone[i] === ZONE.R
+      ? Math.min(40, 8 * (campaign.waste + campaign.sewage) / Math.max(1, world.infrastructure.population)) : 0;
+    world.pol[i] = Math.max(0, Math.min(100, Math.round(e[i] + smog + waste)));
   }
 }
 
@@ -599,6 +606,7 @@ export function computeFields(world) {
   computeCamCover(world);
   computeKnowledgeCulture(world); // before land value, which reads culture
   computeTraffic(world);
+  computeInfrastructure(world);
   computePollution(world);
   computeDread(world);
   computeLandValue(world);

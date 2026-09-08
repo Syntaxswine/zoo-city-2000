@@ -10,6 +10,7 @@ import { addCamp } from "./camps.js";
 import { KNOBS } from "./rules.js";
 import { SPECIES, SPECIES_BY_ID, NAME_PARTS, affinity, ARRIVING, PREY_OF, DIET_OF, isPredatorOf, isPredPrey, admits } from "./species.js";
 import { temperOf, compat } from "./temper.js";
+import { computeInfrastructure } from "./progression.js";
 import { ZONE, CIVIC, TERRAIN, ROAD, idx, inBounds, capacityOf, jobsOf, jobZone, absent, civicAnchorOf } from "./world.js";
 import { useName } from "./use.js";
 import { doorsOf, edgeRoads, commutePath, dial, WALK, nodePath, commuteTime } from "./fields.js";
@@ -888,11 +889,13 @@ export function citizensTick(world, cen, dem) {
   }
 
   // 3. Births: two fertile adults, headroom in the lot.
+  let birthRoom = world.flags.campaign ? computeInfrastructure(world).food - world.citizens.filter(c => !c.dead).length : Infinity;
   const birthMult = world.events.active.reduce((m, e) => m * (e.birthMult || 1), 1);
   for (const hh of world.households) {
     if (hh.gone || hh.home < 0) continue;
     if (hh.companions) continue; // companions keep no litter (SPEC §7.2: one wedding in ten — the owner's "10% gay")
     const cap = capacityOf(world, hh.home);
+    if (birthRoom <= 0) continue; // campaign food gate; the existing crowding rule still applies
     // A FULL home breeds at BIRTH_FULL_MULT and goes OVER capacity — the SPEC's crowding push toward a
     // storey (a fill above 1 satisfies FILL_TO_GROW), promised in §7.2 and unwired until the owner's
     // word on 2026-09-07. Nothing else lets occupants pass capacity; vacantR counts only true headroom.
@@ -928,6 +931,7 @@ export function citizensTick(world, cen, dem) {
       remember(world, cub, KIND.BORN, hh.home);
       for (const parent of parents.slice(0, 2)) remember(world, parent, KIND.LITTER, 1);
       out.births++;
+      birthRoom--;
     }
   }
 
@@ -958,9 +962,11 @@ export function citizensTick(world, cen, dem) {
   jobSearch(world, out);
 
   // 5. Arrivals (or campers), the scout.
+  const food = world.flags.campaign ? computeInfrastructure(world).food : Infinity;
+  let foodRoom = food - world.citizens.filter(c => !c.dead).length;
   const weights = arrivalWeights(world, cen);
   world.lastWeights = weights;
-  if (world.valves.R > 0) {
+  if (world.valves.R > 0 && foodRoom > 0) {
     const vacantR = cen.vacantR;
     let households = Math.floor(KNOBS.ARRIVE_GAIN * world.valves.R * vacantR / KNOBS.ARRIVE_DIV + rng.next());
     if (vacantR === 0 && world.campers.length < KNOBS.CAMPERS_MAX && rng.chance(Math.min(0.9, world.valves.R))) {
@@ -970,7 +976,8 @@ export function citizensTick(world, cen, dem) {
     for (let k = 0; k < households; k++) {
       const species = pickSpecies(world, weights);
       const pack = SPECIES_BY_ID[species].pack || [2, 4];
-      const size = pack[0] + rng.int(pack[1] - pack[0] + 1);
+      const size = Math.min(foodRoom, pack[0] + rng.int(pack[1] - pack[0] + 1));
+      if (size <= 0) break;
       const strict = true;
       let lot = bestHome(world, species, size, strict);
       if (lot < 0) lot = bestHome(world, species, size, false);
@@ -979,6 +986,7 @@ export function citizensTick(world, cen, dem) {
       placeHousehold(world, hh, lot);
       for (const id of hh.members) remember(world, world.byId.get(id), KIND.ARRIVED, lot);
       out.arrived += size;
+      foodRoom -= size;
       if (world.mansion[lot]) out.notices.push(`THE ESTATE — the ${hh.surname}s (${size} ${pluralSpecies(species)}) have moved into the mansion at (${lot % world.w},${(lot / world.w) | 0}).`); // wealth (SPEC §9f)
       // For the walker layer: these animals walk in from the edge road.
       world.arrivals.push(...hh.members);
@@ -1298,6 +1306,7 @@ export function moodTerms(world, c, context = moodContext(world)) {
     if (value) terms.push({ code: "EVENT", arg: e.id, value });
   }
   if (c.path && commuteTime(c.path) <= sp.commute) terms.push({ code: "COMMUTE", value: 10 }); // a ride is KNOBS.RAIL_COST / WALK of a walk step
+  if (world.flags.campaign && world.infrastructure?.food < world.infrastructure?.population) terms.push({ code: "FOOD", value: -20 });
   if (c.grief && c.grief > world.tick) terms.push({ code: "GRIEF", value: -10 });
   if (c.moodPenalty && c.moodPenaltyUntil > world.tick) terms.push({ code: "PENALTY", value: c.moodPenalty });
   if (c.fixed) terms.push({ code: "FIXED", value: -KNOBS.FIXED_MOOD });

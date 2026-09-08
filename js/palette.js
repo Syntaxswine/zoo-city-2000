@@ -1,5 +1,6 @@
 // palette.js — the left-hand build remote. DOM only; no sim state lives here.
 
+import { lockedReason, chapterOf } from "./sim/progression.js";
 import { TOOLS, spriteForTool } from "./tools.js";
 import { paintSprite } from "./render.js";
 import { hasPolice } from "./sim/police-actions.js";
@@ -101,7 +102,20 @@ export function createPalette(app) {
   }
   police.append(policeHeading, actions, hint);
   host.append(police);
-  const refresh = () => { police.hidden = !hasPolice(app.world); };
+  const refresh = () => {
+    police.hidden = !hasPolice(app.world);
+    for (const tool of TOOLS) {
+      const button = buttons.get(tool.id);
+      const reason = lockedReason(app.world, { ...tool.op, density: 1 });
+      button.disabled = !!reason;
+      button.style.order = String((reason ? 100 : 0) + tool.order);
+      button.title = reason || tool.hint;
+      const key = button.querySelector?.(".palette-key");
+      if (key) key.textContent = reason ? reason.match(/Chapter \d/)?.[0] || "Locked" : tool.key;
+      button.setAttribute("aria-label", `${tool.label}, key ${tool.key}. ${reason || tool.hint}`);
+    }
+    if (chapterOf(app.world) < 2 && app.input.density > 1) app.input.setTool("R");
+  };
 
   function setTool(id) {
     for (const [toolId, button] of buttons) {

@@ -133,11 +133,11 @@ function adopt(world, name, { paused = false } = {}) {
   document.title = `ZOO CITY 2000 — ${name}`;
 }
 
-app.newCity = ({ seed, noDisasters }) => {
-  const world = createWorld({ seed });
+app.newCity = ({ seed, noDisasters, campaign = true }) => {
+  const world = createWorld({ seed, campaign });
   if (noDisasters) apply(world, { kind: "toggle", key: "noDisasters", value: true });
   adopt(world, String(seed));
-  app.ui.flash(`${seed}: one road in. Zone R, C and I within 3 tiles of it. 8% is neutral for a town this size.`);
+  app.ui.flash(campaign ? `${seed}: Chapter 1 — connect riverbank farms and low-density homes. Sustain 100 fed villagers for three months.` : `${seed}: sandbox — all tools available.`);
 };
 
 app.doOp = (op) => {
@@ -333,7 +333,7 @@ function frameBody(now) {
     app.updateFollowing(!app.paused && !app.ui.modalOpen() ? dt : 0);
     clampCamera();
     app.input.syncCamera();
-    app.renderer.draw(app.camera, app.input.hover(), app.walkers, app.overlays, dt);
+    app.renderer.draw(app.camera, app.input.hover(), app.walkers, app.overlays, dt, app.input.tool);
     if (now - hoverAt > 90) { hoverAt = now; app.ui.updateHover(app.input.hoverInfo()); }
   }
 }
