@@ -367,6 +367,12 @@ export function createRenderer(canvas, initialWorld, art) {
         if (world.terrain[i] === TERRAIN.WATER) continue;
         let fill = null;
         if (mode === "farm") fill = fertile[i] ? "rgba(195,165,52,0.38)" : null;
+        else if (mode === "health") {
+          const medical = world.infrastructure;
+          fill = medical?.covers.hospital[i] ? "rgba(55,100,190,0.48)"
+            : medical?.covers.doctor[i] ? "rgba(30,155,125,0.42)"
+            : (!medical || medical.counts.doctor + medical.counts.hospital === 0) && world.zone[i] === ZONE.R ? "rgba(185,65,65,0.42)" : null;
+        }
         else if (["sanitation", "garbage", "doctor", "hospital"].includes(mode)) fill = world.infrastructure?.covers[mode][i] ? "rgba(40,140,155,0.35)" : null;
         else if (mode === "lv") fill = `rgba(96,132,84,${(world.lv[i] / 100) * 0.65})`;
         else if (mode === "pol") fill = world.pol[i] > 2 ? `rgba(128,72,40,${(world.pol[i] / 100) * 0.75})` : null;
@@ -506,7 +512,8 @@ export function createRenderer(canvas, initialWorld, art) {
     ctx.setTransform(z, 0, 0, z, base.tx, base.ty);
 
     const range = tileRange(view);
-    if (["farm", "sanitation", "garbage", "doctor", "hospital"].includes(tool)) drawOverlay(tool, range);
+    if (overlays === "health") drawOverlay("health", range);
+    else if (["farm", "sanitation", "garbage", "doctor", "hospital"].includes(tool)) drawOverlay(tool, range);
     else if (overlays && overlays !== "off") drawOverlay(overlays, range);
 
     // Everything that stands or moves, in the one order.

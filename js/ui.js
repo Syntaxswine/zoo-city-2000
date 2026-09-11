@@ -171,7 +171,11 @@ export function createUI(app) {
     mk("btnUndo", "⌫", "undo", "Backspace or Ctrl+Z: undo the last op (this month only)", () => app.undo());
     mk("btnSave", "Ctrl+S", "save", "Ctrl+S: open named saves with the save-as name focused", () => app.save());
     mk("btnLoad", "L", "load", "L: open named saves on the slot list", () => app.load());
-    mk("btnOverlay", "O", "overlay", "O: cycle land value / pollution / crime / dread / use / road access / lot score / camera cover / knowledge / culture overlays", () => app.cycleOverlay());
+    mk("btnOverlay", "O", "overlay", "O: cycle land value / pollution / crime / dread / use / road access / lot score / camera cover / knowledge / culture / health overlays", () => app.cycleOverlay());
+    mk("btnHealth", "✚", "health", "Toggle the healthcare overlay: doctor and hospital coverage, and homes affected by the citywide penalty", () => {
+      app.overlays = app.overlays === "health" ? "off" : "health";
+      refresh();
+    });
     mk("btnNews", "R", "news", "R: the news — every dispatch this city ever made, oldest first; ← → step one at a time", () => app.news.toggle());
     mk("btnZoomOut", "−", "zoom out", "Zoom out (− or scroll down)", () => app.zoomAt(-1));
     mk("btnZoom", "+", "zoom in", "Zoom in: ×1 / ×2 / ×3 / ×4 (+ or scroll up)", () => app.zoomAt(1));
@@ -286,6 +290,8 @@ export function createUI(app) {
     pauseBtn.classList.toggle("on", app.paused);
     pauseBtn.lastElementChild.textContent = app.paused ? "resume" : "pause";
     pauseBtn.title = app.paused ? "Space: resume (the speed keys only set the speed while paused)" : "Space: pause";
+    $("#btnHealth").classList.toggle("on", app.overlays === "health");
+    $("#btnHealth").setAttribute("aria-pressed", String(app.overlays === "health"));
     $("#btnOverlay").classList.toggle("on", app.overlays !== "off");
     $("#btnZoom").classList.toggle("on", app.camera.zoom > 1);
     $("#btnZoom").disabled = app.camera.zoom >= 4;
@@ -365,7 +371,12 @@ export function createUI(app) {
     if (c) add("Zoo City index", hIndex(c), "", hTitle(c));
     dom.banner.textContent = w.flags.receivership ? "RECEIVERSHIP — the county holds the books. Rates forced up; building frozen until cash ≥ 0." : campaignText(w);
     dom.banner.classList.toggle("on", true);
-    dom.banner.title = w.flags.campaign ? CHAPTERS[chapterOf(w)].story + " Milestones require three fed months. Chapter 4 also requires 90% sanitation and garbage coverage with backlog at most 25% of population." : "Existing saves retain unrestricted sandbox play.";
+    if (app.overlays === "health") {
+      const counts = w.infrastructure?.counts;
+      const operating = (counts?.doctor || 0) + (counts?.hospital || 0);
+      dom.banner.textContent = (w.flags.receivership ? dom.banner.textContent + " · " : "") + `HEALTH · ${operating} operating facilities · Teal: doctor +2% · Blue: hospital +3% · ${operating ? "Untinted: normal lifespan" : "Red homes: −3% lifespan citywide (everyone)"}`;
+    }
+    dom.banner.title = w.flags.campaign ? CHAPTERS[chapterOf(w)].story + " Milestones require three fed months. Chapter 4 also requires 90% sanitation and garbage coverage with backlog at most 25% of population." : "Free Play — all tools available, no chapter or food requirements.";
   }
 
   // The Zoo City index is a share of friendships; census.js fades it in over
@@ -1125,13 +1136,24 @@ export function createUI(app) {
     ndl.htmlFor = nd.id;
     row2.append(nd, ndl);
     box.append(row2);
-    const campaignRow = el("div", "row");
-    const sandbox = el("input"); sandbox.type = "checkbox"; sandbox.id = 'sandbox' + (++uid);
-    const sandboxLabel = el("label", "", " Sandbox — all tools, no chapter or food requirements"); sandboxLabel.htmlFor = sandbox.id;
-    campaignRow.append(sandbox, sandboxLabel); box.append(campaignRow);
-    box.append(el("p", "note", "Campaign: 100 → 500 → 1,500 → 3,000 villagers. Each chapter improves farms and unlocks new tools. Farms need a road and river floodplain."));
+    const modes = el("fieldset", "city-modes");
+    modes.append(el("legend", "", "Game mode"));
+    const modeName = 'cityMode' + (++uid);
+    const addMode = (value, label, description, checked) => {
+      const option = el("label", "city-mode");
+      const input = el("input"); input.type = "radio"; input.name = modeName; input.value = value; input.checked = checked;
+      const copy = el("span"); copy.append(el("strong", "", label), el("span", "note", description));
+      option.append(input, copy); modes.append(option); return input;
+    };
+    addMode("free", "Free Play", "All tools available. No chapter or food requirements.", true);
+    const campaign = addMode("campaign", "Campaign", "Grow from a river settlement through five chapters, meeting goals to unlock tools.", false);
+    box.append(modes);
+    const campaignNote = el("p", "note", "Campaign goals: 100 → 500 → 1,500 → 3,000 villagers. Farms need a road and river floodplain.");
+    campaignNote.hidden = true;
+    modes.addEventListener("change", () => { campaignNote.hidden = !campaign.checked; });
+    box.append(campaignNote);
     const go = el("button", "primary", "FOUND THE CITY");
-    go.addEventListener("click", () => { app.newCity({ seed: seed.value.trim() || "zoo", noDisasters: nd.checked, campaign: !sandbox.checked }); done(); });
+    go.addEventListener("click", () => { app.newCity({ seed: seed.value.trim() || "zoo", noDisasters: nd.checked, campaign: campaign.checked }); done(); });
     seed.addEventListener("keydown", (e) => { if (e.key === "Enter") go.click(); });
     const goRow = el("div", "btnrow found-actions");
     goRow.append(go);

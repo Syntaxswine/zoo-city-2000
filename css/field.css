@@ -326,3 +326,11 @@ li.nrow.at .gut { color: var(--ink); }
 .found-actions { align-items: center; justify-content: space-between; }
 .found-actions .primary { min-height: 42px; padding: 10px 18px; font-size: 14px; }
 .found-actions .found-back { margin-left: auto; }
+
+.city-modes { border: 1px solid var(--border); margin: 12px 0; padding: 8px 10px; }
+.city-modes legend { color: var(--dim); padding: 0 5px; }
+.city-mode { display: flex; align-items: flex-start; gap: 9px; padding: 8px 4px; cursor: pointer; }
+.city-mode input { margin: 3px 0 0; flex: 0 0 auto; }
+.city-mode strong, .city-mode .note { display: block; }
+.city-mode strong { margin-bottom: 3px; }
+.city-mode:has(input:checked) strong { color: var(--accent); }

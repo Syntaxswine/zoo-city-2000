@@ -1,6 +1,7 @@
 # The river city campaign
 
-New games default to the campaign. The new-city form offers a sandbox checkbox;
+New games default to Free Play. The new-city form offers two radio options:
+Free Play (all tools, no chapter or food requirements) and Campaign;
 existing saves without campaign state remain unrestricted sandbox cities.
 The [generations proposal](PROPOSAL-GENERATIONS-AND-SKILLS-2026-09-07.md)
 specifies sanitation's seven-tile reach and household mess reduction, and
@@ -57,6 +58,14 @@ Existing funeral friendship and mourning rules remain unchanged.
 Only one cemetery may exist per city, in both campaign and sandbox. It unlocks
 in Chapter 2. Older 2×2 cemeteries remain intact and count toward the limit;
 demolish and rebuild to use the new size. Demolition never deletes the archive.
+
+## Health overlay
+
+Use the ✚ health button or cycle overlays with O. Teal shows doctor coverage
+(+2% lifespan), blue shows hospital coverage (+3%), and uncovered tiles remain
+untinted while any medical facility operates. If none operate, residential
+zones turn red to highlight the citywide −3% penalty. The legend shows the
+operating facility count and remains visible while the overlay is selected.
 
 ## Doctors and hospitals
 

@@ -40,7 +40,7 @@ const TICK_SECONDS = 1.5;
 const SPEEDS = [1, 3, 10];
 const MAX_CATCHUP = 3;
 const AUTOSAVE_EVERY = 12;
-const OVERLAYS = ["off", "lv", "pol", "crime", "dread", "use", "access", "score", "watch", "knowledge", "culture"];
+const OVERLAYS = ["off", "lv", "pol", "crime", "dread", "use", "access", "score", "watch", "knowledge", "culture", "health"];
 const META = (name) => `zoo.meta:${name}`;
 const LAST = "zoo.last";
 const PREF = "zoo.pref"; // UI preferences (the cheat switch, the news read marks) — this browser's, never the city's
@@ -133,11 +133,11 @@ function adopt(world, name, { paused = false } = {}) {
   document.title = `ZOO CITY 2000 — ${name}`;
 }
 
-app.newCity = ({ seed, noDisasters, campaign = true }) => {
+app.newCity = ({ seed, noDisasters, campaign = false }) => {
   const world = createWorld({ seed, campaign });
   if (noDisasters) apply(world, { kind: "toggle", key: "noDisasters", value: true });
   adopt(world, String(seed));
-  app.ui.flash(campaign ? `${seed}: Chapter 1 — connect riverbank farms and low-density homes. Sustain 100 fed villagers for three months.` : `${seed}: sandbox — all tools available.`);
+  app.ui.flash(campaign ? `${seed}: Chapter 1 — connect riverbank farms and low-density homes. Sustain 100 fed villagers for three months.` : `${seed}: free play — all tools available.`);
 };
 
 app.doOp = (op) => {
@@ -252,7 +252,7 @@ app.togglePause = () => {
 app.resume = () => { app.paused = false; app.ui.refresh(); };
 app.cycleOverlay = () => {
   app.overlays = OVERLAYS[(OVERLAYS.indexOf(app.overlays) + 1) % OVERLAYS.length];
-  app.ui.flash(app.overlays === "off" ? "Overlay off" : { lv: "Overlay: land value (greener = higher)", pol: "Overlay: pollution (browner = worse)", crime: "Overlay: crime (redder = worse; blue = police cover; a ring = an open file)", dread: "Overlay: dread (wine = a meat hall's smell; herbivores keep away)", use: "Overlay: use — rust is predator, teal is prey, species have their own colours, combinations blend them, and untinted is mixed (U paints it)", access: "Overlay: road access — untinted is on the road, then sand, mauve and aubergine for one, two and three tiles from it; rust is out of reach, and only where something is asking", watch: "Overlay: camera cover (a ring is a camera; it solves crimes, it does not prevent them)", score: "Overlay: lot score (blue grows, red decays)" }[app.overlays]);
+  app.ui.flash(app.overlays === "off" ? "Overlay off" : { health: "Overlay: health — teal = doctor (+2% lifespan), blue = hospital (+3%), red homes = no operating medical facilities (−3% citywide). Untinted = normal lifespan.", lv: "Overlay: land value (greener = higher)", pol: "Overlay: pollution (browner = worse)", crime: "Overlay: crime (redder = worse; blue = police cover; a ring = an open file)", dread: "Overlay: dread (wine = a meat hall's smell; herbivores keep away)", use: "Overlay: use — rust is predator, teal is prey, species have their own colours, combinations blend them, and untinted is mixed (U paints it)", access: "Overlay: road access — untinted is on the road, then sand, mauve and aubergine for one, two and three tiles from it; rust is out of reach, and only where something is asking", watch: "Overlay: camera cover (a ring is a camera; it solves crimes, it does not prevent them)", score: "Overlay: lot score (blue grows, red decays)" }[app.overlays]);
   app.ui.refresh();
 };
 app.zoomAt = (dir, sx, sy) => {

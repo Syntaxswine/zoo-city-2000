@@ -127,7 +127,7 @@ export function progressionTick(w) {
 
 export function campaignText(w) {
   const p = w.flags.campaign;
-  if (!p) return "Sandbox — all tools available.";
+  if (!p) return "Free Play — all tools available.";
   const s = computeInfrastructure(w), ch = CHAPTERS[p.chapter];
   let text = `Chapter ${p.chapter + 1}/5 · ${ch.name} · ${s.population}${ch.target ? ` / ${ch.target}` : ""} villagers · Food ${s.population} / ${s.food} supported · ${s.counts.farm}/${s.total.farm} working farms × ${farmYield(w)}`;
   if (ch.target) text += ` · Stable ${p.stable}/${KNOBS.CHAPTER_MONTHS} months`;
