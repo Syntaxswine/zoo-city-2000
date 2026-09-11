@@ -104,8 +104,10 @@ button.palette-tool.on { background: linear-gradient(#526c62, #2c443a); border-c
 button.palette-tool:active:not(.locked) { box-shadow: inset 0 2px 4px #0008; }
 button.palette-tool:focus-visible { outline: 3px solid #2975b9; outline-offset: 3px; }
 button.palette-tool.locked { background: #b4b8bd; border-color: #a5a9ae; box-shadow: inset 0 1px 2px #85899066; cursor: not-allowed; }
-.palette-icon { display: block; font: 22px/1 "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif; }
-.palette-tool.locked .palette-icon { filter: grayscale(1); opacity: 0.38; }
+.palette-icon { display: flex; align-items: center; justify-content: center; width: 26px; height: 26px; color: #e8edf0; pointer-events: none; }
+.palette-icon svg { display: block; width: 24px; height: 24px; }
+.palette-tool.on .palette-icon { color: #edfff4; }
+.palette-tool.locked .palette-icon { color: #545b64; opacity: 0.55; }
 #stage { flex: 1; position: relative; min-width: 0; background: var(--map); }
 #map { display: block; width: 100%; height: 100%; image-rendering: pixelated; outline: none; cursor: crosshair; }
 #panel {

@@ -5,7 +5,7 @@ import { TOOLS } from "./tools.js";
 import { KNOBS } from "./sim/rules.js";
 import { hasPolice } from "./sim/police-actions.js";
 
-export const TOOL_EMOJI = Object.freeze({ R: "🏠", C: "🛍️", I: "🏭", M: "🥩", road: "🛣️", wall: "🧱", rail: "🛤️", station: "🚉", tree: "🌳", park: "🌷", zoo: "🦁", centre: "🕊️", police: "🚔", fire: "🚒", inspect: "🔍", bulldoze: "🚜", largePark: "🏞️", camera: "📹", library: "📚", university: "🎓", gallery: "🖼️", amphitheater: "🎭", farm: "🌾", cemetery: "🪦", sanitation: "🚰", garbage: "🗑️", doctor: "🩺", hospital: "🏥" });
+import { remoteIcon } from "./remote-icons.js";
 const PURPOSE = {
   R: "Homes for villagers.", C: "Shops and commercial jobs.", I: "Industrial jobs; produces pollution.", M: "Meat supply and jobs; spreads dread and attracts crime.",
   road: "Connects homes, jobs and public services.", wall: "Blocks passage and service coverage except through road or rail tunnels.", rail: "Carries commuters and freight between stations.",
@@ -63,7 +63,7 @@ export function createPalette(app) {
     const icon = document.createElement("span");
     icon.className = "palette-icon";
     icon.setAttribute("aria-hidden", "true");
-    icon.textContent = TOOL_EMOJI[tool.id];
+    icon.innerHTML = remoteIcon(tool.id);
     button.append(icon);
 
     button.addEventListener("click", () => {
@@ -97,7 +97,7 @@ export function createPalette(app) {
     button.dataset.action = kind;
     const icon = document.createElement("span");
     icon.className = "palette-icon"; icon.setAttribute("aria-hidden", "true");
-    icon.textContent = kind === "interview" ? "🗣️" : "🚓";
+    icon.innerHTML = remoteIcon(kind);
     button.append(icon);
     button.title = `${label} · Hotkey: none\nFree · Requires a police station and a selected citizen.\n${description}`;
     button.setAttribute("aria-label", button.title);
