@@ -73,14 +73,23 @@ unburned footprint to operate. Coverage respects walls and gates. Selecting
 either tool shows existing coverage. As with other public services, there is
 no staffing gate. Healthcare also operates in sandbox cities.
 
-Each month living at home under medical coverage earns a small natural-lifespan
-extension: 0.01 months for a doctor or 0.03 for a hospital. Hospital care wins;
-overlapping facilities never stack. For example, ten years of hospital care
-earns 3.6 extra months. The total is capped at 3% of the citizen’s original
-natural lifespan. Earned care is saved per citizen and is retained after a move
-or service closure. Custody and livestock pens do not receive home-based care.
-This delays natural aging deaths only; it does not prevent violence or disasters.
-Illness and hospital admissions are not simulated in this version.
+Residents of homes within doctor coverage receive **+2% natural lifespan**;
+hospital coverage gives **+3%**. Hospital care wins and overlapping facilities
+never stack. Homes outside coverage have normal lifespan if at least one
+medical facility operates anywhere in the city.
+
+With **no operating doctors or hospitals**, everyone receives **−3% natural
+lifespan**, including unhoused citizens, citizens in custody and livestock pens.
+This also applies before healthcare unlocks. A facility without road access,
+or with flooding, fire or rubble, does not count.
+
+Effects follow current coverage and operation at the monthly aging check.
+Moving or losing service removes the local bonus; restoring a facility removes
+the citywide penalty. Residents past the adjusted lifespan can die at the next
+aging check. Natural lifespan rolls remain unchanged. Older saves still load
+former care credits for compatibility, but these no longer affect lifespan or
+accumulate. Care changes natural aging deaths only, not violence or disasters.
+Illness and hospital admissions are not simulated.
 
 ## Sanitation and garbage
 
@@ -116,7 +125,7 @@ the stability streak; the Rules tab explains all campaign mechanics.
 sewage. Normal civic arrays store the four buildings using appended IDs 13–16.
 Medical buildings append IDs 17–18; larger civic parts use a new offset flag
 while retaining support for older part bytes. Coverage and food are derived.
-Save/load validates campaign values and earned care bonuses and hashes
+Save/load validates campaign values and legacy care credits and hashes
 them; older saves receive no campaign state. Replay uses the original founding
 mode and seed. New civics use code-native solids and the existing art pipeline.
 

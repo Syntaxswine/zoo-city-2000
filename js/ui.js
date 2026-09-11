@@ -19,7 +19,7 @@
 //   createUI(app) → { refresh, onTick, setTool, setCost, flash, updateHover,
 //                     showChoice, hideChoice, openNewCity, closeModals, modalOpen, setWorld }
 
-import { campaignText, CHAPTERS, chapterOf, farmYield, activeInfrastructure } from "./sim/progression.js";
+import { campaignText, CHAPTERS, chapterOf, farmYield, activeInfrastructure, medicalLifespanModifier } from "./sim/progression.js";
 import { ZONE, CIVIC, TERRAIN, ROAD, ZONE_NAME, anchorOf } from "./sim/world.js";
 import { dateOf, characterLine } from "./sim/tick.js";
 import { eventTitle, TICKER_FLASH } from "./sim/events.js";
@@ -491,7 +491,7 @@ export function createUI(app) {
       head.append(el("span", "", `  jobs ${rep.staff}/${rep.jobs}`));
       lines.push(el("div", "", `§${KNOBS.COST[kind].toLocaleString("en-US")} to build · §${hospital ? KNOBS.UPKEEP_HOSPITAL : KNOBS.UPKEEP_DOCTOR}/yr · ${hospital ? "3×3" : "2×2"}`));
       lines.push(el("div", "", hospital ? `Reach: nearest ${Math.ceil(w.w * w.h * KNOBS.KNOW_UNI_SHARE)} tiles, like a university.` : `Reach: ${KNOBS.DOCTOR_RADIUS} tiles from the footprint.`));
-      lines.push(el("div", "dim", `Each covered month earns ${hospital ? KNOBS.HOSPITAL_CARE : KNOBS.DOCTOR_CARE} months of extra natural lifespan, capped at ${KNOBS.HEALTH_BONUS_MAX * 100}%. Overlapping medical services do not stack.`));
+      lines.push(el("div", "dim", `Covered homes receive +${(hospital ? KNOBS.HOSPITAL_CARE : KNOBS.DOCTOR_CARE) * 100}% natural lifespan. Overlapping services do not stack. Any operating medical facility removes the citywide −${KNOBS.NO_MEDICAL_PENALTY * 100}% lifespan penalty.`));
       lines.push(el("div", operating ? "dim" : "warn", operating ? "In service" : "NOT IN SERVICE — needs road access and a dry, unburned footprint."));
     }
     if (rep.civic === CIVIC.CEMETERY) {
@@ -531,7 +531,11 @@ export function createUI(app) {
     if (rep.zone === ZONE.R && rep.tier > 0) {
       const home = rep.ty * w.w + rep.tx;
       const cover = w.infrastructure?.covers;
-      if (cover?.hospital[home] || cover?.doctor[home]) lines.push(el("div", "dim", `Medical care: ${cover.hospital[home] ? "hospital" : "doctor’s office"} — residents earn a small natural-lifespan bonus each month.`));
+      const medical = medicalLifespanModifier(w, home);
+      lines.push(el("div", medical < 0 ? "warn" : "dim", medical < 0
+        ? `No operating medical facilities anywhere in the city: −${KNOBS.NO_MEDICAL_PENALTY * 100}% natural lifespan for everyone.`
+        : medical > 0 ? `Medical care: ${cover.hospital[home] ? "hospital" : "doctor’s office"} — +${medical * 100}% natural lifespan while this home is covered.`
+        : "Outside medical coverage: normal natural lifespan. An operating facility elsewhere prevents the citywide penalty."));
       const ki = rep.ty * w.w + rep.tx;
       const kn = w.knowledge[ki], cu = w.culture[ki];
       if (kn || cu) lines.push(el("div", "dim", [kn ? `${kn === 2 ? "University" : "Library"}: ${KNOBS.KNOWLEDGE[kn]} knowledge` : null, cu ? `${cu === 2 ? "Amphitheater" : "Gallery"}: +${KNOBS.CULTURE_MOOD[cu]} culture, +${KNOBS.LV_CULTURE[cu]} land value` : null].filter(Boolean).join(" · ")));
@@ -847,7 +851,7 @@ export function createUI(app) {
       chapter.append(el("p", "", CHAPTERS[chapterOf(w)].story));
       chapter.append(el("p", "", "Reach 100 → 500 → 1,500 → 3,000 villagers. Hold each goal with enough food for three consecutive months. Earned tools stay unlocked."));
       chapter.append(el("p", "", "Farms: 2×2, §100 plus tree clearing, §20/year and 12 jobs. Place beside a road, within three tiles of the river; isolated ponds do not count. Select Farm to highlight floodplain. Flooded or unserved farms stop producing. Each chapter automatically raises support: 25 → 50 → 100 → 200 → 400 villagers per farm. Food shortages pause births and new arrivals and lower mood."));
-      chapter.append(el("p", "", "Doctors’ offices unlock after Chapter 2 (500 villagers): 2×2, §600, §180/year, four jobs and seven-tile coverage. Hospitals unlock in Chapter 4: 3×3, §4,000, §1,200/year and 16 jobs, covering the nearest half of the map like universities. Both need roads and stop operating when flooded or burning. Each covered month earns 0.01 months of extra natural lifespan at a doctor’s office or 0.03 at a hospital, capped at 3% of natural lifespan. Overlapping services do not stack; earned care survives moves and closures. Selecting either tool shows its coverage."));
+      chapter.append(el("p", "", "Doctors’ offices unlock after Chapter 2 (500 villagers): 2×2, §600, §180/year, four jobs and seven-tile coverage. Hospitals unlock in Chapter 4: 3×3, §4,000, §1,200/year and 16 jobs, covering the nearest half of the map like universities. Both need roads and stop operating when flooded or burning. Homes within doctor coverage receive +2% natural lifespan; hospital coverage gives +3%. Overlapping services do not stack. With no operating medical facilities anywhere, everyone receives −3% natural lifespan, including before medical tools unlock. One operating facility removes that penalty citywide. Effects follow current home coverage and facility operation; they do not accumulate. Selecting either tool shows its coverage."));
       chapter.append(el("p", "", "Cemetery: 6×6, one per city, §300, §60/year, no workers or road required. Inspect a cemetery to search the permanent citywide archive and open remembered citizens’ records."));
       chapter.append(el("p", "", "Sanitation works: 3×3, §1,200, §240/year. Garbage depots: 2×2, §800, §180/year. Each offers eight jobs and serves up to 750 villagers: sanitation within seven tiles, garbage within ten. Sanitation also halves covered household mess, reduced proportionally when capacity is insufficient; select the tool to see existing coverage. Both need road access and dry ground. After Chapter 4's six-month grace period, each resident generates one unit of each waste per month. Spare service capacity clears accumulated waste; backlog raises residential pollution. Reach 90% coverage for BOTH services and reduce combined backlog to at most 25% of population to finish Chapter 4."));
       body.append(chapter);

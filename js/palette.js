@@ -13,8 +13,8 @@ const PURPOSE = {
   zoo: "Holds sentenced citizens in prison.", centre: "Treats sentenced citizens, permanently preventing their reproduction and killings.",
   police: "Reduces nearby crime and enables citywide investigations.", fire: "Reduces fire risk, limits spread and can save burning buildings.",
   farm: "Must lie within three tiles of edge-connected river water; ponds do not qualify. Flooding or lost road access stops food production.",
-  doctor: "Gradually earns residents a small natural-lifespan bonus. Needs road access and a dry, unburned footprint to operate.",
-  hospital: "Stronger longevity benefit than a doctor; overlapping care does not stack. Needs road access and a dry, unburned footprint to operate.",
+  doctor: "Covered homes receive +2% natural lifespan. Any operating medical facility removes the citywide −3% lifespan penalty. Needs road access and a dry, unburned footprint to operate.",
+  hospital: "Covered homes receive +3% natural lifespan; overlapping care does not stack. Any operating medical facility removes the citywide −3% penalty. Needs road access and a dry, unburned footprint to operate.",
   sanitation: "Treats sewage; needs road access and a dry, unburned footprint to operate.", garbage: "Collects refuse and clears accumulated waste; needs road access and a dry, unburned footprint to operate.",
 };
 

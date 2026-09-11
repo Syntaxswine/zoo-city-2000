@@ -87,6 +87,16 @@ export function computeInfrastructure(w) {
   return w.infrastructure;
 }
 
+// Current home coverage determines care; one operating facility removes the
+// citywide penalty even for residents outside its reach or without a home.
+export function medicalLifespanModifier(w, home = -1) {
+  const s = w.infrastructure;
+  if (!s || s.counts.doctor + s.counts.hospital === 0) return -KNOBS.NO_MEDICAL_PENALTY;
+  if (home < 0) return 0;
+  const i = anchorOf(w, home);
+  return s.covers.hospital[i] ? KNOBS.HOSPITAL_CARE : s.covers.doctor[i] ? KNOBS.DOCTOR_CARE : 0;
+}
+
 export function sanitationTick(w) {
   const p = w.flags.campaign;
   if (!p || p.chapter < 3) return;

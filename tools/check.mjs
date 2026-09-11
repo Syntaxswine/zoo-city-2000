@@ -27,7 +27,7 @@ import { readFileSync, readdirSync, statSync, existsSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { lightLevel } from "../js/art/building-character.js";
-import { createWorld, ZONE, ROAD, capacityOf, jobsOf, isPart, sideOf } from "../js/sim/world.js";
+import { createWorld, ZONE, ROAD, capacityOf, jobsOf, isPart, sideOf, absent } from "../js/sim/world.js";
 import { tick } from "../js/sim/tick.js";
 import { apply, replay, undo, costOf as costOfOp } from "../js/sim/ops.js";
 import { save, load, stateHash, stateHashNoNews, toPlain } from "../js/sim/save.js";
@@ -193,10 +193,14 @@ check("tick cost is not catastrophic (the printed number is the instrument; this
 // and in a town this small the nine-grievance push with three-year roots
 // moves fewer animals than friction did — measured, and the number is in the
 // commit message, as this comment asks.
-// 348-384 is +/-5%: a change that moves the town further than
+// Current healthcare (2026-09-11) applies a 3% lifespan penalty in this
+// fixture with no medical facilities. Earlier deaths change the deterministic
+// simulation trajectory: the 15-year population changes from 366 to 271.
+// Focused health checks independently verify the exact lifespan factors.
+// 257-285 is +/-5%: a change that moves the town further than
 // that is a FINDING, and re-baselining this line is a deliberate act with a
 // number in the commit message, not a nuisance to be widened away.
-check("the scripted city is still a town", world.citizens.length > 348 && world.citizens.length < 384, `${world.citizens.length} citizens after ${YEARS} years (the band is 348-384, \u00b15% of 366; moving it is a finding, and re-baselining is a decision)`);
+check("the scripted city is still a town", world.citizens.length > 257 && world.citizens.length < 285, `${world.citizens.length} citizens after ${YEARS} years (the band is 257-285, \u00b15% of 271; moving it is a finding, and re-baselining is a decision)`);
 
 // ledger
 let sum = 0;
@@ -251,7 +255,10 @@ for (let i = 0; i < world.w * world.h; i++) {
   if (occ[i] !== world.occupants[i]) occBad++;
   if (staff[i] !== world.staff[i]) staffBad++;
   // Over capacity is LEGAL on a standing home holding a town-born animal: the full-home litter (SPEC §7.2, wired 2026-09-07) is the one thing that may put a lot over, and a cub is what it puts there. Anything else over is a bug.
-  if (occ[i] > capacityOf(world, i) && world.zone[i] === ZONE.R && !(world.tier[i] > 0 && world.citizens.some((c) => !c.dead && c.home === i && c.native))) overCap++;
+  // Custody retains the home reference even when the old house decays;
+  // those citizens occupy custody beds, not residential capacity.
+  const residents = world.citizens.filter((c) => c.home === i && !absent(world, c));
+  if (residents.length > capacityOf(world, i) && world.zone[i] === ZONE.R && !(world.tier[i] > 0 && residents.some((c) => !c.dead && c.native))) overCap++;
   if (staff[i] > jobsOf(world, i)) overJobs++;
   if (occ[i] > 0 && world.zone[i] !== ZONE.R) homeNotR++;
 }
@@ -369,8 +376,8 @@ function auditIds(w) {
   for (const c of F.citizens) {
     if (!c.pen && (c.held || 0) > F.tick) { heldN++; if (c.job >= 0) heldBad++; if (c.heldAt >= 0) beds.set(c.heldAt, (beds.get(c.heldAt) || 0) + 1); }
   }
-  for (const [i, n] of beds) if (F.civic[i] !== CIVIC.CENTRE || n > KNOBS.CENTRE_BEDS) bedsOver++;
-  check("held citizens hold no job; beds point at a centre and never exceed it", heldN > 0 && heldBad === 0 && bedsOver === 0, `held ${heldN} · with a job ${heldBad} · bad beds ${bedsOver}`);
+  for (const [i, n] of beds) if (![CIVIC.CENTRE, CIVIC.ZOO].includes(F.civic[i]) || n > (F.civic[i] === CIVIC.ZOO ? KNOBS.ZOO_BEDS : KNOBS.CENTRE_BEDS)) bedsOver++;
+  check("held citizens hold no job; beds point at a centre or zoo and never exceed it", heldN > 0 && heldBad === 0 && bedsOver === 0, `held ${heldN} · with a job ${heldBad} · bad beds ${bedsOver}`);
   check("the sold are gone (dangling-id law)", auditIds(F) === 0, `${auditIds(F)}`);
 
   // A POLICE STATION NOBODY CAN REACH INVESTIGATES NOTHING. `justice` sizes
@@ -5011,7 +5018,8 @@ check("no Math.random under js/", mathRandom.length === 0, mathRandom.join(", ")
   let lastCost = { text: "", refused: false };
   let undos = 0, saves = 0, loads = 0, pauses = 0, newsOpen = false, inputModal = false;
   const newsKeys = [];
-  const pinnedWalker = { citizen: A.world.citizens[0].id };
+  const { pinTarget: fixturePinTarget } = await import("../js/follow.js");
+  const pinnedWalker = { citizen: A.world.citizens.find((c) => fixturePinTarget(A.world, [], c.id)?.state === "home").id };
   let walkerAlive = true;
   const inputApp = {
     world: A.world, camera: { x: 20, y: 20, zoom: 1 },

@@ -630,7 +630,7 @@ Binsworth). The card says "the Burrowes family, 4 rabbits".
 ### 7.3 Aging, work, death
 - `age++` on the birth month. Child < 16; worker 16..retire; elder ≥ retire
   (keeps the home, leaves W, walks at ×0.7 with a lighter fur step).
-- `deathAge = lifespan·(0.8 + 0.4·u)` rolled at creation (deterministic).
+- `deathAge = lifespan·(0.8 + 0.4·u)` rolled at creation (deterministic). Monthly natural aging multiplies this roll by current healthcare: 1.02 for doctor-covered homes, 1.03 for hospital coverage (no stacking), 1.00 outside coverage with any operating facility, or 0.97 for everyone when none operate. Legacy care credits no longer affect aging.
 - Job search: ≤ 64 searchers per tick in id order; BFS from the home's road
   tile over roads to any lot with open jobs, ≤ 40 tiles, preferring the
   species' zone by weight (never a gate). No path → `jobless++`, zot NO_JOB.
