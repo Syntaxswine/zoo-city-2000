@@ -6845,19 +6845,22 @@ function costOfBulldoze(w, x, y) { return (0, costOfOp)(w, { kind: "bulldoze", x
   const hits = SHOPS.map(() => [0, 0]);
   for (let v = 0; v < 256; v++) hits[shopKind(v)][v & 1]++;
   check("shops: all 256 variant bytes spread over the eleven kinds, both mirrors each, none under 10 of 128", hits.every(([a, b]) => a >= 10 && b >= 10), JSON.stringify(hits));
-  // The art follows the byte: kind by >> 1, mirror by & 1, a 1×1 footprint; the corner shop keeps variants 0 and 1 as they were.
+  // Kind and orientation retain their original byte mapping. Each complete
+  // eleven-kind cycle advances the architectural plan within that kind.
   let wrong = [];
+  const artHits = SHOP_ART.map(family => family.map(() => 0));
   for (let v = 0; v < 256; v++) {
     const s = art.building(2, 1, v);
     const k = shopKind(v);
-    const want = k ? `C1-${SHOPS[k].key}-${v & 1}` : `C1-shop-${v & 3}`;
-    if (s !== SHOP_ART[k][v & (k === 0 ? 3 : 1)] || s.name !== want || s.footprint[0] !== 1 || s.footprint[1] !== 1) wrong.push(`${v}:${s.name}`);
+    const plan = (Math.floor(v / (2 * SHOPS.length)) % (SHOP_ART[k].length / 2)) * 2 + (v & 1);
+    artHits[k][plan]++;
+    if (s !== SHOP_ART[k][plan] || s.footprint[0] !== 1 || s.footprint[1] !== 1) wrong.push(`${v}:${s.name}`);
   }
-  check("shops: art.building(2, 1, variant) is the pool's sprite for every byte — the existing kind, four corner-shop plans and paired specialist shops — on a 1×1 footprint", wrong.length === 0, wrong.slice(0, 5).join(" "));
-  check("shops: variants 0 and 1 are still the corner shop, and other one-tile families read only the low two bits",
-    art.building(2, 1, 0).name === "C1-shop-0" && art.building(2, 1, 1).name === "C1-shop-1" && art.building(2, 2, 37).name === "C2-store-1" && art.building(1, 1, 37).name === "R1-cottage-1" && art.building(3, 1, 200).name === "I1-shed-0");
-  check("shops: every kind but the corner shop is its own pair of solids in the registry, tagged shop, with a hi-res twin",
-    SHOPS.slice(1).every((s) => SHOP_ART[s.kind].length === 2 && SHOP_ART[s.kind].every((sp) => sp.tags.includes("shop") && art.hires(sp))));
+  check("shops: every byte selects the same business kind and orientation, reaches all six corner-shop and four specialist plans, and retains a 1×1 footprint", wrong.length === 0 && artHits.every(family => family.every(n => n > 0)), wrong.slice(0, 5).join(" "));
+  check("shops: variants 0 and 1 are still the corner shop, and other one-tile families cycle through six plans",
+    art.building(2, 1, 0).name === "C1-shop-0" && art.building(2, 1, 1).name === "C1-shop-1" && art.building(2, 2, 37).name === "C2-store-1" && art.building(1, 1, 37).name === "R1-cottage-1" && art.building(3, 1, 200).name === "I1-shed-2" && art.building(3, 1, 202).name === "I1-shed-4");
+  check("shops: every specialist has four distinct solids tagged shop with a hi-res twin, preserving its original pair",
+    SHOP_ART[0].length === 6 && SHOPS.slice(1).every((s) => SHOP_ART[s.kind].length === 4 && new Set(SHOP_ART[s.kind].map(sp => sp.rows.join("\n"))).size === 4 && SHOP_ART[s.kind][0].name === `C1-${s.key}-0` && SHOP_ART[s.kind][1].name === `C1-${s.key}-1` && SHOP_ART[s.kind].every((sp) => sp.tags.includes("shop") && art.hires(sp))));
 
   // The card: a Low C lot at variant 9 is a mirrored bookshop; nobody's until someone works there, then its keepers' by the staff's plurality species.
   const F = createWorld({ seed: "shops" });

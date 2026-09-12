@@ -121,7 +121,7 @@ const ZL = { 1: "R", 2: "C", 3: "I", 4: "M" };
  * roofs, a two-storey link between the back two, and in the front corner a
  * grass burrow mound with three round holes on its face and a tree on top.
  */
-function warrenTowers() {
+function warrenTowers(alternate = false) {
   const honey = (H, doorMid) => {
     const base = litSkin(BRICK, { grain: brickGrain, height: H });
     const hole = (u, g) => { const s = Math.floor(g / 8); const gg = g - 8 * s; return g > 1 && inRound(((u + (s & 1 ? 3 : 0)) % 6), gg, 3, 4.5, 1.6); };
@@ -141,11 +141,11 @@ function warrenTowers() {
   })();
   return [
     box(1, 47, 1, 47, 0, 0.6, PLINTH), // the lawn
-    ...drum(2, 2, 13, 40, 6.5),
-    ...drum(31, 2, 13, 32, 6.5),
-    box(15, 31, 3, 12, 0, 16, honey(16, null)), // the link
-    box(14.5, 31.5, 2.5, 12.5, 16, 17, PLINTH),
-    ...drum(2, 28, 13, 36, 6.5),
+    ...drum(2, 2, alternate ? 19 : 13, alternate ? 24 : 40, 6.5),
+    ...drum(31, 2, 13, alternate ? 48 : 32, 6.5),
+    box(alternate ? 21 : 15, 31, 3, 12, 0, 16, honey(16, null)), // the link
+    box(alternate ? 20.5 : 14.5, 31.5, 2.5, 12.5, 16, 17, PLINTH),
+    ...drum(2, 28, 13, alternate ? 24 : 36, 6.5),
     ...mound,
     box(15, 20, 30, 34, 0, 0.9, STEP), // the path from the front drum to the mound
     box(20, 24, 40, 44, 0, 0.9, STEP),
@@ -159,8 +159,8 @@ function warrenTowers() {
  * at the back the great lodge — a stepped mound of logs with a round door and
  * a smoke hole — a woodpile by the water, tall trees behind.
  */
-function theLodge() {
-  const H = 14;
+function theLodge(alternate = false) {
+  const H = alternate ? 22 : 14;
   const win = winsOf({ storey: 7, sill: 2, winH: 3, period: 5, winW: 2, from: 2 });
   const hallA = logSkin(H, { door: doorAt(16, 6, 1.6), win });
   const hallB = logSkin(H, { door: doorAt(14, 6, 1.6), win });
@@ -176,9 +176,10 @@ function theLodge() {
     // The two halls, shingle roofs.
     box(2, 12, 22, 46, 1, 1 + H, hallB),
     ...hipRoof(2, 12, 22, 46, 1 + H, 3, 1.5),
-    box(36, 46, 22, 46, 1, 1 + H, hallA),
-    ...hipRoof(36, 46, 22, 46, 1 + H, 3, 1.5),
+    box(36, 46, 22, alternate ? 34 : 46, 1, 1 + H, hallA),
+    ...hipRoof(36, 46, 22, alternate ? 34 : 46, 1 + H, 3, 1.5),
     chimney(4, 24, 1 + H + 7, 2), chimney(43, 24, 1 + H + 7, 2),
+    ...(alternate ? [box(35,46,35,44,10,11,TIMBER),box(44,45,41,43,1,10,logSkin(9)),box(35,36,41,43,1,10,logSkin(9))] : []),
     // The pond, its stone dam along the front, the woodpile.
     box(13, 35, 24, 42, 1, 1.8, WATER),
     box(13, 35, 42, 44.5, 1, 4, stone(3)),
@@ -194,7 +195,7 @@ function theLodge() {
  * between them at storey height, a lamp on the tallest, and tall trees in
  * the lawn they stand over.
  */
-function theRoost() {
+function theRoost(alternate = false) {
   const perchWin = (H) => (u, g) => g > H - 14 && g < H - 2 && inRound(u % 4, (g - (H - 14)) % 6, 2, 3, 1.4);
   const tower = (a, b, s, legs, H) => {
     const out = [];
@@ -208,14 +209,14 @@ function theRoost() {
   };
   return [
     box(1, 47, 1, 47, 0, 0.6, PLINTH),
-    ...tower(6, 6, 9, 10, 34), // A, the tallest, back-left
-    ...tower(31, 4, 9, 8, 26), // B, back-right
-    ...tower(18, 30, 9, 12, 28), // C, front
+    ...tower(6, 6, alternate ? 13 : 9, 10, alternate ? 22 : 34), // A, the tallest, back-left
+    ...tower(31, 4, 9, 8, alternate ? 42 : 26), // B, back-right
+    ...tower(18, 30, alternate ? 15 : 9, 12, alternate ? 18 : 28), // C, front
     // Perch beams: A → B along a at storey height, A → C along b.
-    box(15, 31, 9.5, 10.5, 30, 31, TIMBER),
-    box(9.5, 10.5, 15, 30, 33, 34, TIMBER),
+    box(alternate ? 19 : 15, 31, 9.5, 10.5, 30, 31, TIMBER),
+    box(9.5, 10.5, alternate ? 19 : 15, 30, alternate ? 24 : 33, alternate ? 25 : 34, TIMBER),
     box(15, 20, 33.5, 34.5, 36, 37, TIMBER), // a bar off C's roof for the hawks
-    lamp(10, 10, 47), // on A's cap
+    alternate ? lamp(35,8,55) : lamp(10, 10, 47), // on A's cap
     box(4, 8, 40, 46, 0, 0.9, STEP),
     ...bench(38, 40),
   ];
@@ -227,8 +228,8 @@ function theRoost() {
  * a fence with a gate across the front, and a tree in the corner for the
  * shade — the dirt crowd's own idea of comfort.
  */
-function theWallows() {
-  const H = 15;
+function theWallows(alternate = false) {
+  const H = alternate ? 23 : 15;
   const wallA = walled(litSkin(BRICK, { grain: brickGrain, height: H }), H, { storey: 7, sill: 3, winH: 2.5, period: 4, winW: 2, from: 1, door: doorAt(22, 5.5, 1.5) });
   const wallB = walled(litSkin(BRICK, { grain: brickGrain, height: H }), H, { storey: 7, sill: 3, winH: 2.5, period: 4, winW: 2, from: 1, door: doorAt(10, 5.5, 1.5) });
   return [
@@ -236,8 +237,9 @@ function theWallows() {
     box(1, 47, 1, 11, 0, H, wallA), // the back range
     ...hipRoof(1, 47, 1, 11, H, 2, 1.5),
     chimney(6, 2, H + 6), chimney(40, 2, H + 6),
-    box(1, 11, 11, 44, 0, H, wallB), // the left range
-    ...hipRoof(1, 11, 11, 44, H, 2, 1.5),
+    box(1, 11, 11, alternate ? 29 : 44, 0, H, wallB), // the left range
+    ...hipRoof(1, 11, 11, alternate ? 29 : 44, H, 2, 1.5),
+    ...(alternate ? [box(2,11,33,44,0,10,walled(litSkin(BRICK,{height:10}),10,{door:doorAt(4,6,1.3),endWindows:true})),...hipRoof(2,11,33,44,10,2,1.5)] : []),
     // The wallows: two pools, each two overlapping boxes so the edge is not a square.
     box(16, 28, 18, 26, 0, 0.9, WATER), box(20, 32, 22, 30, 0, 0.9, WATER),
     box(30, 42, 30, 38, 0, 0.9, WATER), box(26, 36, 34, 42, 0, 0.9, WATER),
@@ -255,7 +257,7 @@ function theWallows() {
  * carriage door, a lamp on a bracket beside it and its own chimney, the roofs
  * stepping up and down the row — and a lamp post in the yard.
  */
-function theMews() {
+function theMews(alternate = false) {
   const house = (a0, a1, b0, b1, H, doorMid, flip) => {
     const arch = (u, g) => g < 8 && (g < 4.5 ? Math.abs(u - doorMid) < 3.2 : inRound(u, g, doorMid, 4.5, 3.2));
     const skin = walled(litSkin(BRICK, { grain: brickGrain, height: H }), H, { storey: 9, sill: 4, winH: 3.5, period: 4, winW: 2, from: 1, door: flip ? null : arch });
@@ -266,15 +268,15 @@ function theMews() {
   return [
     box(1, 47, 1, 47, 0, 0.6, COBBLE), // the yard
     // The back terrace, four houses along a.
-    ...house(1, 12, 1, 13, 28, 6, false),
-    ...house(12, 23, 1, 13, 32, 5, false),
-    ...house(23, 34, 1, 13, 26, 6, false),
-    ...house(34, 46, 1, 13, 30, 6, false),
+    ...house(1, 12, 1, 13, alternate ? 18 : 28, 6, false),
+    ...house(12, 23, 1, 13, alternate ? 40 : 32, 5, false),
+    ...house(23, 34, 1, 13, alternate ? 18 : 26, 6, false),
+    ...house(34, 46, 1, 13, alternate ? 18 : 30, 6, false),
     // The left terrace, three houses down b — their arches face the yard on the end face, so these keep plain fronts and a lamp each.
     ...house(1, 13, 13, 24, 27, 5, true),
     ...house(1, 13, 24, 35, 31, 5, true),
-    ...house(1, 13, 35, 46, 25, 5, true),
-    lamp(13.2, 18, 8), lamp(13.2, 29, 8), lamp(13.2, 40, 8),
+    ...(alternate ? house(22,34,30,42,18,6,false) : house(1, 13, 35, 46, 25, 5, true)),
+    lamp(13.2, 18, 8), lamp(13.2, 29, 8), alternate ? lamp(33,40,8) : lamp(13.2, 40, 8),
     // The lamp post.
     box(30, 31.2, 30, 31.2, 0, 11, POST), lamp(29.6, 29.6, 11),
     box(24, 44, 40, 46, 0, 0.9, STEP), // the mews' own paving strip
@@ -291,8 +293,8 @@ function theMews() {
  * gallery along the yard at first-floor height on posts, the hanging sign on
  * its bracket, a trough and two barrels in the cobbled yard.
  */
-function foxAndCat() {
-  const H1 = 9, H2 = 10, H = H1 + H2;
+function foxAndCat(alternate = false) {
+  const H1 = 9, H2 = alternate ? 18 : 10, H = H1 + H2;
   const win = winsOf({ storey: 9, sill: 3, winH: 3, period: 5, winW: 2, from: 2 });
   const upper = framed(H2, { storey: 10, win: winsOf({ storey: 10, sill: 3, winH: 3.5, period: 5, winW: 2, from: 2 }) });
   const range = (arch) => {
@@ -316,8 +318,8 @@ function foxAndCat() {
     // The back range and the left wing.
     box(1, 47, 1, 12, 0, H, range(null)),
     ...hipRoof(1, 47, 1, 12, H, 3, 1.6),
-    box(1, 12, 12, 34, 0, H, range(null)),
-    ...hipRoof(1, 12, 12, 34, H, 3, 1.6),
+    box(1, 12, 12, alternate ? 23 : 34, 0, H, range(null)),
+    ...hipRoof(1, 12, 12, alternate ? 23 : 34, H, 3, 1.6),
     chimney(6, 2, H + 8, 2.2), chimney(38, 2, H + 8, 2.2), chimney(40, 36, H + 8, 2.2),
     // Dormers on the front range.
     box(8, 12, 43, 46.5, H + 1, H + 4.5, litSkin(BRICK, { grain: brickGrain, height: 3.5 })), box(7.5, 12.5, 42.5, 47, H + 4.5, H + 5.5, SLATE_SKIN),
@@ -344,8 +346,8 @@ function foxAndCat() {
  * striped awning in gold and dark, a lantern on every post — on paving, with
  * a row of bins along the hall's end for what the night leaves.
  */
-function nightMarket() {
-  const H = 16;
+function nightMarket(alternate = false) {
+  const H = alternate ? 24 : 16;
   const base = litSkin(CONC_WALL, { height: H });
   const hall = {
     glazing: true,
@@ -366,10 +368,10 @@ function nightMarket() {
     box(1, 47, 1, 47, 0, 0.6, STEP),
     box(1, 47, 1, 14, 0, H, hall),
     box(0.5, 47.5, 0.5, 14.5, H, H + 1, C_ROOF),
-    box(6, 42, 12, 13, H + 1, H + 2, BRACKET), box(5, 43, 12.5, 14, H + 2, H + 6, sign),
+    box(6, 42, 12, 13, H + 1, H + 2, BRACKET), box(alternate ? 13 : 5, alternate ? 35 : 43, 12.5, 14, H + 2, H + 6, sign),
     ...[3, 9, 15, 21, 27, 33, 39, 45].map((a) => lamp(a, 14, 12.5)), // the string of lamps under the eave
-    ...stall(4, 20), ...stall(18, 20), ...stall(32, 20),
-    ...stall(4, 33), ...stall(18, 33), ...stall(32, 33),
+    ...(alternate ? [...stall(4,19),...stall(4,30),...stall(4,41)] : [...stall(4,20),...stall(18,20),...stall(32,20)]),
+    ...(alternate ? [...stall(30,19),...stall(30,30),...stall(30,41)] : [...stall(4,33),...stall(18,33),...stall(32,33)]),
     ...bin(44, 16), ...bin(44, 20), ...bin(44, 24),
     crate(44, 40, 0, 2.5), crate(44, 43.5, 0, 2.5),
   ].flat();
@@ -383,8 +385,8 @@ function nightMarket() {
  * the dock, a row of churns on the step, and a fenced pasture strip with a
  * tree along the front — the cleanest works in the zone.
  */
-function theDairy() {
-  const H = 14;
+function theDairy(alternate = false) {
+  const H = alternate ? 22 : 14;
   const wall = walled(white(H), H, { storey: 14, sill: 4, winH: 4, period: 5, winW: 3, from: 1, door: doorAt(10, 7, 2.5) });
   const silo = (a, b, h) => [box(a, a + 7, b, b + 7, 0, h, litSkin(CONC.slice(1), { grain: ringGrain, height: h })), box(a - 0.5, a + 7.5, b - 0.5, b + 7.5, h, h + 1.2, litSkin(CONC, { height: 1 })), box(a + 1.5, a + 5.5, b + 1.5, b + 5.5, h + 1.2, h + 2.6, litSkin(CONC, { height: 1.4 })), box(a + 2.8, a + 4.2, b + 2.8, b + 4.2, h + 2.6, h + 3.6, litSkin(CONC, { height: 1 }))];
   const churn = (a, b) => [box(a, a + 1.6, b, b + 1.6, 0.8, 3.2, litSkin(CONC.slice(1), { height: 2.4 })), box(a + 0.2, a + 1.4, b + 0.2, b + 1.4, 3.2, 3.8, litSkin(CONC, { height: 0.6 }))];
@@ -401,7 +403,7 @@ function theDairy() {
     box(8, 22, 8, 15, H + 2, H + 5.5, { glazing: true, top: () => SLATE[2], side: (a, k) => (k >= 0.8 && k < 2.8 ? "=" : SLATE[1]), end: (b, k) => (k >= 0.8 && k < 2.8 ? END_GLASS : SLATE[0]) }), // the clerestory
     box(7.5, 22.5, 7.5, 15.5, H + 5.5, H + 6.5, SLATE_SKIN),
     chimney(2, 2, H + 10, 2.2),
-    ...silo(32, 3, 34), ...silo(40, 3, 30),
+    ...(alternate ? [...silo(33,3,24),...silo(33,14,24),...silo(40,3,24)] : [...silo(32,3,34),...silo(40,3,30)]),
     box(1, 29, 22, 25, 0, 1.6, STEP), // the dock step
     ...churn(3, 22.6), ...churn(6, 22.6), ...churn(9, 22.6), ...churn(12, 22.6), ...churn(15, 22.6),
     ...tanker,
@@ -416,8 +418,8 @@ function theDairy() {
  * lantern roof with a stack; crates of the season's find by its dock; a low
  * brick wall along the front with a gap for the carts.
  */
-function truffleWorks() {
-  const H = 12;
+function truffleWorks(alternate = false) {
+  const H = alternate ? 20 : 12;
   const shed = walled(litSkin(RUST, { grain: ribGrain, height: H }), H, { storey: 12, sill: 6, winH: 3, period: 5, winW: 3, from: 1, door: doorAt(8, 7.5, 3) });
   const lantern = { glazing: true, top: () => SLATE[2], side: (a, k) => (k >= 1 && k < 3 ? "=" : SLATE[1]), end: (b, k) => (k >= 1 && k < 3 ? END_GLASS : SLATE[0]) };
   return [
@@ -427,7 +429,7 @@ function truffleWorks() {
     box(5, 18, 5, 14, H + 1, H + 4, lantern),
     box(4.5, 18.5, 4.5, 14.5, H + 4, H + 5, SLATE_SKIN),
     stack(19, 1, H + 22, 3),
-    ...kiln(28, 3, 9), ...kiln(38, 6, 8), ...kiln(30, 34, 9),
+    ...(alternate ? [...kiln(28,3,16),...kiln(30,34,9)] : [...kiln(28,3,9),...kiln(38,6,8),...kiln(30,34,9)]),
     box(2, 20, 18, 21, 0, 1.6, STEP), // the dock
     crate(3, 21.5), crate(6, 21.5), crate(4.5, 21.5, 2), crate(9.5, 21.8), crate(12.5, 22),
     box(15, 27, 27, 35, 0, 0.9, WATER), // the wallow, the oak on the bank beside it (the first sheet stamped the oak in the water)
@@ -442,8 +444,8 @@ function truffleWorks() {
  * and a yard of nine white hives in rows on the lawn behind a low fence, a
  * tree in the corner for the blossom.
  */
-function honeyWorks() {
-  const H = 13;
+function honeyWorks(alternate = false) {
+  const H = alternate ? 21 : 13;
   const win = winsOf({ storey: 13, sill: 5, winH: 3, period: 5, winW: 2, from: 2 });
   const body = litSkin(EARTH, { grain: ribGrain, height: H });
   const hall = {
@@ -459,10 +461,11 @@ function honeyWorks() {
     box(1, 24, 1, 20, 0, H, hall),
     ...hipRoof(1, 24, 1, 20, H, 3, 1.5),
     chimney(2, 2, H + 8, 2),
-    ...tank(29, 4, 12, 6),
+    ...(alternate ? [...tank(29,4,8,6),...tank(39,4,8,6)] : tank(29,4,12,6)),
     box(1, 24, 20, 23, 0, 1.4, STEP), // the loading step
     crate(3, 23.5), crate(6, 23.5), crate(9, 23.5),
     ...hives,
+    ...(alternate ? [box(20,44,21,26,8,9,SLATE_SKIN),...[[20,21],[43,21],[20,25],[43,25]].map(([a,b])=>box(a,a+1,b,b+1,0,8,TIMBER))] : []),
     ...pen(18, 47, 18, 47, 22).slice(0, 7), // the hive yard's fence, gate at 22, no sawdust floor (it is lawn)
   ];
 }
@@ -473,8 +476,8 @@ function honeyWorks() {
  * pond, a waterwheel on its bank, a log stack on the front right, a sawdust
  * heap on the front left, and a brick engine stack behind the shed.
  */
-function theSawmill() {
-  const H = 12;
+function theSawmill(alternate = false) {
+  const H = alternate ? 18 : 12;
   const back = logSkin(H);
   const post = (a, b) => box(a, a + 1.2, b, b + 1.2, 0, H, litSkin(EARTH, { height: H }));
   // The wheel stands on edge along b, so its disc is the END face: rust with a spoke pattern (in slate it was one dark line — the first sheet).
@@ -484,12 +487,13 @@ function theSawmill() {
     // The shed: back wall, posts, roof; open on the yard and pond sides.
     box(1, 27, 1, 3, 0, H, back),
     post(1, 3), post(13, 3), post(25.5, 3), post(1, 16), post(13, 16), post(25.5, 16),
-    box(0.5, 27.5, 0.5, 17.5, H, H + 1.2, SLATE_SKIN),
+    ...(alternate ? [box(.5,13.5,.5,17.5,H,H+1.2,SLATE_SKIN),box(14.5,27.5,.5,17.5,H,H+1.2,SLATE_SKIN)] : [box(.5,27.5,.5,17.5,H,H+1.2,SLATE_SKIN)]),
     box(3, 25, 2, 8, H + 1.2, H + 3.6, { glazing: true, top: () => SLATE[2], side: (a, k) => (k >= 0.6 && k < 2 ? "=" : SLATE[1]), end: (b, k) => (k >= 0.6 && k < 2 ? END_GLASS : SLATE[0]) }),
     box(2.5, 25.5, 1.5, 8.5, H + 3.6, H + 4.4, SLATE_SKIN),
     box(6, 22, 8, 12, 0, 3, TIMBER), // the saw bench
     box(13.5, 14.5, 7, 13, 3, 6, { top: () => "+", side: () => SLATE[1], end: () => SLATE[0] }), // the blade
     chimney(28, 1, H + 20, 3),
+    ...(alternate ? [box(2,11,22,31,0,10,logSkin(10)),...hipRoof(2,11,22,31,10,2,1.2)] : []),
     // The pond, the logs afloat, the wheel on its bank.
     box(14, 40, 18, 40, 0, 0.9, WATER),
     log(16, 26, 22, 0.9), log(20, 32, 29, 0.9), log(28, 38, 35, 0.9),
@@ -503,11 +507,11 @@ function theSawmill() {
 
 // --------------------------------------------------------------- the table
 
-/** LANDMARK_ART[theme] = [variant 0, variant 1], keyed by the roster's ids (js/sim/landmarks.js). */
+/** LANDMARK_ART[theme]: two architectural commissions, each in both orientations. */
 export const LANDMARK_ART = {};
 const reg = (id, make, stamps = []) => {
   const lm = LANDMARKS[id];
-  LANDMARK_ART[id] = family(lm.key, ZL[lm.zone], 3, make, { stamps, tags: ["landmark"] });
+  LANDMARK_ART[id] = [...family(lm.key, ZL[lm.zone], 3, make, { stamps, tags: ["landmark"] }), ...family(`${lm.key}-annex`, ZL[lm.zone], 3, () => make(true), { stamps, tags: ["landmark"] })];
 };
 reg(1, warrenTowers, [[TREE_ROUND, 33, 33, 11]]);
 reg(2, theLodge, [[TREE_TALL, 6, 6, 1], [TREE_TALL, 42, 6, 1], [TREE_WILLOW, 40, 40, 1]]);

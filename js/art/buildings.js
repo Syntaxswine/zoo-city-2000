@@ -1,6 +1,6 @@
 // buildings.js — every built thing in the city is BOXES. SPEC §12.2.
 //
-// Twelve families (4 zones × 3 tiers) × 4 variants, the five civics, and the
+// Twelve families (4 zones × 3 tiers) × 6 variants, the civics, and the
 // overlays. Nothing in this file draws a face. Each family is a list of
 // `box()`es in world units (1 tile = 16 along a and b, c in pixels) handed to
 // `solid.render`, which rasterises per screen pixel through a z-buffer — so a
@@ -14,7 +14,7 @@
 // roofs and trim, in the same order. Glass '=' is cut into a wall by the
 // skin returning it instead of the wall key — never by subtracting solid.
 //
-// VARIANTS. Plans 2 and 3 are authored in building-plans.js. Variant 1 of every family is variant 0 with the plan mirrored
+// VARIANTS. Plans 2 through 5 are authored in building-plans.js. Variant 1 of every family is variant 0 with the plan mirrored
 // across a = b: the chimney, the awning, the tank swap arms. The door stays
 // on the side face because the skin is not mirrored — which is what SPEC
 // means by "mirrored offsets".
@@ -578,7 +578,7 @@ const FAMILY = {
 };
 const ZONE_LETTER = { 1: "R", 2: "C", 3: "I", 4: "M" };
 
-/** BUILDINGS[zone][tier][variant] — 48 sprites. */
+/** BUILDINGS[zone][tier][variant] — 72 sprites, six plans per family. */
 export const BUILDINGS = {};
 for (const zone of [1, 2, 3, 4]) {
   BUILDINGS[zone] = {};
@@ -601,12 +601,16 @@ export function buildingSprite(zone, tier, variant = 0, side = 1, theme = 0, cha
 function baseBuildingSprite(zone, tier, variant = 0, side = 1, theme = 0) {
   const z = typeof zone === "string" ? { R: 1, C: 2, I: 3, M: 4 }[zone] : zone;
   if (side > 1) return blockSprite(z, side, variant, theme);
-  // The shop pool keeps its existing kind mapping. The corner shop has four
-  // plans by & 3; each specialist retains its & 1 mirrored pair.
-  if (z === 2 && tier === 1 && SHOP_ART) return SHOP_ART[shopKind(variant)][variant & (shopKind(variant) === 0 ? 3 : 1)];
+  // Keep the shop-kind mapping intact. Every 22 bytes cycles back to the
+  // corner shop; use that quotient to reach all three pairs of corner plans.
+  if (z === 2 && tier === 1 && SHOP_ART) {
+    const kind = shopKind(variant);
+    const plan = (Math.floor(variant / 22) % (SHOP_ART[kind].length / 2)) * 2 + (variant & 1);
+    return SHOP_ART[kind][plan];
+  }
   const fam = BUILDINGS[z] && BUILDINGS[z][tier];
   if (!fam) throw new Error(`buildingSprite: no family for zone ${zone} tier ${tier}`);
-  return fam[variant & 3];
+  return fam[variant % fam.length];
 }
 
 /**
@@ -632,9 +636,9 @@ export function registerLandmarks(table) { LANDMARK_ART = table; }
  */
 export function blockSprite(zone, side, variant = 0, theme = 0) {
   const z = typeof zone === "string" ? { R: 1, C: 2, I: 3, M: 4 }[zone] : zone;
-  if (theme && side === 3 && LANDMARK_ART && LANDMARK_ART[theme]) return LANDMARK_ART[theme][variant & 1];
+  if (theme && side === 3 && LANDMARK_ART && LANDMARK_ART[theme]) return LANDMARK_ART[theme][variant % LANDMARK_ART[theme].length];
   const fam = BLOCKS && BLOCKS[z] && BLOCKS[z][side];
-  if (fam) return fam[variant & 1];
+  if (fam) return fam[variant % fam.length];
   return BUILDINGS[z][3][variant & 1];
 }
 
@@ -850,7 +854,14 @@ export function registerLargeCivics(table) { LARGE_CIVICS = table; }
 /** Kinds that are not in CIVICS or the 3×3 table — the knowledge and culture buildings (js/art/civics-knowledge.js) — registered by kind and side. */
 const CIVIC_KINDS = {};
 export function registerCivicKind(kind, side, sprite) { (CIVIC_KINDS[kind] ||= {})[side] = sprite; }
-export function civicSprite(kind, side = null) {
+const CIVIC_VARIATIONS = new Map();
+export function registerCivicVariations(base, variants) { CIVIC_VARIATIONS.set(base, [base, ...variants]); }
+export function civicSprite(kind, side = null, variant = 0) {
+  const base = baseCivicSprite(kind, side);
+  const family = CIVIC_VARIATIONS.get(base);
+  return family ? family[((variant | 0) >>> 0) % family.length] : base;
+}
+function baseCivicSprite(kind, side = null) {
   if (kind === "zoo" && LARGE_CIVICS?.zoo) return LARGE_CIVICS.zoo;
   if (side === 3 && LARGE_CIVICS?.[kind]) return LARGE_CIVICS[kind];
   const k = CIVIC_KINDS[kind];

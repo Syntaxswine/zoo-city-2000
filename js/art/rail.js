@@ -98,17 +98,25 @@ function stationBoxes(axis) {
   return boxes;
 }
 
-const makeStation = (axis) => {
-  const boxes = stationBoxes(axis);
+const makeStation = (axis, variant = 0) => {
+  let boxes = stationBoxes(axis);
+  if(variant) {
+    // Ticket pavilion at the far end; a separate open canopy at the near end.
+    // All architecture stays on the five-unit platform, clear of running rails.
+    const glass = {glazing:true,top:()=>CONC[3],side:(a,k)=>k>2&&k<6?"=":CONC[2],end:(b,k)=>k>2&&k<6?"H":CONC[1]};
+    boxes = [box(11,16,0,16,0,1.5,SLAB),box(11.5,15.5,1,6,1.5,11.5,glass),box(11,16,.5,6.5,11.5,12.5,ROOF),box(12,13,13,14,1.5,7,POST),box(11,16,8,15,7,8,ROOF)];
+    if(axis==="ew") boxes=boxes.map(b=>box(b.b0,b.b1,b.a0,b.a1,b.c0,b.c1,b.faces));
+  }
   const r = render(boxes, { hub: A_STEP / 2 });
-  const s = defineSprite({ name: `station-${axis}`, anchor: r.anchor, rows: r.rows, tags: ["building", "station"] });
+  const s = defineSprite({ name: `station-${axis}${variant ? "-pavilion" : ""}`, anchor: r.anchor, rows: r.rows, tags: ["building", "station"] });
   RECIPES.set(s, { name: s.name, boxes, hub: A_STEP / 2, footprint: [1, 1], extent: [], stamps: [] }); // the hi-res set re-renders it at 2×
   return s;
 };
 export const STATIONS = { ns: makeStation("ns"), ew: makeStation("ew") };
+export const STATION_VARIANTS = {ns:[STATIONS.ns,makeStation("ns",1)],ew:[STATIONS.ew,makeStation("ew",1)]};
 
-export function stationSprite(axis = "ns") {
-  return STATIONS[axis === "ew" ? "ew" : "ns"];
+export function stationSprite(axis = "ns", variant = 0) {
+  return STATION_VARIANTS[axis === "ew" ? "ew" : "ns"][(variant >>> 0) % 2];
 }
 
 // ------------------------------------------------------------------ the level crossing
@@ -202,7 +210,7 @@ export const railBridgeSprite = mask => RAIL_BRIDGES[mask&15];
 /** Every rail sprite, named, for the audit. */
 export function allRail() {
   const out = [...RAILS,...RAIL_BRIDGES].map((s) => ({ name: s.name, sprite: s }));
-  out.push({ name: STATIONS.ns.name, sprite: STATIONS.ns }, { name: STATIONS.ew.name, sprite: STATIONS.ew });
+  for(const axis of ["ns","ew"]) for(const sprite of STATION_VARIANTS[axis]) out.push({name:sprite.name,sprite});
   const sq = squareOnCrossings();
   for (const busy of [0, 1]) for (const axis of ["ns", "ew"]) out.push({ name: sq[busy][axis].name, sprite: sq[busy][axis] });
   return out;

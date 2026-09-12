@@ -1,7 +1,7 @@
 // index.js — the registry the renderer calls. SPEC §16.
 //
 //   art.building(zone, tier, variant, side, theme, character)   zone 1|2|3|4 or 'R'|'C'|'I'|'M', tier 1..3; side 2 | 3 → the zone's block (blocks.js), tier ignored;
-//                                       variant is the whole tile byte; original families use & 3; the shop kind still uses >> 1
+//                                       variant is the whole saved tile byte; each family selects its authored layout deterministically
 //                                       character = {lit:0..3, majority:species index+1, seed:tile index}; omitted for previews
 //                                       theme > 0 with side 3 → that landmark (landmarks.js; ids per js/sim/landmarks.js)
 //   art.mansion(variant, character)     the MANSION (mansion.js; SPEC §9f): the affluent address's 3×3, risen not placed, lit and marked like every building
@@ -45,6 +45,7 @@ import { allLandmarks } from "./landmarks.js"; // registers the eleven landmarks
 import { allShops } from "./shops.js"; // registers the shop pool (SPEC §12.2d)
 import { allMansion, MANSION } from "./mansion.js"; // the mansion (SPEC §9f)
 import { markSprite, characterSprite, MARKS } from "./building-character.js";
+import { allCivicVariations } from "./civic-variations.js";
 import { hires } from "./hires.js";
 import { roadSprite, bridgeSprite, allRoads } from "./roads.js";
 import { wallSprite, tunnelSprite, allWalls } from "./walls.js";
@@ -111,7 +112,7 @@ function notBuilt(name) {
 
 /** The mansion (SPEC §9f): the affluent address's 3×3 R family, with the same lights and species mark as every building. */
 export function mansion(variant = 0, character = null) {
-  const base = MANSION[variant & 1];
+  const base = MANSION[variant % MANSION.length];
   return character ? characterSprite(base, character) : base;
 }
 
@@ -159,7 +160,7 @@ export const art = Object.freeze({
 
 /** Every sprite the registry can hand out, named — the check.mjs audit walks this. */
 export function allSprites() {
-  const out = [...Object.values(MARKS).map(sprite => ({ name: sprite.name, sprite })), ...allBuildings(), ...allLargeCivics(), ...allKnowledgeCivics(), ...allInfrastructureCivics(), ...allBlocks(), ...allLandmarks(), ...allMansion(), ...allShops(), ...allRoads(), ...allWalls(), ...allRail(), ...allTerrain(), ...allCitizens(), ...BUBBLE_SAMPLES.map((sprite) => ({ name: sprite.name, sprite }))];
+  const out = [...Object.values(MARKS).map(sprite => ({ name: sprite.name, sprite })), ...allBuildings(), ...allLargeCivics(), ...allKnowledgeCivics(), ...allInfrastructureCivics(), ...allCivicVariations(), ...allBlocks(), ...allLandmarks(), ...allMansion(), ...allShops(), ...allRoads(), ...allWalls(), ...allRail(), ...allTerrain(), ...allCitizens(), ...BUBBLE_SAMPLES.map((sprite) => ({ name: sprite.name, sprite }))];
   const seen = new Set();
   return out.filter(({ name }) => (seen.has(name) ? false : (seen.add(name), true)));
 }

@@ -449,15 +449,68 @@ function meatExchange() {
   return boxes;
 }
 
+// Additional plans are individually composed: paired villas, staggered slabs,
+// a shopping court, a department-store tower, and working industrial yards.
+function newBlock(zone, side) {
+  const n = side * 16, out = [box(1, n-1, 1, n-1, 0, 0.6, zone < 3 ? PLINTH : SAWDUST)];
+  const hall = (a,b,w,d,h,roof = "hip") => {
+    const ramp = zone === 1 ? BRICK : zone === 2 ? CONC_WALL : zone === 3 ? RUST : SLATE;
+    out.push(box(a,a+w,b,b+d,0.6,h+0.6,walled(litSkin(ramp,{height:h,grain:zone===1?brickGrain:zone===3?ribGrain:undefined}),h,{storey:8,sill:3,winH:3,period:4,winW:2,from:1,endWindows:true,door:doorAt(w/2,6,1.3)})));
+    if(roof === "hip") out.push(...hipRoof(a,a+w,b,b+d,h+0.6,3,1.5));
+    else {
+      out.push(box(a-.5,a+w+.5,b-.5,b+d+.5,h+.6,h+1.6,SLATE_SKIN));
+      if(roof === "saw") out.push(...sawtooth(a,a+w,b,b+d,h+1.6,5));
+    }
+  };
+  if(zone===1 && side===2) { // Two villas across an open garden, not an L range.
+    hall(2,2,12,16,24); hall(18,5,12,15,16);
+    out.push(chimney(3,3,33),chimney(27,6,25),...fountain(15,26,3),...bench(3,25));
+    out.push(gardenWall(1,10,30,31),gardenWall(20,31,30,31));
+  } else if(zone===1) { // Three separate staggered apartment slabs.
+    hall(2,2,13,24,40,"flat"); hall(19,2,26,11,32,"flat"); hall(29,21,16,16,24,"flat");
+    for(const h of [9,17,25,33]) out.push(box(2,15,26,27,h,h+1,STEP));
+    out.push(...fountain(19,35,4),...bench(3,39),gardenWall(1,13,46,47),gardenWall(25,47,46,47));
+  } else if(zone===2 && side===2) { // Two shop pavilions with a broad central plaza.
+    hall(2,2,12,12,20,"flat"); hall(18,2,12,17,12,"flat");
+    out.push(box(1.5,14.5,13,17,7,8,AWNING),box(17.5,30.5,18,22,7,8,AWNING),...fountain(12,25,3),...bench(21,25));
+  } else if(zone===2) { // Low sales podium and an asymmetric tall office wing.
+    hall(2,2,43,20,16,"flat"); hall(4,24,12,18,24,"flat");
+    hall(29,4,14,14,40,"flat");
+    out.push(box(17,44,22,27,8,9,AWNING),...fountain(30,37,4),...bench(19,31));
+    for(const a of [18,26,34,42]) out.push(box(a,a+1,26,27,0,8,CONC_WALL_SKIN));
+  } else if(zone===3 && side===2) { // Twin narrow production sheds, tank in the gap.
+    hall(2,2,11,19,14,"saw"); hall(18,2,12,15,10,"saw");
+    out.push(stack(2,2,30,3),...tank(23,23,8,5),...van(6,26));
+  } else if(zone===3) { // Separate tall boiler house and long low machine hall.
+    hall(2,2,13,20,26,"flat"); hall(20,2,25,20,12,"saw");
+    out.push(stack(3,3,43,4),stack(10,3,35,3),...tank(3,30,10,7),...tank(14,30,7,6),...van(33,30));
+    out.push(box(22,43,24,28,0,2,STEP),box(26,34,36,43,0,4,TIMBER));
+  } else if(side===2) { // Slim slaughter hall alongside a large stock pen.
+    hall(2,2,12,25,16,"hip");
+    out.push(chimney(3,3,29),...pen(18,31,3,26,22),box(2,14,26,30,7,8.5,AWNING_M));
+    for(const a of [4,7,10]) out.push(box(a,a+.5,29,29.5,5,7,HOOK));
+  } else { // Two market ranges flanking the livestock court.
+    hall(2,2,43,12,18,"hip"); hall(2,18,12,23,12,"flat");
+    out.push(chimney(3,3,32),...pen(20,33,19,34,24),...pen(35,47,19,34,39),...van(24,40));
+    out.push(box(17,45,13,17,8,9.5,AWNING_M));
+    for(const a of [20,25,30,35,40]) out.push(box(a,a+.5,16.5,17,6,8,HOOK));
+  }
+  return out;
+}
+const CONC_WALL_SKIN = litSkin(CONC,{height:8});
+
 // --------------------------------------------------------------- the table
 
-/** BLOCKS[zone][side][variant] — 16 sprites, registered with buildings.js at load. */
+/** BLOCKS[zone][side][variant]: original and alternate plan, each in two orientations. */
 export const BLOCKS = {
   1: { 2: family("terrace-court", "R", 2, terraceCourt, { stamps: [[TREE_ROUND, 22, 20, 1]] }), 3: family("towers", "R", 3, towers, { stamps: [[TREE_ROUND, 16, 20, 1], [TREE_TALL, 31, 20, 1]] }) },
   2: { 2: family("arcade", "C", 2, arcade), 3: family("emporium", "C", 3, emporium, { stamps: [[TREE_ROUND, 6, 43, 1], [TREE_WILLOW, 42, 43, 1]] }) },
   3: { 2: family("mill", "I", 2, mill), 3: family("foundry", "I", 3, foundry) },
   4: { 2: family("abattoir", "M", 2, abattoir), 3: family("meat-exchange", "M", 3, meatExchange) },
 };
+for (const zone of [1,2,3,4]) for(const side of [2,3]) {
+  BLOCKS[zone][side].push(...family([null,"garden-villas","market-pavilions","machine-yards","stock-court"][zone], [null,"R","C","I","M"][zone], side, () => newBlock(zone,side)));
+}
 registerBlocks(BLOCKS);
 
 /**

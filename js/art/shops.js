@@ -255,15 +255,60 @@ function clockmaker() {
 
 const MAKERS = { bakery, greengrocer, fishmonger, bookshop, barber, florist, "tea-room": teaRoom, pub, ironmonger, clockmaker };
 
-/** SHOP_ART[kind] = [variant 0, variant 1]; kind 0 is the corner shop buildings.js already made. */
+/** A second architectural commission for each business. Retain its street
+ * furniture/sign (identity), but rebuild its upper mass and roof individually. */
+function alternateShop(key, make) {
+  const original = make(), body = original[0], h = body.c1;
+  let out = original.filter((b,i) => i===0 || b.b0>=body.b1 || (b.c1<=h && b.c0<h && b.a0>=body.a1));
+  const upper = (a,b,w,d,H,skin=BRICK) => {
+    out.push(box(a,a+w,b,b+d,h,h+H,walled(litSkin(skin,{height:H}),H,{storey:8,sill:2,winH:3,period:4,winW:2,from:1,endWindows:true})),...hipRoof(a,a+w,b,b+d,h+H,2,1.2));
+  };
+  const roof = (a,b,w,d,H=h) => out.push(...hipRoof(a,a+w,b,b+d,H,2,1.2));
+  switch(key) {
+    case "bakery": // A tall narrow bakehouse with the oven flue at the side.
+      out.push(box(1.5,14.5,2.5,13.5,h,h+.7,C_ROOF)); upper(2,3,7,10,7);
+      out.push(chimney(11,4,23,2.5)); break;
+    case "greengrocer": // Open market pavilion, a high ventilated central lantern.
+      roof(1.5,2.5,13,11); out.push(box(4,12,5,11,h+2,h+7,GLASS),box(3.5,12.5,4.5,11.5,h+7,h+8,SLATE_SKIN)); break;
+    case "fishmonger": // Long low fish hall with two distinct clerestory ridges.
+      for(const a of [1.5,8.5]) { out.push(box(a,a+6,2.5,13.5,h,h+3,GLASS)); roof(a,2.5,6,11,h+3); } break;
+    case "bookshop": // Setback reading room over the display floor.
+      out.push(box(3,13,2.5,13.5,h,h+.8,C_ROOF)); upper(3.5,3,8,7,7);
+      out.push(chimney(4,3.5,h+14,1.8)); break;
+    case "barber": // A narrow residential tower over the salon, pole still visible.
+      roof(1.5,2.5,13,11); upper(7.5,3,6.5,8,10,CONC_WALL); break;
+    case "florist": // A high greenhouse lantern behind the lower flower conservatory.
+      out = original.filter((b,i)=>i===0 || b.b0>=8.6);
+      out.push(box(2,14,3,8.5,h,h+6,GLASS),box(1.5,14.5,2.5,9,h+6,h+7,TIMBER)); break;
+    case "tea-room": // Two-storey tea house, low bay and tables beneath it.
+      upper(2,3,9,7,8); out.push(chimney(2.5,3.5,23,2));
+      out.push(...original.filter(b=>b.a0>=12 && b.b1<11)); break;
+    case "pub": // A projecting framed cross-wing instead of a single dormer roof.
+      roof(1.5,2.5,13,11); upper(2,3,6,10,7,CONC_WALL); out.push(chimney(11,3.5,25,2)); break;
+    case "ironmonger": // Sawtooth industrial supply shed, with ladder and buckets.
+      for(const a of [1.5,6,10.5]) out.push(box(a,a+3.5,2.5,13.5,h,h+4,GLASS),box(a,a+3.5,2.5,13.5,h+4,h+4.8,SLATE_SKIN)); break;
+    case "clockmaker": { // Tall central clock pavilion, moved from the small end turret.
+      roof(1.5,2.5,13,11);
+      const clock = original.find(b=>b.a0===9 && b.c0>h);
+      out.push(box(5,11,5,11,h,h+10,clock.faces),box(4.5,11.5,4.5,11.5,h+10,h+11,SLATE_SKIN),lamp(7.6,7.6,h+11));
+      break;
+    }
+  }
+  return out;
+}
+
+/** SHOP_ART[kind]: original and alternate shop plans, each in both orientations. Kind 0 uses the corner-shop pool. */
 export const SHOP_ART = SHOPS.map((s) => {
   if (s.kind === 0) return BUILDINGS[2][1];
   const make = MAKERS[s.key];
   if (!make) throw new Error(`shops: no maker for '${s.key}'`);
   const boxes = make();
+  const alternate = alternateShop(s.key,make);
   return [
     solidSprite(`C1-${s.key}-0`, boxes, { tags: ["building", "C", "shop"] }),
     solidSprite(`C1-${s.key}-1`, flipPlan(boxes), { tags: ["building", "C", "shop"] }),
+    solidSprite(`C1-${s.key}-pavilion-0`, alternate, { tags: ["building", "C", "shop"] }),
+    solidSprite(`C1-${s.key}-pavilion-1`, flipPlan(alternate), { tags: ["building", "C", "shop"] }),
   ];
 });
 registerShops(SHOP_ART);

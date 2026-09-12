@@ -23,8 +23,8 @@ function differences(a, b) {
 export function checkBuildingCharacter(check) {
   const bases = [...new Set([...allBuildings(), ...allBlocks(), ...allLandmarks(), ...allShops(), ...allMansion()]
     .map(x => x.sprite).filter(s => s.tags.includes("building")))];
-  check("buildings E: all twelve original families have four pairwise-distinct authored plans",
-    [1, 2, 3, 4].every(z => [1, 2, 3].every(t => BUILDINGS[z][t].length === 4 && new Set(BUILDINGS[z][t].map(s => s.rows.join("\n"))).size === 4)));
+  check("buildings E: all twelve original families have six pairwise-distinct authored plans",
+    [1, 2, 3, 4].every(z => [1, 2, 3].every(t => BUILDINGS[z][t].length === 6 && new Set(BUILDINGS[z][t].map(s => s.rows.join("\n"))).size === 6)));
   check("buildings E: every species has a distinct stamp inside a six-by-six socket",
     SPECIES.every(s => MARKS[s.id]?.w <= 6 && MARKS[s.id]?.h <= 6) && new Set(Object.values(MARKS).map(s => s.rows.join("\n"))).size === 14);
   check("buildings E: light levels clamp full occupancy and change at the four fill thresholds",

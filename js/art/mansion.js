@@ -84,7 +84,22 @@ function mansion() {
 /** MANSION[variant] — an R 3×3 family (SPEC §12.2b's `family`), registered with the audit through allMansion. */
 export const MANSION = family("mansion", "R", 3, mansion, { stamps: [[TREE_ROUND, 8, 43, 0.6], [TREE_TALL, 4, 7, 0.6]], tags: ["mansion"] });
 
-/** Both mansion sprites, named, for the audit and the sheet. */
+/** A garden villa: tall belvedere, single long gallery and detached glasshouse.
+ * The entrance court stays open instead of repeating the original U plan. */
+function gardenVilla() {
+  const out = [slab(0,0,48,48,0,.6,LAWN),slab(17,16,20,29,.6,.2)];
+  const wing = (a,b,w,d,h) => out.push(box(a,a+w,b,b+d,.6,h+.6,stone(h,{door:doorAt(w/2,7,1.5)})),...hipRoof(a,a+w,b,b+d,h+.6,3,1.5));
+  wing(3,3,30,12,18); wing(3,15,12,19,12); wing(32,3,12,13,30);
+  out.push(chimney(5,4,27),chimney(26,4,27));
+  for(const a of [18,23,28]) out.push(column(a,19,9));
+  out.push(box(16,32,14,21,9,10,SLATE_SKIN),slab(21,21,7,3,.6,1.2,STEP));
+  out.push(box(33,44,29,41,.6,7.6,GLASS),box(32.5,44.5,28.5,41.5,7.6,8.4,SLATE_SKIN));
+  out.push(...fountain(24,33,4),...bench(4,39),gardenWall(.5,18,46.5,47.5),gardenWall(30,47.5,46.5,47.5),...gateLamp(17,45),...gateLamp(30,45));
+  return out;
+}
+MANSION.push(...family("garden-villa","R",3,gardenVilla,{stamps:[[TREE_ROUND,7,44,.6]],tags:["mansion"]}));
+
+/** Every mansion plan and orientation, named, for the audit and the sheet. */
 export function allMansion() {
   return MANSION.map((sprite) => ({ name: sprite.name, sprite }));
 }

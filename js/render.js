@@ -539,24 +539,24 @@ export function createRenderer(canvas, initialWorld, art) {
             // A MANSION (SPEC §9f) is an R block by every rule but the picture: its own family, the same lights and mark.
             standing = world.mansion[i] ? art.mansion(world.variant[i], character) : art.building(world.zone[i], world.tier[i], world.variant[i], sideOf(world, i), world.theme[i], character);
           }
-        } else if (world.civic[i] === CIVIC.PARK) standing = art.civic("park", civicSideOf(world, i));
-        else if (world.civic[i] === CIVIC.LARGE_PARK) standing = art.civic("largePark", civicSideOf(world, i));
-        else if (world.civic[i] === CIVIC.ZOO) standing = art.civic("zoo", 3);
-        else if (world.civic[i] === CIVIC.FIRE) standing = art.civic("fire", civicSideOf(world, i));
-        else if (world.civic[i] === CIVIC.POLICE) standing = art.civic("police", civicSideOf(world, i));
-        else if (world.civic[i] === CIVIC.CENTRE) standing = art.civic("centre", civicSideOf(world, i));
-        else if (world.civic[i] === CIVIC.LIBRARY) standing = art.civic("library", civicSideOf(world, i)); // knowledge and culture (SPEC §9e)
-        else if (world.civic[i] === CIVIC.UNIVERSITY) standing = art.civic("university", civicSideOf(world, i));
-        else if (world.civic[i] === CIVIC.GALLERY) standing = art.civic("gallery", civicSideOf(world, i));
-        else if (world.civic[i] === CIVIC.FARM) standing = art.civic("farm", civicSideOf(world, i));
-        else if (world.civic[i] === CIVIC.DOCTOR) standing = art.civic("doctor", civicSideOf(world, i));
-        else if (world.civic[i] === CIVIC.HOSPITAL) standing = art.civic("hospital", civicSideOf(world, i));
-        else if (world.civic[i] === CIVIC.CEMETERY) standing = art.civic("cemetery", civicSideOf(world, i));
-        else if (world.civic[i] === CIVIC.SANITATION) standing = art.civic("sanitation", civicSideOf(world, i));
-        else if (world.civic[i] === CIVIC.GARBAGE) standing = art.civic("garbage", civicSideOf(world, i));
-        else if (world.civic[i] === CIVIC.AMPHITHEATER) standing = art.civic("amphitheater", civicSideOf(world, i));
+        } else if (world.civic[i] === CIVIC.PARK) standing = art.civic("park", civicSideOf(world, i), world.variant[i]);
+        else if (world.civic[i] === CIVIC.LARGE_PARK) standing = art.civic("largePark", civicSideOf(world, i), world.variant[i]);
+        else if (world.civic[i] === CIVIC.ZOO) standing = art.civic("zoo", 3, world.variant[i]);
+        else if (world.civic[i] === CIVIC.FIRE) standing = art.civic("fire", civicSideOf(world, i), world.variant[i]);
+        else if (world.civic[i] === CIVIC.POLICE) standing = art.civic("police", civicSideOf(world, i), world.variant[i]);
+        else if (world.civic[i] === CIVIC.CENTRE) standing = art.civic("centre", civicSideOf(world, i), world.variant[i]);
+        else if (world.civic[i] === CIVIC.LIBRARY) standing = art.civic("library", civicSideOf(world, i), world.variant[i]); // knowledge and culture (SPEC §9e)
+        else if (world.civic[i] === CIVIC.UNIVERSITY) standing = art.civic("university", civicSideOf(world, i), world.variant[i]);
+        else if (world.civic[i] === CIVIC.GALLERY) standing = art.civic("gallery", civicSideOf(world, i), world.variant[i]);
+        else if (world.civic[i] === CIVIC.FARM) standing = art.civic("farm", civicSideOf(world, i), world.variant[i]);
+        else if (world.civic[i] === CIVIC.DOCTOR) standing = art.civic("doctor", civicSideOf(world, i), world.variant[i]);
+        else if (world.civic[i] === CIVIC.HOSPITAL) standing = art.civic("hospital", civicSideOf(world, i), world.variant[i]);
+        else if (world.civic[i] === CIVIC.CEMETERY) standing = art.civic("cemetery", civicSideOf(world, i), world.variant[i]);
+        else if (world.civic[i] === CIVIC.SANITATION) standing = art.civic("sanitation", civicSideOf(world, i), world.variant[i]);
+        else if (world.civic[i] === CIVIC.GARBAGE) standing = art.civic("garbage", civicSideOf(world, i), world.variant[i]);
+        else if (world.civic[i] === CIVIC.AMPHITHEATER) standing = art.civic("amphitheater", civicSideOf(world, i), world.variant[i]);
         else if (world.wall[i]) standing = world.road[i] !== ROAD.NONE || world.rail[i] ? art.tunnel(tunnelAxis(world, i)) : art.wall(wallMask(tx, ty)); // a wall stands; a tunnel stands over its road or rail
-        else if (world.rail[i] === 2) standing = art.station(railAxis(tx, ty)); // the platform and shelter stand over the track
+        else if (world.rail[i] === 2) standing = art.station(railAxis(tx, ty), world.variant[i]); // the platform and shelter stand over the track
         if (standing) items.push({ sprite: standing, tx, ty, kind: "building" });
         // A camera is a SECOND push, never a link in the chain above: it stands
         // over a plain road (where no branch fires) and can also share a tile
