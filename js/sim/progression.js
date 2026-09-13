@@ -1,3 +1,4 @@
+import { foodSupport } from './governance.js';
 // Campaign state lives in flags, so saves, undo boundaries and replay share it.
 import { CIVIC, TERRAIN, ZONE, civicTiles, anchorOf } from "./world.js";
 import { served } from "./fields.js";
@@ -12,7 +13,7 @@ export const CHAPTERS = Object.freeze([
   { name: "The Metropolis", target: null, story: "The river city has learned to care for itself. Every tool is available, and mechanized farms support 400 villagers each. Its future is yours." },
 ]);
 const UNLOCK = { road: 0, R: 0, M: 0, farm: 0, fire: 0, inspect: 0, bulldoze: 0,
-  C: 1, I: 1, police: 1, interview: 1, collect: 1, cemetery: 1, doctor: 2, hospital: 3, library: 2, gallery: 2, park: 2, largePark: 2,
+  governor: 1, governance: 1, C: 1, I: 1, police: 1, interview: 1, collect: 1, cemetery: 1, doctor: 2, hospital: 3, library: 2, gallery: 2, park: 2, largePark: 2,
   zoo: 2, centre: 2, sanitation: 3, garbage: 3 };
 export const chapterOf = w => w.flags?.campaign?.chapter ?? 4;
 export const farmYield = w => KNOBS.FARM_CAPACITY[chapterOf(w)];
@@ -83,7 +84,7 @@ export function computeInfrastructure(w) {
   w.infrastructure = { counts, total, covers, population, housed, sanitation, garbage, sanitationCapacityShare,
     sanitationShare: population ? sanitation / population : 1,
     garbageShare: population ? garbage / population : 1,
-    food: counts.farm * farmYield(w) };
+    food: counts.farm * farmYield(w) + foodSupport(w) };
   return w.infrastructure;
 }
 

@@ -1,3 +1,5 @@
+import { releaseJob as releaseGovernanceJob } from './citizens.js';
+import { governancePlan } from './governance.js';
 // ops.js — every player action, logged, costed, undoable. SPEC §11, §15.
 //
 // The renderer/input layer builds an op; `apply` validates it, charges the
@@ -165,7 +167,7 @@ export function costOf(world, op) {
   const tiles = [];
   // Every footprint a tile op writes — the four knowledge-and-culture kinds included: until session 18 the list stopped at
   // the centre, so a Library could be dropped on an occupied tent (found while building the wealth arc; fixed as seen).
-  if (["zone", "road", "rail", "station", "wall", "bulldoze", "tree", "park", "largePark", "zoo", "fire", "police", "centre", "library", "university", "gallery", "amphitheater", "farm", "cemetery", "sanitation", "garbage", "doctor", "hospital"].includes(op.kind)) {
+  if (["zone", "road", "rail", "station", "wall", "bulldoze", "tree", "park", "largePark", "zoo", "fire", "police", "centre", "library", "university", "gallery", "amphitheater", "farm", "cemetery", "sanitation", "garbage", "doctor", "hospital", "governor"].includes(op.kind)) {
     const side = CIVIC_SIDE[op.kind] || 1;
     const requested = op.tiles || (op.x0 != null ? rect(world, op) : Array.from({ length: side * side }, (_, k) => idx(world, op.tx + k % side, op.ty + Math.floor(k / side))));
     if (requested.some(i => campAt(world, i))) return { cost: 0, tiles, reason: "someone is camping here — provide housing before building" };
@@ -246,7 +248,8 @@ export function costOf(world, op) {
       }
       break;
     }
-    case "park": case "fire": case "police": case "centre": case "largePark": case "zoo": case "library": case "university": case "gallery": case "amphitheater": case "farm": case "cemetery": case "sanitation": case "garbage": case "doctor": case "hospital": {
+    case "park": case "fire": case "police": case "centre": case "largePark": case "zoo": case "library": case "university": case "gallery": case "amphitheater": case "farm": case "cemetery": case "sanitation": case "garbage": case "doctor": case "hospital": case "governor": {
+      if (op.kind === "governor" && world.civic.includes(CIVIC.GOVERNOR)) return { cost: 0, tiles: [], reason: "Only one Governor’s Mansion is allowed per city" };
       if (op.kind === "cemetery" && world.civic.includes(CIVIC.CEMETERY)) return { cost: 0, tiles: [], reason: "Only one cemetery is allowed per city" };
       const side = CIVIC_SIDE[op.kind]; // 1 the park · 2 the Library and the Gallery · 3 the campuses (world.js)
       for (let dy = 0; dy < side; dy++) for (let dx = 0; dx < side; dx++) {
@@ -387,6 +390,29 @@ function applyOperation(world, op, { log = true } = {}) {
     refreshLast(world);
     return result;
   }
+  if (op.kind === "governance") {
+    const plan=governancePlan(world,op.key,op.value);
+    if(plan.reason)return {ok:false,cost:plan.cost||0,reason:plan.reason};
+    if(plan.cost)post(world,"governance",-plan.cost);
+    world.events.governance={...(world.events.governance||{}),unlocked:true,[op.key]:op.value};
+    if(op.key==='scrubbers')world.events.scrubbers=true;
+    if(op.key==='meatTrade'){
+      world.events.licence=op.value==='inspected';
+      if(op.value==='prohibited'){
+        for(let i=0;i<world.zone.length;i++)if(world.zone[i]===ZONE.M&&!(world.big[i]&128))closeHall(world,i);
+        for(const c of world.citizens)if(c.job>=0&&world.zone[c.job]===ZONE.M)releaseGovernanceJob(world,c);
+      }
+      resetMeatRoutes(world);
+    }
+    if(['licence','scrubbers'].includes(world.events.choice?.id))world.events.choice=null;
+    const label=plan.def.options.find(([v])=>v===op.value)[1];
+    const line='GOVERNANCE — '+plan.def.name+': '+label+'.';
+    world.events.log.push({t:world.tick,id:'governance',line});
+    if(log)world.log.push({t:world.tick,op:{kind:'governance',key:op.key,value:op.value}});
+    world.undoStack=[];
+    refreshLast(world);
+    return {ok:true,cost:plan.cost,notices:[line]};
+  }
   // Non-tile ops first.
   if (op.kind === "rate") {
     const v = Math.max(0, Math.min(20, Math.round(op.value)));
@@ -476,10 +502,11 @@ function applyOperation(world, op, { log = true } = {}) {
       case "tree":
         world.terrain[i] = TERRAIN.TREE;
         break;
-      case "park": case "fire": case "police": case "centre": case "largePark": case "zoo": case "library": case "university": case "gallery": case "amphitheater": case "farm": case "cemetery": case "sanitation": case "garbage": case "doctor": case "hospital": {
+      case "park": case "fire": case "police": case "centre": case "largePark": case "zoo": case "library": case "university": case "gallery": case "amphitheater": case "farm": case "cemetery": case "sanitation": case "garbage": case "doctor": case "hospital": case "governor": {
         world.terrain[i] = TERRAIN.GRASS;
         const a = idx(world, op.tx, op.ty), dx = i % world.w - op.tx, dy = ((i / world.w) | 0) - op.ty;
         world.civic[i] = i === a ? CIVIC_OF_KIND[op.kind] : CIVIC.PART;
+        if(op.kind==='governor'&&i===a)world.events.governance={...(world.events.governance||{}),unlocked:true};
         world.civicSize[i] = i === a ? CIVIC_SIDE[op.kind] : CIVIC_SIDE[op.kind] > 4 ? 192 | dx | dy << 3 : 128 | dx | dy << 2;
         civics = true;
         break;

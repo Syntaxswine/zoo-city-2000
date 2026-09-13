@@ -15,14 +15,14 @@ export const ROAD = Object.freeze({ NONE: 0, ROAD: 1, BRIDGE: 2 });
 export const ZONE = Object.freeze({ NONE: 0, R: 1, C: 2, I: 3, M: 4 });
 // 9–12 are the knowledge-and-culture buildings (SPEC §9e, 2026-09-05): appended after the Zoo, never renumbered,
 // and never inferred from a footprint's size — a 2×2 Library and a legacy 2×2 Large Park share a side and nothing else.
-export const CIVIC = Object.freeze({ NONE: 0, PARK: 1, LARGE_PARK: 2, LARGE_PARK_PART: 3, FIRE: 4, POLICE: 5, CENTRE: 6, PART: 7, ZOO: 8, LIBRARY: 9, UNIVERSITY: 10, GALLERY: 11, AMPHITHEATER: 12, FARM: 13, CEMETERY: 14, SANITATION: 15, GARBAGE: 16, DOCTOR: 17, HOSPITAL: 18 });
+export const CIVIC = Object.freeze({ NONE: 0, PARK: 1, LARGE_PARK: 2, LARGE_PARK_PART: 3, FIRE: 4, POLICE: 5, CENTRE: 6, PART: 7, ZOO: 8, LIBRARY: 9, UNIVERSITY: 10, GALLERY: 11, AMPHITHEATER: 12, FARM: 13, CEMETERY: 14, SANITATION: 15, GARBAGE: 16, DOCTOR: 17, HOSPITAL: 18, GOVERNOR: 19 });
 export const isStation = (c) => c === CIVIC.FIRE || c === CIVIC.POLICE; // coverage
 export const isKnowledgeCivic = (c) => c === CIVIC.LIBRARY || c === CIVIC.UNIVERSITY; // the knowledge field
 export const isCultureCivic = (c) => c === CIVIC.GALLERY || c === CIVIC.AMPHITHEATER; // the culture field
-export const isCivicEmployer = (c) => c === CIVIC.DOCTOR || c === CIVIC.HOSPITAL || c === CIVIC.FARM || c === CIVIC.SANITATION || c === CIVIC.GARBAGE || isStation(c) || c === CIVIC.CENTRE || c === CIVIC.ZOO || isKnowledgeCivic(c) || isCultureCivic(c); // jobs
+export const isCivicEmployer = (c) => c === CIVIC.GOVERNOR || c === CIVIC.DOCTOR || c === CIVIC.HOSPITAL || c === CIVIC.FARM || c === CIVIC.SANITATION || c === CIVIC.GARBAGE || isStation(c) || c === CIVIC.CENTRE || c === CIVIC.ZOO || isKnowledgeCivic(c) || isCultureCivic(c); // jobs
 /** The footprint side a kind is BUILT at (ops.js): the small services 2×2, the campuses 3×3, the park 1×1. Legacy saves carry their own side in civicSize. */
-export const CIVIC_SIDE = Object.freeze({ doctor: 2, hospital: 3, farm: 2, cemetery: 6, sanitation: 3, garbage: 2, park: 1, fire: 3, police: 3, centre: 3, largePark: 3, zoo: 3, library: 2, university: 3, gallery: 2, amphitheater: 3 });
-export const CIVIC_OF_KIND = Object.freeze({ doctor: CIVIC.DOCTOR, hospital: CIVIC.HOSPITAL, farm: CIVIC.FARM, cemetery: CIVIC.CEMETERY, sanitation: CIVIC.SANITATION, garbage: CIVIC.GARBAGE, park: CIVIC.PARK, fire: CIVIC.FIRE, police: CIVIC.POLICE, centre: CIVIC.CENTRE, largePark: CIVIC.LARGE_PARK, zoo: CIVIC.ZOO, library: CIVIC.LIBRARY, university: CIVIC.UNIVERSITY, gallery: CIVIC.GALLERY, amphitheater: CIVIC.AMPHITHEATER });
+export const CIVIC_SIDE = Object.freeze({ governor: 3, doctor: 2, hospital: 3, farm: 2, cemetery: 6, sanitation: 3, garbage: 2, park: 1, fire: 3, police: 3, centre: 3, largePark: 3, zoo: 3, library: 2, university: 3, gallery: 2, amphitheater: 3 });
+export const CIVIC_OF_KIND = Object.freeze({ governor: CIVIC.GOVERNOR, doctor: CIVIC.DOCTOR, hospital: CIVIC.HOSPITAL, farm: CIVIC.FARM, cemetery: CIVIC.CEMETERY, sanitation: CIVIC.SANITATION, garbage: CIVIC.GARBAGE, park: CIVIC.PARK, fire: CIVIC.FIRE, police: CIVIC.POLICE, centre: CIVIC.CENTRE, largePark: CIVIC.LARGE_PARK, zoo: CIVIC.ZOO, library: CIVIC.LIBRARY, university: CIVIC.UNIVERSITY, gallery: CIVIC.GALLERY, amphitheater: CIVIC.AMPHITHEATER });
 export const KIND_OF_CIVIC = Object.freeze(Object.fromEntries(Object.entries(CIVIC_OF_KIND).map(([k, v]) => [v, k])));
 /**
  * The jobs a civic anchor offers — EXPLICIT per kind. The knowledge-and-culture
@@ -32,6 +32,7 @@ export const KIND_OF_CIVIC = Object.freeze(Object.fromEntries(Object.entries(CIV
  */
 export function civicJobs(c) {
   switch (c) {
+    case CIVIC.GOVERNOR: return 12;
     case CIVIC.DOCTOR: return KNOBS.DOCTOR_JOBS;
     case CIVIC.HOSPITAL: return KNOBS.HOSPITAL_JOBS;
     case CIVIC.FARM: return KNOBS.FARM_JOBS;
@@ -418,6 +419,7 @@ export function capacityOf(world, i) {
   if (z === ZONE.R) return Math.round(KNOBS.R_CAP[t] * m);
   if (z === ZONE.C) return Math.round(KNOBS.C_JOBS[t] * m);
   if (z === ZONE.I) return Math.round(KNOBS.I_JOBS[t] * m);
+  if (z === ZONE.M && world.events.governance?.meatTrade === "prohibited") return 0;
   if (z === ZONE.M) return Math.round(KNOBS.M_JOBS[t] * m);
   return civicJobs(world.civic[i]); // a civic anchor's places; a PART is 0 by the table
 }
@@ -431,6 +433,7 @@ export function jobsOf(world, i) {
   const m = blockMultiplier(b);
   if (z === ZONE.C) return Math.round(KNOBS.C_JOBS[world.tier[i]] * m);
   if (z === ZONE.I) return Math.round(KNOBS.I_JOBS[world.tier[i]] * m);
+  if (z === ZONE.M && world.events.governance?.meatTrade === "prohibited") return 0;
   if (z === ZONE.M) return Math.round(KNOBS.M_JOBS[world.tier[i]] * m);
   return civicJobs(world.civic[i]);
 }

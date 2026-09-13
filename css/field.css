@@ -336,3 +336,12 @@ li.nrow.at .gut { color: var(--ink); }
 .city-mode strong, .city-mode .note { display: block; }
 .city-mode strong { margin-bottom: 3px; }
 .city-mode:has(input:checked) strong { color: var(--accent); }
+
+/* Persistent policy controls remain readable in the narrow field guide. */
+#tabs { flex-wrap: wrap; }
+.governance-policy { padding: 10px 0; border-top: 1px solid var(--border); }
+.governance-policy h3, .governance-outcomes h3 { margin: 0 0 5px; font-size: 12px; }
+.governance-policy p { margin: 4px 0 8px; }
+.governance-policy select { max-width: calc(100% - 70px); margin: 0 6px 6px 0; font: inherit; }
+.governance-policy button { margin-bottom: 6px; }
+.governance-outcomes { border-top: 2px solid var(--border); padding-top: 12px; }

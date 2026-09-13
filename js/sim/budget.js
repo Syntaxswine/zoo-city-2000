@@ -1,3 +1,4 @@
+import { governanceCosts, policy } from './governance.js';
 // budget.js — the ONLY place cash changes. SPEC §0.3, §8.
 //
 // `post(world, kind, amount)` rounds to whole §, adds to cash and to the
@@ -40,7 +41,7 @@ export function yearlyFigures(world) {
     if (c.job < 0) continue;
     const z = world.zone[c.job];
     if (z === ZONE.I) fi++;
-    else if (z === ZONE.M) fm++;
+    else if (z === ZONE.M) { if(policy(world,'meatTrade')!=='prohibited')fm++; }
     else fc++;
   }
   // Bear winter: bears out of the workforce still counted as filled jobs? No —
@@ -98,9 +99,11 @@ export function yearlyFigures(world) {
     + KNOBS.UPKEEP_LIBRARY * libraries + KNOBS.UPKEEP_UNIVERSITY * universities + KNOBS.UPKEEP_GALLERY * galleries + KNOBS.UPKEEP_AMPHITHEATER * amphitheaters;
   upkeepYr += doctors * KNOBS.UPKEEP_DOCTOR + hospitals * KNOBS.UPKEEP_HOSPITAL;
   upkeepYr += farms * KNOBS.UPKEEP_FARM + cemeteries * KNOBS.UPKEEP_CEMETERY + sanitationWorks * KNOBS.UPKEEP_SANITATION + garbageDepots * KNOBS.UPKEEP_GARBAGE;
+  const governance = governanceCosts(world);
+  upkeepYr += Object.values(governance).reduce((a,b)=>a+b,0);
   const winter = world.events.active.find((e) => e.id === "bearWinter");
   if (winter) upkeepYr *= 0.8;
-  return { doctors, hospitals, farms, cemeteries, sanitationWorks, garbageDepots, incomeYr: Math.round(incomeYr), upkeepYr: Math.round(upkeepYr), cutYr: Math.round(cutYr), taxByClass, fc, fi, fm, roads, bridges, parks, largeParks, zoos, fireStations, policeStations, centres, markets, walls, rails, railBridges, stations, cams, licence, libraries, universities, galleries, amphitheaters };
+  return { governance, doctors, hospitals, farms, cemeteries, sanitationWorks, garbageDepots, incomeYr: Math.round(incomeYr), upkeepYr: Math.round(upkeepYr), cutYr: Math.round(cutYr), taxByClass, fc, fi, fm, roads, bridges, parks, largeParks, zoos, fireStations, policeStations, centres, markets, walls, rails, railBridges, stations, cams, licence, libraries, universities, galleries, amphitheaters };
 }
 
 /** The monthly slice: post tax and upkeep, apply receivership rules. */

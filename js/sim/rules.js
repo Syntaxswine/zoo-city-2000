@@ -199,7 +199,7 @@ export const KNOBS = {
   HOSPITAL_CARE: 0.03,
   HEALTH_BONUS_MAX: 0.03, // legacy saved careBonus validation
   NO_MEDICAL_PENALTY: 0.03, // citywide, while no medical facility operates
-  COST: { doctor: 600, hospital: 4000, farm: 100, cemetery: 300, sanitation: 1200, garbage: 800, zoneR: 5, zoneC: 8, zoneI: 8, zoneM: 12, road: 10, bridge: 40, bulldoze: 2, bulldozeTree: 4, tree: 4, park: 150, largePark: 2500, zoo: 2500, pond: 40, fire: 500, police: 500, centre: 1500, wall: 8, use: 1, rail: 20, railBridge: 60, station: 300, camera: 100, library: 1000, university: 4000, gallery: 800, amphitheater: 3000 },
+  COST: { governor: 3000, doctor: 600, hospital: 4000, farm: 100, cemetery: 300, sanitation: 1200, garbage: 800, zoneR: 5, zoneC: 8, zoneI: 8, zoneM: 12, road: 10, bridge: 40, bulldoze: 2, bulldozeTree: 4, tree: 4, park: 150, largePark: 2500, zoo: 2500, pond: 40, fire: 500, police: 500, centre: 1500, wall: 8, use: 1, rail: 20, railBridge: 60, station: 300, camera: 100, library: 1000, university: 4000, gallery: 800, amphitheater: 3000 },
   // ---- knowledge and culture (the owner, 2026-09-05; docs/PROPOSAL-KNOWLEDGE-CULTURE-2026-09-05.md, its review and the owner's ruling) ----
   // Four public buildings: Library 2×2 and University 3×3 give KNOWLEDGE, Gallery 2×2 and Amphitheater 3×3 give CULTURE.
   // C-type jobs, a road touching to build, served to operate. The owner ruled the reach: five tiles for the small
@@ -570,7 +570,7 @@ export const RULES = Object.freeze([
   },
   {
     id: "M3", title: "The licence, the raid",
-    formula: "the Butchers' Guild offers a licence when the first hall reaches tier 2: §2,000 + §400/yr per hall, the jobs go on the books at the C rate, crime and the buyer's pull halve ; an unlicensed hall under police cover with crime > 50 can be raided: a storey shut, §200·tier in fines",
+    formula: "Governance licenses meat halls at the player’s direction: §2,000 + §400/yr per hall, the jobs go on the books at the C rate, crime and the buyer's pull halve ; an unlicensed hall under police cover with crime > 50 can be raided: a storey shut, §200·tier in fines",
     live: (w) => (w.events.licence ? "licensed" : "unlicensed"),
   },
   {
@@ -600,7 +600,7 @@ export const RULES = Object.freeze([
   },
   {
     id: "P2", title: "The sentence",
-    formula: "lighter crimes: Zoo prison (24 beds, release unchanged); murder or second theft: Pacification Centre (6 beds, six months, home FIXED); third theft, or theft after pacification: meat hall (§100 cut). A missing or full destination leaves the case open. Species does not determine sentencing. Theft from the affluent is one step harsher: a first theft goes to the centre and a second to the hall; murder of the affluent goes to the hall.",
+    formula: "Default laws, editable in Governance: lighter crimes: Zoo prison (24 beds, release unchanged); murder or second theft: Pacification Centre (6 beds, six months, home FIXED); third theft, or theft after pacification: meat hall (§100 cut). A missing or full destination leaves the case open. Species does not determine sentencing. Unless Equal treatment is enacted, theft from the affluent is one step harsher: a first theft goes to the centre and a second to the hall; murder of the affluent goes to the hall.",
     live: (w) => `${w.last.census.centres} centre${w.last.census.centres === 1 ? "" : "s"} · ${w.last.census.held} held · pacified ${w.events.justice.pacified} · sold ${w.events.justice.sold}`,
   },
   {

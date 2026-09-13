@@ -39,13 +39,14 @@ export const TOOLS = Object.freeze([
   row(26, "garbage", "Q", "Garbage", { kind: "garbage" }, { kind: "civic", args: ["garbage", 2] }, "2×2 collection depot beside a road; serves 750 villagers within 10 tiles"),
   row(27, "doctor", "[", "Doctor’s office", { kind: "doctor" }, { kind: "civic", args: ["doctor", 2] }, "2×2 beside a road; preventive care within 7 tiles; unlocks after Chapter 2"),
   row(28, "hospital", "]", "Hospital", { kind: "hospital" }, { kind: "civic", args: ["hospital", 3] }, "3×3 beside a road; stronger preventive care over the nearest half of the map; Chapter 4"),
+  row(29, "governor", ";", "Governor’s Mansion", { kind: "governor" }, { kind: "civic", args: ["governor", 3] }, "unique 3×3 estate beside a road; §3,000, §360/year, 12 jobs; unlocks Governance"),
 ]);
-// There is no Estate tool (SPEC §9f): a mansion is never placed. It RISES, like a storey, where an address has become affluent —
+// Residential mansions (SPEC §9f) are never placed; the Governor’s Mansion is a separate public civic. A residential mansion rises, like a storey, where an address has become affluent —
 // the owner: "if there are enough positive things near you it happens naturally like when the building upgrades to an apartment building".
 
 export const TOOL_BY_ID = Object.freeze(Object.fromEntries(TOOLS.map((tool) => [tool.id, tool])));
 export const TOOL_BY_KEY = Object.freeze(Object.fromEntries(TOOLS.map((tool) => [tool.key.toUpperCase(), tool])));
-export const PLACE_TOOLS = Object.freeze(TOOLS.filter((tool) => ["doctor", "hospital", "farm", "cemetery", "sanitation", "garbage", "station", "park", "largePark", "zoo", "centre", "police", "fire", "library", "university", "gallery", "amphitheater"].includes(tool.op.kind)).map((tool) => tool.id));
+export const PLACE_TOOLS = Object.freeze(TOOLS.filter((tool) => ["governor", "doctor", "hospital", "farm", "cemetery", "sanitation", "garbage", "station", "park", "largePark", "zoo", "centre", "police", "fire", "library", "university", "gallery", "amphitheater"].includes(tool.op.kind)).map((tool) => tool.id));
 /**
  * Tools that get a GHOST under the cursor — the ground diamond
  * (`art.overlay("ghost")`), green where the tile will take the thing and red

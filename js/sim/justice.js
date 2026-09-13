@@ -1,3 +1,4 @@
+import { policy, foodRecipient, oversightFactor } from './governance.js';
 // justice.js — crime and punishment. SPEC §9c. Pure; imports cleanly in Node.
 //
 // The owner (2026-09-02): predation as part of crime; grey-market meat
@@ -101,7 +102,8 @@ export function thiefPool(world, lot) {
     w *= Math.pow(KNOBS.RECORD_WEIGHT, Math.min(3, c.record || 0));
     return w;
   });
-  return weightedPick(world, cands, weights);
+  const chosen=weightedPick(world, cands, weights);
+  return chosen && foodRecipient(world,chosen) && world.rng.chance(.5) ? null : chosen;
 }
 
 // ---------------------------------------------------------------------------
@@ -111,7 +113,7 @@ export function thiefPool(world, lot) {
 export function killWeight(world, c) {
   if (c.dead || c.home < 0 || c.fixed || absent(world, c) || ageYears(world, c) < KNOBS.ADULT_AGE) return 0;
   let w = KNOBS.KILL_DIET[DIET_OF[c.species]] || 0;
-  if (c.job < 0 && isWorker(world, c)) w *= KNOBS.KILL_HUNGRY;
+  if (c.job < 0 && isWorker(world, c)) w *= KNOBS.KILL_HUNGRY * (foodRecipient(world,c)?.5:1);
   // The market influence is a service route, not the four-tile smell. Rail
   // on this H route is free; a cut line or a hall beyond 60 walked steps is
   // no market at all. Full hooks cannot buy another body.
@@ -285,7 +287,8 @@ function markBurgled(world, lot) {
 function pickWrongful(world, f, culprit) {
   const { cands, dists } = adultsWithin(world, f.tile, KNOBS.WRONGFUL_RADIUS, culprit);
   const weights = dists.map((d) => 1 / (1 + d));
-  return weightedPick(world, cands, weights);
+  const chosen=weightedPick(world, cands, weights);
+  return chosen && foodRecipient(world,chosen) && world.rng.chance(.5) ? null : chosen;
 }
 
 /** Beds taken at a centre — counted, never stored. */
@@ -374,10 +377,12 @@ export function sentenceFor(world, f, c, opts = {}) {
   // THE OWNER'S STEP (SPEC §9f): "any theft from the ultrawealthy gets … one step harsher punishment" — "yes harsher punishment".
   // One step up the table for a theft from an affluent address — a first theft goes to the centre, a second to the hall — and
   // murder of the affluent, already the centre, becomes the hall. The counter records what happened (thefts); the step is on the SENTENCE.
-  const harsher = (f.victimClass || 0) === CLASS.AFFLUENT && (theft || murder);
-  const steps = thefts + (harsher && theft ? 1 : 0);
-  const sentence = opts.sentence || ((theft && steps >= 3) || (theft && c.fixed) || (murder && harsher) ? "hall"
-    : murder || (theft && steps === 2) ? "centre" : "zoo");
+  const harsher = !policy(world,'equalTreatment') && (f.victimClass || 0) === CLASS.AFFLUENT && (theft || murder);
+  const steps = thefts;
+  const key=(theft&&steps>=3)||(theft&&c.fixed)?'persistentSentence':murder?'violentSentence':theft&&steps===2?'repeatSentence':'minorSentence';
+  let sentence=opts.sentence||policy(world,key);
+  if(!opts.sentence&&harsher)sentence=['zoo','centre','hall'][Math.min(2,['zoo','centre','hall'].indexOf(sentence)+1)];
+  if(sentence==='hall'&&policy(world,'meatTrade')==='prohibited')sentence='zoo';
   const market = sentence === "hall" ? hallReach(world, c.home, KNOBS.MEAT_ROAD, { space: true }) : null;
   const destination = sentence === "hall" ? market?.hall ?? -1 : custodyWithBed(world, c.home, sentence === "zoo" ? CIVIC.ZOO : CIVIC.CENTRE);
   return { theft, thefts, murder, harsher, sentence, destination };
@@ -425,7 +430,7 @@ export function arrest(world, f, c, wrongful, notices, opts = {}) {
     post(world, "cut", KNOBS.SOLD_PRICE);
     receiveMeat(world, destination, "convicted", 1);
     ev.justice.sold++;
-    const because = opts.ordered ? "The collection sentence was the meat hall." : murder ? "Murder of the affluent." : thefts >= 3 ? "Third theft." : c.fixed ? "An offence after pacification." : "A second theft from the affluent.";
+    const because = opts.ordered ? "The collection sentence was the meat hall." : world.events.governance ? "The city’s sentencing law permits sale for this offence." : murder ? "Murder of the affluent." : thefts >= 3 ? "Third theft." : c.fixed ? "An offence after pacification." : "A second theft from the affluent.";
     line = `SOLD — ${nameOf(c)} was convicted ${why} and sold at the meat hall at ${at(world, destination)}. ${because}${tail}`;
   } else {
     const months = sentence === "centre" ? KNOBS.PACIFY_MONTHS : minor ? KNOBS.TRESPASS_MONTHS : KNOBS.CELLS_MONTHS;
@@ -516,7 +521,7 @@ export function filesTick(world, cen, notices) {
     if (!world.rng.chance(p)) continue;
     // The same single draw it always was — the knob moves the threshold, not
     // the number of times the die is thrown.
-    let wrongful = world.rng.chance(KNOBS.WRONGFUL_P + KNOBS.CAM_WRONGFUL * cov);
+    let wrongful = world.rng.chance((KNOBS.WRONGFUL_P + KNOBS.CAM_WRONGFUL * cov) * oversightFactor(world));
     let target = culprit;
     if (wrongful) {
       const t = pickWrongful(world, f, culprit);

@@ -1,3 +1,4 @@
+import { policy } from './governance.js';
 // fields.js — roadDist, pollution, land value, traffic. SPEC §6. Pure.
 //
 // All of these are DERIVED: rebuilt every tick (roadDist only when roads
@@ -206,7 +207,7 @@ export function computePollution(world) {
     const t = world.tier[i];
     if (mess[i]) {
       const sanitation = world.infrastructure?.covers.sanitation[i] ? KNOBS.SANITATION_MESS_CUT * world.infrastructure.sanitationCapacityShare : 0;
-      spread(world, e, i, mess[i] * (1 - sanitation), KNOBS.MESS_RADIUS);
+      spread(world, e, i, mess[i] * (1 - sanitation) * (policy(world,'cleaners') ? .5 : 1), KNOBS.MESS_RADIUS);
     }
     if (world.zone[i] === ZONE.I && t > 0) spread(world, e, i, KNOBS.EMIT_I[t] * scrub, KNOBS.EMIT_I_RADIUS[t]);
     else if (world.zone[i] === ZONE.C && KNOBS.EMIT_C[t] > 0) spread(world, e, i, KNOBS.EMIT_C[t], KNOBS.EMIT_C_RADIUS[t]);
@@ -238,7 +239,7 @@ export function computeDread(world) {
   e.fill(0);
   for (let i = 0; i < n; i++) {
     const t = world.tier[i];
-    if (world.zone[i] === ZONE.M && t > 0) {
+    if (world.zone[i] === ZONE.M && t > 0 && policy(world,'meatTrade')!=='prohibited') {
       const hall = anchorOf(world, i);
       let stock = 0;
       for (const j of footprintOf(world, hall)) stock += world.meat[j] || 0;
@@ -562,7 +563,7 @@ export function computeCrime(world) {
   const mult = world.events.licence ? KNOBS.LICENCE_CRIME_MULT : 1;
   for (let i = 0; i < n; i++) {
     const t = world.tier[i];
-    if (world.zone[i] === ZONE.M && t > 0) spread(world, near, i, KNOBS.CRIME_M[t] * mult, KNOBS.CRIME_M_RADIUS[t]);
+    if (world.zone[i] === ZONE.M && t > 0 && policy(world,'meatTrade')!=='prohibited') spread(world, near, i, KNOBS.CRIME_M[t] * mult, KNOBS.CRIME_M_RADIUS[t]);
   }
   // The files' stain is capped at FILE_CRIME_MAX — a street where three things
   // happened is a bad street, not three bad streets. Uncapped it stacked, and

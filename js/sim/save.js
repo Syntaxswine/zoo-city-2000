@@ -1,3 +1,4 @@
+import { POLICIES } from './governance.js';
 // save.js — JSON round trip and the state hash. SPEC §15.
 //
 // Saved: tiles, citizens, households, campers, valves, events, ledger,
@@ -59,11 +60,13 @@ function plainCitizen(c) {
 }
 
 export function toPlain(world) {
+  // Repeat the household address only for residents whose address differs.
+  const homes=new Map(world.households.filter(h=>!h.gone).map(h=>[h.id,h.home]));
   const o = {
-    version: world.version, justiceVersion: 2, seed: world.seed, seedNum: world.seedNum, w: world.w, h: world.h, tick: world.tick,
+    version: world.version, justiceVersion: 2, citizenHomes: 1, seed: world.seed, seedNum: world.seedNum, w: world.w, h: world.h, tick: world.tick,
     cash: world.cash, rates: { ...world.rates }, start: world.start,
     valves: { ...world.valves }, festivalBonus: world.festivalBonus,
-    citizens: world.citizens.filter((c) => !c.dead).map(plainCitizen),
+    citizens: world.citizens.filter((c) => !c.dead).map(c=>{const p=plainCitizen(c); if(c.home===homes.get(c.household))delete p.home; else p.home=c.home; return p;}),
     deaths: (world.deaths || []).map((entry) => Array.isArray(entry) ? entry.slice() : { ...entry }),
     households: world.households.filter((h) => !h.gone).map((h) => ({ id: h.id, members: h.members.slice(), home: h.home, species: h.species, surname: h.surname, arrived: h.arrived, notice: h.notice || 0, ...(h.companions ? { companions: true } : {}), ...(h.homed != null && h.homed !== h.arrived ? { homed: h.homed } : {}), ...(h.burnedAt != null ? { burnedAt: h.burnedAt } : {}) })), // companions (SPEC §7.2) only when true, homed only when it differs from arrived, burnedAt only when set (§7.4): a town without them saves and hashes as it did
     campers: world.campers.map((c) => ({ ...c })),
@@ -106,8 +109,10 @@ export function fromPlain(o) {
   // Validate BEFORE Uint16 assignment: typed-array coercion would otherwise
   // turn an impossible imported 70000 into the plausible mask 4464.
   if (o.use) for (let i = 0; i < world.use.length && i < o.use.length; i++) world.use[i] = normalizeUse(o.use[i]);
+  const homes=new Map((o.households||[]).map(h=>[h.id,h.home]));
   world.citizens = (o.citizens || []).map((c) => ({
     ...citizenDefaults(), ...c,
+    ...(o.citizenHomes===1&&!Object.hasOwn(c,"home")?{home:homes.get(c.household)??-1}:{}),
     friends: (c.friends || []).slice(), life: (c.life || []).map((e) => e.slice()), path: null, stale: false,
   }));
   for (const c of world.citizens) if (!Number.isFinite(c.careBonus) || c.careBonus < 0 || c.careBonus > c.deathAge * KNOBS.HEALTH_BONUS_MAX) throw new Error("Invalid health bonus");
@@ -128,6 +133,12 @@ export function fromPlain(o) {
   }
   const jDefaults = world.events.justice;
   world.events = { ...world.events, ...o.events };
+  if(world.events.governance){
+    const g=world.events.governance;
+    for(const [key,value] of Object.entries(g))if(key!=='unlocked'&&!POLICIES.some(p=>p.key===key&&p.options.some(([v])=>v===value)))throw Error('Invalid governance policy');
+    world.events.governance={...g,unlocked:!!g.unlocked};
+  }
+  if(['licence','scrubbers'].includes(world.events.choice?.id))world.events.choice=null;
   world.events.justice = { ...jDefaults, ...(o.events.justice || {}) }; // an old save without a counter keeps 0, never NaN
   world.ledger = { ...o.ledger };
   world.history = o.history.slice();
@@ -184,6 +195,7 @@ export function rebuildDerived(world) {
 export function stateHash(world, { news = true } = {}) {
   const o = toPlain(world);
   o.citizens = world.citizens.filter((c) => !c.dead).map(canonicalCitizen);
+  delete o.citizenHomes; // storage-only household address deduplication
   delete o.justiceVersion; // migration marker, not simulation state
   delete o.log;
   delete o.history;

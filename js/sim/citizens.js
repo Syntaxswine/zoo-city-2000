@@ -1,3 +1,4 @@
+import { policy, foodRecipient, communityFactor } from './governance.js';
 // citizens.js — the zoo. SPEC §7. Pure; imports cleanly in Node.
 //
 // Every animal is a record with a persistent home and job (the anti-GlassBox
@@ -1169,7 +1170,7 @@ function friendships(world, out) {
     }
     if (!cand || cand === c || cand.dead || absent(world, cand) || cand.friends.length >= KNOBS.FRIEND_MAX || c.friends.includes(cand.id)) continue;
     const boost = world.events.active.reduce((m, e) => m * (e.friendMult || 1), 1);
-    if (rng.chance(KNOBS.FRIEND_P * pairAffinity(c, cand) * parkBonus * boost)) befriend(world, c, cand, out);
+    if (rng.chance(KNOBS.FRIEND_P * pairAffinity(c, cand) * parkBonus * boost * communityFactor(world,c,cand))) befriend(world, c, cand, out);
   }
   world._friendCursor = (start + samples) % N;
 }
@@ -1296,6 +1297,8 @@ export function moodTerms(world, c, context = moodContext(world)) {
     if (van && diet === "carn") terms.push({ code: "VAN", value: -KNOBS.VAN_MOOD });
   }
   terms.push({ code: "FRIENDS", value: 5 * c.friends.length });
+  if(foodRecipient(world,c))terms.push({code:"FOOD_AID",value:3});
+  if(policy(world,'community'))terms.push({code:"COMMUNITY",value:2});
   terms.push({ code: "FLIGHT", arg: flightSpecies, value: -Math.min(20, flight) });
   if (c.home >= 0) terms.push({ code: "CRIME", value: -KNOBS.CRIME_MOOD * Math.max(0, world.crime[c.home] - KNOBS.CRIME_MOOD_FROM) });
   // WATCHED is CHARACTERISATION, not the brake — the brake is CAM_CAP in the

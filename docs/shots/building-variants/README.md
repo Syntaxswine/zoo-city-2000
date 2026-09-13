@@ -1,6 +1,8 @@
 # Building variation review
 
-This set contains 259 sprites across 65 families, including 128 additions.
+The original expansion contains 259 sprites across 65 families, including 128 additions.
+The subsequent Governor’s Mansion adds three sprites in one family: the current
+regenerated set contains 262 sprites across 66 families.
 The additions cover every zoned tier, specialist shop, larger block,
 species landmark, mansion, civic kind/size, and both station axes.
 
@@ -11,7 +13,7 @@ species landmark, mansion, civic kind/size, and both station axes.
 | Larger blocks | 8 | 32 |
 | Species landmarks | 11 | 44 |
 | Mansion | 1 | 4 |
-| Civic kind/size combinations | 21 | 63 |
+| Civic kind/size combinations (including Governor’s Mansion) | 22 | 66 |
 | Station axes | 2 | 4 |
 
 The corner shop is counted in one-tile zoning. Original plans remain in the
@@ -29,7 +31,7 @@ Run `node tools/check-building-variants.mjs` for reachability, unique pixels,
 footprint bounds, palette/detail at 1x/2x/4x, and deterministic rendering checks.
 This gate is also included in `npm run check`.
 
-Independent hostile review progressed from 6.5/10 to 9.1/10. Revisions fixed
+The original 65-family batch’s independent hostile review progressed from 6.5/10 to 9.1/10. Revisions fixed
 unsupported roofs and towers, obstructed fire-station bays, skylight overhangs,
 cemetery path collisions, and sparse park planting. The final full-set review
 covered every sheet and city panel. Remaining stylistic deductions concerned

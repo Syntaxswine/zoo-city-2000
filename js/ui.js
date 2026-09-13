@@ -1,3 +1,4 @@
+import { POLICIES, policy, governanceUnlocked, governorOperational, governanceCosts, governanceOutcomes, governancePlan } from './sim/governance.js';
 // ui.js — the field-guide panel. SPEC §11 (hover card, bars, tabs), §10.
 //
 // Everything here is DOM: the tool strip, the three demand bars over the map,
@@ -81,6 +82,7 @@ export function createUI(app) {
     help: $("#help"),
   };
   let tab = "rules";
+  const governanceDraft=new Map();
   let flashTimer = 0;
   let flashQ = [];      // the rest of this month's headlines, waiting their turn
   let newsStick = true; // the News tab follows the newest line unless you scroll up
@@ -109,6 +111,7 @@ export function createUI(app) {
     let tiers = 0;
     for (let i = 0; i < w.w * w.h; i++) tiers += w.tier[i];
     const raw = [
+      ...Object.entries(fig.governance).map(([key,cost])=>[({estate:"Governor’s Mansion",oversight:"police accountability",cleaners:"building cleaners",foodAid:"food assistance",community:"community activities"})[key],cost]),
       ["doctors’ offices", KNOBS.UPKEEP_DOCTOR * fig.doctors], ["hospitals", KNOBS.UPKEEP_HOSPITAL * fig.hospitals],
       ["farms", KNOBS.UPKEEP_FARM * fig.farms], ["cemeteries", KNOBS.UPKEEP_CEMETERY * fig.cemeteries],
       ["sanitation works", KNOBS.UPKEEP_SANITATION * fig.sanitationWorks], ["garbage depots", KNOBS.UPKEEP_GARBAGE * fig.garbageDepots],
@@ -449,13 +452,14 @@ export function createUI(app) {
     else if (rep.civic === CIVIC.GALLERY) what = "Gallery";
     else if (rep.civic === CIVIC.FARM) what = `Farm · supports ${farmYield(w)} villagers when road-served and not flooded`;
     else if (rep.civic === CIVIC.DOCTOR) what = "Doctor’s office · preventive care within 7 tiles · 4 jobs";
+    else if (rep.civic === CIVIC.GOVERNOR) what = "Governor’s Mansion · 3×3 public estate · 12 jobs · Governance";
     else if (rep.civic === CIVIC.HOSPITAL) what = "Hospital · preventive care over the nearest half of the map · 16 jobs";
     else if (rep.civic === CIVIC.CEMETERY) what = "Cemetery · citywide memorial archive";
     else if (rep.civic === CIVIC.SANITATION) what = "Sanitation works · 750 villagers within 7 tiles · household mess −50%";
     else if (rep.civic === CIVIC.GARBAGE) what = "Garbage depot · 750 villagers within 10 tiles";
     else if (rep.civic === CIVIC.AMPHITHEATER) what = "Amphitheater";
     else if (rep.mansion) what = "Mansion"; // wealth and class (SPEC §9f)
-    else if (rep.zone === ZONE.M) what = `Meat market ${rep.maxTier === 1 ? "Low" : "High"}`;
+    else if (rep.zone === ZONE.M) what = `Meat market ${rep.maxTier === 1 ? "Low" : "High"}${policy(w,"meatTrade")==="prohibited"?" · closed by Governance":""}`;
     else if (rep.zone !== ZONE.NONE) what = `${ZONE_NAME[rep.zone]} ${rep.maxTier === 1 ? "Low" : "High"}`;
     else if (w.terrain[i] === TERRAIN.WATER) what = "Water";
     else if (w.terrain[i] === TERRAIN.TREE) what = "Trees";
@@ -830,7 +834,7 @@ export function createUI(app) {
   // ---- tabs ---------------------------------------------------------------------------------------------------
   function buildTabs() {
     dom.tabs.innerHTML = "";
-    for (const [id, label] of [["rules", "Rules"], ["budget", "Budget"], ["census", "Census"], ["news", "News"]]) {
+    for (const [id, label] of [["rules", "Rules"], ["budget", "Budget"], ["census", "Census"], ["news", "News"], ...(governanceUnlocked(world()) ? [["governance", "Governance"]] : [])]) {
       const b = el("button", "tab", label);
       b.dataset.tab = id;
       b.addEventListener("click", () => { tab = id; newsJump = true; renderTab(); });
@@ -839,8 +843,13 @@ export function createUI(app) {
   }
 
   function renderTab() {
+    const unlocked=governanceUnlocked(world());
+    if(!!dom.tabs.querySelector('[data-tab="governance"]')!==unlocked)buildTabs();
+    if(tab==='governance'&&!unlocked)tab='rules';
     for (const b of dom.tabs.children) b.classList.toggle("on", b.dataset.tab === tab);
     const body = dom.tabBody;
+    const governanceScroll=tab==='governance'?body.scrollTop:0;
+    if(tab==='governance'&&document.activeElement?.tagName==='SELECT'&&body.contains(document.activeElement))return;
     // The feed runs oldest-first, so "follow the news" means the BOTTOM. Read
     // the scroll before the wipe: a player who scrolled up to read an old
     // month must not be yanked back down by the next tick.
@@ -850,12 +859,38 @@ export function createUI(app) {
     if (tab === "rules") renderRules(body, w);
     else if (tab === "budget") renderBudget(body, w);
     else if (tab === "census") renderCensus(body, w);
+    else if (tab === "governance") renderGovernance(body, w);
     else renderNews(body, w);
     if (tab === "news" && (newsJump || newsStick)) body.scrollTop = body.scrollHeight;
+    if(tab==='governance')body.scrollTop=governanceScroll;
     newsJump = false;
   }
 
+  function renderGovernance(body,w){
+    const running=governorOperational(w),costs=governanceCosts(w),out=governanceOutcomes(w);
+    body.append(el('h2','','Governance'),el('p','','The laws and public commitments that shape this city. Changes apply to future decisions; existing convictions and permanent pacification are not reversed.'));
+    if(!running)body.append(el('p','warn','Restore the Governor’s Mansion and its road access to change policy. Enacted laws and funded programmes remain in force.'));
+    body.append(el('p','dim','Governor’s Mansion: §360/year. Current programmes: §'+(Object.values(costs).reduce((a,b)=>a+b,0)-costs.estate)+'/year, plus licensed inspectors shown in Budget. Scrubbers and each licensing enactment have upfront charges.'));
+    for(const p of POLICIES){
+      const card=el('section','governance-policy');card.append(el('h3','',p.name),el('p','dim',p.description));
+      const select=el('select','');select.setAttribute('aria-label',p.name);select.dataset.policy=p.key;
+      p.options.forEach(([value,label],i)=>{const option=el('option','',label);option.value=String(i);option.selected=(governanceDraft.has(p.key)?governanceDraft.get(p.key):policy(w,p.key))===value;select.append(option);});
+      const button=el('button','','Enact'),hint=el('div','dim');
+      const update=()=>{const value=p.options[Number(select.value)][0],plan=governancePlan(w,p.key,value);button.disabled=!!plan.reason;hint.textContent=plan.reason||(plan.cost?'§'+plan.cost+' now.':'No enactment fee. Recurring costs apply while funded.');};
+      select.disabled=!running||(p.key==='scrubbers'&&policy(w,'scrubbers'));select.addEventListener('change',()=>{governanceDraft.set(p.key,p.options[Number(select.value)][0]);update();});
+      button.addEventListener('click',()=>{const value=p.options[Number(select.value)][0];governanceDraft.delete(p.key);app.doOp({kind:'governance',key:p.key,value});});
+      update();card.append(select,button,hint);body.append(card);
+    }
+    const report=el('section','governance-outcomes');report.append(el('h3','','Life under these laws'));
+    report.append(el('p','',out.foodSupport+' residents receiving food assistance · '+out.foodShortfall+' unsupported by campaign food capacity.'));
+    report.append(el('p','',out.wrongful+' wrongful convictions · '+out.pacified+' residents pacified · '+out.sold+' residents sold by sentence (all-time totals).'));
+    report.append(el('p','',out.cross+' cross-species friendships out of '+out.friendships+' current friendships.'));
+    report.append(el('p','dim','These are observed outcomes, not a claim that one policy caused every change.'));
+    body.append(report);
+  }
+
   function renderRules(body, w) {
+    body.append(el("p","dim","Governor’s Mansion (;): one 3×3 public estate, §3,000 and §360/year, twelve jobs. Unlocks Governance; available from Chapter 2 in campaigns. Set meat regulation, sentencing, equal treatment, oversight, cleaners, smoke scrubbers, food assistance and community funding there."));
     if (w.flags.campaign) {
       const chapter = el("section", "campaign-guide");
       chapter.append(el("b", "", `Chapter ${chapterOf(w) + 1} · ${CHAPTERS[chapterOf(w)].name}`));
@@ -1301,6 +1336,7 @@ export function createUI(app) {
     if (app.news) app.news.invalidate();
     newsJump = true;
     lastHoverKey = "";
+    governanceDraft.clear();
     tab = "rules"; // SPEC §2: the Rules tab is open by default on a new city
     refresh();
     showChoice();

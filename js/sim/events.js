@@ -1,3 +1,4 @@
+import { policy } from './governance.js';
 // events.js — what the years throw at the town. SPEC §9.
 //
 // One roll per tick with p = EVENT_P from the ARMED roster (gates true),
@@ -297,7 +298,7 @@ export const ROSTER = [
   {
     // The raid: the police working, so a BOON kind — the No-disasters toggle must not mask it.
     id: "raid", kind: BOON, news: ["RAID", "bad", true], weight: () => 3,
-    gate: (w) => !w.events.licence && w.tick - (w.events.lastRaid ?? -100000) >= 24 && raidable(w).length > 0,
+    gate: (w) => policy(w,'meatTrade')!=='prohibited' && !w.events.licence && w.tick - (w.events.lastRaid ?? -100000) >= 24 && raidable(w).length > 0,
     fire: (w) => {
       const lot = w.rng.pick(raidable(w));
       const tier = w.tier[lot];
@@ -326,7 +327,7 @@ export const ROSTER = [
   },
   {
     id: "scrubbers", kind: BOON, news: ["The Scrubbers", "good", true], weight: () => 2, choice: true,
-    gate: (w, c) => !w.events.scrubbers && countI(w) >= 15 && !w.events.choice,
+    gate: () => false, // Factory investment is chosen in Governance.
     fire: (w) => {
       w.events.choice = { id: "scrubbers", title: "The Scrubbers Offer", text: "A firm offers to fit smoke scrubbers on every factory: industrial emissions ×0.7, permanently.", cost: 1500, accept: "Pay §1,500", decline: "Decline" };
       return `The Scrubbers Offer is on your desk.`;
@@ -416,16 +417,7 @@ export function resolveChoice(world, accept) {
   const ch = world.events.choice;
   if (!ch) return null;
   world.events.choice = null;
-  if (ch.id === "scrubbers" && accept && world.cash >= ch.cost) {
-    post(world, "scrubbers", -ch.cost);
-    world.events.scrubbers = true;
-    return "Scrubbers fitted. The air will clear.";
-  }
-  if (ch.id === "licence" && accept && world.cash >= ch.cost) {
-    post(world, "licence", -ch.cost);
-    world.events.licence = true;
-    return "The meat halls are licensed. An inspector in every one; the till pays tax.";
-  }
+  if(['scrubbers','licence'].includes(ch.id))return 'This decision is now in Governance. Build a Governor’s Mansion to set policy.';
   return accept ? "You cannot afford it." : "Declined.";
 }
 
@@ -516,17 +508,7 @@ export function eventsTick(world, cen, dem) {
     }
   }
 
-  // The Butchers' licence: offered DETERMINISTICALLY the month the first hall
-  // reaches tier 2 (a weight-2 roster card would arrive once per 15–40 years).
-  if (!ev.licence && !ev.choice && world.tick - (ev.lastLicenceOffer ?? -100000) >= 120) {
-    let hall2 = false;
-    for (let i = 0; i < n && !hall2; i++) if (world.zone[i] === ZONE.M && world.tier[i] >= 2 && served(world, i)) hall2 = true;
-    if (hall2) {
-      ev.lastLicenceOffer = world.tick;
-      ev.choice = { id: "licence", title: "The Butchers' Licence", text: `The Butchers' Guild has a licence on your desk: an inspector in every meat hall, §${KNOBS.LICENCE_COST} and §${KNOBS.UPKEEP_LICENCE} a year each. The till pays tax at the C rate; crime around the halls halves; the halls buy half as eagerly.`, cost: KNOBS.LICENCE_COST, accept: `Pay §${KNOBS.LICENCE_COST}`, decline: "Decline" };
-      say("licence", "The Butchers' Licence is on your desk.");
-    }
-  }
+  // Meat inspection is a standing Governance policy, never a timed offer.
 
   // Roll a new event.
   if (world.rng.chance(KNOBS.EVENT_P)) {

@@ -28,6 +28,7 @@ const paths = Object.freeze({
   sanitation: '<path d="M12 2c-2 3-6 7-6 10a6 6 0 0 0 12 0c0-3-4-7-6-10ZM3 21c3-3 6 3 9 0s6 3 9 0"/>',
   garbage: '<path d="M4 6h16M9 6V3h6v3M6 6l1 15h10l1-15M10 10v7m4-7v7"/>',
   doctor: '<path d="M5 3v6a5 5 0 0 0 10 0V3M3 3h4m6 0h4M10 14v2a5 5 0 0 0 10 0v-3"/><circle cx="20" cy="10" r="2"/>',
+  governor: '<path d="M3 9h18L12 3 3 9Zm2 2v8m5-8v8m4-8v8m5-8v8M3 21h18M2 9h20"/>',
   hospital: '<path d="M4 21V6h16v15M2 21h20M10 21v-5h4v5M12 2v8M8 6h8M7 12h1m8 0h1"/>',
   interview: '<path d="M4 4h16v12H9l-5 4ZM8 9h8m-8 3h5"/>',
   collect: '<circle cx="9" cy="6" r="3"/><path d="M3 21v-4a6 6 0 0 1 10-4M15 17h7m-3-3 3 3-3 3"/>',

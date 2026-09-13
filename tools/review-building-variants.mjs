@@ -1,3 +1,4 @@
+import { GOVERNOR_FAMILY } from '../js/art/governor.js';
 // Repeatable art evidence. Sheets use real selectors; city panels use js/render.js.
 import {mkdirSync,writeFileSync} from 'node:fs';
 import {resolve} from 'node:path';
@@ -25,7 +26,7 @@ export function families() {
   for(let zone=1;zone<=4;zone++)for(const side of [2,3])out.push({group:'blocks',key:`block-${zone}-${side}`,zone,tier:3,side,sprites:BLOCKS[zone][side],select:v=>art.building(zone,3,v,side)});
   for(const [id,sprites] of Object.entries(LANDMARK_ART)){const zone=LANDMARKS[id].zone;out.push({group:'landmarks',key:`landmark-${id}`,zone,tier:3,side:3,theme:+id,sprites,select:v=>art.building(zone,3,v,3,+id)});}
   out.push({group:'mansion',key:'mansion',zone:1,tier:3,side:3,mansion:true,sprites:MANSION,select:v=>art.mansion(v)});
-  for(const f of CIVIC_VARIANT_FAMILIES)out.push({group:'civics',key:`${f.kind}-${f.side}`,kind:f.kind,side:f.side,sprites:f.sprites,select:v=>art.civic(f.kind,f.side,v)});
+  for(const f of [...CIVIC_VARIANT_FAMILIES,GOVERNOR_FAMILY])out.push({group:'civics',key:`${f.kind}-${f.side}`,kind:f.kind,side:f.side,sprites:f.sprites,select:v=>art.civic(f.kind,f.side,v)});
   for(const axis of ['ns','ew']){
     const table=railArt.STATION_VARIANTS || railArt.STATION_FAMILIES;
     const sprites=table?.[axis] || [railArt.STATIONS[axis]];

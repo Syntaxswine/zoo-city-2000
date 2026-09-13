@@ -1,3 +1,4 @@
+import { allGovernor } from './governor.js';
 // index.js — the registry the renderer calls. SPEC §16.
 //
 //   art.building(zone, tier, variant, side, theme, character)   zone 1|2|3|4 or 'R'|'C'|'I'|'M', tier 1..3; side 2 | 3 → the zone's block (blocks.js), tier ignored;
@@ -160,7 +161,7 @@ export const art = Object.freeze({
 
 /** Every sprite the registry can hand out, named — the check.mjs audit walks this. */
 export function allSprites() {
-  const out = [...Object.values(MARKS).map(sprite => ({ name: sprite.name, sprite })), ...allBuildings(), ...allLargeCivics(), ...allKnowledgeCivics(), ...allInfrastructureCivics(), ...allCivicVariations(), ...allBlocks(), ...allLandmarks(), ...allMansion(), ...allShops(), ...allRoads(), ...allWalls(), ...allRail(), ...allTerrain(), ...allCitizens(), ...BUBBLE_SAMPLES.map((sprite) => ({ name: sprite.name, sprite }))];
+  const out = [...Object.values(MARKS).map(sprite => ({ name: sprite.name, sprite })), ...allBuildings(), ...allLargeCivics(), ...allKnowledgeCivics(), ...allInfrastructureCivics(), ...allCivicVariations(), ...allGovernor(), ...allBlocks(), ...allLandmarks(), ...allMansion(), ...allShops(), ...allRoads(), ...allWalls(), ...allRail(), ...allTerrain(), ...allCitizens(), ...BUBBLE_SAMPLES.map((sprite) => ({ name: sprite.name, sprite }))];
   const seen = new Set();
   return out.filter(({ name }) => (seen.has(name) ? false : (seen.add(name), true)));
 }

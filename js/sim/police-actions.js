@@ -1,3 +1,4 @@
+import { oversightFactor, governanceUnlocked } from './governance.js';
 import { CIVIC, absent } from "./world.js";
 import { served } from "./fields.js";
 import { arrest, sentenceFor } from "./justice.js";
@@ -39,14 +40,15 @@ export function policeAction(world, op) {
   const month = world.events.policeMonth;
   if (op.kind === "interview") {
     month.interview.push(citizen.id);
-    const caught = world.rng.chance(guilty ? KNOBS.INTERVIEW_GUILTY_P : KNOBS.INTERVIEW_INNOCENT_P);
+    const caught = world.rng.chance(guilty ? KNOBS.INTERVIEW_GUILTY_P : KNOBS.INTERVIEW_INNOCENT_P * oversightFactor(world));
     const line = `INTERVIEW — ${citizen.name} ${citizen.surname}: ${caught ? "the police ordered collection." : "released without a charge."}`;
     world.events.log.push({ t: world.tick, id: "interview", line, links: [citizen.id] });
     notices.push(line);
     if (!caught) return { ok: true, cost: 0, notices, collected: false, undoable: false };
   }
   month.collect.push(citizen.id);
-  const sentence = collectionSentence(plan.sentence, world.rng.next());
+  const proposed = governanceUnlocked(world) ? plan.sentence : collectionSentence(plan.sentence, world.rng.next());
+  const sentence = sentenceFor(world, charge, citizen, {sentence:proposed}).sentence;
   const options = { sentence, ordered: true };
   const destination = sentenceFor(world, charge, citizen, options).destination;
   const line = `COLLECT — ${citizen.name} ${citizen.surname}: ${sentence === "zoo" ? "jail" : sentence === "centre" ? "pacification" : "meat hall"}${destination < 0 ? `; waiting for ${destinationName[sentence]}. Try again next month.` : "."}`;

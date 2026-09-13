@@ -88,8 +88,8 @@ export function createPalette(app) {
   hint.className = "note";
   hint.textContent = "Inspect a citizen, then Interview or Collect.";
   for (const [kind, label, description] of [
-    ["interview", "Interview", "Interrogate the selected citizen: 90% catch chance for an unresolved crime; 5% wrongful collection for an innocent citizen. Once per month."],
-    ["collect", "Collect", "Collect the selected citizen: 60% normal sentence, 20% harsher, 10% lighter, 10% meat hall. No undo."],
+    ["interview", "Interview", "Interrogate the selected citizen: 90% catch chance for an unresolved crime; 5% wrongful collection for an innocent citizen (2.5% with funded accountability). Once per month."],
+    ["collect", "Collect", "Collect the selected citizen. After founding the Governor’s Mansion, collections follow Governance sentencing laws. Before then: 60% normal, 20% harsher, 10% lighter, 10% meat hall. No undo."],
   ]) {
     const button = document.createElement("button");
     button.type = "button";

@@ -1,3 +1,4 @@
+import { policy } from './sim/governance.js';
 // render.js — THE ONLY MODULE THAT TOUCHES A CANVAS. SPEC §13.
 //
 //   createRenderer(canvas, world, art) →
@@ -535,11 +536,12 @@ export function createRenderer(canvas, initialWorld, art) {
           // A block stands on its anchor and its parts stand for nothing (the sprite's footprint keys it; painter.js).
           if (!isPart(world, i)) {
             const fill = (world.zone[i] === ZONE.R ? world.occupants[i] : world.staff[i]) / (capacityOf(world, i) || 1);
-            const character = { lit: lightLevel(fill), majority: world.majority[i], seed: i, wear: wearLevel(buildingAge(world,i)) };
+            const character = { lit: lightLevel(fill), majority: world.majority[i], seed: i, wear: Math.max(0,wearLevel(buildingAge(world,i))-(policy(world,'cleaners')?1:0)) };
             // A MANSION (SPEC §9f) is an R block by every rule but the picture: its own family, the same lights and mark.
             standing = world.mansion[i] ? art.mansion(world.variant[i], character) : art.building(world.zone[i], world.tier[i], world.variant[i], sideOf(world, i), world.theme[i], character);
           }
-        } else if (world.civic[i] === CIVIC.PARK) standing = art.civic("park", civicSideOf(world, i), world.variant[i]);
+        } else if (world.civic[i] === CIVIC.GOVERNOR) standing = art.civic("governor", 3, world.variant[i]);
+        else if (world.civic[i] === CIVIC.PARK) standing = art.civic("park", civicSideOf(world, i), world.variant[i]);
         else if (world.civic[i] === CIVIC.LARGE_PARK) standing = art.civic("largePark", civicSideOf(world, i), world.variant[i]);
         else if (world.civic[i] === CIVIC.ZOO) standing = art.civic("zoo", 3, world.variant[i]);
         else if (world.civic[i] === CIVIC.FIRE) standing = art.civic("fire", civicSideOf(world, i), world.variant[i]);

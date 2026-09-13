@@ -1,3 +1,4 @@
+import { policy } from './governance.js';
 // meat.js — stock, road/rail reach, pens and the hall's till. SPEC §9c.
 //
 // One unit is one body. All state-changing flows pass through addStock,
@@ -98,6 +99,7 @@ export function beginMeatMonth(world) {
 
 /** A standing hall is one M building anchor. Road access is a route concern, not existence. */
 export function isHall(world, i) {
+  if(policy(world,'meatTrade')==='prohibited')return false;
   if (!(i >= 0 && i < world.w * world.h)) return false;
   const a = anchorOf(world, i);
   return a === i && world.zone[a] === ZONE.M && world.tier[a] > 0 && !world.rubble[a] && !world.burning[a];
