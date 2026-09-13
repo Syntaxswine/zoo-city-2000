@@ -5,8 +5,11 @@ Build the **Governor’s Mansion** from the remote (`;`): one 3×3 public estate
 access and unlocks in Chapter 2 of Campaign; Free Play offers it immediately.
 It has three architectural layouts and is separate from residential mansions.
 
-Placement unlocks the Governance tab. Changing a policy requires an unburned,
-unflooded estate with road access. Enacted laws and funded programmes survive
+The Governance tab is always visible beside Rules, Budget, Census and News in
+the right-hand data panel. It shows annual commitments and city outcomes above
+the current laws and programmes, even before an estate is built. Placement
+unlocks policy changes, which require an unburned, unflooded estate with road
+access. Enacted laws and funded programmes survive
 damage or demolition; rebuild to change them. Policy decisions are saved,
 recorded in News and the replay log, and cannot be undone through tile undo.
 

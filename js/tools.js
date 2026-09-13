@@ -39,7 +39,7 @@ export const TOOLS = Object.freeze([
   row(26, "garbage", "Q", "Garbage", { kind: "garbage" }, { kind: "civic", args: ["garbage", 2] }, "2×2 collection depot beside a road; serves 750 villagers within 10 tiles"),
   row(27, "doctor", "[", "Doctor’s office", { kind: "doctor" }, { kind: "civic", args: ["doctor", 2] }, "2×2 beside a road; preventive care within 7 tiles; unlocks after Chapter 2"),
   row(28, "hospital", "]", "Hospital", { kind: "hospital" }, { kind: "civic", args: ["hospital", 3] }, "3×3 beside a road; stronger preventive care over the nearest half of the map; Chapter 4"),
-  row(29, "governor", ";", "Governor’s Mansion", { kind: "governor" }, { kind: "civic", args: ["governor", 3] }, "unique 3×3 estate beside a road; §3,000, §360/year, 12 jobs; unlocks Governance"),
+  row(29, "governor", ";", "Governor’s Mansion", { kind: "governor" }, { kind: "civic", args: ["governor", 3] }, "unique 3×3 estate beside a road; §3,000, §360/year, 12 jobs; unlocks policy changes in Governance"),
 ]);
 // Residential mansions (SPEC §9f) are never placed; the Governor’s Mansion is a separate public civic. A residential mansion rises, like a storey, where an address has become affluent —
 // the owner: "if there are enough positive things near you it happens naturally like when the building upgrades to an apartment building".

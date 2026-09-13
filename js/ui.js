@@ -834,7 +834,7 @@ export function createUI(app) {
   // ---- tabs ---------------------------------------------------------------------------------------------------
   function buildTabs() {
     dom.tabs.innerHTML = "";
-    for (const [id, label] of [["rules", "Rules"], ["budget", "Budget"], ["census", "Census"], ["news", "News"], ...(governanceUnlocked(world()) ? [["governance", "Governance"]] : [])]) {
+    for (const [id, label] of [["rules", "Rules"], ["budget", "Budget"], ["census", "Census"], ["news", "News"], ["governance", "Governance"]]) {
       const b = el("button", "tab", label);
       b.dataset.tab = id;
       b.addEventListener("click", () => { tab = id; newsJump = true; renderTab(); });
@@ -843,9 +843,6 @@ export function createUI(app) {
   }
 
   function renderTab() {
-    const unlocked=governanceUnlocked(world());
-    if(!!dom.tabs.querySelector('[data-tab="governance"]')!==unlocked)buildTabs();
-    if(tab==='governance'&&!unlocked)tab='rules';
     for (const b of dom.tabs.children) b.classList.toggle("on", b.dataset.tab === tab);
     const body = dom.tabBody;
     const governanceScroll=tab==='governance'?body.scrollTop:0;
@@ -868,9 +865,24 @@ export function createUI(app) {
 
   function renderGovernance(body,w){
     const running=governorOperational(w),costs=governanceCosts(w),out=governanceOutcomes(w);
-    body.append(el('h2','','Governance'),el('p','','The laws and public commitments that shape this city. Changes apply to future decisions; existing convictions and permanent pacification are not reversed.'));
-    if(!running)body.append(el('p','warn','Restore the Governor’s Mansion and its road access to change policy. Enacted laws and funded programmes remain in force.'));
-    body.append(el('p','dim','Governor’s Mansion: §360/year. Current programmes: §'+(Object.values(costs).reduce((a,b)=>a+b,0)-costs.estate)+'/year, plus licensed inspectors shown in Budget. Scrubbers and each licensing enactment have upfront charges.'));
+    body.append(el('h2','','Governance'));
+    const report=el('section','governance-outcomes');report.append(el('h3','','Life under these laws'));
+    const table=el('table','ledger');table.setAttribute('aria-label','Governance outcomes');
+    const row=(label,value)=>{const tr=el('tr');tr.append(el('td','',label),el('td','num',String(value)));table.append(tr);};
+    row('Residents receiving food aid',out.foodSupport);
+    if(w.flags.campaign)row('Residents short of food capacity',out.foodShortfall);
+    row('Wrongful convictions',out.wrongful);
+    row('Residents pacified',out.pacified);
+    row('Residents sold by sentence',out.sold);
+    row('Cross-species friendships',out.cross+' / '+out.friendships);
+    report.append(table,el('p','dim','Convictions and sentences: totals since founding. Food aid and friendships: current city.'));
+    report.append(el('p','dim','These are observed outcomes, not a claim that one policy caused every change.'));
+    body.append(report);
+    body.append(el('p','dim','Current annual commitments: Governor’s Mansion §'+costs.estate+'; programmes §'+(Object.values(costs).reduce((a,b)=>a+b,0)-costs.estate)+', plus licensed inspectors shown in Budget. Scrubbers and each licensing enactment have upfront charges.'));
+    if(!running)body.append(el('p','warn',governanceUnlocked(w)
+      ? 'Restore the Governor’s Mansion and its road access to change policy. Enacted laws and funded programmes remain in force.'
+      : 'Build the Governor’s Mansion (;) beside a road to change policy: §3,000 for a 3×3 estate, then §360/year. Available from Chapter 2 in campaigns.'));
+    body.append(el('p','','Changes apply to future decisions; existing convictions and permanent pacification are not reversed.'));
     for(const p of POLICIES){
       const card=el('section','governance-policy');card.append(el('h3','',p.name),el('p','dim',p.description));
       const select=el('select','');select.setAttribute('aria-label',p.name);select.dataset.policy=p.key;
@@ -881,16 +893,10 @@ export function createUI(app) {
       button.addEventListener('click',()=>{const value=p.options[Number(select.value)][0];governanceDraft.delete(p.key);app.doOp({kind:'governance',key:p.key,value});});
       update();card.append(select,button,hint);body.append(card);
     }
-    const report=el('section','governance-outcomes');report.append(el('h3','','Life under these laws'));
-    report.append(el('p','',out.foodSupport+' residents receiving food assistance · '+out.foodShortfall+' unsupported by campaign food capacity.'));
-    report.append(el('p','',out.wrongful+' wrongful convictions · '+out.pacified+' residents pacified · '+out.sold+' residents sold by sentence (all-time totals).'));
-    report.append(el('p','',out.cross+' cross-species friendships out of '+out.friendships+' current friendships.'));
-    report.append(el('p','dim','These are observed outcomes, not a claim that one policy caused every change.'));
-    body.append(report);
   }
 
   function renderRules(body, w) {
-    body.append(el("p","dim","Governor’s Mansion (;): one 3×3 public estate, §3,000 and §360/year, twelve jobs. Unlocks Governance; available from Chapter 2 in campaigns. Set meat regulation, sentencing, equal treatment, oversight, cleaners, smoke scrubbers, food assistance and community funding there."));
+    body.append(el("p","dim","Governor’s Mansion (;): one 3×3 public estate, §3,000 and §360/year, twelve jobs. Unlocks policy changes in the Governance tab; available from Chapter 2 in campaigns. Set meat regulation, sentencing, equal treatment, oversight, cleaners, smoke scrubbers, food assistance and community funding there."));
     if (w.flags.campaign) {
       const chapter = el("section", "campaign-guide");
       chapter.append(el("b", "", `Chapter ${chapterOf(w) + 1} · ${CHAPTERS[chapterOf(w)].name}`));
