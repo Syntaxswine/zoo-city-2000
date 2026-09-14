@@ -7,9 +7,9 @@ import { KNOBS } from "./rules.js";
 
 export const CHAPTERS = Object.freeze([
   { name: "The River Settlement", target: 100, story: "A road reaches the river. Lay out cottages and working farms; one farm feeds 25 villagers." },
-  { name: "The Town", target: 500, story: "The settlement earns its name. Shops, workshops, police and cemeteries open; better tools and storage double each farm's harvest." },
-  { name: "The City", target: 1500, story: "Survival becomes civic life. Doctors’ offices, libraries, galleries, parks, zoos, pacification centres and high density are available. Irrigation doubles farm capacity." },
-  { name: "The Sanitation Crisis", target: 3000, story: "Density leaves a mark on the river. Build hospitals, sanitation works and garbage depots. You have six months before waste accumulates; cleaner storage doubles farm capacity." },
+  { name: "The Town", target: 400, story: "The settlement earns its name. Shops, workshops, police and cemeteries open; better tools and storage double each farm's harvest." },
+  { name: "The City", target: 800, story: "Survival becomes civic life. Doctors’ offices, libraries, galleries, parks, zoos, pacification centres and high density are available. Irrigation doubles farm capacity." },
+  { name: "The Sanitation Crisis", target: 1200, story: "Density leaves a mark on the river. Build hospitals, sanitation works and garbage depots. You have six months before waste accumulates; cleaner storage doubles farm capacity." },
   { name: "The Metropolis", target: null, story: "The river city has learned to care for itself. Every tool is available, and mechanized farms support 400 villagers each. Its future is yours." },
 ]);
 // Anything absent here waits for the Metropolis (chapter 5). Trees, walls and Use are land tools, not civic

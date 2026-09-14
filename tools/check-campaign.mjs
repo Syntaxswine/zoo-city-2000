@@ -4,7 +4,7 @@ import { apply, costOf, undo, replay } from "../js/sim/ops.js";
 import { tick, refreshLast } from "../js/sim/tick.js";
 import { computeFields } from "../js/sim/fields.js";
 import { save, load, stateHash } from "../js/sim/save.js";
-import { computeInfrastructure, progressionTick, sanitationTick, farmYield, floodplain, lockedReason } from "../js/sim/progression.js";
+import { computeInfrastructure, progressionTick, sanitationTick, farmYield, floodplain, lockedReason, CHAPTERS } from "../js/sim/progression.js";
 import { yearlyFigures } from "../js/sim/budget.js";
 import { citizenDefaults } from "../js/sim/citizens.js";
 import { TOOLS } from "../js/tools.js";
@@ -64,7 +64,7 @@ for (let stage=0;stage<5;stage++) {
 assert.equal(new Set(TOOLS.map(t=>t.key)).size,TOOLS.length);
 assert.equal(TOOLS.some(t=>["W","A","S","D"].includes(t.key)),false,"build keys preserve WASD");
 
-for (const [stage, population] of [[1,500],[2,1500]]) {
+for (const [stage, population] of [[1,CHAPTERS[1].target],[2,CHAPTERS[2].target]]) {
   const town=fixture(); town.flags.campaign.chapter=stage;
   for(let y=0;y<45;y+=3) assert.equal(apply(town,{kind:"farm",tx:12,ty:y}).ok,true);
   town.citizens=Array.from({length:population},(_,id)=>({id,home:20*town.w+19}));
@@ -89,7 +89,7 @@ assert.equal(sanitary.civic[25*sanitary.w+15],CIVIC.CEMETERY);
 // Final gate: population and food alone cannot bypass sanitation.
 const final=fixture(); final.flags.campaign.chapter=3;
 for(let y=0;y<45;y+=3) assert.equal(apply(final,{kind:"farm",tx:12,ty:y}).ok,true);
-final.citizens=Array.from({length:3000},(_,id)=>({...citizenDefaults(),id,species:"rabbit",born:0,home:20*final.w+19}));
+final.citizens=Array.from({length:CHAPTERS[3].target},(_,id)=>({...citizenDefaults(),id,species:"rabbit",born:0,home:20*final.w+19}));
 for(let i=0;i<4;i++) progressionTick(final);
 assert.equal(final.flags.campaign.chapter,3);
 for(let k=0;k<4;k++) {

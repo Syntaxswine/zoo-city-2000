@@ -26,23 +26,36 @@ reset the streak — 22 and 38 months on two seeds against 10 with a fifth farm.
 | Chapter | Population goal | Newly available tools | Villagers per farm |
 | --- | ---: | --- | ---: |
 | The River Settlement | 100 | Roads, trees, walls, Use zoning, Low residential, Low meat, farms, fire stations | 25 |
-| The Town | 500 | Police (with Interview and Collect), cemeteries, the Governor’s Mansion and Governance, Low commercial and industrial | 50 |
-| The City | 1,500 | Doctors’ offices, libraries, galleries, small and large parks, zoos, pacification centres, High R/C/I | 100 |
-| The Sanitation Crisis | 3,000 plus sanitation goals | Hospitals, sanitation works and garbage depots | 200 |
+| The Town | 400 | Police (with Interview and Collect), cemeteries, the Governor’s Mansion and Governance, Low commercial and industrial | 50 |
+| The City | 800 | Doctors’ offices, libraries, galleries, small and large parks, zoos, pacification centres, High R/C/I | 100 |
+| The Sanitation Crisis | 1,200 plus sanitation goals | Hospitals, sanitation works and garbage depots | 200 |
 | The Metropolis | Open-ended | Rail and stations, cameras, the University, the Amphitheater, High meat | 400 |
 
 Inspection, demolition, saving, undo, taxes and game controls remain available.
 Locked tools explain their chapter on hover, on click and on keyboard
 selection. Both operation preview and application enforce the same gates.
 
-The 1,500 target is **not yet balanced** (hostile review, 2026-09-13): six
-scripted 40-year runs at the demand-neutral tax rate reached Chapter 3 in
-27–106 months and then peaked at 892–934 villagers, because §12 per animal of
-upkeep outruns Low-density residential tax around 600–900 animals and the town
-enters receivership in years 6–10. Raising taxes to 12–14% triggered the
-over-tax flight instead. A human mayor may do better; the deficit is
-arithmetic. The owner decides whether the target, the upkeep or the campaign
-tax curve moves.
+**The targets were 100 → 500 → 1,500 → 3,000 until 2026-09-14.** The hostile
+review of 2026-09-13 found the 1,500 unreachable: six scripted 40-year runs at
+the demand-neutral tax rate peaked at 892–934 villagers, because §12 per animal
+of upkeep outruns Low-density residential tax around 600–900 animals and the
+town enters receivership in years 6–10. The owner: *"lets lower the target …
+that suggests implicitly that the later targets also need to be lowered"* —
+100 → 400 → 800 → 1,200. Measured before the change with two players on the
+same 64×64 maps, neutral taxes, disasters on:
+
+| rig | Chapter 3 (400) | Chapter 4 (800) | 1,200 reached |
+| --- | ---: | ---: | ---: |
+| a weak Low-density player, seed 7 | 2.8 y | 16.3 y | never (plateau ≈ 810) |
+| the same, seed zoo | 1.9 y | 4.9 y | never (≈ 805) |
+| the same, seed 3 | 1.8 y | never (receivership from year 5) | never |
+| the project's calibrated free-play mayor (High from day one, locks bypassed), seed 7 | 3.0 y | 4.3 y | 9.0 y |
+| the same, seed zoo | 3.8 y | 4.8 y | 6.1 y |
+
+So 400 and 800 are a middling mayor's chapters, and 1,200 is the stretch a good
+economy reaches in six to nine years. The economy itself is unchanged: a
+Low-density town still runs a deficit past a few hundred animals, and the
+Metropolis is earned by fixing that, not by waiting.
 
 ## Farms and food
 
@@ -57,8 +70,8 @@ placement ghost checks clear ground and road access for the whole footprint.
 Output requires the existing whole-footprint road-access rule and no flooded,
 burning or rubble footprint tile. Losing all nearby roads or flooding stops
 production. Output has no staffing gate, consistent with existing public
-services. Four farms support 100 villagers; ten support 500 after Chapter 2
-unlocks. Farm workers participate in the normal employment and tax systems.
+services. Four farms support 100 villagers; eight support 400 after Chapter 2
+unlocks, and the same eight carry 800 once Chapter 3 doubles the yield. Farm workers participate in the normal employment and tax systems.
 
 Campaign births and new arrivals require remaining food capacity. The final
 arriving household can be smaller to fill the remaining food places. Existing
@@ -96,7 +109,7 @@ operating facility count and remains visible while the overlay is selected.
 
 ## Doctors and hospitals
 
-Doctors’ offices unlock when Chapter 2 completes: sustain 500 fed villagers
+Doctors’ offices unlock when Chapter 2 completes: sustain 400 fed villagers
 for three months. Hospitals unlock at the beginning of Chapter 4.
 
 | Facility | Footprint | Build | Annual upkeep | Jobs | Coverage |
@@ -150,7 +163,7 @@ current population. Combined backlog adds up to 40 residential pollution,
 at eight points per backlog unit per resident, affecting existing land value,
 mood and growth rules.
 
-Chapter 5 requires 3,000 villagers, sufficient food, **90% coverage for each
+Chapter 5 requires 1,200 villagers, sufficient farm food, **90% coverage for each
 service**, and combined backlog at most **25% of population**, sustained for
 three months. The status bar displays coverage, backlog, grace countdown and
 the stability streak; the Rules tab explains all campaign mechanics.
@@ -180,6 +193,6 @@ sprite audits cover the new buildings too. `tools/check-hostile-review.mjs`
 holds the counter-assertions of the 2026-09-13 review — the gates, the bill,
 the wrongful roll, the free-play offers, the estate's undo.
 
-The 1,500 and 3,000 goals and service capacities are initial tuning values.
+The 400 / 800 / 1,200 goals (re-targeted 2026-09-14, see Chapters) and the service capacities are tuning values.
 Long-term balancing remains iterative: later chapters still require jobs,
 housing, taxes and the existing civic population-capacity system.

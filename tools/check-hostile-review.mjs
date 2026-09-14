@@ -20,7 +20,7 @@ import { openFile, filesTick } from "../js/sim/justice.js";
 import { ROSTER, resolveChoice } from "../js/sim/events.js";
 import { policy, governanceUnlocked, governorOperational, governanceCosts, hasGovernor } from "../js/sim/governance.js";
 import { createHousehold, placeHousehold, citizenDefaults } from "../js/sim/citizens.js";
-import { computeInfrastructure, progressionTick, sanitationTick, lockedReason, medicalLifespanModifier } from "../js/sim/progression.js";
+import { computeInfrastructure, progressionTick, sanitationTick, lockedReason, medicalLifespanModifier, CHAPTERS, farmYield } from "../js/sim/progression.js";
 import { KNOBS } from "../js/sim/rules.js";
 
 const at = (w, x, y) => y * w.w + x;
@@ -129,17 +129,18 @@ const villagers = (w, n, home = at(w, 16, 30)) => { w.citizens = Array.from({ le
 {
   const w = flat("crisis", { campaign: true });
   w.flags.campaign.chapter = 3; w.flags.campaign.entered = 0;
-  const home = at(w, 18, 30);
-  villagers(w, 3000, home);
-  for (const y of [17, 20, 23, 26]) assert.equal(apply(w, { kind: "sanitation", tx: 15, ty: y }).ok, true); // 4 × 750 serve 3,000
-  for (const y of [29, 31, 33, 35]) assert.equal(apply(w, { kind: "garbage", tx: 15, ty: y }).ok, true);
-  for (let y = 2; y < 47; y += 3) assert.equal(apply(w, { kind: "farm", tx: 12, ty: y }).ok, true); // 15 × 200 = 3000
+  const home = at(w, 18, 26), T = CHAPTERS[3].target; // the Sanitation Crisis target, read from the one table; the home sits within 7 of the works (y 17–22) and 10 of the depots (y 29+)
+  villagers(w, T, home);
+  const works = Math.ceil(T / KNOBS.INFRA_CAPACITY); // each works serves 750; the town needs full coverage AND capacity
+  for (let k = 0; k < works; k++) assert.equal(apply(w, { kind: "sanitation", tx: 15, ty: 17 + 3 * k }).ok, true);
+  for (let k = 0; k < works; k++) assert.equal(apply(w, { kind: "garbage", tx: 15, ty: 29 + 2 * k }).ok, true);
+  for (let y = 2, farms = 0; farms < Math.ceil(T / farmYield(w)); y += 3, farms++) assert.equal(apply(w, { kind: "farm", tx: 12, ty: y }).ok, true);
   const s = computeInfrastructure(w);
-  assert.equal(s.farmFood, 3000); assert.equal(s.sanitationShare, 1); assert.equal(s.garbageShare, 1);
-  w.flags.campaign.waste = 3000 * KNOBS.WASTE_GOAL + 1; w.flags.campaign.sewage = 0;
+  assert.ok(s.farmFood >= T, `the farms carry the target (${s.farmFood} ≥ ${T})`); assert.equal(s.sanitationShare, 1); assert.equal(s.garbageShare, 1);
+  w.flags.campaign.waste = T * KNOBS.WASTE_GOAL + 1; w.flags.campaign.sewage = 0;
   for (let k = 0; k < 4; k++) progressionTick(w);
   assert.equal(w.flags.campaign.chapter, 3, "one unit over the backlog goal holds the Metropolis shut");
-  w.flags.campaign.waste = 3000 * KNOBS.WASTE_GOAL;
+  w.flags.campaign.waste = T * KNOBS.WASTE_GOAL;
   progressionTick(w); progressionTick(w);
   assert.match(progressionTick(w)[0], /CHAPTER 5/, "at the goal the chapter turns");
 }

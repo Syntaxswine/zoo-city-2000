@@ -9,8 +9,8 @@ hundredth birthday.
 **Play:** https://syntaxswine.github.io/zoo-city-2000/
 
 New Game offers two modes. **Free Play** (the default) opens every tool at
-once. **Campaign** is a five-chapter river settlement: sustain 100 → 500 →
-1,500 → 3,000 villagers to open successive tools, then build freely in the
+once. **Campaign** is a five-chapter river settlement: sustain 100 → 400 →
+800 → 1,200 villagers to open successive tools, then build freely in the
 metropolis. Riverbank farms improve from 25 to 400 villagers supported per
 farm; Chapter 4 introduces sanitation, garbage collection and a cleanup goal.
 Existing saves load as Free Play cities. See [the campaign guide](docs/CAMPAIGN.md)

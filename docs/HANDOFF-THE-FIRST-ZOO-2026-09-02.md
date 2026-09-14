@@ -3223,3 +3223,26 @@ field-guide aesthetic); `[`/`]` as AltGr chords; the over-capacity audit widened
 around a prisoner's decayed address; campers in the sanitation denominator.
 
 Maker's mark — Fable 5.1, session 20: the one who read the nine commits nobody had written down, and found the card that had gone missing from the desk.
+
+## 42. The targets, lowered on the numbers (session 20, 2026-09-14)
+
+The review's first open decision, taken by the owner the next morning:
+*"lets lower the target … that suggests implicitly that the later targets also
+need to be lowered"* → 100 → 400 → 800 → 1,200. Two instruments bracketed the
+choice before the table changed: the review's weak Low-density player (the
+floor) and a new scratch `campaign-ceiling.mjs` — the project's own calibrated
+free-play mayor on a campaign map, farms kept ahead of the population, the
+chapter LOCKS bypassed during her month (the ceiling; the food gate and the
+chapters left on). Floor: 400 in 1.8–2.8 y, 800 in 4.9–16.3 y on two seeds of
+three. Ceiling: 400 in 3.0–3.8 y, 800 in 4.3–4.8 y, 1,200 in 6.1–9.0 y, then a
+plateau at 1,400–1,500; 3,000 was never seen. The targets now live in ONE
+place — `CHAPTERS` in `js/sim/progression.js` — and the Rules tab, the new-city
+form, `check-campaign.mjs` and `check-hostile-review.mjs` read it.
+
+| what you see | what it is |
+|---|---|
+| the ceiling probe pinned at exactly 1,200 on its first run | my farm placement ran out of road-adjacent riverbank at 12 farms; the food gate did the rest — a probe must extend its own farm road (`extendFarmRoad`) |
+| a 1,200-villager Chapter 4 fixture reading sanitation share 0 | the home sat at y 30, the two works reach y 29 — with fewer works the home must move within 7 tiles; the fixture derives `works = ceil(T / 750)` |
+| the weak player's Chapter 3 town capped at 900 | nine farms × 100: the food line caps arrivals until Chapter 4 doubles the yield |
+
+Maker's mark — Fable 5.1, session 20, the morning after: the one who measured the floor and the ceiling before moving the bar.

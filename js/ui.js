@@ -21,6 +21,8 @@ import { POLICIES, policy, governanceUnlocked, governorOperational, governanceCo
 //                     showChoice, hideChoice, openNewCity, closeModals, modalOpen, setWorld }
 
 import { campaignText, CHAPTERS, chapterOf, farmYield, activeInfrastructure, medicalLifespanModifier } from "./sim/progression.js";
+// The chapter goals, written ONCE (progression.js CHAPTERS) and read here for the Rules tab and the new-city form.
+const GOALS = CHAPTERS.filter((c) => c.target).map((c) => c.target.toLocaleString("en-US")).join(" → ");
 import { ZONE, CIVIC, TERRAIN, ROAD, ZONE_NAME, anchorOf } from "./sim/world.js";
 import { dateOf, characterLine } from "./sim/tick.js";
 import { eventTitle, TICKER_FLASH } from "./sim/events.js";
@@ -902,7 +904,7 @@ export function createUI(app) {
       const chapter = el("section", "campaign-guide");
       chapter.append(el("b", "", `Chapter ${chapterOf(w) + 1} · ${CHAPTERS[chapterOf(w)].name}`));
       chapter.append(el("p", "", CHAPTERS[chapterOf(w)].story));
-      chapter.append(el("p", "", "Reach 100 → 500 → 1,500 → 3,000 villagers. Hold each goal with enough food for three consecutive months. Earned tools stay unlocked."));
+      chapter.append(el("p", "", `Reach ${GOALS} villagers. Hold each goal with enough farm food for its target for three consecutive months. Earned tools stay unlocked.`));
       chapter.append(el("p", "", "Farms: 2×2, §100 plus tree clearing, §20/year and 12 jobs. Place beside a road, within three tiles of the river; isolated ponds do not count. Select Farm to highlight floodplain. Flooded or unserved farms stop producing. Each chapter automatically raises support: 25 → 50 → 100 → 200 → 400 villagers per farm. Food shortages pause births and new arrivals and lower mood."));
       chapter.append(el("p", "", "Doctors’ offices unlock after Chapter 2 (500 villagers): 2×2, §600, §180/year, four jobs and seven-tile coverage. Hospitals unlock in Chapter 4: 3×3, §4,000, §1,200/year and 16 jobs, covering the nearest half of the map like universities. Both need roads and stop operating when flooded or burning. Homes within doctor coverage receive +2% natural lifespan; hospital coverage gives +3%. Overlapping services do not stack. With no operating medical facilities anywhere, everyone receives −3% natural lifespan, including before medical tools unlock. One operating facility removes that penalty citywide. Effects follow current home coverage and facility operation; they do not accumulate. Selecting either tool shows its coverage."));
       chapter.append(el("p", "", "Cemetery: 6×6, one per city, §300, §60/year, no workers or road required. Inspect a cemetery to search the permanent citywide archive and open remembered citizens’ records."));
@@ -1190,7 +1192,7 @@ export function createUI(app) {
     addMode("free", "Free Play", "All tools available. No chapter or food requirements.", true);
     const campaign = addMode("campaign", "Campaign", "Grow from a river settlement through five chapters, meeting goals to unlock tools.", false);
     box.append(modes);
-    const campaignNote = el("p", "note", "Campaign goals: 100 → 500 → 1,500 → 3,000 villagers. Farms need a road and river floodplain.");
+    const campaignNote = el("p", "note", `Campaign goals: ${GOALS} villagers. Farms need a road and river floodplain.`);
     campaignNote.hidden = true;
     modes.addEventListener("change", () => { campaignNote.hidden = !campaign.checked; });
     box.append(campaignNote);
