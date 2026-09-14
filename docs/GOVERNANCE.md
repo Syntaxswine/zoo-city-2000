@@ -11,7 +11,15 @@ the current laws and programmes, even before an estate is built. Placement
 unlocks policy changes, which require an unburned, unflooded estate with road
 access. Enacted laws and funded programmes survive
 damage or demolition; rebuild to change them. Policy decisions are saved,
-recorded in News and the replay log, and cannot be undone through tile undo.
+recorded in News and the replay log, and cannot be undone through tile undo —
+enacting one also clears the tile undo stack, and the notice says so.
+
+"Governed" is derived, never stored: a town is governed while a mansion stands
+or a law is on the books. Undo or bulldoze the estate before any law passes
+and the town is exactly as ungoverned as before (the undone city hashes as the
+city before the build). Earlier saves carry an `unlocked` key; it is read by
+nothing. A town in receivership cannot enact anything, free or not — the county
+holds the books, as for every other op.
 
 | Decision | Effect | Cost |
 | --- | --- | --- |
@@ -40,8 +48,17 @@ penned animals alive. Sale sentences are replaced by imprisonment while the
 ban holds. Repealing it restores trading availability without replacing stock
 or automatically rehiring workers.
 
-Scrubbers and inspectors are no longer random purchase offers. Existing paid
-installations/licences survive loading; stale pending offers are retired.
+In a town with **no Governor** the two old offers still come to the desk, as
+they did before governance existed: the Scrubbers card (a roster event once 15
+industrial lots stand) and the Butchers' licence (offered deterministically the
+month the first hall reaches tier 2; SPEC §9c). Accepting them sets the same
+flags Governance reads. A governed town gets no card; a card left on the desk
+when the estate rose is referred to Governance without a charge. Striking the
+cards outright (2026-09-12) had silently re-rolled every free-play city's event
+stream past 15 industrial lots and made the licence cost a §3,000 mansion
+nobody was told to build — restored by the hostile review of 2026-09-13.
+Existing paid installations and licences survive loading, and so does a
+pending card.
 Budget includes every recurring programme, under the existing winter upkeep
 modifier. Governance reports food support/shortfall, cumulative wrongful
 convictions, pacification and sentence sales, and current cross-species ties.

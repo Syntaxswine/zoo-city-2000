@@ -3824,11 +3824,11 @@ function cameraJusticeWorld(){
     };
     const off = arms(false);
     const on = arms(true);
-    check("access: what a road actually buys, arm by arm — a zoo, a pacification centre, a police and a fire station and a tier-2 meat hall, all out of reach: no jobs on the census (so no demand either), no cover on a single tile, NO STATION ON THE COUNT THE ARREST FORCE AND THE ADVISOR READ, no van shadow, and no Butchers' licence; lay the road and the services arrive, while licensing remains an explicit Governance decision",
+    check("access: what a road actually buys, arm by arm — a zoo, a pacification centre, a police and a fire station and a tier-2 meat hall, all out of reach: no jobs on the census (so no demand either), no cover on a single tile, NO STATION ON THE COUNT THE ARREST FORCE AND THE ADVISOR READ, no van shadow, and no Butchers' licence; lay the road that reaches them and every one of them arrives (the licence card is offered to an UNGOVERNED town the month its hall reaches tier 2 — struck 2026-09-12, restored by the hostile review of 2026-09-13; a Governor's Mansion takes the decision into Governance instead)",
       off.jobs === 0 && off.zoos === 1 && off.zoosNoRoad === 1 && off.police === 0 && off.fire === 0 && off.vanShadow === 0 && !off.licence
         && off.police1 === 0 && off.fire1 === 0 && off.centre1 === 0
         && off.policeNo === 1 && off.fireNo === 1 && off.centreNo === 1
-        && on.jobs > 0 && on.zoos === 1 && on.zoosNoRoad === 0 && on.police > 0 && on.fire > 0 && on.vanShadow > 0 && !on.licence
+        && on.jobs > 0 && on.zoos === 1 && on.zoosNoRoad === 0 && on.police > 0 && on.fire > 0 && on.vanShadow > 0 && on.licence
         && on.police1 === 1 && on.fire1 === 1 && on.centre1 === 1
         && on.policeNo === 0 && on.fireNo === 0 && on.centreNo === 0,
       `out of reach: ${off.jobs} jobs · ${off.zoos}/${off.zoosNoRoad} zoos served/not · ${off.police} police tiles · ${off.fire} fire tiles · van shadow ${off.vanShadow} · licence ${off.licence} · the census counts police/fire/centre ${off.police1}/${off.fire1}/${off.centre1} with ${off.policeNo}/${off.fireNo}/${off.centreNo} out of reach`

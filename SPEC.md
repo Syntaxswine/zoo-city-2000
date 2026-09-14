@@ -1,9 +1,13 @@
 # ZOO CITY 2000 — the specification
 
-**Campaign update (2026-09-08):** [Five-chapter campaign and infrastructure](docs/CAMPAIGN.md)
-defines the default new-game progression, riverbank farms, cemeteries,
-sanitation, garbage, doctors’ offices and hospitals. Its chapter gates layer over the simulation below;
-existing saves and explicit sandbox games retain unrestricted tools.
+**Campaign update (2026-09-08; corrected 2026-09-13):** [Five-chapter campaign and infrastructure](docs/CAMPAIGN.md)
+defines the OPTIONAL Campaign mode — Free Play is the default new game — with riverbank farms, cemeteries,
+sanitation, garbage, doctors’ offices and hospitals (healthcare also runs in Free Play: +2%/+3% lifespan under
+a doctor/hospital, −3% citywide while none operates). Its chapter gates layer over the simulation below;
+existing saves and Free Play games retain unrestricted tools. [Governance](docs/GOVERNANCE.md) (2026-09-13)
+is the Governor’s Mansion and its eleven policies; §9 event 16 (Scrubbers) and §9c LICENCE below still hold
+for a town with no Governor, and a governed town takes both decisions in Governance instead.
+`docs/REVIEW-HOSTILE-2026-09-13.md` is the hostile review of these nine commits and what it changed.
 
 An isometric city builder where anthropomorphic animals live and grow together.
 The player zones residential, commercial and industrial land, lays roads, sets

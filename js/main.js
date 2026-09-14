@@ -137,7 +137,8 @@ app.newCity = ({ seed, noDisasters, campaign = false }) => {
   const world = createWorld({ seed, campaign });
   if (noDisasters) apply(world, { kind: "toggle", key: "noDisasters", value: true });
   adopt(world, String(seed));
-  app.ui.flash(campaign ? `${seed}: Chapter 1 — connect riverbank farms and low-density homes. Sustain 100 fed villagers for three months.` : `${seed}: free play — all tools available.`);
+  // A farm needs a road TOUCHING it, not a road joined to the town's — the machine never checks the connection, so the words must not promise one.
+  app.ui.flash(campaign ? `${seed}: Chapter 1 — riverbank farms beside a road, Low homes within 3 tiles of one. Four farms feed 100; sustain 100 fed villagers for three months. 8% is neutral for a town this size.` : `${seed}: free play — all tools available. 8% is neutral for a town this size.`);
 };
 
 app.doOp = (op) => {
@@ -162,7 +163,7 @@ app.doOp = (op) => {
 app.undo = () => {
   const r = undo(app.world);
   if (r.ok) { app.renderer.invalidate(); app.walkers.notify(); app.ui.refresh(); app.ui.flash("Undone and refunded."); }
-  else app.ui.flash(r.reason === "nothing to undo" ? "Nothing to undo (a bulldoze that turned animals out cannot be undone)." : r.reason || "Nothing to undo.");
+  else app.ui.flash(r.reason === "nothing to undo" ? "Nothing to undo (a bulldoze that turned animals out, a police action or a governance change cannot be undone, and each clears the stack)." : r.reason || "Nothing to undo.");
 };
 
 function rememberSave(name, json, result, manual) {

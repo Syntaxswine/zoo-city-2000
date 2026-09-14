@@ -375,9 +375,15 @@ function snapshot(world, tiles) {
 /** Apply an op. Returns { ok, cost, reason }. */
 export function apply(world,op,options) {
   const before=buildingSnapshot(world),result=applyOperation(world,op,options);
-  if(result.ok) { syncBuildingAge(world,before); computeInfrastructure(world); }
+  // Infrastructure is a TILE fact (farms, works, roads, walls): a rate slider or a police interview cannot move it.
+  // computeFields already recomputes it on every fields pass (fields.js), so this call is the tile op's immediate
+  // refresh and nothing more; with a hospital standing each recompute floods half the map (1.7 → 8.1 ms an op,
+  // hostile review 2026-09-13 — the standing cost lives in computeFields, like the University's halo, and is a
+  // knob-free fact of the design, not a defect this line can fix).
+  if(result.ok) { syncBuildingAge(world,before); if(!NON_TILE_OPS.has(op.kind)) computeInfrastructure(world); }
   return result;
 }
+const NON_TILE_OPS = new Set(["rate", "toggle", "cheat", "choice", "governance", "interview", "collect"]);
 function applyOperation(world, op, { log = true } = {}) {
   const locked = lockedReason(world, op);
   if (locked) return { ok: false, cost: 0, reason: locked };
@@ -393,8 +399,11 @@ function applyOperation(world, op, { log = true } = {}) {
   if (op.kind === "governance") {
     const plan=governancePlan(world,op.key,op.value);
     if(plan.reason)return {ok:false,cost:plan.cost||0,reason:plan.reason};
+    // The one gate every other op pays: a town in receivership buys no scrubbers and no licence (the county holds the books).
+    const can=canSpend(world,plan.cost);
+    if(!can.ok)return {ok:false,cost:plan.cost,reason:can.reason};
     if(plan.cost)post(world,"governance",-plan.cost);
-    world.events.governance={...(world.events.governance||{}),unlocked:true,[op.key]:op.value};
+    world.events.governance={...(world.events.governance||{}),[op.key]:op.value}; // no `unlocked` bit: governance.js derives it
     if(op.key==='scrubbers')world.events.scrubbers=true;
     if(op.key==='meatTrade'){
       world.events.licence=op.value==='inspected';
@@ -411,7 +420,7 @@ function applyOperation(world, op, { log = true } = {}) {
     if(log)world.log.push({t:world.tick,op:{kind:'governance',key:op.key,value:op.value}});
     world.undoStack=[];
     refreshLast(world);
-    return {ok:true,cost:plan.cost,notices:[line]};
+    return {ok:true,cost:plan.cost,notices:[line+" (a law is not undoable; the tile undo stack is cleared.)"]};
   }
   // Non-tile ops first.
   if (op.kind === "rate") {
@@ -506,7 +515,6 @@ function applyOperation(world, op, { log = true } = {}) {
         world.terrain[i] = TERRAIN.GRASS;
         const a = idx(world, op.tx, op.ty), dx = i % world.w - op.tx, dy = ((i / world.w) | 0) - op.ty;
         world.civic[i] = i === a ? CIVIC_OF_KIND[op.kind] : CIVIC.PART;
-        if(op.kind==='governor'&&i===a)world.events.governance={...(world.events.governance||{}),unlocked:true};
         world.civicSize[i] = i === a ? CIVIC_SIDE[op.kind] : CIVIC_SIDE[op.kind] > 4 ? 192 | dx | dy << 3 : 128 | dx | dy << 2;
         civics = true;
         break;

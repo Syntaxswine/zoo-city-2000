@@ -320,7 +320,7 @@ export function createInput(canvas, app) {
     if (tool) { setTool(tool.id); return; }
     switch (k) {
       case "h": case "H":
-        if (chapterOf(app.world) < 2) { app.ui.flash("High density unlocks in Chapter 3: The City."); break; }
+        if (chapterOf(app.world) < 2) { app.ui.flash("High density unlocks in Chapter 3: The City (Chapter 5 for meat halls)."); break; }
         state.density = state.density === 3 ? 1 : 3;
         app.ui.setTool(state.tool, state.density);
         app.ui.flash(`Density: ${state.density === 3 ? "High (tiers to 3)" : "Low (cottages only)"}`);

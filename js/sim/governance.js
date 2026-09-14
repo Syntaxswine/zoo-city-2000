@@ -23,7 +23,11 @@ export function policy(w,key){
   return w.events.governance?.[key] ?? (key==='meatTrade'&&w.events.licence?'inspected':defaults[key]);
 }
 export const hasGovernor=w=>w.civic.includes(CIVIC.GOVERNOR);
-export const governanceUnlocked=w=>!!w.events.governance?.unlocked||hasGovernor(w);
+// DERIVED, never a stored bit (hostile review 2026-09-13): a mansion that stands, or a law already on the books.
+// The old `unlocked` flag was written inside the tile loop and never snapshotted, so undoing or bulldozing the
+// mansion left the town "governed" forever — Collect stopped rolling its sentence for an estate that did not exist,
+// and the undone city no longer hashed as the city before the build. An old save's `unlocked` key is ignored.
+export const governanceUnlocked=w=>hasGovernor(w)||Object.keys(w.events.governance||{}).some(k=>k!=='unlocked');
 export const governorOperational=w=>w.civic.some((c,i)=>c===CIVIC.GOVERNOR&&civicTiles(w,i).every(t=>!w.burning[t]&&!w.flooded[t])&&served(w,i));
 export const poorResident=(w,c)=>!c.dead&&(c.home<0||!w.klass[c.home]);
 export const foodRecipient=(w,c)=>policy(w,'foodAid')&&poorResident(w,c);

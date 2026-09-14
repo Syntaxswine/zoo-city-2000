@@ -12,7 +12,9 @@ export const CHAPTERS = Object.freeze([
   { name: "The Sanitation Crisis", target: 3000, story: "Density leaves a mark on the river. Build hospitals, sanitation works and garbage depots. You have six months before waste accumulates; cleaner storage doubles farm capacity." },
   { name: "The Metropolis", target: null, story: "The river city has learned to care for itself. Every tool is available, and mechanized farms support 400 villagers each. Its future is yours." },
 ]);
-const UNLOCK = { road: 0, R: 0, M: 0, farm: 0, fire: 0, inspect: 0, bulldoze: 0,
+// Anything absent here waits for the Metropolis (chapter 5). Trees, walls and Use are land tools, not civic
+// progression, so they open with the road (hostile review 2026-09-13: the U key read "Unlocks in Chapter 5").
+const UNLOCK = { road: 0, R: 0, M: 0, farm: 0, fire: 0, inspect: 0, bulldoze: 0, tree: 0, wall: 0, use: 0,
   governor: 1, governance: 1, C: 1, I: 1, police: 1, interview: 1, collect: 1, cemetery: 1, doctor: 2, hospital: 3, library: 2, gallery: 2, park: 2, largePark: 2,
   zoo: 2, centre: 2, sanitation: 3, garbage: 3 };
 export const chapterOf = w => w.flags?.campaign?.chapter ?? 4;
@@ -81,10 +83,14 @@ export function computeInfrastructure(w) {
   const sanitationCapacityShare = sanitation ? Math.min(1, counts.sanitation * KNOBS.INFRA_CAPACITY / sanitation) : 1;
   sanitation = Math.min(sanitation, counts.sanitation * KNOBS.INFRA_CAPACITY);
   garbage = Math.min(garbage, counts.garbage * KNOBS.INFRA_CAPACITY);
+  // `farmFood` is what the fields grow; `food` adds Food assistance, which feeds mouths (arrivals, births, the
+  // FOOD mood) but never passes a chapter — a town of paupers on aid with no farms is not a settlement that
+  // "feeds 100 villagers" (hostile review 2026-09-13: the gate was passable with zero farms for §12 a head).
+  const farmFood = counts.farm * farmYield(w);
   w.infrastructure = { counts, total, covers, population, housed, sanitation, garbage, sanitationCapacityShare,
     sanitationShare: population ? sanitation / population : 1,
     garbageShare: population ? garbage / population : 1,
-    food: counts.farm * farmYield(w) + foodSupport(w) };
+    farmFood, food: farmFood + foodSupport(w) };
   return w.infrastructure;
 }
 
@@ -119,7 +125,10 @@ export function progressionTick(w) {
   const s = computeInfrastructure(w), ch = CHAPTERS[p.chapter];
   if (!ch.target) return [];
   const clean = p.chapter !== 3 || (s.sanitationShare >= KNOBS.SANITATION_GOAL && s.garbageShare >= KNOBS.SANITATION_GOAL && p.waste + p.sewage <= s.population * KNOBS.WASTE_GOAL);
-  const ready = s.population >= ch.target && s.food >= s.population && clean;
+  // The farms must carry the chapter's TARGET, not the month's head-count: arrivals stop exactly at the food line,
+  // so "food ≥ population" with four farms held only while the town sat at precisely 100 and any birth reset the
+  // streak (22–38 months on the four farms the guide recommends; 10 with a fifth — hostile review 2026-09-13).
+  const ready = s.population >= ch.target && s.farmFood >= ch.target && clean;
   p.stable = ready ? p.stable + 1 : 0;
   if (p.stable < KNOBS.CHAPTER_MONTHS) return [];
   p.chapter++; p.stable = 0; p.entered = w.tick + 1;
@@ -130,7 +139,7 @@ export function campaignText(w) {
   const p = w.flags.campaign;
   if (!p) return "Free Play — all tools available.";
   const s = computeInfrastructure(w), ch = CHAPTERS[p.chapter];
-  let text = `Chapter ${p.chapter + 1}/5 · ${ch.name} · ${s.population}${ch.target ? ` / ${ch.target}` : ""} villagers · Food ${s.population} / ${s.food} supported · ${s.counts.farm}/${s.total.farm} working farms × ${farmYield(w)}`;
+  let text = `Chapter ${p.chapter + 1}/5 · ${ch.name} · ${s.population}${ch.target ? ` / ${ch.target}` : ""} villagers · Food ${s.population} / ${s.food} supported · ${s.counts.farm}/${s.total.farm} working farms × ${farmYield(w)}${s.food > s.farmFood ? ` (+${s.food - s.farmFood} on aid)` : ""}`;
   if (ch.target) text += ` · Stable ${p.stable}/${KNOBS.CHAPTER_MONTHS} months`;
   if (p.chapter >= 3) text += ` · Sanitation ${Math.round(s.sanitationShare * 100)}% · Garbage ${Math.round(s.garbageShare * 100)}% · Backlog ${Math.round(p.waste + p.sewage)} (goal ≤ ${Math.floor(s.population * KNOBS.WASTE_GOAL)})`;
   if (p.chapter === 3 && w.tick - p.entered < KNOBS.SANITATION_GRACE) text += ` · ${KNOBS.SANITATION_GRACE - (w.tick - p.entered)} months before waste accumulates`;

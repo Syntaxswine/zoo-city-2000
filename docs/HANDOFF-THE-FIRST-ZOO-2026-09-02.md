@@ -3180,3 +3180,46 @@ holds 1,326–1,607 against controls of 870–1,691 (proposal §10e has the tabl
 | the arrivals door at ninety years reads 0 | the town is FULL (V_R ≤ 0) — the pull's law, not the push; eight decades of both doors before it |
 
 Maker's mark — Fable 5.1, session 19, late: the one who gave the town a reason to leave, and three years of roots to stay.
+
+## 41. The hostile review of the campaign, healthcare and governance commits (session 20, 2026-09-13)
+
+Nine commits by another agent (`a925df5..7b59fbb`: campaign, farms, 6×6 cemetery,
+doctors and hospitals, the Governor's Mansion and eleven policies, SVG pictograms,
+six plans per family) had landed on `main` with no BACKLOG, SPEC or handoff entry.
+Three reviewers under the fan-out cap — sim correctness with executed reproductions,
+a 23-mutant pass on the four new check files in an isolated worktree, a
+player/docs pass with a headless campaign play-through — plus this session's own
+browser founding. The whole record is `docs/REVIEW-HOSTILE-2026-09-13.md`; the
+counter-assertions are `tools/check-hostile-review.mjs` (17 blocks; 19 reverting
+mutants, 19 caught; wired into `npm run check`).
+
+**The instrument that settled the biggest question:** `scratchpad/rebase-probe.mjs`
+rebuilt `check.mjs`'s scripted city against the pre-merge tree (a detached worktree
+at `a925df5`) and the merged one with knob overrides. Old: 366 / `e0833adf`, a
+Butchers' licence card on the desk. Merged: 271, no card. Merged with
+`NO_MEDICAL_PENALTY=0`: 366 / `e0833adf` — but NO card, and that missing card was
+the second finding. After the fixes: 366 / `e0833adf` WITH the card. The nine
+commits plus the fixes are byte-identical to `a925df5` when the one new free-play
+rule is neutral. On the 60-year rigs the −3% rule moves balanced −2% and the
+estate +8% the other way: a chaotic perturbation, not a lever; the canary's −26%
+is the cascade. Kept, under accuracy over determinism.
+
+| what you see | what it is |
+|---|---|
+| a Butchers' licence card in a free-play town | restored: struck 2026-09-12, it is offered again the month the first hall reaches tier 2 in a town with NO Governor; a governed town decides in Governance and gets no card; a card on the desk when the estate rises is referred there free |
+| `governanceUnlocked` with no `unlocked` key anywhere | DERIVED: a standing mansion or a law on the books; the stored bit was written in the tile loop, never snapshotted, and survived undo/bulldoze; old saves' key is ignored, never added |
+| `infrastructure.farmFood` beside `food` | the chapter gate reads the fields; `food` adds aid and feeds arrivals, births and the FOOD mood; the status line says "+N on aid" |
+| the Chapter 1 gate reads `ch.target`, not `population` | arrivals stop at the food line, so four farms held only at exactly 100 and any birth reset the streak (22–38 months on two seeds; 10 with the target gate) |
+| `canSpend` in the governance branch | receivership bought scrubbers and a licence |
+| `tree: 0, wall: 0, use: 0` in UNLOCK | absent = Chapter 5; the U key read "Unlocks in Chapter 5" |
+| `on.licence` back in check.mjs's "what a road buys" | the other agent flipped it to `!on.licence` when the offer was struck |
+| `farmFood` fixtures placing 15 farms and 4 + 4 works | a 3,000-villager Chapter 4 needs 4 × 750 of each capacity; the first draft asserted share 1 and read 0.25 |
+| the mutation script ran while `npm run check` was running | my mistake; the run is repeated clean before the commit — no repo writes mid-run |
+
+OWNER DECISIONS written down, not taken: Chapter 3's 1,500 is unreachable on the
+current economy (six 40-y runs peak 892–934, receivership in years 6–10); the
+remote (no label or key on 29 pictograms; a silver bevelled shell against the
+field-guide aesthetic); `[`/`]` as AltGr chords; the over-capacity audit widened
+around a prisoner's decayed address; campers in the sanitation denominator.
+
+Maker's mark — Fable 5.1, session 20: the one who read the nine commits nobody had written down, and found the card that had gone missing from the desk.

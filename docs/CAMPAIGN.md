@@ -11,26 +11,45 @@ and adds garbage collection, capacity, backlog and chapter goals.
 ## Chapters
 
 Targets are each chapter's finish line. Meet the target with enough working
-farm capacity for every living resident for three consecutive months. A failed
-month resets the streak, never an earned unlock. Only one chapter advances per
-month. Farming improvements apply automatically to every existing farm.
+farm capacity for the chapter's **target** population (four farms carry the
+first hundred) for three consecutive months. A failed month resets the streak,
+never an earned unlock. Only one chapter advances per month. Farming
+improvements apply automatically to every existing farm. Food assistance
+(Governance) feeds mouths but never passes a chapter: a settlement is judged
+on what its fields grow.
+
+*Why the target and not the head-count (hostile review, 2026-09-13):* arrivals
+stop exactly at the food line, so with four farms the old "food ≥ population"
+gate held only while the town sat at precisely 100 villagers, and any birth
+reset the streak — 22 and 38 months on two seeds against 10 with a fifth farm.
 
 | Chapter | Population goal | Newly available tools | Villagers per farm |
 | --- | ---: | --- | ---: |
-| The River Settlement | 100 | Roads, Low residential, Low meat, farms, fire stations | 25 |
-| The Town | 500 | Police, cemeteries, Low commercial and industrial | 50 |
+| The River Settlement | 100 | Roads, trees, walls, Use zoning, Low residential, Low meat, farms, fire stations | 25 |
+| The Town | 500 | Police (with Interview and Collect), cemeteries, the Governor’s Mansion and Governance, Low commercial and industrial | 50 |
 | The City | 1,500 | Doctors’ offices, libraries, galleries, small and large parks, zoos, pacification centres, High R/C/I | 100 |
 | The Sanitation Crisis | 3,000 plus sanitation goals | Hospitals, sanitation works and garbage depots | 200 |
-| The Metropolis | Open-ended | Every remaining tool, including High meat | 400 |
+| The Metropolis | Open-ended | Rail and stations, cameras, the University, the Amphitheater, High meat | 400 |
 
 Inspection, demolition, saving, undo, taxes and game controls remain available.
-Locked tools explain their chapter in the palette and on keyboard selection.
-Both operation preview and application enforce the same gates.
+Locked tools explain their chapter on hover, on click and on keyboard
+selection. Both operation preview and application enforce the same gates.
+
+The 1,500 target is **not yet balanced** (hostile review, 2026-09-13): six
+scripted 40-year runs at the demand-neutral tax rate reached Chapter 3 in
+27–106 months and then peaked at 892–934 villagers, because §12 per animal of
+upkeep outruns Low-density residential tax around 600–900 animals and the town
+enters receivership in years 6–10. Raising taxes to 12–14% triggered the
+over-tax flight instead. A human mayor may do better; the deficit is
+arithmetic. The owner decides whether the target, the upkeep or the campaign
+tax curve moves.
 
 ## Farms and food
 
 A farm occupies 2×2 tiles, costs §100 plus tree clearing, costs §20/year, and
-offers 12 jobs. It must touch a road at placement, with at least one footprint
+offers 12 jobs. It must touch a road at placement — any road tile, not
+necessarily one joined to the town's road: the machine checks adjacency, never
+connection — with at least one footprint
 tile within three tiles (including diagonals) of edge-connected river water.
 Isolated ponds do not qualify. Selecting Farm highlights floodplain; the
 placement ghost checks clear ground and road access for the whole footprint.
@@ -44,8 +63,16 @@ unlocks. Farm workers participate in the normal employment and tax systems.
 Campaign births and new arrivals require remaining food capacity. The final
 arriving household can be smaller to fill the remaining food places. Existing
 residents survive shortages but receive −20 mood, and no chapter completes
-without enough food. Meat inventory, predation and logistics remain separate;
-farm capacity supports all villagers.
+without enough farm food for its target. Meat inventory, predation and
+logistics remain separate; farm capacity supports all villagers. Food
+assistance adds one place per poor resident to the mouths fed (arrivals,
+births, the mood penalty) and is shown on the status line as "+N on aid"; it
+does not count toward a chapter.
+
+Four farms employ 48 villagers and feed 100: in Chapter 1 the rest are jobless,
+and the news fills with "MOVED AWAY — no work" lines until the Town opens shops
+and workshops. That is the chapter's tension, not a fault, but the guide says
+so here because the review's players were surprised by it.
 
 ## Cemeteries
 
@@ -144,7 +171,14 @@ service grace, capacity and lost roads; citywide memorial access; the sanitation
 completion gate; real four-farm founding on two generated maps; deterministic
 save/load continuation and input replay; and legacy compatibility. Both
 generated settlements reached 100 villagers and Chapter 2 without cash cheats
-(months 16 and 12 on the latest household/migration simulation). Existing sprite audits cover the new buildings too.
+(months 16 and 12 on the latest household/migration simulation — on a **40×40
+map with disasters off, a full road grid and the whole map zoned Low
+residential**, which is the test's rig and not a player-shaped city; a
+player-shaped 64×64 founding with four farms and one residential strip took
+22–38 months under the old gate and 10–11 under the target gate). Existing
+sprite audits cover the new buildings too. `tools/check-hostile-review.mjs`
+holds the counter-assertions of the 2026-09-13 review — the gates, the bill,
+the wrongful roll, the free-play offers, the estate's undo.
 
 The 1,500 and 3,000 goals and service capacities are initial tuning values.
 Long-term balancing remains iterative: later chapters still require jobs,

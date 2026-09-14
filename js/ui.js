@@ -372,7 +372,8 @@ export function createUI(app) {
     add("animals", P.toLocaleString(), "", "this month's census");
     add("approval", `${appr}`, "", "mean mood");
     if (c) add("Zoo City index", hIndex(c), "", hTitle(c));
-    dom.banner.textContent = w.flags.receivership ? "RECEIVERSHIP — the county holds the books. Rates forced up; building frozen until cash ≥ 0." : campaignText(w);
+    // Receivership takes the line but a campaign keeps its chapter beside it — the chapter/food read used to vanish for the whole of a receivership.
+    dom.banner.textContent = w.flags.receivership ? "RECEIVERSHIP — the county holds the books. Rates forced up; building frozen until cash ≥ 0." + (w.flags.campaign ? " · " + campaignText(w) : "") : campaignText(w);
     dom.banner.classList.toggle("on", true);
     if (app.overlays === "health") {
       const counts = w.infrastructure?.counts;

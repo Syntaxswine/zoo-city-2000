@@ -67,7 +67,9 @@ export function createPalette(app) {
     button.append(icon);
 
     button.addEventListener("click", () => {
-      if (lockedReason(app.world, { ...tool.op, density: 1 })) return;
+      // A locked button SAYS why (the keyboard path always did; the click was silent — hostile review 2026-09-13).
+      const reason = lockedReason(app.world, { ...tool.op, density: 1 });
+      if (reason) { app.ui.flash(reason); return; }
       app.input.setTool(tool.id); preview(tool);
     });
     button.addEventListener("pointerenter", () => { hovered = true; preview(tool); });

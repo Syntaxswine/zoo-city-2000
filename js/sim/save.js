@@ -135,16 +135,19 @@ export function fromPlain(o) {
   world.events = { ...world.events, ...o.events };
   if(world.events.governance){
     const g=world.events.governance;
+    // `unlocked` is a legacy key (saves of 2026-09-12/13): tolerated, never read, never added — forcing it in
+    // here put a key on a loaded city that the straight run lacked, and the save/load hash invariant broke.
     for(const [key,value] of Object.entries(g))if(key!=='unlocked'&&!POLICIES.some(p=>p.key===key&&p.options.some(([v])=>v===value)))throw Error('Invalid governance policy');
-    world.events.governance={...g,unlocked:!!g.unlocked};
+    world.events.governance={...g};
   }
-  if(['licence','scrubbers'].includes(world.events.choice?.id))world.events.choice=null;
+  // A pending Butchers' licence or Scrubbers card survives a save: the offers are live again in a town with no
+  // Governor (events.js); a governor's own governance op clears them.
   world.events.justice = { ...jDefaults, ...(o.events.justice || {}) }; // an old save without a counter keeps 0, never NaN
   world.ledger = { ...o.ledger };
   world.history = o.history.slice();
   world.log = o.log.slice();
   world.flags = { ...o.flags };
-  if (o.flags.campaign) {
+  if (o.flags?.campaign) { // a hand-built save may carry no flags at all; the old spread tolerated that
     const p = o.flags.campaign;
     if (!Number.isInteger(p.chapter) || p.chapter < 0 || p.chapter > 4 ||
         !Number.isInteger(p.stable) || p.stable < 0 || p.stable >= KNOBS.CHAPTER_MONTHS ||
