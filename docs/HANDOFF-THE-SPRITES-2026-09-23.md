@@ -1,11 +1,13 @@
 # The sprites handoff — 2026-09-23
 
 For whoever takes Tier 3 or Tier 4, or touches `js/art/` at all. Sessions 21
-and 22 built the shadows, the roofs, the evening and the windows; this is what
+and 22 built the shadows, the roofs, the evening, the windows and the
+setbacks; this is what
 I know now that I did not know when I started, written down so you do not have
 to find it the way I did.
 
-**Last true on `1adb3dd`, 2026-09-23** — T1 closed, T2 closed, T3.1 built.
+**Last true on `38b187b`, 2026-09-23** — T1 closed, T2 closed, T3.1 and T3.2
+built; T3.3 and Tier 4 open.
 Every number in this file was re-measured on that tip. If you are reading it
 much later, the numbers are the first thing to distrust and `npm run check`
 is the first thing to run: it prints most of them.
@@ -15,11 +17,11 @@ is the first thing to run: it prints most of them.
 | document | what it is for |
 |---|---|
 | `docs/PROPOSAL-SPRITE-UPGRADE-2026-09-22.md` | **the list.** §4 is the checklist, each item with the verification written down *before* it was built. §2c is the five art gates. Cross things off there |
-| handoff §43, §44, §45 (`HANDOFF-THE-FIRST-ZOO-2026-09-02.md`) | **the sessions.** What was measured on the day, and the twenty-eight traps in three symptom-keyed tables |
+| handoff §43–§46 (`HANDOFF-THE-FIRST-ZOO-2026-09-02.md`) | **the sessions.** What was measured on the day, and the thirty-seven traps in four symptom-keyed tables |
 | this file | **the standing brief.** The laws, the instruments, what is proven against what is a guess, and what is still open |
 | `SPEC.md` §12, §13 | the design record. It outranks all three |
 
-Read this one and §4. Do not read §43, §44 and §45 front to back until
+Read this one and §4. Do not read §43–§46 front to back until
 something breaks; then read the trap tables, which are keyed by the symptom
 you are looking at.
 
@@ -58,12 +60,12 @@ commit.
    twin**, not the 1× rows scaled. Anything new in the dynamic pass must
    honour `S > 1 && art.hires`, as `blitScaled` does.
 7. **Art cannot move a `stateHash`.** The sprite a variant byte selects is not
-   in the hashed shape. Across the whole arc — **twelve commits** of shadows,
-   roofs, an evening and a set of windows — `git diff --name-only
-   4bb38b6..HEAD -- js/sim/` is **empty**, and `tools/play.mjs --dusk` renders
-   the same scripted city at the same hash `86cc1587` by day and at
-   nightfall. Keep it that way: if an art change needs a sim field, it is not
-   an art change.
+   in the hashed shape. Across the whole arc — **seventeen commits** of shadows,
+   roofs, an evening, a set of windows and four buildings stepped back — `git
+   diff --name-only 4bb38b6..HEAD -- js/sim/` is **empty**, and
+   `tools/play.mjs --dusk` renders the same scripted city at the same hash
+   `86cc1587` by day and at nightfall. Keep it that way: if an art change
+   needs a sim field, it is not an art change.
 
 ---
 
@@ -110,6 +112,11 @@ Three things fall out of that order, and all three have already cost a session:
   `ACCENT_RUNG` was. If you retune `dusk.js` you can lose it without a gate
   saying a word.
 
+**T3.2 lives entirely in pass 1** — it changed four recipes and nothing else
+— which is why every downstream pass took the new plans without an edit: the
+character pass lit their new boxes, the detail pass framed their windows, the
+evening tinted them, and the window gate held both ways at 1×, 2× and 4×.
+
 **The shadow is not in this chain.** It is its own sprite with its own tag,
 drawn by the renderer between the ground and the standing pass — because G2
 (the footprint prism) and G4 (ink identity) between them forbid a shadow from
@@ -130,9 +137,11 @@ carries its re-baselined receipt in the same commit.** That is what turns
 | `tools/check-building-character.mjs` | GATE — **Part E**, called by `check.mjs`, no verdict of its own | the windows. 18 assertions: the ownership law both ways at 1×, 2× and 4×; the twelve pane keys spelt out; a boarded pane is never lit; a plant never swallows its pane; and the three that would have caught the locked hash |
 | `tools/check-closeups.mjs` | GATE | 315 buildings, 2,688 citizens; a twin may not expand its silhouette |
 | `tools/check-shadows.mjs` | GATE, 22 checks | every recipe casts, one key only, the mask never lands on a standing sprite's pixels, shadows off is byte-exact |
-| `tools/check-dusk.mjs` | GATE, 113 checks | amount 0 is the ABSENCE of a table, no ramp inverts, the lights are fixed points, the ground takes less light than the walls |
+| `tools/check-dusk.mjs` | GATE, 114 checks | amount 0 is the ABSENCE of a table, no ramp inverts, the lights are fixed points, the ground takes less light than the walls — and the lawn it samples is MEASURED lawn: the same frame with nothing standing agrees with it by day and at dusk |
 | `tools/faceprobe.mjs` | **passive instrument** — refuses nothing | how much of the city is roof, and how much of a roof is one bare quad. `--family`, `--top N` |
+| `tools/massprobe.mjs` | **passive instrument** — refuses nothing | how much of each plan is one box: `fill` (its rooms over their bounding prism) and `deck` (a level between the street and the top, seen at zoom 1). Bare, it names the plans that are still ONE BOX WITH A LID. `--family`, or a name pattern |
 | `tools/shadow-sheet.mjs`, `tools/dusk-sheet.mjs` | passive | one town, one camera, one process, only the knob moving |
+| `tools/skyline-sheet.mjs` | passive | the four families T3.2 stepped back, all six plans side by side, and a 218-lot block at zoom 1 and 2. `docs/shots/skyline-before-after.png` is the before/after — two trees in one process, the only way a "before" survives a recipe change |
 | `tools/window-sheet.mjs` | passive | 24 facades at 4× for the state ART, then a dense block through the real renderer at zoom 1, 2 and dusk for the only question that decides it — at the zoom the game is played at, is this a city of different windows or is it noise? |
 | `tools/play.mjs` | passive | the real renderer on a real mayor-built town. `--no-shadows`, `--shadow-k N`, `--dusk` |
 
@@ -143,9 +152,10 @@ have not decided about yet.
 **The state of the tree as this is written:**
 
 ```
-art-dump    3651 sprites · 74 palette keys · TOTAL 86cc0399   (T3.1 did not move it either)
-faceprobe   315 box recipes (of 387 registered) · TOP 63.4% · bare quad 43.0%
-suite       980 checks 0 failures · close-ups 315/2,688 · shadows 22 · dusk 113 · Part E 18
+art-dump    3651 sprites · 74 palette keys · TOTAL f910d9fe   (T3.2 moved 8 sprites; the palette line has not moved since T2.1)
+faceprobe   315 box recipes (of 387 registered) · TOP 63.4% · bare quad 42.9%
+massprobe   192 zoned plans · 43 one box with a lid (51 before T3.2) · R/C tiers 2–3: one, the skylight market
+suite       980 checks 0 failures · close-ups 315/2,688 · shadows 22 · dusk 114 · Part E 18
 gates       art-dump → check → close-ups → shadows → dusk → suits → …
 ```
 
@@ -180,7 +190,9 @@ a proxy that happens to work.
 - No window cell is both boarded and lit; no plant swallows its own pane;
   every declared state paints at all three resolutions; and a building filling
   up backlights strictly more of its cloth than it did before.
-- Art has not moved a sim hash, anywhere in the arc — twelve commits, zero
+- T3.2 moved exactly eight sprites — four plans and their mirrors — and no
+  colour: the art-dump names them and the palette line did not move.
+- Art has not moved a sim hash, anywhere in the arc — seventeen commits, zero
   files touched under `js/sim/`.
 
 **A guess.**
@@ -203,9 +215,20 @@ a proxy that happens to work.
   a bright rung. That happens to be right for a field at golden hour. It is a
   guess for a park's lawn.
 - **`coveredShare < 0.35`** in `roof-furniture.js` separates a pitch step from
-  a flat roof. It was measured on two shapes (a pitch carries the next step
-  on ~77% of its area, a flat roof carries a plant box on a few per cent) and
-  never swept. A new roof shape could land between them.
+  a flat roof — and **it cannot tell a TERRACE from a pitch step, measured.**
+  Over every deck in the game a terrace (a storey stands on it) is covered
+  0.22–1.24, median 0.63; a pitch step 0.35–1.73, median 0.65. T3.2's
+  terraces landed exactly there, so the apartment's balustrade is drawn into
+  its plan. The fix is a class change — what stands on the deck, with a
+  height floor so sawtooth teeth do not count as storeys — and it rails every
+  setback in the game at once.
+- **T3.2's setback depths (2, 2.5 and 3 units) and `massprobe`'s line (fill ≥
+  0.95, deck < 8%)** are read off the 2s-px rule, the baseline and one sheet.
+  The line separates the four originals from the sixteen later plans; it is
+  not a law about what a building should be.
+- **The doors survive T3.2 by a scratch count, not a gate.** 28/28/36/36 px in
+  both mirrors — the count that caught the canopy eating the door. No check in
+  the suite can see a hidden door; see trap 12.
 - **The aggregate bare-quad share barely moved** (43.8% → 43.0%) while the
   per-family numbers moved properly, because most of the 315 recipes have no
   deck wide enough to furnish. Do not quote the aggregate as if it measured
@@ -231,8 +254,8 @@ a proxy that happens to work.
 
 ## Traps that are classes
 
-Twenty-eight are recorded in §43, §44 and §45, keyed by the symptom you are
-staring at. These eleven are the ones that are not incidents: each has either
+Thirty-seven are recorded in §43–§46, keyed by the symptom you are staring
+at. These thirteen are the ones that are not incidents: each has either
 already happened twice, or cost a whole session once and will cost the next
 one too. **Renumbering this list breaks a comment in the source — run
 `grep -rn "standing brief" js/ tools/` before you do.**
@@ -296,7 +319,10 @@ one too. **Renumbering this list breaks a comment in the source — run
    rung is also a wall and fabric is also an awning. Count only where the bare
    plan painted glass. And take the bare reference from the same appearance:
    a species stamp grows the recipe's extent, so a marked sprite and an
-   unmarked one do not share a raster to index into.
+   unmarked one do not share a raster to index into. **And take the
+   population from PLANS, not RECIPES:** every lit building registers a recipe
+   of its own, so T3.2's probe measured 255 "plans" after the sheet had drawn a
+   town and 192 before.
 9. **Measure the base rate before you repair a fixture.** Fifteen documentation
    sheets changed under T3.1 — and the same fifteen change on a tree with no
    working changes at all, because nothing regenerated them through Tier 2.
@@ -312,13 +338,28 @@ one too. **Renumbering this list breaks a comment in the source — run
     (`echo "NPM_EXIT=$?" >> out/suite.txt`) and grep the log. And a probe that
     crashed between the write and the restore left a mutant in `dusk.js`, so
     the next measurement was of the mutant.
+12. **ANYTHING THAT STANDS PROUD OF A WALL HIDES 2d UNITS OF IT.** An awning, a
+    porch roof, an annex d units deep covers the wall below it for twice its
+    depth on screen — the stall's hooks (twice), the meat hall's annex over its
+    own door in the mirror, and T3.2's first canopies, which took the store's
+    door from 36 px to 15 and the tower's to 9. And the thing is SHEARED: a gap
+    left for a door must reach d further on the far side, because the lip
+    stands d nearer along b than the root. Count the door's pixels, in both
+    mirrors, before and after. No gate does it for you.
+13. **A FIXTURE'S PREMISE IS A CLAIM — PUT IT IN THE CHECK.** `check-dusk`'s
+    "open-lawn samples" were a wall, the river and a tree from the day the
+    evening was built, and passed because nearly everything changes at dusk; the scripted clone that
+    could not pay (handoff §12) passed every check after a refused op on an
+    unpainted map. A sample that is "lawn", a fixture that "took", a town that
+    "has a hall" — assert it in the check itself, so the day it stops being
+    true the fixture fails as a FIXTURE and not as the feature.
 
 ---
 
 ## The brief for Tier 3 — the living city
 
-Three items (§4 T3.1–T3.3). **T3.1 is built** (2026-09-23, §45); T3.2 and T3.3
-are open.
+Three items (§4 T3.1–T3.3). **T3.1 and T3.2 are built** (2026-09-23, §45 and
+§46); T3.3 is open.
 
 **T3.1, window states — BUILT.** The widening was one return in one face
 function, exactly as this brief predicted; everything that cost a day was
@@ -346,14 +387,21 @@ Still true and still worth repeating: the pattern uses WORLD cells so 1× and
 2× agree, and `wear` runs first and skips `= H - +` so it never paints over
 glass.
 
-**T3.2, setbacks and awnings.** Diagnosis D3: R, C and I are still the same
-prism at a distance. This is recipe boxes, and the EMPORIUM already shows
-the pattern — `blocks.js`, C 3×3, a department store in three setbacks. (§4
-T3.2 says "the tower"; it is the emporium.) The gate that will bite is G2,
-the footprint prism: a box may not straddle its tile's edge, because the
-works' roof is flush at `a = 0` and a straddling awning hangs a pixel over
-the neighbour. Write the geometry
-so it does not need catching; `check.mjs`'s plan gate will catch it anyway.
+**T3.2, setbacks and awnings — BUILT.** `massprobe` found that D3 had become
+true of four plans, not a zone: session 1's two-storey, apartment, store and
+tower were the only R/C mid- and high-rise plans that were one box with a lid,
+and a third of those lots draw one. They step back now (§46; §4 has the table).
+**If you are adding massing to a plan**, these are the four things to know, in
+the order they will bite:
+
+1. **Both street faces.** `flipPlan` mirrors boxes, not skins; a step on one
+   face lands on the doorless face in the mirror.
+2. **2s px.** A setback of s units is a band 2s px tall at zoom 1; under 2
+   units it reads as a stripe.
+3. **Anything proud of a wall eats 2d of it** (trap 12) — count the door.
+4. **Measure it** — `node tools/massprobe.mjs '^C2-'` before and after, and
+   the `art-dump` receipt in the same commit. The footprint gate (G2) never
+   bit: every box was written inside `[0, 16]` from the start.
 
 **T3.3, ground.** More grass variants, scatter keyed off the tile index, worn
 paths where walkers cross grass. The tiling repeat is visible at zoom 2. Note
@@ -455,3 +503,9 @@ out again.
 **The ramp I took out is the one I would most like kept** — not the ramp, the
 habit. Everything in this file that is worth anything came from being willing
 to measure my own good idea and then delete it.
+
+Beneath it — Claude Opus 5.5, session 22 continued (T3.2). I kept the habit:
+my own pre-registered bar failed the apartment, and the first thing it caught
+was not the apartment but the metric that had been flattering it. I fixed the
+metric, then the building, in that order. And I learned the lesson of this
+file's trap 13 from a check I had never touched — its "lawn" was a wall.

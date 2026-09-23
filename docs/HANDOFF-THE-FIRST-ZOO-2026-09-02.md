@@ -3648,3 +3648,163 @@ to time this in the browser: fresh seeds do not make fresh sprites, and the
 Maker's mark — Claude Opus 5, session 22: the one who wrote a comment
 explaining why two hashes could not possibly lock, and then measured them
 locked. The comment is still there, and it now says what it got wrong.
+
+## 46. The skyline — four boxes stepped back, and two fixtures that were not what they said (session 22 continued, 2026-09-23)
+
+The owner: *"lets continue with the handoff."* The standing brief's next open
+item was T3.2, setbacks and awnings — *"R, C and I are still the same prism at
+a distance"* (diagnosis D3). **The list is still
+`docs/PROPOSAL-SPRITE-UPGRADE-2026-09-22.md`**; §4's T3.2 carries the numbers.
+This is the why and the traps. Four commits: `b39866c` and `c61920c` repaired
+two fixtures T3.2 exposed, each alone on an unchanged tree; `38b187b` is the
+work; this section and the standing brief are the fourth.
+
+### What was a box, measured
+
+There was no instrument for D3, so the first thing built was one:
+`tools/massprobe.mjs`, passive like faceprobe. Two readings per plan — how much
+of its glazed mass fills its bounding prism (**fill**; 1.00 is one box) and how
+much of the sprite at zoom 1 is a deck standing between the street and the top
+(**deck**), because fill cannot see *where* the mass went and a bite out of the
+back corner is invisible from the camera.
+
+It re-read the diagnosis. Over the twenty-four R and C plans at tiers 2 and 3,
+**exactly four were one box with a lid — session 1's originals, the
+two-storey, the apartment, the store and the tower — and their mirrors.** Every
+plan authored later (the six-plan expansion of 2026-09-12) already stepped,
+except the skylight market, which is flat-fronted with an awning and was left
+as its family's one. So D3 had become a statement about a third of the lots
+rather than all of them — and the list's "mid-tiers" was re-read by the same
+number: two of the four are tier 3, the tallest prisms on the skyline.
+
+### Four plans, and what each became
+
+| plan | before · fill, deck | after | what it became |
+|---|---|---|---|
+| two-storey | 1.00 · 0.0% | 0.83 · 18.1% | the upper storey 2.5 back under its hip; a terracotta porch roof in two courses round both street faces |
+| apartment | 1.00 · 5.3% | 0.84 · 12.8% | two storeys on the plot, then an L round an 8×8 front-corner terrace with a balustrade and a planter |
+| store | 1.00 · 0.0% | 0.83 · 19.4% | a glass shop floor under a canvas awning on both faces; the ribbon storeys 2 back |
+| tower | 1.00 · 0.0% | 0.67 · 12.4% | a lobby podium on the plot; the shaft 3 back from both street faces |
+
+Each keeps its storeys, its material, its windows and its door, so a saved
+city's store is still its store. City-wide, 51 of 192 zoned plans were one box
+and 43 are: the eight are the only ones that moved, and `art-dump` says so —
+eight lines and a `TOTAL`, the palette line untouched.
+
+Two rules set every number. **Both street faces, always**: `flipPlan` mirrors
+the boxes and not the skins, so a step on one face lands on the doorless face in
+variant 1. **Size on screen**: a setback of s units is a band 2s px tall at
+zoom 1, so 2 units is the least that reads as a step and not a stripe.
+
+### The door, the shear, and a canopy that went
+
+The pre-registration counted door pixels because of the meat hall's annex —
+which once stood in front of its own door in the mirror. It caught something
+else: **an awning d deep hides the wall under it for 2d units**, the stall's
+lesson from session 1, and the first draft's canopies took the store's door
+from 36 px to 15 and the tower's to 9. The store's awning now stops short of
+its door bay, and *further on the far side than the near one*, because on screen
+an awning is sheared — its lip stands d units nearer along b, so its far end
+reaches d units of a further left than where it meets the wall. The tower lost
+its canopies altogether: they read at zoom 1 as two light slivers, and the
+podium is its street. So P3 ("the store and the tower each carry a canopy") was
+half indicted by P4, and the art changed rather than the count.
+
+### The metric the bar caught
+
+`fill` first counted the roof slab a setback stands on as empty space. That
+flatters any plan that sandwiches a cap between storeys, and the apartment's
+first draft passed the pre-registered 0.85 at **0.848 that way and failed at
+0.875 honestly.** The metric was fixed — the occupied layers only — every plan
+re-read, and the terrace grown from 7×7 to 8×8 units rather than the bar moved.
+
+And the probe's *population* leaked. Every lit building is a character sprite
+that registers its own recipe as `<plan>-people-<key>`, so `RECIPES` grows with
+whatever the process has drawn: run inside the sheet, after rendering a town,
+the probe measured **255 "plans" where the bare tool measured 192.** It reads
+`PLANS` now — what `solidSprite` registered, the list the footprint gate reads.
+
+### Two fixtures that were not what they said
+
+**`check-dusk`'s "open lawn" was three parts building, river and tree.** Its
+four samples existed to catch a `setDusk` that forgets to mark the ground layer
+dirty, and had been placed by eye: measured, `(40, 40)` was the old apartment's
+brick, `(380, 60)` the river, `(400, 270)` a tree's canopy, and only
+`(30, 250)` was grass. They passed because nearly every key changes at dusk —
+until the stepped apartment put a lit window, a dusk *fixed point*, on
+`(40, 40)`. The same check held every grass-coloured pixel to the ground's
+table, and grass keys also paint parks' plinths, block gardens and now a
+terrace planter, which stand and take the standing table by design. Lawn is
+MEASURED now — the frame again with nothing standing, and a pixel is lawn only
+where the two agree by day *and* at dusk (by day alone was fooled at `(90, 63)`,
+where the planter's soil matched the grass texture under it). The premise is a
+check of its own. Committed alone (`b39866c`), green on both trees, three
+mutants red.
+
+**Two sheets had been stale since T3.1.** Base rate first, on a detached
+worktree: every sheet tool in turn, and `git status` named `sheet-shadows` and
+`sheet-dusk` — both photograph lit towns, and T3.1 changed what a lit window
+holds without regenerating them. Twice regenerated, byte-identical: stale, not
+nondeterministic. Committed alone (`c61920c`).
+
+### The terrace the roof furniture cannot see
+
+The standing brief listed `coveredShare < 0.35` in `roof-furniture.js` as a
+guess a new roof shape could land between. T3.2 made that shape, and the census
+says the rule cannot tell: over every deck in the game **a terrace — a storey
+standing on it — is covered 0.22–1.24, median 0.63, and a pitch step 0.35–1.73,
+median 0.65.** Only what stands on the deck could separate them, and "a storey"
+needs a height floor, because sawtooth teeth are glazed and 3.5 tall and ground
+plinths are decks too. Changing the rule rails every setback in the game at
+once, so it is left as a class question with its numbers, and the apartment's
+balustrade is drawn into its plan as architecture.
+
+| what you see | what it is |
+|---|---|
+| a canopy that hides the door it was hung over | **an awning d deep hides 2d units of wall under it.** 36 → 15 px on the store, 36 → 9 on the tower. Count the door's pixels before and after, in both mirrors |
+| a gap left in an awning for the door, and the door still half covered | **the awning is sheared on screen.** Its lip is d units nearer along b, so its far end reaches d units of a further left than its root. Resume the awning d past the door on the far side |
+| a setback that passes a fill bar only because a roof slab sits between its storeys | **a layer with no room in it is not void.** Measure the occupied layers; a sandwiched cap flattered 0.875 to 0.848 |
+| a probe reporting a different count of plans in two processes | **`RECIPES` grows with every lit building drawn.** Measure `PLANS`, which does not |
+| a terrace with no rail when every flat roof has one | **`coveredShare` cannot tell a terrace from a pitch step** — same median, 0.63 against 0.65. Draw the balustrade into the plan; the rule is a class question |
+| a dusk check failing on a building, after an art change that touched no dusk code | **its "lawn" samples were not lawn.** Three of four were a wall, the river and a tree. A fixture's premise is a claim: put it in the check |
+| a lawn pixel taking the wrong table at dusk, on a planter | **grass keys paint standing things too.** Lawn is where the full city and the empty city agree — by day AND at dusk; by day alone a planter matched the grass under it |
+| a sheet moving that shows nothing you touched | **`sheet-civics` draws the store under the scaffold overlay** — which nothing in the game calls. Explained, not ignored |
+| the preview tool refusing to start a server | **five servers per folder, held by other chats.** Verify the deployed Pages build instead — and check the art hash it serves before believing a picture |
+
+### The state of it
+
+```
+art-dump    3651 sprites · 74 palette keys · TOTAL f910d9fe   (8 moved: the four plans and mirrors; palette untouched)
+massprobe   192 zoned plans · 43 one box with a lid (was 51) · R/C tiers 2–3: one, the skylight market
+faceprobe   TOP 63.4% · bare quad 42.9% (was 43.0%)
+sheets      docs/shots/sheet-skyline.png — the four families' six plans, a 218-lot block at zoom 1 and 2
+            docs/shots/skyline-before-after.png — two trees in one process; the only "before" there is
+suite       980 checks 0 failures · dusk 114 · NPM_EXIT=0
+browser     the DEPLOYED Pages build, since all five preview slots were held by other chats: the four
+            changed plans hash as art-dump says (1929eb66 · f82d98ba · eed09fab · 453c31c3), and a 218-lot
+            block drawn by js/render.js at zoom 1 and 2 paints every pixel — cold 3.1 s (the cache filling),
+            warm 3.6–4.8 ms — with no console messages and no city entered
+```
+
+### What is open
+
+- **T3.3 — ground variety.** The ground has two readers (`duskTable(amount,
+  true)`), and `check-dusk` now measures what lawn is instead of reading it off
+  the colour, so a new ground key will be held to the flat table honestly.
+- **Tier 4 — the animals.** Eight coats for fourteen species; unchanged.
+- **Q1, the shadow length, is still the owner's.**
+- **The roof furniture's terrace question** — above; a class change with its
+  numbers, not made.
+- **No gate sees a hidden door.** Twice now — the meat hall's annex, T3.2's
+  canopy draft — and both times a scratch count found it. A door check needs a
+  way to find a door that is not "a `+` pixel", because hooks, vents and
+  outlines are `+` too.
+- **The 43 one-box plans** are tier-1 shops and cottages, the industrial sheds
+  and works, the meat stalls. `node tools/massprobe.mjs` names them; nobody has
+  decided whether a shed ought to step.
+- **Nobody has played this.** Not a shadow, not an evening, not a blind, not a
+  terrace.
+
+Maker's mark — Claude Opus 5.5, session 22 continued: the one whose own
+pre-registered bar failed the apartment, and who changed the metric that had
+been flattering it and then the apartment, in that order and not the other.
