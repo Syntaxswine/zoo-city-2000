@@ -45,6 +45,7 @@ const GRASS = keysOf("grass"); // m n o p
 
 // ------------------------------------------------------------------- skins
 
+const TILE = keysOf("tile"); // B C D E — added with the roofs, T2.1
 const SLATE_SKIN = flatSkin(SLATE[2], SLATE[1], SLATE[0]);
 // The commercial roof cap is LIGHT concrete on slate edges: a slate cap
 // ('?' ≈95) on a concrete wall ('&' side ≈133, '^' end ≈98) made the top of
@@ -52,6 +53,24 @@ const SLATE_SKIN = flatSkin(SLATE[2], SLATE[1], SLATE[0]);
 // its own box, correctly shaded) but an inversion of the building-level
 // read. '*' (≈171) on top honours "top brightest" for the whole box.
 const C_ROOF = flatSkin(CONC[3], SLATE[1], SLATE[0]);
+// THE ROOF SAYS THE ZONE (T2.2). Two thirds of every standing pixel in this
+// game is a top face — `tools/faceprobe.mjs` measured 66.1% — and until now
+// every one of those faces was slate or concrete, so the largest surface in
+// the city carried none of the one fact a player most wants from the air.
+// Four materials, one per zone:
+//
+//   R  terracotta   warm, and DARKER at every rung than the brick beneath it
+//   C  light concrete cap on slate edges — as it already was
+//   I  rust         the works and the sheds, in the ramp their stacks use
+//   M  slate, dark  the meat halls read as the grim ones, by value
+//
+// Every roof in the game goes through this table: the six base families
+// below, and `building-plans.js`'s `cap()` helper, which is the one choke
+// point for all twenty-four authored variants.
+const R_ROOF = flatSkin(TILE[2], TILE[1], TILE[0]);
+const I_ROOF = flatSkin(RUST[2], RUST[1], RUST[0]);
+const M_ROOF = flatSkin(SLATE[1], SLATE[0], SLATE[0]);
+const ROOF_OF = { 1: R_ROOF, 2: C_ROOF, 3: I_ROOF, 4: M_ROOF };
 const TIMBER = flatSkin(EARTH[4], EARTH[3], EARTH[2]);
 const PLINTH = flatSkin(GRASS[3], GRASS[1], GRASS[0]);
 // The commercial wall is concrete one rung DOWN from the ramp's top: with
@@ -226,8 +245,8 @@ function cottage() {
   // as 1-px courses up the roof and the steps read as a pitch. Two big
   // steps (round 2) read as a flat roof with a box on it; three read as a
   // ziggurat of trays. A slope is a limit of thin steps.
-  const boxes = [box(2.5, 13.5, 3, 13, 0, H, wall), box(1.5, 14.5, 2, 14, H, H + 1, SLATE_SKIN)];
-  for (let i = 1; i <= 4; i++) boxes.push(box(1.5 + 1.5 * i, 14.5 - 1.5 * i, 2 + 1.5 * i, 14 - 1.5 * i, H + i, H + i + 1, SLATE_SKIN));
+  const boxes = [box(2.5, 13.5, 3, 13, 0, H, wall), box(1.5, 14.5, 2, 14, H, H + 1, R_ROOF)];
+  for (let i = 1; i <= 4; i++) boxes.push(box(1.5 + 1.5 * i, 14.5 - 1.5 * i, 2 + 1.5 * i, 14 - 1.5 * i, H + i, H + i + 1, R_ROOF));
   boxes.push(box(10, 12, 4.5, 6.5, H, H + 7, litSkin(BRICK, { grain: brickGrain, height: 7 })));
   return boxes;
 }
@@ -237,9 +256,9 @@ function twoStorey() {
   const wall = walled(litSkin(BRICK, { grain: brickGrain, height: H }), H, { storey: 8, sill: 3, winH: 3, period: 4, winW: 2, from: 1, door: doorAt(8) });
   return [
     box(1.5, 14.5, 1.5, 14.5, 0, H, wall),
-    box(0.5, 15.5, 0.5, 15.5, H, H + 1.5, SLATE_SKIN),
-    box(3, 13, 3, 13, H + 1.5, H + 4, SLATE_SKIN),
-    box(5.5, 10.5, 5.5, 10.5, H + 4, H + 6, SLATE_SKIN),
+    box(0.5, 15.5, 0.5, 15.5, H, H + 1.5, R_ROOF),
+    box(3, 13, 3, 13, H + 1.5, H + 4, R_ROOF),
+    box(5.5, 10.5, 5.5, 10.5, H + 4, H + 6, R_ROOF),
     box(11, 13, 3, 5, H, H + 7, litSkin(BRICK, { grain: brickGrain, height: 7 })),
   ];
 }
@@ -251,8 +270,8 @@ function apartment() {
   // Balcony strips stop at the tile edge (b = 16): a box past the plan is a
   // pixel outside the footprint, which check.mjs now gates.
   for (let k = 1; k <= 3; k++) boxes.push(box(2, 14, 15, 16, 8 * k, 8 * k + 1, SLATE_SKIN));
-  boxes.push(box(0.5, 15.5, 0.5, 15.5, H, H + 1.5, SLATE_SKIN));
-  boxes.push(box(3, 13, 3, 13, H + 1.5, H + 3, SLATE_SKIN));
+  boxes.push(box(0.5, 15.5, 0.5, 15.5, H, H + 1.5, R_ROOF));
+  boxes.push(box(3, 13, 3, 13, H + 1.5, H + 3, R_ROOF));
   boxes.push(box(10, 13, 10, 13, H + 3, H + 6, litSkin(CONC, { height: 3 })));
   return boxes;
 }
@@ -317,7 +336,7 @@ function shed() {
   const wall = walled(litSkin(RUST, { grain: ribGrain, height: H }), H, { storey: 8, sill: 4, winH: 2, period: 6, winW: 3, from: 2, door: doorAt(6, 6.5, 2) });
   return [
     box(1, 15, 2.5, 13.5, 0, H, wall),
-    box(0.5, 15.5, 2, 14, H, H + 1, SLATE_SKIN),
+    box(0.5, 15.5, 2, 14, H, H + 1, I_ROOF),
     box(3, 5, 4, 6, 0, 14, litSkin(RUST, { grain: ringGrain, height: 14 })),
   ];
 }
@@ -331,9 +350,12 @@ function factory() {
   // the teeth read as glazing strips lying flat on the roof.
   const tooth = {
     glazing: true,
-    top: () => SLATE[2],
-    side: () => SLATE[1],
-    end: (b, k) => (k < 2.5 ? END_GLASS : SLATE[0]),
+    // RUST, not slate, since the roofs began saying the zone (T2.2): the
+    // sawtooth IS this building's roof, and a works read grey from the air
+    // like every other family. The END_GLASS rule below is untouched.
+    top: () => RUST[2],
+    side: () => RUST[1],
+    end: (b, k) => (k < 2.5 ? END_GLASS : RUST[0]),
   };
   const boxes = [box(1, 15, 1, 15, 0, H, wall)];
   for (let i = 0; i < 3; i++) boxes.push(box(1 + 4.7 * i, 4.9 + 4.7 * i, 1, 15, H, H + 3.5, tooth));
@@ -347,7 +369,7 @@ function works() {
   const wall = walled(litSkin(RUST, { grain: ribGrain, height: H }), H, { storey: 10, sill: 5, winH: 3, period: 4, winW: 2, from: 1, door: doorAt(8, 8, 2.5) });
   return [
     box(0.5, 15.5, 0.5, 15.5, 0, H, wall),
-    box(0, 16, 0, 16, H, H + 1, SLATE_SKIN),
+    box(0, 16, 0, 16, H, H + 1, I_ROOF),
     box(2, 7, 9, 14, H + 1, H + 8, litSkin(CONC, { grain: ringGrain, height: 7 })),
     box(3, 6, 10, 13, H + 8, H + 9.5, litSkin(CONC, { height: 1.5 })),
     box(11.5, 14.5, 1.5, 4.5, 0, H + 14, litSkin(RUST, { grain: ringGrain, height: 34 })),
@@ -452,7 +474,7 @@ function stall() {
   const boxes = [
     box(3, 13, 3, 13, 0, H, skin),
     box(3.5, 10.5, 13, 14.5, 6, 8, AWNING_M),
-    box(2.5, 13.5, 2.5, 13.5, H, H + 1, SLATE_SKIN),
+    box(2.5, 13.5, 2.5, 13.5, H, H + 1, M_ROOF),
     box(4, 10.5, 13, 14.5, 0, 1, SAWDUST),
   ];
   for (const a of [5.5, 7.5, 9.5]) boxes.push(box(a - 0.25, a + 0.25, 14, 14.5, 4, 6, HOOK));
@@ -512,9 +534,9 @@ function meatHall() {
   };
   return [
     box(1, 11, 1.5, 14.5, 0, H, skin),
-    box(0.5, 11.5, 1, 15, H, H + 1, SLATE_SKIN),
+    box(0.5, 11.5, 1, 15, H, H + 1, M_ROOF),
     box(11, 15.5, 3.5, 8, 0, 9, annex),
-    box(10.5, 16, 3, 8.5, 9, 10, SLATE_SKIN),
+    box(10.5, 16, 3, 8.5, 9, 10, M_ROOF),
     box(9, 9.5, 14.5, 15.5, 10, 10.5, BRACKET),
     box(7.5, 11, 15.5, 16, 7.5, 10, sign),
   ];
@@ -560,10 +582,10 @@ function coldStore() {
   };
   return [
     box(1, 11.5, 1, 15, 0, H, skin),
-    box(0.5, 12, 0.5, 15.5, H, H + 1, C_ROOF),
+    box(0.5, 12, 0.5, 15.5, H, H + 1, M_ROOF),
     box(2.5, 7, 3, 6, H + 1, H + 4, litSkin(CONC, { grain: ribGrain, height: 3 })),
     box(11.5, 15.5, 3.5, 7.5, 0, A, annex),
-    box(11, 16, 3, 8, A, A + 1, SLATE_SKIN),
+    box(11, 16, 3, 8, A, A + 1, M_ROOF),
     box(12.5, 14.5, 0.5, 2.5, 0, H + 10, litSkin(RUST, { grain: ringGrain, height: H + 10 })),
   ];
 }
@@ -585,7 +607,7 @@ for (const zone of [1, 2, 3, 4]) {
   for (const tier of [1, 2, 3]) {
     const [name, make] = FAMILY[zone][tier];
     const boxes = make();
-    const additions = extraPlans(zone, tier, { walled, doorAt, BRICK, CONC_WALL, RUST, SLATE_SKIN, C_ROOF, TIMBER, AWNING, AWNING_M, HOOK, STEP: flatSkin(CONC[4], CONC[3], CONC[2]), GRASS });
+    const additions = extraPlans(zone, tier, { walled, doorAt, BRICK, CONC_WALL, RUST, SLATE_SKIN, C_ROOF, ROOF: ROOF_OF[zone], TIMBER, AWNING, AWNING_M, HOOK, STEP: flatSkin(CONC[4], CONC[3], CONC[2]), GRASS });
     BUILDINGS[zone][tier] = [
       solidSprite(`${ZONE_LETTER[zone]}${tier}-${name}-0`, boxes, { tags: ["building", ZONE_LETTER[zone]] }),
       solidSprite(`${ZONE_LETTER[zone]}${tier}-${name}-1`, flipPlan(boxes), { tags: ["building", ZONE_LETTER[zone]] }),
@@ -1042,7 +1064,7 @@ export function overlaySprite(kind, frame = 0) {
 export const KIT = Object.freeze({
   walled, doorAt, flipPlan, extentBox,
   BRICK, CONC, RUST, SLATE, EARTH, GRASS,
-  SLATE_SKIN, C_ROOF, TIMBER, PLINTH, CONC_WALL, END_GLASS, AWNING, AWNING_M, SAWDUST, BRACKET, HOOK, LAMP, BLUE_LAMP, STEP, POST,
+  SLATE_SKIN, C_ROOF, R_ROOF, I_ROOF, M_ROOF, ROOF_OF, TIMBER, PLINTH, CONC_WALL, END_GLASS, AWNING, AWNING_M, SAWDUST, BRACKET, HOOK, LAMP, BLUE_LAMP, STEP, POST,
   brickGrain, ribGrain, ringGrain, TREE_REACH,
 });
 

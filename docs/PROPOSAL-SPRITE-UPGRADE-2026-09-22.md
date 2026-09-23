@@ -204,20 +204,39 @@ k=0.55 **7.96%** · k=1.2 **10.30%**.
 
 ### Tier 2 — material vocabulary (adds keys; existing keys untouched)
 
-- [ ] **T2.1 — four new ramps:** `tile` (terracotta roof), `timber` (distinct
-  from soil-brown `earth`), `fabric` (awnings, stalls, tents), `furDark` (the
-  missing dark coat range that bear/beaver/raccoon are currently faking with a
-  shifted `furWarm`). Additive only.
-  *Verify:* every pre-existing key's hex identical; `relight`/`remapRamp` total
-  over the new ramps; the canopy-darker-than-grass relationship still holds;
-  **no existing sprite's rows change** (I1).
-- [ ] **T2.2 — zone-legible roofs.** R terracotta, C concrete + glazed lights,
-  I rust + ducting, M dark with a stained apron. Reads the zoning from the air
-  without the chalk. *Gates:* changes recipes ⇒ G4 ink identity is per-scale and
-  still holds (the skin changes keys, not coverage), but the 4× "must gain new
-  architectural detail" assertion must still pass per family.
-  *Verify:* per-family ink delta table; `--sheet` before/after; roof-face share
-  recomputed (the 66% should not move — this is colour, not coverage).
+- [x] **T2.1 — three new ramps, not four:** `tile` (terracotta roof, `BCDE`),
+  `timber` (`LMNO`, real wood instead of the soil-brown `earth` that has been
+  standing in for it) and `fabric` (`PQRS`, awning cloth and washing).
+  **`furDark` is deferred to T4**, where the citizens that need it live: a
+  ramp with no consumer is a guess, and its consumer is two tiers away.
+  **The receipt says exactly what an additive palette commit must say:**
+  `ADDED 12` keys, `MOVED 1: PALETTE` — that one being the key-count header —
+  and **no sprite and no existing key moved.**
+  That claim is only checkable because `art-dump` now writes **one line per
+  key** instead of one hash for the palette: a single hash says the palette
+  moved and cannot say *which* key, and "no existing key's hex changed" is
+  precisely a per-key question.
+  *Constraint found while choosing the colours:* `check-shadows` pins the
+  shadow key as a near-black within 3 of the palette's **luminance floor**
+  (slate `<` 37.7, `+` 38.4). A new ramp whose dark rung undercuts that moves
+  the floor and breaks the shadow's claim on it, so the three bottom out at
+  44.1 / 54.1 / 69.1 — recorded in `palette.js` beside them.
+- [x] **T2.2 — zone-legible roofs.** R terracotta · C light concrete cap ·
+  I rust · M dark slate. Routed through one table (`ROOF_OF` in
+  `buildings.js`) that reaches all three places roofs are built: the six base
+  families, `building-plans.js`'s `cap()` helper — already the single choke
+  point for all twenty-four authored variants — and `blocks.js` (its
+  `hipRoof` now takes a skin, and the generic `newBlock` reads `ROOF_OF[zone]`).
+  The factory's sawtooth went rust too: it *is* that building's roof, and a
+  works read grey from the air like everything else. Civics keep slate on
+  purpose — grey now means *civic* rather than *everything*.
+  **Measured: 84 sprites moved and NOT ONE changed its ink** — the whole of
+  R/I/M at 1×1 (six variants each), the R/I/M blocks, and the two C families
+  whose upper steps had been slate on a concrete building. A recolour that
+  altered one pixel of coverage would be a different change than the one
+  claimed, and the per-sprite ink column is what proves it did not.
+  **The top-face share is unmoved at 66.1%**, exactly as predicted — this item
+  is colour, and T2.3 is the one that must move that number.
 - [ ] **T2.3 — roof furniture.** Parapet ring (one rung lighter on its top =
   instant depth), stair head, tank on legs, vents, laundry lines on R, ducting
   on I, a roof garden on affluent addresses. All recipe boxes, deterministic

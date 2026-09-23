@@ -55,9 +55,17 @@ export function dumpLines() {
     seen.set(name, `${name}\t${sprite.w}x${sprite.h}\t${ax},${ay}\t${ink(sprite.rows)}\t${h8(sprite.rows.join("\n"))}`);
   }
   const lines = [...seen.values()].sort();
-  const palette = [...KEYS].sort().map((k) => `${k}=${colourOf(k).join(",")}`).join(" ");
-  lines.unshift(`PALETTE\t${KEYS.length} keys\t${h8(palette)}`);
-  lines.push(`TOTAL\t${lines.length - 1}\t${h8(lines.join("\n"))}`);
+  // ONE LINE PER KEY, not one hash for the lot. A single PALETTE hash says
+  // that the palette moved; it cannot say WHICH key moved — and "ramps were
+  // added and no existing key's hex changed", the whole claim of an additive
+  // palette commit, is exactly a per-key question. 62 keys beside 3,651
+  // sprites costs nothing, and the diff now names the key.
+  for (const k of [...KEYS].sort().reverse()) {
+    const hex = colourOf(k).map((n) => n.toString(16).padStart(2, "0")).join("");
+    lines.unshift(`PALETTE:${k}\t#${hex}\t${colourOf(k).join(",")}`);
+  }
+  lines.unshift(`PALETTE\t${KEYS.length} keys`);
+  lines.push(`TOTAL\t${lines.length - 1 - KEYS.length}\t${h8(lines.join("\n"))}`); // the count excludes the PALETTE header and its per-key lines
   return lines;
 }
 
@@ -66,9 +74,9 @@ const lines = dumpLines();
 const text = lines.join("\n") + "\n";
 
 if (args.includes("--write")) {
-  const had = existsSync(BASELINE) ? readFileSync(BASELINE, "utf8").split(/\r?\n/).filter(Boolean).length - 2 : 0;
+  const had = existsSync(BASELINE) ? readFileSync(BASELINE, "utf8").split(/\r?\n/).filter(Boolean).length - 2 - KEYS.length : 0;
   writeFileSync(BASELINE, text);
-  console.log(`art-dump: wrote ${lines.length - 2} sprites to docs/fixtures/art-baseline.txt (was ${had})`);
+  console.log(`art-dump: wrote ${lines.length - 2 - KEYS.length} sprites and ${KEYS.length} palette keys to docs/fixtures/art-baseline.txt (was ${had} sprites)`);
   console.log(`art-dump: ${lines[lines.length - 1]}`);
   process.exit(0);
 }
@@ -106,7 +114,7 @@ if (args.includes("--list")) {
 }
 
 if (!drift) {
-  console.log(`art-dump: ${now.size - 2} sprites and the palette, none moved — ${now.get("TOTAL")}`);
+  console.log(`art-dump: ${now.size - 2 - KEYS.length} sprites and ${KEYS.length} palette keys, none moved — ${now.get("TOTAL")}`);
   process.exit(0);
 }
 console.error(`art-dump: ${drift} sprite(s) drifted from docs/fixtures/art-baseline.txt`);

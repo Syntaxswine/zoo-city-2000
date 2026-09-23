@@ -24,6 +24,29 @@ export const RAMPS = {
   furWarm:  { keys: "wxyz",   hex: ["#4A2E1A", "#8A5A34", "#C48D5C", "#EBC9A0"] },
   furCool:  { keys: "WXYZ",   hex: ["#3A3D45", "#6E7380", "#A6ABB5", "#E4E6EA"] },
   olive:    { keys: "fghi",   hex: ["#2A2E1B", "#45492A", "#62663A", "#8A8B52"] },
+  // ---- added 2026-09-22 for the roofs (PROPOSAL-SPRITE-UPGRADE, T2.1) ----
+  //
+  // ADDITIVE: not one hex above this line moved, and the per-key lines in
+  // docs/fixtures/art-baseline.txt are what proves it rather than asserts it.
+  //
+  // Until now every roof in the city was `slate` or `concrete` and every
+  // "timber" was `earth` — the soil ramp standing in for wood. Three ramps
+  // close that, each with a consumer in this tier; `furDark` waits for the
+  // citizens in T4 rather than sitting here unused.
+  //
+  // TILE is the R roof. It is deliberately DARKER and more orange at every
+  // rung than `brick` (45/71/102/151 luminance), so a terracotta roof still
+  // separates from the brick wall under it instead of merging into one warm
+  // mass — the risk that made this the owner's Q3.
+  //
+  // NOTHING HERE MAY BE THE DARKEST KEY IN THE PALETTE. check-shadows.mjs
+  // pins the shadow key as a near-black within 3 of the palette's luminance
+  // floor (slate '<' 37.7, '+' 38.4). A new ramp whose dark rung undercuts
+  // that moves the floor and breaks the shadow's claim on it; these bottom
+  // out at 44.1, 54.1 and 69.1.
+  tile:     { keys: "BCDE",   hex: ["#46261C", "#6E3A24", "#9C552F", "#C47A45"] },
+  timber:   { keys: "LMNO",   hex: ["#3D352C", "#5E5344", "#85775F", "#AE9E82"] },
+  fabric:   { keys: "PQRS",   hex: ["#4C443C", "#71665A", "#9C8F7E", "#C8BCA8"] },
 };
 
 export const ACCENT = {

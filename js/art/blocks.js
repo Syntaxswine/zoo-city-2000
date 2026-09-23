@@ -31,17 +31,17 @@ import { box, litSkin, flatSkin, A_STEP } from "./solid.js";
 import { solidSprite, registerBlocks, KIT } from "./buildings.js";
 import { TREE_ROUND, TREE_TALL, TREE_WILLOW } from "./terrain.js";
 
-const { walled, doorAt, flipPlan, extentBox, BRICK, CONC, RUST, SLATE, EARTH, GRASS, SLATE_SKIN, C_ROOF, TIMBER, PLINTH, CONC_WALL, END_GLASS, AWNING, AWNING_M, SAWDUST, BRACKET, HOOK, LAMP, STEP, POST, brickGrain, ribGrain, ringGrain, TREE_REACH } = KIT;
+const { walled, doorAt, flipPlan, extentBox, BRICK, CONC, RUST, SLATE, EARTH, GRASS, SLATE_SKIN, C_ROOF, R_ROOF, I_ROOF, M_ROOF, ROOF_OF, TIMBER, PLINTH, CONC_WALL, END_GLASS, AWNING, AWNING_M, SAWDUST, BRACKET, HOOK, LAMP, STEP, POST, brickGrain, ribGrain, ringGrain, TREE_REACH } = KIT;
 
 // ---------------------------------------------------------------- shared
 
-/** A stepped hipped slate roof over [a0, a1] × [b0, b1] from height h: an eave slab and `steps` risers each inset `inset`. The cottage's roof, generalised. */
-function hipRoof(a0, a1, b0, b1, h, steps = 3, inset = 1.5) {
-  const out = [box(a0 - 0.5, a1 + 0.5, b0 - 0.5, b1 + 0.5, h, h + 1, SLATE_SKIN)];
+/** A stepped hipped roof over [a0, a1] × [b0, b1] from height h: an eave slab and `steps` risers each inset `inset`. The cottage's roof, generalised. `skin` is the ZONE's roof (T2.2) — slate only where a block has no zone. */
+function hipRoof(a0, a1, b0, b1, h, steps = 3, inset = 1.5, skin = SLATE_SKIN) {
+  const out = [box(a0 - 0.5, a1 + 0.5, b0 - 0.5, b1 + 0.5, h, h + 1, skin)];
   for (let i = 1; i <= steps; i++) {
     const k = inset * i;
     if (a1 - a0 - 2 * k < 1 || b1 - b0 - 2 * k < 1) break;
-    out.push(box(a0 + k, a1 - k, b0 + k, b1 - k, h + i, h + i + 1, SLATE_SKIN));
+    out.push(box(a0 + k, a1 - k, b0 + k, b1 - k, h + i, h + i + 1, skin));
   }
   return out;
 }
@@ -145,13 +145,13 @@ function terraceCourt() {
   const boxes = [
     // The back wing (along a, near the b = 0 edge): its side face looks onto the court.
     box(1, 31, 1, 10, 0, H, wallA),
-    ...hipRoof(1, 31, 1, 10, H, 3, 1.5),
+    ...hipRoof(1, 31, 1, 10, H, 3, 1.5, R_ROOF),
     chimney(26, 2, H + 8),
     box(12, 16, 7, 10.5, H + 1, H + 5, litSkin(BRICK, { grain: brickGrain, height: 4 })), // the dormer
-    box(11.5, 16.5, 6.5, 11, H + 5, H + 6, SLATE_SKIN),
+    box(11.5, 16.5, 6.5, 11, H + 5, H + 6, R_ROOF),
     // The left wing (along b, near the a = 0 edge): its end face looks onto the court.
     box(1, 10, 10, 31, 0, H, wallB),
-    ...hipRoof(1, 10, 10, 31, H, 3, 1.5),
+    ...hipRoof(1, 10, 10, 31, H, 3, 1.5, R_ROOF),
     chimney(2, 26, H + 8),
     // The garden wall round the court, a gate gap on each near side.
     gardenWall(10, 20, 30, 31), gardenWall(24, 31, 30, 31),
@@ -176,15 +176,15 @@ function towers() {
   const brick = (door) => walled(litSkin(BRICK, { grain: brickGrain, height: H }), H, { storey: 8, sill: 3, winH: 3, period: 4, winW: 2, from: 1, door });
   const boxes = [
     box(1, 47, 1, 12, 0, H, brick(doorAt(24, 6, 1.5))), // the back wing
-    box(0.5, 47.5, 0.5, 12.5, H, H + 1.5, SLATE_SKIN),
-    box(3, 45, 3, 10, H + 1.5, H + 3, SLATE_SKIN),
+    box(0.5, 47.5, 0.5, 12.5, H, H + 1.5, R_ROOF),
+    box(3, 45, 3, 10, H + 1.5, H + 3, R_ROOF),
     box(1, 12, 12, 40, 0, H, brick(doorAt(20, 6, 1.5))), // the left arm
-    box(0.5, 12.5, 12, 40.5, H, H + 1.5, SLATE_SKIN),
+    box(0.5, 12.5, 12, 40.5, H, H + 1.5, R_ROOF),
     box(35, 47, 12, 40, 0, H, brick(doorAt(20, 6, 1.5))), // the right arm
-    box(34.5, 47.5, 12, 40.5, H, H + 1.5, SLATE_SKIN),
+    box(34.5, 47.5, 12, 40.5, H, H + 1.5, R_ROOF),
     // The stair tower, a storey taller, a lamp on its cap.
     box(20, 28, 1, 9, H, H + 10, litSkin(BRICK, { grain: brickGrain, height: 10 })),
-    box(19.5, 28.5, 0.5, 9.5, H + 10, H + 11, SLATE_SKIN),
+    box(19.5, 28.5, 0.5, 9.5, H + 10, H + 11, R_ROOF),
     box(23, 25, 3, 5, H + 11, H + 13, LAMP),
     // Balcony strips on the arms' court-facing faces and the back wing's front.
     ...[1, 2, 3, 4].flatMap((k) => [box(11, 12, 14, 38, 8 * k, 8 * k + 1, SLATE_SKIN), box(35, 36, 14, 38, 8 * k, 8 * k + 1, SLATE_SKIN), box(14, 34, 11, 12, 8 * k, 8 * k + 1, SLATE_SKIN)]),
@@ -240,9 +240,9 @@ function arcade() {
     box(0.5, 31.5, 0.5, 24.5, H, H + 1, C_ROOF),
     // The pavilion: a glazed lantern on the roof, the clock tower on its cap, a lamp on top.
     box(9, 23, 6, 19, H + 1, H + 7, lantern),
-    box(8.5, 23.5, 5.5, 19.5, H + 7, H + 8, SLATE_SKIN),
+    box(8.5, 23.5, 5.5, 19.5, H + 7, H + 8, C_ROOF),
     box(13.5, 18.5, 10, 15, H + 8, H + 14, clock),
-    box(13, 19, 9.5, 15.5, H + 14, H + 15, SLATE_SKIN),
+    box(13, 19, 9.5, 15.5, H + 14, H + 15, C_ROOF),
     box(15, 17, 11.5, 13.5, H + 15, H + 17, LAMP),
     // The colonnade along the front: slab on posts, awnings between.
     box(1, 31, 24, 31, 10, 11.5, C_ROOF),
@@ -313,7 +313,7 @@ function mill() {
   const crate = litSkin(EARTH, { height: 2 });
   const boxes = [
     box(1, 31, 4, 24, 0, H, wall),
-    box(0.5, 31.5, 3.5, 24.5, H, H + 1, SLATE_SKIN),
+    box(0.5, 31.5, 3.5, 24.5, H, H + 1, I_ROOF),
     ...sawtooth(2, 30, 4, 24, H + 1, 5),
     chimney(27, 1, H + 32, 3),
     ...tank(2, 25, 8, 5),
@@ -339,12 +339,12 @@ function foundry() {
   const coal = flatSkin(SLATE[1], SLATE[0], SLATE[0]);
   const boxes = [
     box(1, 22, 1, 30, 0, HA, wallA),
-    box(0.5, 22.5, 0.5, 30.5, HA, HA + 1, SLATE_SKIN),
+    box(0.5, 22.5, 0.5, 30.5, HA, HA + 1, I_ROOF),
     ...sawtooth(2, 21, 1, 30, HA + 1, 5),
     box(26, 47, 1, 30, 0, HB, wallB),
-    box(25.5, 47.5, 0.5, 30.5, HB, HB + 1, SLATE_SKIN),
+    box(25.5, 47.5, 0.5, 30.5, HB, HB + 1, I_ROOF),
     box(30, 43, 8, 22, HB + 1, HB + 5, lantern),
-    box(29.5, 43.5, 7.5, 22.5, HB + 5, HB + 6, SLATE_SKIN),
+    box(29.5, 43.5, 7.5, 22.5, HB + 5, HB + 6, I_ROOF),
     // The conveyor bridge.
     box(22, 26, 12, 16, 11, 14, litSkin(SLATE, { height: 3 })),
     // Three stacks along the back.
@@ -385,9 +385,9 @@ function abattoir() {
   const counter = litSkin(BRICK, { grain: brickGrain, height: 3 });
   const boxes = [
     box(1, 22, 1, 20, 0, H, hall),
-    box(0.5, 22.5, 0.5, 20.5, H, H + 1, SLATE_SKIN),
+    box(0.5, 22.5, 0.5, 20.5, H, H + 1, M_ROOF),
     box(22, 31, 4, 16, 0, 10, annex),
-    box(21.5, 31.5, 3.5, 16.5, 10, 11, SLATE_SKIN),
+    box(21.5, 31.5, 3.5, 16.5, 10, 11, M_ROOF),
     chimney(1, 1, H + 12, 2.5),
     // The sign over the door.
     box(10, 10.5, 20, 21, 10, 10.5, BRACKET),
@@ -426,13 +426,13 @@ function meatExchange() {
   const sign = { top: () => SLATE[2], side: (a, k) => (a >= 2 && a < 2.5 && k >= 1 && k < 2 ? BRICK[3] : SLATE[1]), end: (b, k) => (b >= 2 && b < 2.5 && k >= 1 && k < 2 ? BRICK[3] : SLATE[0]) };
   const boxes = [
     box(1, 40, 1, 24, 0, H, hall),
-    box(0.5, 40.5, 0.5, 24.5, H, H + 1, SLATE_SKIN),
+    box(0.5, 40.5, 0.5, 24.5, H, H + 1, M_ROOF),
     box(10, 31, 7, 17, H + 1, H + 6, lantern),
-    box(9.5, 31.5, 6.5, 17.5, H + 6, H + 7, SLATE_SKIN),
+    box(9.5, 31.5, 6.5, 17.5, H + 6, H + 7, M_ROOF),
     box(40, 47, 1, 24, 0, 12, cold), // the east cold store
-    box(39.5, 47.5, 0.5, 24.5, 12, 13, SLATE_SKIN),
+    box(39.5, 47.5, 0.5, 24.5, 12, 13, M_ROOF),
     box(1, 12, 24, 34, 0, 12, cold), // the south cold store
-    box(0.5, 12.5, 23.5, 34.5, 12, 13, SLATE_SKIN),
+    box(0.5, 12.5, 23.5, 34.5, 12, 13, M_ROOF),
     chimney(42, 26, 30, 3),
     // The sign, the awning and the hooks along the hall's front.
     box(19, 19.5, 24, 25, 11.5, 12, BRACKET),
@@ -456,9 +456,9 @@ function newBlock(zone, side) {
   const hall = (a,b,w,d,h,roof = "hip") => {
     const ramp = zone === 1 ? BRICK : zone === 2 ? CONC_WALL : zone === 3 ? RUST : SLATE;
     out.push(box(a,a+w,b,b+d,0.6,h+0.6,walled(litSkin(ramp,{height:h,grain:zone===1?brickGrain:zone===3?ribGrain:undefined}),h,{storey:8,sill:3,winH:3,period:4,winW:2,from:1,endWindows:true,door:doorAt(w/2,6,1.3)})));
-    if(roof === "hip") out.push(...hipRoof(a,a+w,b,b+d,h+0.6,3,1.5));
+    if(roof === "hip") out.push(...hipRoof(a,a+w,b,b+d,h+0.6,3,1.5,ROOF_OF[zone]));
     else {
-      out.push(box(a-.5,a+w+.5,b-.5,b+d+.5,h+.6,h+1.6,SLATE_SKIN));
+      out.push(box(a-.5,a+w+.5,b-.5,b+d+.5,h+.6,h+1.6,ROOF_OF[zone]));
       if(roof === "saw") out.push(...sawtooth(a,a+w,b,b+d,h+1.6,5));
     }
   };

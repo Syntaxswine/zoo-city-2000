@@ -3,13 +3,15 @@
 import { box, litSkin, flatSkin } from "./solid.js";
 
 function legacyPlans(z, t, K) {
-  const { walled, doorAt, BRICK, CONC_WALL, RUST, SLATE_SKIN: roof, C_ROOF,
+  const { walled, doorAt, BRICK, CONC_WALL, RUST, ROOF: roof, C_ROOF,
     TIMBER: wood, AWNING, AWNING_M, HOOK, STEP, GRASS } = K;
   const material = z === 1 || z === 4 ? BRICK : z === 2 ? CONC_WALL : RUST;
   const skin = (h) => walled(litSkin(material, { height: h }), h,
     { door: doorAt(5), storey: z === 3 ? 10 : 8, sill: z === 2 && t === 1 ? 1 : 3, winH: z === 2 && t === 1 ? 5 : 3 });
   const body = (a, b, w, d, h, c = 0) => box(a, a + w, b, b + d, c, c + h, skin(h));
-  const cap = (a, b, w, d, c, h = 1) => box(a, a + w, b, b + d, c, c + h, z === 2 ? C_ROOF : roof);
+  // `roof` IS the zone's roof now (T2.2) — the kit hands it in, so C no
+  // longer needs naming here and R/I/M stop being slate by default.
+  const cap = (a, b, w, d, c, h = 1) => box(a, a + w, b, b + d, c, c + h, roof);
   const stack = (a, b, h, c = 0) => box(a, a + 2, b, b + 2, c, c + h, litSkin(RUST, { height: h }));
   const pitch = (a, b, w, d, c) => Array.from({ length: 4 }, (_, n) => cap(a + n, b + n, w - 2 * n, d - 2 * n, c + n));
   const garden = (a, b, w, d, c) => box(a, a + w, b, b + d, c, c + 1, flatSkin(GRASS[3], GRASS[1], GRASS[0]));
@@ -78,11 +80,11 @@ function legacyPlans(z, t, K) {
 
 /** Plans 4 and 5: named uses, rather than rotations of the same envelope. */
 export function extraPlans(z, t, K) {
-  const { walled, doorAt, BRICK, CONC_WALL, RUST, SLATE_SKIN, C_ROOF,
+  const { walled, doorAt, BRICK, CONC_WALL, RUST, ROOF, C_ROOF,
     TIMBER, AWNING, AWNING_M, HOOK, STEP, GRASS } = K;
   const material = z === 2 ? CONC_WALL : z === 3 ? RUST : BRICK;
   const shell = litSkin(material, {height:24});
-  const roof = z === 2 ? C_ROOF : SLATE_SKIN;
+  const roof = ROOF;
   const block = (a,b,w,d,h,c=0,skin=shell) => box(a,a+w,b,b+d,c,c+h,skin);
   const room = (a,b,w,d,h,c=0) => {
     const skin = walled(litSkin(material,{height:h,grain:(x,y)=>((x+3*y)&7)===0?-0.4:0}),h,
