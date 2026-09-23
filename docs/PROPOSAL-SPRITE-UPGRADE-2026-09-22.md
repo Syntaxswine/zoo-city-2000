@@ -394,9 +394,12 @@ The A/B is `docs/shots/sheet-windows.png` (`tools/window-sheet.mjs`).
   third ramp, worn until now only by awnings — with its slats a rung apart.
   The slat period is deliberately **sub-pixel at 1×**: it dithers two adjacent
   rungs into one warm mass at the zoom the game is played at and opens into
-  slats at 2× and 4×. A LIT blind alternates the lit key with pale fabric, so
-  at dusk — where the lit key is a fixed point and fabric is not — a backlit
-  blind goes to gold-and-dark stripes, which is what a backlit blind does.
+  slats at 2× and 4×. A LIT blind alternates the lit key with pale fabric, and
+  the measurement is the nicest accident in the item: `-` is 193.9 luminance
+  and `S` is 189.1, so **by day they are 4.8 apart and the blind barely reads
+  — and at dusk `-` is a fixed point while `S` is projected onto `R` at 144.5,
+  so the gap opens to 49.4 and the slats come out.** The one state that hides
+  at noon and shows at nightfall, which is what a backlit venetian blind does.
 
   **A fixture needs an occupant** (`lit >= 1`); a board needs age. An empty
   building has bare glass, which is both right and what keeps

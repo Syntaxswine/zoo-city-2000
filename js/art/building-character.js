@@ -106,7 +106,8 @@ const BOARD_PERIOD = 2.4, BOARD_DUTY = 1.15;
  * EVERY KEY A PANE MAY HOLD. `architecture-detail.js` needs this to know that
  * a blind still has a window frame round it, and `check-building-character`
  * asserts it against a list spelt out in the check file — a check that reads
- * this constant would be the code agreeing with itself (handoff trap 1).
+ * this constant would be the code agreeing with itself (the standing brief,
+ * "a check that reads the module's own constant", trap 3).
  */
 export const PANE_KEYS = Object.freeze(["=", "H", "-", "R", "Q", "P", "S", "d", "b", "M", "L", "<"]);
 

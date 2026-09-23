@@ -3570,6 +3570,20 @@ re-derived in the check file:
   hash that shares structure with the fixture hash leaves one of the three
   untouched.
 
+### The blind hides at noon and shows at nightfall
+
+Measured after the fact, and it is the nicest accident in the item. A lit
+blind alternates the lit key `-` with pale fabric `S` — 193.9 and 189.1
+luminance, **4.8 apart, which at 1× is very nearly nothing.** But `-` is one
+of dusk's fixed points and `S` is not: at nightfall `S` projects onto `R` at
+144.5, and **the gap opens to 49.4.** The one window state that is invisible
+at noon and pronounced in the evening, which is what a backlit venetian blind
+actually does. (The boarded pane's hole `<` is a fixed point too, for the
+opposite reason — it is already the palette's floor.) **No gate asserts it.**
+It is emergent, from two tables that do not know about each other, and it is
+recorded rather than given a check invented to protect it — the same call
+`ACCENT_RUNG` got in §44.
+
 **Mutation-tested 13 of 13**, and the first round left ONE survivor: *every
 window carries a blind*. It breaks no law — how many blinds is the right
 number of blinds is taste, and this gate holds no opinion on it — but "all of
