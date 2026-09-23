@@ -19,11 +19,22 @@ export function detailedRecipe(recipe) {
         const material = rampOf(key)?.name;
         // Timber seats and low fences get slats too, including the small park.
         if (material === "earth" && b.c1 >= 4 && face === "top" && mod(v, 1.5) < 0.2) return shift(key, -1);
-        if (face !== "top" && b.faces.glazing && glass(key)) {
+        // THE APERTURE IS WHERE THE GLASS WAS, not where the glass still is.
+        // building-character.js paints blinds, plants and boards INTO a pane
+        // (T3.1) and hangs `aperture` on the box saying where the bare skin's
+        // glass ran; without it a blinded pane would read as wall here and
+        // lose the jamb and sill the bare one gets, at 2× and 4× only. A
+        // recipe that never went through that pass has no `aperture` and falls
+        // back to the ink, which is what every base sprite still does — that
+        // is why the 1× dump and the close-up fixtures do not move.
+        const opening = b.faces.aperture
+          ? (uu, vv) => b.faces.aperture(face, uu, vv, x, y)
+          : (uu, vv) => glass(original(uu, vv, x, y));
+        if (face !== "top" && b.faces.glazing && opening(u, v)) {
           // Recessed jambs and sills follow the actual window aperture,
           // including continuous shopfront glazing and occupied windows.
-          const edgeU = !glass(original(Math.max(0, u - 0.22), v, x, y));
-          const edgeV = !glass(original(u, Math.min(height, v + 0.28), x, y));
+          const edgeU = !opening(Math.max(0, u - 0.22), v);
+          const edgeV = !opening(u, Math.min(height, v + 0.28));
           if (edgeU) return face === "side" ? "^" : "%";
           if (edgeV) return face === "side" ? "*" : "&";
           if (mod(u, 2) < 0.16 || mod(v, 3) < 0.16) return face === "side" ? "^" : "%";

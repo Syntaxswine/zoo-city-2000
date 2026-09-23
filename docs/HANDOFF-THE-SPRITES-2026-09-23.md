@@ -10,11 +10,11 @@ it the way I did.
 | document | what it is for |
 |---|---|
 | `docs/PROPOSAL-SPRITE-UPGRADE-2026-09-22.md` | **the list.** §4 is the checklist, each item with the verification written down *before* it was built. §2c is the five art gates. Cross things off there |
-| handoff §43, §44 (`HANDOFF-THE-FIRST-ZOO-2026-09-02.md`) | **the sessions.** What was measured on the day, and the twenty traps in two symptom-keyed tables |
-| this file | **the standing brief.** The laws, the instruments, what is proven against what is a guess, and the two tiers still open |
+| handoff §43, §44, §45 (`HANDOFF-THE-FIRST-ZOO-2026-09-02.md`) | **the sessions.** What was measured on the day, and the twenty-eight traps in three symptom-keyed tables |
+| this file | **the standing brief.** The laws, the instruments, what is proven against what is a guess, and what is still open |
 | `SPEC.md` §12, §13 | the design record. It outranks all three |
 
-Read this one and §4. Do not read §43 and §44 front to back until something
+Read this one and §4. Do not read §43, §44 and §45 front to back until something
 breaks; then read the trap tables, which are keyed by the symptom you are
 looking at.
 
@@ -70,12 +70,13 @@ carries its re-baselined receipt in the same commit.** That is what turns
 | tool | gate or instrument | what it says |
 |---|---|---|
 | `tools/art-dump.mjs` | **GATE** — exit 1, and the FIRST step of `npm run check` | one line per sprite (`name · w×h · anchor · ink · hash8`), one line per palette key, one `TOTAL`. Drift against `docs/fixtures/art-baseline.txt` fails |
-| `tools/check.mjs` | GATE, 970 checks | the footprint prism, the hi-res set's visibility, `allCitizens() === 3236`, 504 portraits |
+| `tools/check.mjs` | GATE, 980 checks (Part E is T3.1's) | the footprint prism, the hi-res set's visibility, `allCitizens() === 3236`, 504 portraits |
 | `tools/check-closeups.mjs` | GATE | 315 buildings, 2,688 citizens; a twin may not expand its silhouette |
 | `tools/check-shadows.mjs` | GATE, 22 checks | every recipe casts, one key only, the mask never lands on a standing sprite's pixels, shadows off is byte-exact |
 | `tools/check-dusk.mjs` | GATE, 113 checks | amount 0 is the ABSENCE of a table, no ramp inverts, the lights are fixed points, the ground takes less light than the walls |
 | `tools/faceprobe.mjs` | **passive instrument** — refuses nothing | how much of the city is roof, and how much of a roof is one bare quad. `--family`, `--top N` |
 | `tools/shadow-sheet.mjs`, `tools/dusk-sheet.mjs` | passive | one town, one camera, one process, only the knob moving |
+| `tools/window-sheet.mjs` | passive | 24 facades at 4× for the state ART, then a dense block through the real renderer at zoom 1, 2 and dusk for the only question that decides it — at the zoom the game is played at, is this a city of different windows or is it noise? |
 | `tools/play.mjs` | passive | the real renderer on a real mayor-built town. `--no-shadows`, `--shadow-k N`, `--dusk` |
 
 A gate refuses; an instrument reports. Do not make faceprobe refuse and do not
@@ -85,9 +86,9 @@ have not decided about yet.
 **The state of the tree as this is written:**
 
 ```
-art-dump    3651 sprites · 74 palette keys · TOTAL 86cc0399
+art-dump    3651 sprites · 74 palette keys · TOTAL 86cc0399   (T3.1 did not move it either)
 faceprobe   315 box recipes (of 387 registered) · TOP 63.4% · bare quad 43.0%
-suite       970 checks 0 failures · close-ups 315/2,688 · shadows 22 · dusk 113
+suite       980 checks 0 failures · close-ups 315/2,688 · shadows 22 · dusk 113 · Part E 18
 gates       art-dump → check → close-ups → shadows → dusk → suits → …
 ```
 
@@ -116,6 +117,12 @@ a proxy that happens to work.
 - Under the evening no ramp inverts, nothing is brighter than it was at noon,
   and the canopy is still darker than the grass — at every amount, in both
   tables.
+- A window state repaints a pixel the bare plan drew as glass and nothing
+  else, and nothing but a window state paints a pane key, at 1×, 2× and 4×,
+  across six appearances of all 192 glazed plans.
+- No window cell is both boarded and lit; no plant swallows its own pane;
+  every declared state paints at all three resolutions; and a building filling
+  up backlights strictly more of its cloth than it did before.
 - Art has not moved a sim hash, anywhere in the arc.
 
 **A guess.**
@@ -145,18 +152,37 @@ a proxy that happens to work.
   per-family numbers moved properly, because most of the 315 recipes have no
   deck wide enough to furnish. Do not quote the aggregate as if it measured
   the work.
+- **The window MIX is taste.** Three of sixteen cells get a blind, two get a
+  plant, and a board takes four cells in twenty-three at `wear 2` against one
+  at `wear 1`. Those five numbers were read off `sheet-windows.png` by me. The
+  gate holds only a floor — a fixture is an accent, and at every age most
+  windows are still just windows — because "how many blinds is the right
+  number of blinds" is not a thing a check can know.
+- **`BLIND_SLAT`, `PLANT_BAND`, `PLANT_HEAD`, `BOARD_PERIOD` are tuned against
+  rendered frames**, exactly like `dusk.js`'s constants. `PLANT_HEAD` is the
+  one with a reason behind it: the Roost's perch windows are 0.8 units tall.
 - **Nobody has played this.** Every frame in `docs/shots/` was taken by me,
-  through the real renderer, on a scripted town. No player has seen a shadow
-  or an evening in this game yet. Treat the owner's first reaction as data
-  that outranks all of the above.
+  through the real renderer, on a scripted town. No player has seen a shadow,
+  an evening or a drawn blind in this game yet. Treat the owner's first
+  reaction as data that outranks all of the above.
 
 ---
 
 ## Traps that are classes
 
-Twenty are recorded in §43 and §44, keyed by symptom. These are the ones that
+Twenty-eight are recorded in §43, §44 and §45, keyed by symptom. These are the ones that
 are not incidents — they will come back in Tier 3 and Tier 4.
 
+0. **TWO HASHES ARE NOT DECORRELATED BECAUSE THEIR COEFFICIENTS LOOK
+   DIFFERENT.** T3.1 drew a window's fixture with `(5cu + 11ck + 7phase + 3) &
+   15` beside the lights' `(3cu + ck + phase) & 3` and wrote a comment saying
+   the forms differ so they cannot lock. **5 ≡ 1 and 11 ≡ 3 mod 4**, which
+   makes the first form exactly `3·cell + 3 mod 4`: any linear form mod 2^n
+   reduces to a linear form mod 2^m, and two of those lock on an arithmetic
+   coincidence that reads as fine. Use an avalanche (`hash` in `terrain.js`)
+   and **measure the joint distribution before you believe either**. And note
+   what let it through for an afternoon: an EXISTENCE check ("both kinds
+   appear") cannot see a lock — you need a number that must MOVE.
 1. **A check that reads the module's own constant is the code agreeing with
    itself.** It has now happened twice: `check-shadows` asserting "every pixel
    is `SHADOW_KEY`" (re-point the constant and it passes), and `check-dusk`
@@ -198,25 +224,35 @@ are not incidents — they will come back in Tier 3 and Tier 4.
 
 ## The brief for Tier 3 — the living city
 
-Three items (§4 T3.1–T3.3). Start with T3.1; it is the one with a machine
-already waiting for it.
+Three items (§4 T3.1–T3.3). **T3.1 is built** (2026-09-23, §45); T3.2 and T3.3
+are open.
 
-**T3.1, window states.** `js/art/building-character.js` already does 90% of
-this. `characterSprite` computes a deterministic `phase` from the tile seed
-and a per-window `cell = (floor(u/2)*3 + floor(k/3) + phase) & 3`, then turns
-a glass key (`=`, `H`) into the lit key `-` when `cell < lit`. A window state
-is a widening of that one return: a small table keyed on `cell`, `lit`, `wear`
-and `phase`, giving a drawn blind, a plant, a cracked pane above a wear
-threshold. Three things will bite you:
+**T3.1, window states — BUILT, and what it left behind.** The widening itself
+was one return in one face function, exactly as this brief predicted. What it
+cost was everything around it, and three of those are now permanent facts
+about `js/art/building-character.js` that the next state to be added inherits:
 
-- **The pattern uses WORLD cells so 1× and 2× agree.** That comment in the
-  file is load-bearing; `check.mjs` proves the hi-res set is visible by
-  drawing the same town through `{ ...art, hires: null }` and demanding a
-  2×2-uniform frame. Anything keyed on screen pixels instead of world units
-  breaks it.
-- **`wear` runs first and explicitly skips `= H - +`** so it never paints over
-  glass. A new state must respect that ordering or wear will eat it.
-- **The cache key.** See trap 5.
+- **A pane key is not the same question as an aperture.** The box a character
+  sprite hands on carries an `aperture(face, u, k, x, y)` saying where the
+  BARE skin's glass ran, and `architecture-detail.js` asks it instead of
+  reading the ink — otherwise a blinded pane reads as wall at 2× and 4× and
+  loses the jamb and sill the bare one has. It answers about the bare skin and
+  never about what the pass painted; ask the wrapper and a state widens its
+  own aperture one probe at a time. A recipe that never went through the
+  character pass has no `aperture` and falls back to the ink, which is why no
+  fixture moved.
+- **`PANE_KEYS` is the contract**, and `check-building-character` holds it
+  against a list spelt out in the check file. Add a state, add its keys to
+  both.
+- **A cell is a THIRD glass on median.** Anything new that paints a fixed
+  sub-rectangle of a cell will paint nothing on a sixth of the city. Probe, or
+  paint the whole cell.
+
+And the two that were already written here, both still true: the pattern uses
+WORLD cells so 1× and 2× agree, and `wear` runs first and skips `= H - +` so
+it never paints over glass — a state that fires on glass and a wear streak
+that does not are disjoint by construction, which is what makes the
+ownership check in the gate a clean two-way claim.
 
 **T3.2, setbacks and awnings.** Diagnosis D3: R, C and I are still the same
 prism at a distance. This is recipe boxes, and the EMPORIUM already shows

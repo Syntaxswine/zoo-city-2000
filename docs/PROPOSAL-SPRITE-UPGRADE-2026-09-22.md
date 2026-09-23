@@ -363,8 +363,93 @@ them, which is the difference between an evening and an overcast afternoon.
 
 ### Tier 3 — the living city
 
-- [ ] **T3.1 — window states** in the `glazing` skin: blind drawn, plant,
-  cracked pane above a wear threshold — keyed on `lit` + wear + tile seed.
+**T3.1 BUILT 2026-09-23.** `tools/art-dump.mjs` on the finished tree:
+**3,651 sprites and 74 palette keys, none moved** — a window state adds no
+colour, the same claim T1.5 made and for the same reason: everything a pane
+can hold was already in the palette.
+The A/B is `docs/shots/sheet-windows.png` (`tools/window-sheet.mjs`).
+
+- [x] **T3.1 — window states** in the `glazing` skin. `characterSprite` turned
+  a glass key into the lit key when `cell < lit`; it now returns what the pane
+  HOLDS, from a small table keyed on the cell, the light and the age — a drawn
+  blind, a plant in the window, a boarded pane on a building old enough to
+  have lost one. Nothing hand-draws anything: it is still one return in one
+  face function, on the same 2×3 grid of world-unit cells the lights have used
+  since People E.
+
+  **THE APERTURE MEASUREMENT CAME FIRST AND IT DECIDED THE SHAPE OF EVERY
+  STATE.** Over the 192 glazed plans there are **17,473 window cells that
+  carry glass**, and a cell is on median **only a third glass** (2.0 of 6
+  world units²). Which third varies — **15.8% hold glass in the bottom third
+  only, 12.2% in the top third only** — and no horizontal slice of a cell is
+  favoured by more than three points. So a state that paints a fixed
+  sub-rectangle of the CELL paints nothing at all on a sixth of the city and
+  covers everything on another eighth. A state is therefore either
+  **whole-cell** — the blind and the board — or it is **found from the
+  aperture** by probing the skin underneath, which is the `edgeV` move
+  `architecture-detail.js` already makes to find its sills. Only the plant
+  needs it.
+
+  **The blind is geometry and a dither, not a new colour.** Fabric — T2.1's
+  third ramp, worn until now only by awnings — with its slats a rung apart.
+  The slat period is deliberately **sub-pixel at 1×**: it dithers two adjacent
+  rungs into one warm mass at the zoom the game is played at and opens into
+  slats at 2× and 4×. A LIT blind alternates the lit key with pale fabric, so
+  at dusk — where the lit key is a fixed point and fabric is not — a backlit
+  blind goes to gold-and-dark stripes, which is what a backlit blind does.
+
+  **A fixture needs an occupant** (`lit >= 1`); a board needs age. An empty
+  building has bare glass, which is both right and what keeps
+  `characterSprite(base, { majority })` changing nothing outside its species
+  socket.
+
+  **THE FIXTURE HASH WAS A FUNCTION OF THE LIGHTING HASH AND SEVEN CHECKS
+  WERE GREEN OVER IT.** The lights pick a cell with `(3cu + ck + phase) & 3`; the
+  fixtures were given `(5cu + 11ck + 7phase + 3) & 15`, chosen because (5, 11)
+  is not a multiple of (3, 1). It does not have to be: **5 ≡ 1 and 11 ≡ 3 mod
+  4** make the second form exactly `3·cell + 3 mod 4`. Any linear form mod 16
+  reduces to a linear form mod 4, and two of those lock together on a
+  coincidence you cannot see by reading them. Measured, it meant **cell class 1
+  could never carry a blind and classes 2 and 3 could never carry a plant**,
+  and the backlit cloth on a facade **did not move when the building filled
+  up** — 11,690 px at lit 1 and 11,690 at lit 2. Both hashes are now the
+  avalanche `hash` the terrain already uses; over 2,560 cells every (cell,
+  fixture) pair is populated within 10%. The board's own hand-rolled form was
+  biased the same way, more mildly — it boarded **21.4% of plant cells against
+  16.6% of plain ones** — and went the same way.
+
+  **The check written to catch that did not, and three read off the OUTPUT
+  replace it.** The first form asked only whether backlit and shaded cloth
+  both appear, which stayed true while the hashes were locked — blinds were
+  spread over three of the four cell classes, just never the same three as the
+  plants. An existence test cannot see a lock. Now: *filling a building
+  backlights more of its cloth and shades less* (the frozen number is the
+  tell); *every fixture turns up behind a lit pane and a dark one at every
+  light level* (under the lock there was not one unlit plant in the city at
+  lit 3); and *ageing a building costs it lit panes, blinds and plants alike*,
+  which fails if the board hash shares structure with anything.
+
+  **Two things were measured out.** The plant had a **pot** and it is gone:
+  earth under the leaves is 14 px of a facade's 54 at 4×, and
+  `architecture-detail`'s sill claims the bottom 0.28 of every aperture, so
+  nearly all of it was invisible — while at 1× the count inverts and a window
+  plant read as a BROWN pixel, the one colour on a brick wall that says
+  nothing. (The same move as the evening's `night` ramp.) And the plant's
+  downward probe **needed a second one looking up**: the owl landmark's perch
+  windows are 0.8 units tall, so a 1.4-unit band swallowed them whole, and *a
+  window plant sits in a pane and never swallows it* is a check that found
+  real art rather than a bad claim.
+
+  **The detail pass had to be told what an aperture is.** It runs OVER the
+  character pass at 2× and 4×, and draws its jambs and sills wherever the ink
+  is a glass key — so a blinded pane read as wall and lost its frame. The
+  character pass now hangs an `aperture` function on each glazing box saying
+  where the BARE skin's glass ran; a recipe that never went through that pass
+  has none and falls back to the ink, which is why the 1× dump and the
+  close-up fixtures do not move. It answers about the bare skin and never
+  about what the pass painted — ask the wrapper and a blind widens its own
+  aperture one probe at a time.
+
 - [ ] **T3.2 — setbacks and awnings** on R/C mid-tiers, so the skyline has
   profile (D3). Recipe boxes; the tower already shows the pattern.
 - [ ] **T3.3 — ground:** more grass variants, scatter keyed off tile index,
@@ -512,7 +597,10 @@ Only the genuinely undecided; everything else is decided above.
    **Q3's frame is every dusk shot there is**: terracotta is the one roof
    that still reads as its own material at nightfall.
 4. **Tier 2** on the rulings.
-5. Tier 3, Tier 4.
+5. **Tier 3** — T3.1 (window states) **DONE 2026-09-23**, its own commit for
+   the same reason T1.5 got one: it is raster-time rather than geometry, and
+   it needed a second predicate on the box (`aperture`) that T3.2's recipe
+   boxes have no use for. T3.2 and T3.3 next, then Tier 4.
 
 ---
 

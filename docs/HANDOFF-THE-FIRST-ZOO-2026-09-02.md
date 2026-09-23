@@ -3501,3 +3501,136 @@ rig         tools/play.mjs --dusk · same city, same month, sim hash 86cc1587 ei
 
 Maker's mark — Claude Opus 5, session 22: the one who built a ramp for the
 dark, measured it at a tenth of a luminance point, and took it out again.
+
+## 45. The pane — two hashes that turned out to be one, and the check that could not see it (session 22, 2026-09-23)
+
+The owner: *"lets keep going with the work in the handoff."* The standing
+brief says start at T3.1, because it is the one with a machine already waiting
+for it. It was right about that and wrong about how much of the work would be
+in the machine: `characterSprite` needed one return widened, and everything
+else in this section is about the two things around it.
+
+**The list is still `docs/PROPOSAL-SPRITE-UPGRADE-2026-09-22.md`.** §4's T3.1
+carries the measurements. This is the why and the traps.
+
+### The aperture is not the cell
+
+A window state has to paint inside the 2×3 grid of world-unit CELLS the lights
+have used since People E. So the first question is where, inside a cell, the
+glass actually is — and `scratchpad`'s aperture probe said something that
+decided the shape of all three states: over the 192 glazed plans there are
+**17,473 cells that carry glass, and a cell is on median only a THIRD glass**
+(2.0 of 6 world units²). Which third varies — 15.8% of cells hold glass in the
+bottom third only, 12.2% in the top third only — and **no horizontal slice is
+favoured by more than three points.**
+
+So a state that paints a fixed sub-rectangle of the cell paints nothing at all
+on a sixth of the city and covers everything on another eighth. A state is
+either **whole-cell** (the blind, the board) or **found from the aperture** by
+probing the skin underneath — which is the `edgeV` move
+`architecture-detail.js` already makes to find its sills. Only the plant needs
+it, and it costs two probes: one down for the sill, and one UP, which the owl
+landmark forced — the Roost's perch windows are 0.8 units tall and a 1.4-unit
+band swallowed them whole.
+
+### The two hashes were the same hash
+
+The lights pick a cell with `(3cu + ck + phase) & 3`. The fixtures were given
+`(5cu + 11ck + 7phase + 3) & 15`, and the comment beside it said, confidently,
+that (5, 11) is not a multiple of (3, 1) so the two are decorrelated. **It does
+not have to be a multiple. 5 ≡ 1 and 11 ≡ 3 mod 4**, which makes the second
+form exactly `3·cell + 3 mod 4`. Any linear form mod 16 reduces to a linear
+form mod 4, and two of those lock together on an arithmetic coincidence that
+reads as obviously fine.
+
+What it meant, measured: **cell class 1 could never carry a blind, and classes
+2 and 3 could never carry a plant.** And the share of backlit cloth on a
+facade did not move when a building filled up — 11,690 px at lit 1 and 11,690
+at lit 2, a number that has no business being equal twice.
+
+**Seven checks were green over it, including the one written to catch
+exactly this.** That check asked whether backlit and shaded cloth both appear, which
+stayed true: blinds were spread over three of the four cell classes, just
+never the same three as the plants. An existence test cannot see a lock.
+
+Both hashes are the terrain's avalanche `hash` now. The board's own linear
+form was biased the same way, more mildly — it boarded 21.4% of plant cells
+against 16.6% of plain ones — and went with it.
+
+### What replaced the check
+
+Three claims, every one read off the OUTPUT rather than off a formula
+re-derived in the check file:
+
+- **Filling a building backlights more of its cloth and shades less.** The
+  frozen number is the tell, and it is the one the lock could not fake.
+- **Every fixture turns up behind a lit pane and a dark one at every light
+  level.** Under the lock there was not one unlit plant in the city at lit 3.
+- **Ageing a building costs it lit panes, blinds AND plants alike.** A board
+  hash that shares structure with the fixture hash leaves one of the three
+  untouched.
+
+**Mutation-tested 13 of 13**, and the first round left ONE survivor: *every
+window carries a blind*. It breaks no law — how many blinds is the right
+number of blinds is taste, and this gate holds no opinion on it — but "all of
+them" is not a mix, it is a different feature. So the gate took a FLOOR and
+not a band: *a fixture is an accent, and at every age most windows are still
+just windows.* It is the same shape the chalk check ended up with in §44, for
+the same reason: derive a bar, never demand an exact share.
+
+| what you see | what it is |
+|---|---|
+| two hashes with plainly different coefficients producing a pattern that never varies | **any linear form mod 2^n reduces to a linear form mod 2^m.** `(5cu + 11ck)` beside `(3cu + ck)` is `3·cell + 3` mod 4, because 5 ≡ 1 and 11 ≡ 3. Coefficients that look unrelated tell you nothing. Avalanche it, and MEASURE the joint distribution before you believe it |
+| a decorrelation check passing over two locked hashes | **an existence test cannot see a lock.** "Both kinds appear" stayed true while blinds were confined to three cell classes. You need a number that must MOVE — the backlit share against the light level — and the tell is that it does not move at all |
+| a new pixel state reading as WALL at 2× and 4× but right at 1× | **`architecture-detail` runs OVER the character pass and finds its window frames by the INK.** A key it does not know is not an aperture, so the jamb and sill vanish. The character pass has to hand it an `aperture()` — and that must answer about the BARE skin, or a state widens its own aperture one probe at a time |
+| a pane state landing on a shopfront's blue floor tiles | **a skin may paint glass-blue where it does not mean a window.** The night market's `glazing` FUNCTION excludes them, and it is the discriminator for a state — but the detail pass must NOT consult it, because its fixtures already hold the jambs it draws round them. Two predicates, and they are not the same question |
+| a probe-found feature that swallows the whole window it sits in | **a probe that only looks ONE WAY has no idea how big the thing is.** A 1.4-unit band found from the bottom eats an 0.8-unit aperture whole (the owl landmark's perch windows). The second probe, looking up, is what leaves a head on every window and gives the smallest ones nothing |
+| a brand-new building reported as 4.3% boarded up | **a tally over the whole sprite credits every slate wall to the boards** and every fabric awning to the blinds. Count only where the BARE plan painted glass — and take the reference from the same species stamp, because a stamp grows the recipe's extent and an unmarked plan does not share a raster to index into |
+| five buildings placed three tiles apart and one of them in frame | **a road runs along a TILE axis, which on screen is a DIAGONAL.** Three tiles is 96 px across and 48 down; five of them walk 192 px off the bottom of the panel. A sheet that wants to compare facades places them on `tx + ty = const` |
+| fifteen documentation sheets changing under your commit | **measure the base rate before repairing a fixture.** The same fifteen changed on a tree with no working changes at all — they had been stale since before Tier 2. They went in a commit of their own, on an unchanged tree, so this one's four could be read |
+
+### The state of it
+
+```
+art-dump    3651 sprites · 74 palette keys · TOTAL 86cc0399   (UNCHANGED by T3.1)
+sheet       docs/shots/sheet-windows.png — 24 close-ups at 4×, a dense block at zoom 1, 2 and 2-at-dusk
+suite       980 checks 0 failures · Part E 8 → 18 assertions · NPM_EXIT=0
+gates       art-dump → check (Part E) → close-ups → shadows → dusk → suits → …
+cells       10,679 window cells, lit 3 · wear 2: light 40.8% · board 21.1% · blind 16.8% · glass 15.7% · plant 5.7%
+browser     a 191-lot district at zoom 4, no console messages; the pane keys counted OFF THE LIVE CANVAS
+            — lit 4,953 px · backlit cloth 549 · shaded cloth 200 · glass 1,558; a warm draw is 1.6 ms
+```
+
+**And the cache key is why the cost does not matter.** A plant costs two
+probes per glass pixel and the detail pass asks `aperture` three times per
+glass pixel at 4×, which sounds expensive until you notice that
+`characterSprite` keys on `lit:species:phase:wear` and **`phase` is two bits**
+— so a whole city has at most a few hundred distinct building appearances, and
+every one of them is generated once. (That also ate the first three attempts
+to time this in the browser: fresh seeds do not make fresh sprites, and the
+"cold" measurement was measuring the cache.)
+
+### What is open
+
+- **T3.2 — setbacks and awnings.** The one the brief warns about: the pattern
+  is the **emporium** in `blocks.js`, not the tower, and the gate that will
+  bite is the footprint prism, because a works' roof is flush at `a = 0` and a
+  straddling awning hangs a pixel over the neighbour.
+- **T3.3 — ground variety.** Note the ground now has a SECOND reader:
+  `duskTable(amount, true)`, the flat table. A new ground key is a key at dusk
+  too, and `check-dusk` paints the lawn with the ground's table key for key.
+- **Tier 4 — the animals.** Fourteen species, **eight coats**: raccoon, wolf
+  and skunk are the same colour, so are fox and cat, rabbit and pig, mouse and
+  cow, beaver and bear, and the hawk is painted in `earth` — the soil ramp
+  standing in for feathers. Six of fourteen wear somebody else's coat, and
+  that is cheaper to fix than any of the authored art beneath it.
+- **Q1, the shadow length, is still the owner's.**
+- **The window MIX is taste and the gate only holds a floor.** Three cells in
+  sixteen get a blind, two get a plant, four in twenty-three board at `wear 2`
+  against one at `wear 1`. Those five numbers came off the sheet, and the only
+  thing asserted about them is that a fixture stays an accent.
+- **Nobody has played this.** Not a shadow, not an evening, not a drawn blind.
+
+Maker's mark — Claude Opus 5, session 22: the one who wrote a comment
+explaining why two hashes could not possibly lock, and then measured them
+locked. The comment is still there, and it now says what it got wrong.
