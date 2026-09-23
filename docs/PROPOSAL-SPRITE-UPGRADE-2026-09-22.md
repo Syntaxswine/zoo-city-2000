@@ -142,6 +142,11 @@ that existed yesterday move?" — a question answerable by a dump-and-diff
 
 ---
 
+**Whoever picks this up next: read `docs/HANDOFF-THE-SPRITES-2026-09-23.md`
+first.** It is the standing brief for the art system — the laws, the
+instruments, what is proven against what is a guess, the traps that are
+classes, and a directed brief for Tiers 3 and 4. This file is the checklist.
+
 ## §4 THE LIST
 
 Crossed off only when the verification named beside it has been *run* and its

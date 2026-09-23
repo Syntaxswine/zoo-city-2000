@@ -3373,6 +3373,13 @@ closed.
 the document to read.** §4's T1.5 carries the measurements and §5 Q2 the
 answer. This section is the why and the traps.
 
+**And the arc now has a standing brief:** `docs/HANDOFF-THE-SPRITES-2026-09-23.md`
+— the laws of this art system, which instruments refuse and which only report,
+an honest inventory of what is PROVEN against what is a GUESS, the eight traps
+from §43 and §44 that are classes rather than incidents, and a directed brief for
+Tier 3 and Tier 4. That is the one to hand a successor; §43 and §44 are the
+sessions behind it.
+
 **Nothing in `js/sim/` was touched, and nothing in the art registry either.**
 `docs/fixtures/art-baseline.txt` does not appear in the diff: 3,651 sprites,
 74 palette keys, `TOTAL 86cc0399` — byte for byte the fixture Tier 2 left
