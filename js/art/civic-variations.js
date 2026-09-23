@@ -3,6 +3,13 @@
 import { TREE_ROUND, TREE_TALL, TREE_WILLOW } from './terrain.js';
 import { box, flatSkin, litSkin } from './solid.js';
 import { KIT, solidSprite, civicSprite, registerCivicVariations } from './buildings.js';
+import { dress } from "./roof-furniture.js";
+
+
+// Roof furniture for a civic campus: the rail, a plant room, a vent — and
+// GREY, because grey is how a player tells a civic from a zoned building
+// now that the zones carry colour (roof-furniture.js, T2.3).
+const dressCivic = (boxes) => dress(boxes, 0);
 const { BRICK, CONC, CONC_WALL, GRASS, RUST, TIMBER, SLATE_SKIN, C_ROOF, walled, doorAt } = KIT;
 const lawn = flatSkin(GRASS[3], GRASS[1], GRASS[0]);
 const paving = flatSkin(CONC[3], CONC[2], CONC[1]);
@@ -106,7 +113,7 @@ function layout(kind, side, v) {
 export const CIVIC_VARIANT_ROSTER = [['park',1],['largePark',2],['largePark',3],['fire',1],['fire',3],['police',1],['police',3],['centre',1],['centre',3],['zoo',3],['library',2],['gallery',2],['university',3],['amphitheater',3],['farm',2],['cemetery',2],['cemetery',6],['doctor',2],['hospital',3],['sanitation',3],['garbage',2]];
 export const CIVIC_VARIANT_FAMILIES = CIVIC_VARIANT_ROSTER.map(([kind,side])=>{
   const base=civicSprite(kind,side), n=side*16;
-  const alternatives=[1,2].map(v=>{const {boxes,stamps}=layout(kind,side,v);return solidSprite(`civic-${kind}-${side}x${side}-layout-${v}`,boxes,{hub:n/2,footprint:[side,side],tags:['civic',kind],stamps,extent:[box(0,n,0,n,0,52*Math.sqrt(side/3),{})]});});
+  const alternatives=[1,2].map(v=>{const {boxes,stamps}=layout(kind,side,v);return solidSprite(`civic-${kind}-${side}x${side}-layout-${v}`,dressCivic(boxes),{hub:n/2,footprint:[side,side],tags:['civic',kind],stamps,extent:[box(0,n,0,n,0,52*Math.sqrt(side/3),{})]});});
   registerCivicVariations(base,alternatives);
   return {kind,side,sprites:[base,...alternatives]};
 });

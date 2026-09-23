@@ -29,6 +29,7 @@
 
 import { box, litSkin, flatSkin, A_STEP } from "./solid.js";
 import { solidSprite, registerBlocks, KIT } from "./buildings.js";
+import { dress as dressRoof } from "./roof-furniture.js";
 import { TREE_ROUND, TREE_TALL, TREE_WILLOW } from "./terrain.js";
 
 const { walled, doorAt, flipPlan, extentBox, BRICK, CONC, RUST, SLATE, EARTH, GRASS, SLATE_SKIN, C_ROOF, R_ROOF, I_ROOF, M_ROOF, ROOF_OF, TIMBER, PLINTH, CONC_WALL, END_GLASS, AWNING, AWNING_M, SAWDUST, BRACKET, HOOK, LAMP, STEP, POST, brickGrain, ribGrain, ringGrain, TREE_REACH } = KIT;
@@ -123,9 +124,15 @@ function family(name, zoneLetter, side, make, { stamps = [], tags = [] } = {}) {
   const hub = (A_STEP * side) / 2;
   const n = 16 * side;
   const opts = (st) => ({ hub, footprint: [side, side], tags: ["building", "block", zoneLetter, ...tags], extent: stamps.length ? [extentBox(0, n, 0, n, 0, TREE_REACH)] : [], stamps: st });
+  // THE BLOCKS CARRY THE MOST ROOF IN THE GAME — the 3×3 families run 53–75%
+  // top face against a 1×1's 24–60% — so furnishing the small families and
+  // stopping would have left the biggest surfaces bare. Same `furnish`, same
+  // exposed-deck rule (T2.3).
+  const zone = { R: 1, C: 2, I: 3, M: 4 }[zoneLetter];
+  const dress = (plan, v) => dressRoof(plan, zone, v);
   return [
-    solidSprite(`${zoneLetter}${side}x${side}-${name}-0`, boxes, opts(stamps)),
-    solidSprite(`${zoneLetter}${side}x${side}-${name}-1`, flipPlan(boxes), opts(mirrorStamps(stamps))),
+    solidSprite(`${zoneLetter}${side}x${side}-${name}-0`, dress(boxes, 0), opts(stamps)),
+    solidSprite(`${zoneLetter}${side}x${side}-${name}-1`, dress(flipPlan(boxes), 1), opts(mirrorStamps(stamps))),
   ];
 }
 

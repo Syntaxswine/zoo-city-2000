@@ -5,6 +5,13 @@ import { box, flatSkin, litSkin } from "./solid.js";
 import { solidSprite, registerLargeCivics, KIT } from "./buildings.js";
 import { BLOCK_KIT } from "./blocks.js";
 import { TREE_ROUND, TREE_TALL, TREE_WILLOW } from "./terrain.js";
+import { dress } from "./roof-furniture.js";
+
+
+// Roof furniture for a civic campus: the rail, a plant room, a vent — and
+// GREY, because grey is how a player tells a civic from a zoned building
+// now that the zones carry colour (roof-furniture.js, T2.3).
+const dressCivic = (boxes) => dress(boxes, 0);
 
 const { BRICK, CONC, CONC_WALL, EARTH, SLATE, GRASS, TIMBER, SLATE_SKIN,
   C_ROOF, STEP, LAMP, BLUE_LAMP, POST, walled, doorAt, brickGrain } = KIT;
@@ -181,7 +188,7 @@ const TREES = {
   zoo: [],
 };
 export const LARGE_CIVICS = Object.freeze(Object.fromEntries(Object.entries(PLANS).map(([kind, make]) =>
-  [kind, solidSprite(`civic-${kind}-3x3`, make(), { hub: 24, footprint: [3, 3], tags: ["civic", "civic-large", kind],
+  [kind, solidSprite(`civic-${kind}-3x3`, dressCivic(make()), { hub: 24, footprint: [3, 3], tags: ["civic", "civic-large", kind],
     stamps: TREES[kind], extent: [box(0,48,0,48,0,52,{})] })])));
 registerLargeCivics(LARGE_CIVICS);
 export const allLargeCivics = () => Object.values(LARGE_CIVICS).map(sprite => ({name: sprite.name, sprite}));

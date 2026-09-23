@@ -3,6 +3,13 @@
 // distinctly at the game's smallest zoom.
 import { box, flatSkin } from "./solid.js";
 import { solidSprite, registerCivicKind, KIT } from "./buildings.js";
+import { dress } from "./roof-furniture.js";
+
+
+// Roof furniture for a civic campus: the rail, a plant room, a vent — and
+// GREY, because grey is how a player tells a civic from a zoned building
+// now that the zones carry colour (roof-furniture.js, T2.3).
+const dressCivic = (boxes) => dress(boxes, 0);
 const { GRASS, CONC, TIMBER, SLATE_SKIN } = KIT;
 const lawn = flatSkin(GRASS[3], GRASS[1], GRASS[0]);
 const stone = flatSkin(CONC[3], CONC[2], CONC[1]);
@@ -44,7 +51,7 @@ function plan(kind, side) {
 }
 export const INFRASTRUCTURE_CIVICS = Object.freeze(Object.fromEntries([["farm", 2], ["cemetery", 2], ["cemetery", 6], ["sanitation", 3], ["garbage", 2], ["doctor", 2], ["hospital", 3]].map(([kind, side]) => {
   const n = side * 16;
-  const sprite = solidSprite(`civic-${kind}-${side}x${side}`, plan(kind, side), {
+  const sprite = solidSprite(`civic-${kind}-${side}x${side}`, dressCivic(plan(kind, side)), {
     hub: n / 2, footprint: [side, side], tags: ["civic", kind],
     extent: [box(0, n, 0, n, 0, 20, {})],
   });

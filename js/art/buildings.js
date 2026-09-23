@@ -33,6 +33,7 @@ import { defineSprite, part, toRows, T } from "./format.js";
 import { keysOf } from "./palette.js";
 import { TREE_ROUND, TREE_TALL, TREE_WILLOW, RUBBLE, groundSprite, hash } from "./terrain.js";
 import { extraPlans } from "./building-plans.js";
+import { dress as dressRoof } from "./roof-furniture.js"; // T2.3 — something on the 66%
 import { characterSprite, socketsFor } from "./building-character.js";
 import { shopKind } from "../sim/shops.js";
 
@@ -72,6 +73,7 @@ const I_ROOF = flatSkin(RUST[2], RUST[1], RUST[0]);
 const M_ROOF = flatSkin(SLATE[1], SLATE[0], SLATE[0]);
 const ROOF_OF = { 1: R_ROOF, 2: C_ROOF, 3: I_ROOF, 4: M_ROOF };
 const TIMBER = flatSkin(EARTH[4], EARTH[3], EARTH[2]);
+
 const PLINTH = flatSkin(GRASS[3], GRASS[1], GRASS[0]);
 // The commercial wall is concrete one rung DOWN from the ramp's top: with
 // the full ramp the side face came out '*' (#A3ADB8), ten luminance points
@@ -608,10 +610,15 @@ for (const zone of [1, 2, 3, 4]) {
     const [name, make] = FAMILY[zone][tier];
     const boxes = make();
     const additions = extraPlans(zone, tier, { walled, doorAt, BRICK, CONC_WALL, RUST, SLATE_SKIN, C_ROOF, ROOF: ROOF_OF[zone], TIMBER, AWNING, AWNING_M, HOOK, STEP: flatSkin(CONC[4], CONC[3], CONC[2]), GRASS });
+    // ROOF FURNITURE (T2.3) is added per VARIANT, after the plan is whole and
+    // before the sprite is made, so `furnish` reads the finished boxes — a
+    // chimney, a sawtooth, a tower over a podium — and lays its rails and
+    // tanks on what is actually exposed to the sky.
+    const dress = (plan, n) => dressRoof(plan, zone, n);
     BUILDINGS[zone][tier] = [
-      solidSprite(`${ZONE_LETTER[zone]}${tier}-${name}-0`, boxes, { tags: ["building", ZONE_LETTER[zone]] }),
-      solidSprite(`${ZONE_LETTER[zone]}${tier}-${name}-1`, flipPlan(boxes), { tags: ["building", ZONE_LETTER[zone]] }),
-      ...additions.map((plan, n) => solidSprite(`${ZONE_LETTER[zone]}${tier}-${name}-${n + 2}`, plan, { tags: ["building", ZONE_LETTER[zone]] })),
+      solidSprite(`${ZONE_LETTER[zone]}${tier}-${name}-0`, dress(boxes, 0), { tags: ["building", ZONE_LETTER[zone]] }),
+      solidSprite(`${ZONE_LETTER[zone]}${tier}-${name}-1`, dress(flipPlan(boxes), 1), { tags: ["building", ZONE_LETTER[zone]] }),
+      ...additions.map((plan, n) => solidSprite(`${ZONE_LETTER[zone]}${tier}-${name}-${n + 2}`, dress(plan, n + 2), { tags: ["building", ZONE_LETTER[zone]] })),
     ];
   }
 }

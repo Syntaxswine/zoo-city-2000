@@ -237,13 +237,60 @@ k=0.55 **7.96%** · k=1.2 **10.30%**.
   claimed, and the per-sprite ink column is what proves it did not.
   **The top-face share is unmoved at 66.1%**, exactly as predicted — this item
   is colour, and T2.3 is the one that must move that number.
-- [ ] **T2.3 — roof furniture.** Parapet ring (one rung lighter on its top =
-  instant depth), stair head, tank on legs, vents, laundry lines on R, ducting
-  on I, a roof garden on affluent addresses. All recipe boxes, deterministic
-  off the variant byte that already exists. *This is the item D2 is about.*
-  *Verify:* roof-face share **falls** measurably (that is the point — it is the
-  number this item exists to move); prism gate G2 green on every changed plan;
-  no footprint or anchor moves.
+- [x] **T2.3 — roof furniture.** `js/art/roof-furniture.js`. Parapet rails,
+  stair heads and plant rooms, vents, a water tank on legs for I, extractor
+  stacks for M, washing on a line for R (which is what `fabric` was added
+  for), and the grey rail-plus-vent kit for the civic campuses.
+
+  **IT IS FOUND, NOT PLACED.** Hand-placing furniture on 315 recipes is 315
+  chances to put a tank through a roof. `decksOf` reads the boxes a recipe
+  already has and returns the top faces EXPOSED TO THE SKY; the furniture is
+  laid on those, so a family that changes shape keeps its furniture. The idea
+  is `building-character.js`'s — `socketsFor` already asks the z-buffer for a
+  building's most visible roof point, which is how the occupancy lights and
+  species stamps find their spot — widened from one point to every deck.
+
+  *A rail belongs on a flat roof, not a pitched one.* The first pass railed
+  every deck ≥ 6×6 and the hipped R roofs — a stepped slope IS four inset
+  decks — came out as **concentric bullseyes on every house in the scene**. A
+  step of a pitch carries the next step on ~77% of its area; a flat roof
+  carries a plant box on a few per cent. `coveredShare < 0.35` is that
+  difference, and no family has to declare itself.
+
+  **Applied to all four zones at 1×1, the 2×2/3×3 blocks, and the civics.**
+  The blocks were not optional: they run 53–75% top face against a 1×1's
+  24–60%, so furnishing the small families and stopping would have left the
+  biggest roofs in the game bare. Civics keep grey — shape, not hue.
+
+  **Measured.** Aggregate **TOP 66.1% → 63.4%**. But the headline share is a
+  poor reading of this work and it is worth saying so: *a parapet's cap is
+  itself a top face*, so railing every flat roof in the game moved it four
+  tenths of a point before the blocks and civics were added. What D2 actually
+  complained about was the roof being **one undifferentiated quad**, so
+  `faceprobe` now also reports the **bare share** — of a building's roof
+  pixels, how many belong to its single biggest flat plane. On the families
+  the work reached, both move properly:
+
+  | family | roof | bare quad |
+  |---|---|---|
+  | `C2-store` | 42% → 38% | **77% → 56%** |
+  | `I1-shed` | 61% → 54% | **68% → 44%** |
+  | `M1-stall` | 69% → 58% | **62% → 38%** |
+  | `C3-tower` | 27% → 24% | **55% → 33%** |
+  | `M3-cold-store` | 39% → 36% | **55% → 39%** |
+  | `I3-works` | 37% → 33% | **61% → 43%** |
+  | `R3-apartment` | 37% → 35% | 43% → 36% |
+  | `R1-cottage` | 65% → 60% | 22% → 23% *(a pitch, correctly unrailed)* |
+
+  The aggregate bare share barely moves (43.8% → 43.0%) because most of the
+  315 recipes — the cemetery's grave plots, the shops, the landmarks — have
+  no deck wide enough to furnish at all. That is a fact about the aggregate,
+  not about the roofs that changed, and the before/after was taken on a git
+  worktree of the previous tip with the *same* instrument copied in.
+
+  **And the furniture casts.** The shadow pass went from 9,640 to 9,748 px on
+  the same frame without a line of shadow code being touched — a rail and a
+  tank are boxes, and the shadow was built from the boxes.
 
 ### Tier 3 — the living city
 
