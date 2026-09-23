@@ -27,6 +27,8 @@ import { allGovernor } from './governor.js';
 //   art.zot(kind)                       'noroad' | 'smog' | 'nojob' | 'nodemand'
 //   art.waterTint(frame)                key map for the water cycle, frame mod WATER_FRAMES (4)
 //   art.hires(sprite, scale=2)          a 2×/4× detailed twin of a solid, ground or citizen; null for sprites without a detail kit
+//   art.shadow(sprite, {k, scale})      the ground mask a box solid casts (shadow.js); null for a billboard
+//   art.billboardShadow(sprite, {scale}) the contact ellipse under a citizen, tree or glyph
 //   art.bubble(w, h)                    reserved for Part A
 //   art.portrait(species, opts)         16×16 face; opts.age/look/expression
 //   art.mark(species)                   6×6 stamp for the majority residents/staff
@@ -48,6 +50,7 @@ import { allMansion, MANSION } from "./mansion.js"; // the mansion (SPEC §9f)
 import { markSprite, characterSprite, MARKS } from "./building-character.js";
 import { allCivicVariations } from "./civic-variations.js";
 import { hires } from "./hires.js";
+import { shadow, billboardShadow } from "./shadow.js"; // what a solid puts on the ground (SPEC §12)
 import { roadSprite, bridgeSprite, allRoads } from "./roads.js";
 import { wallSprite, tunnelSprite, allWalls } from "./walls.js";
 import { railSprite, railBridgeSprite, stationSprite, crossingSprite, allRail } from "./rail.js";
@@ -157,6 +160,8 @@ export const art = Object.freeze({
   waterTint,
   WATER_FRAMES,
   hires,
+  shadow,
+  billboardShadow,
 });
 
 /** Every sprite the registry can hand out, named — the check.mjs audit walks this. */

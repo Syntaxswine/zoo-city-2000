@@ -34,6 +34,7 @@ import { lightLevel } from "./art/building-character.js";
 import { buildingAge, wearLevel } from "./sim/building-age.js";
 import { toScreen, toWorld, pickTile, HALF_H, HALF_W, TILE_W, TILE_H } from "./iso/iso.js";
 import { paintScene, Z_BUILDING } from "./iso/painter.js";
+import { SHADOW_K, SHADOW_ALPHA, CONTACT_ALPHA } from "./art/shadow.js";
 import { rasterize } from "./art/format.js";
 import { floodplain } from "./sim/progression.js";
 import { ZONE, CIVIC, TERRAIN, ROAD, capacityOf, isPart, anchorOf, sideOf, civicAnchorOf, civicSideOf } from "./sim/world.js";
@@ -169,6 +170,86 @@ export function createRenderer(canvas, initialWorld, art) {
     }
     c.setTransform(base.z / S, 0, 0, base.z / S, base.tx, base.ty);
     c.drawImage(raster(h, tint), S * (sx + sprite.anchor[0]) - h.anchor[0], S * (sy + sprite.anchor[1]) - h.anchor[1]);
+  }
+
+  // ---- shadows ---------------------------------------------------------------------
+  //
+  // THE MASK IS UNIONED BEFORE IT IS DARKENED. Two neighbouring buildings'
+  // shadows overlap constantly, and blitting each at alpha would compound
+  // where they cross — a dense block would silt up into a dark smear that no
+  // single building casts. So each pass paints its masks OPAQUE into a
+  // scratch canvas, which is then blitted once at its alpha: the union, at
+  // one density, however many things overlap. Two passes, because two
+  // densities are wanted and one blit can only carry one — the cast mask
+  // (k = SHADOW_K) first, then the contact mask (the same solids at k = 0,
+  // plus the billboards' ellipses) over it.
+  //
+  // A shadow is drawn AFTER the ground layer and BEFORE the standing pass, so
+  // it lands on grass, chalk, asphalt and water without the sprite having to
+  // know which — and the ground layer, which is only rebuilt when the camera
+  // leaves its margin, never has to be rebuilt for a shadow at all.
+  // The shadow knobs live on the renderer so one rig can shoot the A/B (the
+  // proposal's §5 Q1) without a second tree: k = 0 is a contact patch that
+  // never crosses a road, k = 0.55 a tower's shadow across the street.
+  let shadowsOn = true, shadowK = SHADOW_K, shadowAlpha = SHADOW_ALPHA, contactAlpha = CONTACT_ALPHA;
+  let scratch = null;
+  function scratchFor() {
+    if (!scratch) scratch = document.createElement("canvas");
+    if (scratch.width !== canvas.width || scratch.height !== canvas.height) {
+      scratch.width = canvas.width;
+      scratch.height = canvas.height;
+    }
+    return scratch;
+  }
+  /** Blit a shadow mask like blitScaled does a solid, but resolving the twin through art.shadow at scale S. */
+  function blitMask(c, base, S, item, sx, sy) {
+    const one = item.sprite;
+    // THE SHADOW FOLLOWS THE DETAIL SWITCH. `S > 1 && art.hires` is the same
+    // condition blitScaled uses, and it is not a formality: check.mjs proves
+    // the hi-res set is visible by drawing the same town through
+    // `{ ...art, hires: null }` and demanding a 2×2-uniform frame. A shadow
+    // that resolved its own 2× mask regardless put sub-block detail into that
+    // frame (719 non-uniform blocks where there must be none) — the detail
+    // scale is one concept for the whole pass, and the shadow is part of it.
+    if (S === 1 || !art.hires || !item.source) {
+      c.setTransform(base.z, 0, 0, base.z, base.tx, base.ty);
+      c.drawImage(raster(one), sx, sy);
+      return;
+    }
+    const big = item.billboard
+      ? art.billboardShadow(item.source, { scale: S, width: item.width })
+      : art.shadow(item.source, { k: item.k, scale: S });
+    if (!big) {
+      c.setTransform(base.z, 0, 0, base.z, base.tx, base.ty);
+      c.drawImage(raster(one), sx, sy);
+      return;
+    }
+    c.setTransform(base.z / S, 0, 0, base.z / S, base.tx, base.ty);
+    c.drawImage(raster(big), S * (sx + one.anchor[0]) - big.anchor[0], S * (sy + one.anchor[1]) - big.anchor[1]);
+  }
+  /** Paint one union pass and lay it down at `alpha`. Returns the number of masks drawn. */
+  function paintShadowPass(masks, base, S, alpha) {
+    if (!masks.length) return 0;
+    const s = scratchFor();
+    const sc = s.getContext("2d");
+    sc.setTransform(1, 0, 0, 1, 0, 0);
+    sc.clearRect(0, 0, s.width, s.height);
+    const n = paintScene(masks, (sprite, sx, sy, item) => blitMask(sc, base, S, item, sx, sy + (item.dy || 0)));
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.globalAlpha = alpha;
+    ctx.drawImage(s, 0, 0);
+    ctx.globalAlpha = 1;
+    ctx.setTransform(base.z, 0, 0, base.z, base.tx, base.ty);
+    return n;
+  }
+  // Which billboards get a contact ellipse, and how wide a one relative to
+  // their own sprite. A citizen is narrower than its 12 px box (ears, tail),
+  // a tree fills its own; an 'overlay', 'glyph' or 'zot' is not standing on
+  // the ground at all and gets none.
+  const BILLBOARD_SHADOW = { citizen: 0.3, tree: 0.4, extra: 0.35 };
+  function billboardWidth(sprite) {
+    for (const tag of sprite.tags) if (tag in BILLBOARD_SHADOW) return BILLBOARD_SHADOW[tag];
+    return 0;
   }
 
   // ---- geometry -------------------------------------------------------------------
@@ -635,6 +716,34 @@ export function createRenderer(canvas, initialWorld, art) {
         }
       }
     }
+    // THE SHADOWS, derived from the very items about to be painted — one
+    // place, so anything that stands casts without a second push at each of
+    // the twenty call sites above. A solid with boxes throws its sheared
+    // rectangle (shadow.js); a citizen, tree or tent gets a contact ellipse;
+    // fire, zots, the cursor and the drag ghosts stand on nothing and throw
+    // nothing. The PLACEMENT ghost is excluded by its alpha: it is a picture
+    // of a building that is not there yet, and a thing that is not there does
+    // not put anything on the ground.
+    if (shadowsOn) {
+      const cast = [], contact = [];
+      for (const item of items) {
+        if (item.alpha != null) continue;
+        const mask = art.shadow(item.sprite, { k: shadowK });
+        if (mask) {
+          const flat = art.shadow(item.sprite, { k: 0 }); // at k = 0 this is the same cached sprite: the union pass absorbs it, and the density stays the one a contact patch has at every other k
+          cast.push({ ...item, sprite: mask, source: item.sprite, k: shadowK, kind: "ground", z: 0, dy: item.dy || 0 });
+          if (flat) contact.push({ ...item, sprite: flat, source: item.sprite, k: 0, kind: "ground", z: 0, dy: item.dy || 0 });
+          continue;
+        }
+        const width = billboardWidth(item.sprite);
+        if (!width) continue;
+        const blob = art.billboardShadow(item.sprite, { width });
+        if (blob) contact.push({ ...item, sprite: blob, source: item.sprite, billboard: true, width, kind: "ground", z: 0, dy: item.dy || 0 });
+      }
+      paintShadowPass(cast, base, S, shadowAlpha);
+      paintShadowPass(contact, base, S, contactAlpha);
+    }
+
     paintScene(items, (sprite, sx, sy, item) => {
       if (item.alpha != null) ctx.globalAlpha = item.alpha;
       blitScaled(ctx, base, S, sprite, sx, sy + (item.dy || 0), item.tint || null);
@@ -684,5 +793,19 @@ export function createRenderer(canvas, initialWorld, art) {
   function setWorld(nw) { world = nw; dirty = true; G = null; }
 
   resize();
-  return { draw, drawBubbles, invalidate, pick, pickWalker, resize, setWorld, viewportTiles, tileToScreen, get view() { return view; } };
+  /**
+   * Shadows off is the NEUTRAL KNOB: with it false the dynamic pass is the
+   * pass that existed before 2026-09-22, blit for blit, which is what makes
+   * "the shadows added something and changed nothing" checkable rather than
+   * arguable.
+   */
+  function setShadows(on, opts = {}) {
+    shadowsOn = !!on;
+    if (opts.k != null) shadowK = opts.k;
+    if (opts.alpha != null) shadowAlpha = opts.alpha;
+    if (opts.contact != null) contactAlpha = opts.contact;
+    dirty = true;
+  }
+
+  return { draw, drawBubbles, invalidate, pick, pickWalker, resize, setWorld, viewportTiles, tileToScreen, setShadows, get shadows() { return shadowsOn; }, get view() { return view; } };
 }

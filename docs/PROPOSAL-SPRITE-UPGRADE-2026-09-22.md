@@ -149,47 +149,58 @@ number recorded in this file.
 
 ### Tier 1 — the flatness (hash-neutral: no existing sprite changes)
 
-- [ ] **T1.1 — `shadowSprite(recipe)` in `solid.js`.** Project every box's
-  silhouette down onto `c = 0` along the light and rasterise it into its own
-  grid, anchored on the same world point as the solid. The light in this game
-  is upper-left (`litSkin` makes the +tx-facing *end* face the darkest, so the
-  sun opposes +a), therefore the shadow is cast toward **+a** — down-right on
-  screen, `(2kc, kc)` px for a box of height `c` — with `SHADOW_K` the length
-  per unit of height. **`SHADOW_K = 0` degenerates to the bare footprint
-  diamond**, so the conservative option and the dramatic one are the same knob
-  and the A/B is one number (§5, Q1).
-  *Gates:* its own tag (`shadow`), kept out of G2's building/civic/overlay
-  filter and out of G3's "must have a twin" list, or given a twin at the same
-  scale (trivial — it is recipe-derived). Never a box in the parent recipe.
-  *Verify:* every one of the 315 recipes yields a shadow; shadow ink > 0 for
-  every box of non-zero height; the shadow's anchor equals the solid's; at
-  `SHADOW_K = 0` the shadow is exactly the footprint diamond, pixel for pixel.
-- [ ] **T1.2 — draw it.** A painter item between `Z_GROUND` (0) and `Z_WALKER`
-  (512) — the band is empty today — carrying `alpha`, which the dynamic pass
-  already honours (`js/render.js:639`). It composites over the static ground
-  layer, so it darkens grass, chalk, asphalt and water without knowing which.
-  *Verify:* `tools/depthaudit.mjs` still green; a walker crossing a shadow is
-  drawn *over* it at every one of the audit's ring positions; the static ground
-  layer is not rebuilt by a shadow (no `invalidate()` churn per frame).
-- [ ] **T1.3 — contact darkening.** One to two pixels of the ground ramp
-  shifted one rung down, hugging where a solid meets its tile, under the cast
-  shadow. This is what sells *standing* even when `SHADOW_K` is small.
-  *Verify:* present on all 315; absent where the box floats (bridge decks).
-- [ ] **T1.4 — walker foot shadows.** The citizens have no recipe, so this is
-  the one hand-authored piece in Tier 1: a small ellipse under the anchor, one
-  for the 12×20 adult and one for the 8×12 cub, at 1× / 2× / 4×.
-  **Not composed into the citizen sprite** — G4 forbids expanding a citizen's
-  silhouette and G5 pins `allCitizens()` at 3236 — so it is a separate sprite
-  drawn one item earlier at the walker's fractional key.
-  *Verify:* `allCitizens().length === 3236` unchanged; every citizen sprite
-  byte-identical to the dump (I1); the blob never outlives its walker.
-- [ ] **T1.5 — dusk.** `rasterize(rows, tint)` already takes a key map. One
-  global table — every ramp a rung cooler, `-` lit windows left blazing — makes
-  the occupancy data the game already computes finally visible, for almost no
-  code, and changes no sprite (it is applied at raster time).
-  *Verify:* every ramp key maps to a key in the same ramp; the accents are
-  untouched; a dusk frame and a day frame of the same scene differ by > 60% of
-  pixels; no sprite's rows change.
+**BUILT 2026-09-22, except T1.5.** `tools/art-dump.mjs` on the finished tree:
+**3,651 sprites and the palette, none moved** — the additive claim, proven,
+not asserted. `tools/check-shadows.mjs`, **22 checks**, in `npm run check`.
+The A/B is `docs/shots/sheet-shadows.png` (`tools/shadow-sheet.mjs`): one
+town, one camera, one process, only the knob moving.
+
+- [x] **T1.1 — `shadowSprite(recipe)`** → `js/art/shadow.js`. The geometry
+  collapsed further than the proposal expected: because the shear runs along
+  ONE axis and a box's a-range and c-range are independent intervals, the
+  shadow of a box is not a hull or a silhouette walk but simply the ground
+  rectangle `a ∈ [a0 + k·c0, a1 + k·c1], b ∈ [b0, b1]`. The union of those is
+  the solid's shadow, and the z-buffer unions them for free. **315 of 315
+  recipes cast**, one key, no empty masks.
+  **Two claims in the proposal were wrong, and the pre-registered checks are
+  what found them:**
+  - *"at `k = 0` the shadow is exactly the footprint diamond"* — it is the
+    **plan's own ground footprint**, which is the better answer: a house whose
+    boxes span 14 of its tile's 16 units gets a 14-unit patch, not a full tile
+    of shade.
+  - *"ink is monotone in k"* — **it is not, and it should not be.** Three 3×3
+    blocks failed that check (`C3x3-emporium-1`: 8,855 → 8,772 → 9,863) and
+    they were right: a box starting **above** the ground (a roof slab, an
+    overhang) begins its rectangle at `a0 + k·c0`, so as the light lowers its
+    shadow slides OFF its own footprint, and where the walls beneath are inset
+    nothing else covers what it leaves. Area dips, then grows. What is monotone
+    is **reach** — every box's far edge is `a1 + k·c1`, `c1 ≥ 0` — and that is
+    what the check now asserts, *conditionally on the geometry saying it must
+    grow*, because the cemetery's reach is set by a low boundary wall at the
+    front of the plot that the chapel behind never out-throws (32.0 / 32.0 /
+    32.0 — correct, and it read as a failure until the check asked instead of
+    assumed).
+- [x] **T1.2 — drawn between `Z_GROUND` and the standing pass.** Two union
+  passes: each paints its masks OPAQUE into a scratch canvas which is blitted
+  once at its alpha, so two neighbouring buildings' overlapping shadows are a
+  union at one density instead of a compounding smear. `item.alpha` was
+  already honoured; the ground layer never rebuilds for a shadow.
+  **The neutral knob is byte-exact:** `setShadows(false)` renders the frame
+  the renderer rendered before any of this existed, and `--no-shadows` on
+  `tools/play.mjs` shoots it, same sim hash (`3a90be53`), for the A/B.
+- [x] **T1.3 — contact darkening** = the same mask at `k = 0` in the second
+  pass. No new art, as designed.
+- [x] **T1.4 — billboard contact ellipses** for citizens, trees and tents
+  (`billboardShadow`), sized off each sprite's own width. **Not** composed into
+  the pose: `allCitizens()` is still 3236, no citizen's rows changed, and no
+  shadow sprite reaches `allSprites()`.
+- [ ] **T1.5 — dusk.** Not built. It is the one Tier 1 item with an owner
+  question attached (§5 Q2) and it is a raster-time change rather than a
+  geometry one, so it is split out rather than bundled.
+
+**Measured** (`docs/shots/sheet-shadows.png`, 420×300 panels at zoom 2, px
+changed against the no-shadow frame): k=0 **0.77%** · k=0.25 **4.12%** ·
+k=0.55 **7.96%** · k=1.2 **10.30%**.
 
 ### Tier 2 — material vocabulary (adds keys; existing keys untouched)
 
@@ -273,9 +284,26 @@ Only the genuinely undecided; everything else is decided above.
   roofs are no longer bare" are both readings. `--family` and `--top N`.
   **Baselined: 315 recipes, 1,634,087 px, TOP 66.1%** (§0, §1 D2).
   T2.3 is crossed off by that share **falling**.
-- [ ] **I3 — the before/after sheet.** `--scene` at day and dusk, and a
-  `--sheet` contact sheet per family, both committed, per the render-upgrade
-  rule: an upgrade nobody can see in a frame did not happen.
+- [x] **I3 — the before/after sheet — `tools/shadow-sheet.mjs`.** One town,
+  one camera, one process: the left panel is the renderer with shadows OFF,
+  each panel right of it the SAME frame at a different `SHADOW_K`, with the
+  changed-pixel count printed under each. `docs/shots/sheet-shadows.png`.
+  `tools/play.mjs` also takes `--no-shadows` and `--shadow-k N`, so the A/B
+  can be shot on a real mayor-built town at the same sim hash.
+  *(The dusk half of this waits on T1.5.)*
+- [x] **I4 — `tools/check-shadows.mjs` — the gate, 22 checks**, in
+  `npm run check`. **Mutation-tested, 5/5 caught, and the first round found
+  two real gaps in it:** shadows-off-by-default survived (every other check
+  turned them on explicitly — a game shipping with the pass switched off is
+  the exact regression this arc is about), and re-pointing `SHADOW_KEY` at
+  asphalt-dark `1` survived because "every pixel is `SHADOW_KEY`" compares the
+  constant with itself and passes whatever it is set to. Both closed: a fresh
+  renderer is asserted to have them on, and the key is asserted to be a
+  **near-black** — within 3 of the palette's luminance floor, which separates
+  the two near-blacks from asphalt's 44.1 while not over-claiming "darkest"
+  (slate `<` at 37.7 is a hair under `+` at 38.4).
+  The mutant that matters — **painting the shadows after the standing pass** —
+  is caught with 3,122 of 9,117 building pixels gone to the shadow colour.
 
 ---
 
@@ -283,9 +311,14 @@ Only the genuinely undecided; everything else is decided above.
 
 1. ~~I1 + I2, baselined on `4bb38b6`.~~ **DONE** — `36aa06d`'s successor;
    no art touched, `art-dump` wired in as the suite's first step.
-2. **Tier 1** — T1.1, T1.2, T1.3, T1.4, T1.5 — one commit, with I1 proving no
-   existing sprite moved and the before/after frames attached.
-3. Q1/Q2/Q3 frames to the owner.
+2. ~~**Tier 1** — T1.1, T1.2, T1.3, T1.4, T1.5 — one commit~~ **DONE for
+   T1.1–T1.4**, with `art-dump` proving no existing sprite moved and
+   `sheet-shadows.png` attached. T1.5 (dusk) split off: it is raster-time
+   rather than geometry, and it carries the one open owner question in the
+   tier (Q2), so bundling it would have held the flatness fix behind a
+   decision that does not block it.
+3. Q1/Q2/Q3 frames to the owner. **Q1's frames are shot** —
+   `docs/shots/sheet-shadows.png`.
 4. **Tier 2** on the rulings.
 5. Tier 3, Tier 4.
 
@@ -306,6 +339,31 @@ Only the genuinely undecided; everything else is decided above.
   dynamic pass lands over it for free — but a shadow written *into* the ground
   layer would need the layer rebuilt whenever a building changed, which is the
   wrong side of that boundary.
+- **A shadow's bounding box need not contain the solid's anchor.** The
+  security camera found it: its boxes sit off to one side and up a pole, so at
+  `k > 0` every rectangle lands clear of the hub and `defineSprite` threw
+  (`anchor [-20,2] is outside the 33x18 sprite`). Fixed by pinning the hub into
+  the bounds with a face-less `extent` box — the idiom `solidSprite` already
+  uses.
+- **At zoom ≥ 2 the renderer blits the HI-RES TWIN, not the 1× rows.** Any
+  check that reasons about which pixels a sprite *owns* must ask the twin: the
+  twin's ink equals the *scaled* render's, which is not the 1× silhouette
+  doubled, so the two disagree along every edge. Sampling the 1× rows at zoom 2
+  read 176 of 24,448 pixels as wrongly shadowed; the same check at zoom 1 found
+  zero. Both zooms are checked now so neither answer can hide the other.
+- **A re-derived transform is not the transform.** `draw()` uses
+  `base.tx = -Math.round(view.left · z)`; re-deriving it as `(camera.x − W/2z)·z`
+  drops the rounding and lands every sample a pixel off. Read `r.view`.
+- **The detail scale is one concept for the whole pass.** `check.mjs` proves
+  the hi-res set is visible by drawing the same town through
+  `{ ...art, hires: null }` and demanding a 2×2-uniform frame. A shadow that
+  resolved its own 2× mask regardless of that switch put sub-block detail into
+  that frame — 719 non-uniform blocks where there must be none, the suite's one
+  real failure in this arc. Anything new in the dynamic pass must honour
+  `S > 1 && art.hires`, exactly as `blitScaled` does.
+- **An exit code read through a pipe is the pipe's.** `npm run check | grep …`
+  reported 0 on the run that carried that 719-block failure. Write the status
+  into the log (`echo "NPM_EXIT=$?" >> out/suite.txt`) and grep the log.
 - **The grass/canopy relationship is load-bearing** (`palette.js`: grass mid is
   lighter than canopy mid, kept from Glades). A new ramp that lands between
   them puts something in the mush zone. The R chalk accent and the olive

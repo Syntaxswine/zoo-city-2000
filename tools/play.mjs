@@ -5,6 +5,8 @@
 //   node tools/play.mjs --years 40 --disasters --when "^FIRE" --after 0,1,3,6,7
 //   node tools/play.mjs --years 20 --film 24 --follow city
 //   node tools/play.mjs --years 30 --overlay crime --stations --every 60
+//   node tools/play.mjs --years 12 --at 2011-12 --no-shadows        the frame as it was
+//   node tools/play.mjs --years 12 --at 2011-12 --shadow-k 0.25     the A/B
 //
 // The scripted mayor of `tools/mayor.mjs` builds a town in the real sim, and
 // the REAL renderer — js/render.js, the same file the browser loads, through
@@ -64,6 +66,11 @@ const YEARS = wholeYears(num("--years", 12), 0);
 const W = num("--w", 960);
 const H = num("--h", 600);
 const ZOOM = num("--zoom", 2);
+// The shadow A/B on ONE rig: --no-shadows is the neutral knob (the dynamic
+// pass as it stood before 2026-09-22), --shadow-k N the length per unit of
+// height (0 = a contact patch that never crosses a road).
+const NO_SHADOWS = flag("--no-shadows");
+const SHADOW_K_ARG = argv.includes("--shadow-k") ? num("--shadow-k", 0.55) : null;
 const OUT = resolve(ROOT, arg("--out", "docs/play"));
 const EVERY = num("--every", 0);
 const AT = list("--at", "");
@@ -107,6 +114,7 @@ const mayor = SAVED ? null : createMayor(world, {
 // ---- the camera and the renderer --------------------------------------------
 const canvas = createCanvas(W, H);
 const renderer = createRenderer(canvas, world, art);
+renderer.setShadows(!NO_SHADOWS, SHADOW_K_ARG == null ? {} : { k: SHADOW_K_ARG });
 const walkers = createWalkers(world);
 const camera = { x: 0, y: 0, zoom: ZOOM };
 
