@@ -3246,3 +3246,119 @@ form, `check-campaign.mjs` and `check-hostile-review.mjs` read it.
 | the weak player's Chapter 3 town capped at 900 | nine farms × 100: the food line caps arrivals until Chapter 4 doubles the yield |
 
 Maker's mark — Fable 5.1, session 20, the morning after: the one who measured the floor and the ceiling before moving the bar.
+
+## 43. The sprites — the flatness, the roofs, and two instruments before either (session 21, 2026-09-22)
+
+The owner: *"how would you upgrade the sprites for animal city 2000?"* and, on
+the answer, *"you are greenlit to work on the problems you identified. start
+with documentation so you have a list to cross off as you go."* Later, on the
+choice of what to take next: *"lets try it"* — Tier 2, the roofs.
+
+**The list is `docs/PROPOSAL-SPRITE-UPGRADE-2026-09-22.md` and it is the
+document to read, not this section.** §4 is the checklist with every item's
+verification written down *before* the item was built; §2c writes out the five
+art gates the suite actually enforces, which is what put the tiers in the order
+they are in. This section is the why and the traps.
+
+**Nothing in `js/sim/` was touched. Not one file, across six commits** —
+`git diff --name-only 4bb38b6..HEAD -- js/sim/` is empty. Art cannot move a
+`stateHash`: the sprite a variant byte selects is not in the hashed shape, so
+no mayor rig, no scripted city and no save moved for any of this. What *was* at
+risk was the art audit, and the whole arc is ordered around it.
+
+### What the city looked like, measured before anything was proposed
+
+`grep -rn -i shadow js/` returned nine hits and every one was a comment —
+`litSkin` darkening an end face, `relight` pulling a mirrored highlight back.
+Faces were *shaded*; **nothing was shadowed**, and a screen of correctly
+projected boxes read as cardboard on a lawn. And `tools/faceprobe.mjs`, written
+for the purpose, found that **66.1% of every standing pixel was a TOP face** —
+the cemetery 90%, the large park 88%, the industrial works 74–75% — each of
+them a single flat quad. The largest surface in the game carried the least.
+
+### The two instruments, and why they came first
+
+`tools/art-dump.mjs` is a **gate**: one line per sprite (name · w×h · anchor ·
+ink · hash8), one line per palette key, drift is exit 1, and it is the first
+step of `npm run check`. It is what turns "this change is additive, nothing
+that existed moved" from a claim into a number — which is the entire sequencing
+argument of the arc. `tools/faceprobe.mjs` is a **passive instrument**: it
+refuses nothing, and exists so that "the roofs are bare" and "the roofs are no
+longer bare" are both readings.
+
+A deliberate art change therefore carries its re-baselined receipt in the same
+commit. That is the discipline, and it is why the diff says which families
+moved.
+
+### What landed
+
+**Tier 1, the flatness.** `js/art/shadow.js`. The geometry collapsed further
+than the proposal expected: the shear runs along one axis and a box's a-range
+and c-range are independent intervals, so the shadow of a box is not a hull or
+a silhouette walk but simply the ground rectangle `a ∈ [a0 + k·c0, a1 + k·c1],
+b ∈ [b0, b1]`, and the z-buffer unions them for free. 315 of 315 recipes cast.
+`k = 0` degenerates to the plan's own footprint, so **one knob spans a contact
+patch and a tower's shadow across the street**, and the contact darkening is
+that same mask again rather than new art. Masks are unioned OPAQUE into a
+scratch canvas and blitted once per density, because blitting each at alpha
+would compound where two shadows cross and silt a dense block into a smear.
+`art-dump` on the finished tree: 3,651 sprites, none moved.
+
+**Tier 2, the roofs.** Three added ramps (`tile` `BCDE`, `timber` `LMNO`,
+`fabric` `PQRS`) with 12 keys added and no existing key or sprite moved;
+`furDark` deferred to T4 where its consumer lives. Then `ROOF_OF` — R
+terracotta, C light concrete, I rust, M dark slate — through the six base
+families, `building-plans.js`'s `cap()` helper and `blocks.js`. **84 sprites
+recoloured and not one changed its ink.** Then `js/art/roof-furniture.js`:
+rails, plant rooms, vents, tanks, extractor stacks, washing lines, laid on the
+decks a recipe *already exposes to the sky* rather than hand-placed on 315
+recipes. The idea is `building-character.js`'s — `socketsFor` already asks the
+z-buffer for a building's most visible roof point — widened from one point to
+every deck. **And the furniture casts**: 9,640 → 9,748 shadowed px with no
+shadow code touched, the dividend for having put the shadow on the recipe
+instead of on the picture.
+
+### The state of it
+
+```
+art-dump   3651 sprites · 74 palette keys · TOTAL 86cc0399
+faceprobe  315 recipes · TOP 63.4% (was 66.1) · bare quad 43.0%
+suite      970 checks 0 failures · close-ups 315/2,688 · shadows 22 · NPM_EXIT=0
+gates      art-dump → check → close-ups → shadows → suits → … (art-dump is FIRST)
+```
+
+| what you see | what it is |
+|---|---|
+| `defineSprite(camera-0@shadow): anchor [-20,2] is outside the 33x18 sprite` | **a shadow's bounding box need not contain the solid's anchor.** The security camera's boxes sit off to one side and up a pole, so at `k > 0` every rectangle lands clear of the hub. Pin the hub into the bounds with a face-less `extent` box — the idiom `solidSprite` already uses |
+| an ownership check reading 176 of 24,448 building pixels as wrongly shadowed | **at zoom ≥ 2 the renderer blits the HI-RES TWIN, not the 1× rows.** `check-closeups` holds a twin's ink equal to the *scaled* render's, which is not the 1× silhouette doubled, so the two disagree along every edge. The same check at zoom 1 found ZERO — that split is what settled it, and both zooms are checked now |
+| `hires: … 719 non-uniform 2×2 blocks, none without` — the suite's one real failure | **the detail scale is one concept for the whole pass.** `check.mjs` proves the hi-res set is visible by drawing the same town through `{ ...art, hires: null }` and demanding a 2×2-uniform frame; a shadow that resolved its own 2× mask regardless broke it. Anything new in the dynamic pass must honour `S > 1 && art.hires`, as `blitScaled` does |
+| that failure reported as green for a round | **an exit code read through a pipe is the pipe's.** `npm run check \| grep …` returns grep's status. Write it into the log (`echo "NPM_EXIT=$?" >> out/suite.txt`) and grep the log |
+| concentric bullseyes on every house in the scene | **a rail belongs on a flat roof, not a pitched one.** A stepped slope IS four inset decks by the exposed-top test. A pitch step carries the next on ~77% of its area, a flat roof carries a plant box on a few per cent: `coveredShare < 0.35` separates them and no family has to declare itself |
+| `C3x3-emporium-1` failing "ink is monotone in k" at 8,855 → 8,772 → 9,863 | **the block was right and the pre-registered check was wrong.** A box starting ABOVE the ground begins its rectangle at `a0 + k·c0`, so its shadow slides OFF its own footprint as the light lowers; area dips, then grows. REACH is what cannot decrease — and assert it *conditionally* on `max(a1 + k·c1)` advancing, or the cemetery's low front wall (32.0/32.0/32.0, correct) reads as a failure |
+| a palette re-hex passing a green art receipt | **rows are palette KEYS.** Re-hexing a ramp changes every pixel on screen and not one row in the tree. `art-dump` hashes key→hex per key for exactly this; `#74863C → #74863D` on grass mid is caught as `MOVED 1: PALETTE:o` |
+| a new ramp quietly breaking `check-shadows` | **`check-shadows` pins the shadow key as a near-black within 3 of the palette's luminance FLOOR** (slate `<` 37.7, `+` 38.4). A ramp whose dark rung undercuts that moves the floor. The three new ones bottom out at 44.1 / 54.1 / 69.1 |
+| two surviving mutants in a brand-new gate | **a gate that only ever turns the feature ON cannot see it default OFF, and `every pixel is SHADOW_KEY` compares a constant with itself.** Both now asserted — a fresh renderer is checked to have shadows on, and the key is checked to be a near-black rather than to equal itself |
+
+### What is open
+
+- **T1.5, dusk** — the one Tier 1 item not built. It is raster-time rather than
+  geometry (`rasterize(rows, tint)` already takes a key map) and it carries the
+  tier's only owner question: a toggle, an Options switch, or tied to the month.
+- **Q1, the shadow length.** `SHADOW_K` is committed at 0.55.
+  `docs/shots/sheet-shadows.png` is one town, one camera, one process, with only
+  the knob moving: 0 · 0.25 · 0.55 · 1.2, changing 0.77% / 4.12% / 7.96% /
+  10.30% of the panel. `tools/play.mjs --no-shadows` and `--shadow-k N` shoot
+  the same A/B on a real mayor-built town.
+- **Tier 3** — window states in the `glazing` skin, setbacks and awnings on the
+  R/C mid-tiers (D3: R, C and I are still the same prism), ground variety.
+- **Tier 4** — authored 2× species heads. The citizens got their contact
+  ellipses and nothing else; fourteen species still share two builds and three
+  four-step fur ramps, which is why the light coats collapse at 1×.
+- **The aggregate bare-quad share barely moved** (43.8% → 43.0%) because most
+  of the 315 recipes — the cemetery's grave plots, the shops, the landmarks —
+  have no deck wide enough to furnish. The per-family numbers moved properly;
+  the aggregate is a fact about the aggregate. Whoever takes Tier 3 should know
+  the cemetery is still 88% roof and 74% of that one quad.
+
+Maker's mark — Claude Opus 5, session 21: the one who built the receipt before
+the art, and let the geometry correct two of its own pre-registered claims.
