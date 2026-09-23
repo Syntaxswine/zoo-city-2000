@@ -253,29 +253,77 @@ function cottage() {
   return boxes;
 }
 
+// THE ORIGINAL FOUR STEP BACK (T3.2). The two-storey, the apartment, the store
+// and the tower were each ONE BOX WITH A LID — measured (`tools/massprobe.mjs`),
+// the only four of the twenty-four R and C plans at tiers 2 and 3 whose rooms
+// filled their whole bounding prism with nothing between the street and the
+// roof (the skylight market also fills its prism, and carries an awning), and a
+// third of every mid- and high-rise lot draws one of them or its mirror. Each
+// keeps its storeys, its material, its windows and its door; what changes is
+// that the mass above the street stands back from it.
+//
+// SIZE ON SCREEN, because that decides every number below: a setback of s units
+// on a street face shows at zoom 1 as a band 2s px tall (one unit of a or b is
+// one pixel of y, and the terrace is seen from 2:1 above), so 2 units is the
+// least that reads as a STEP rather than a stripe. And an awning d units deep
+// hides the wall under it for 2d units of height — the stall's lesson — so a
+// canopy is the read, not a frame round the glass.
+//
+// BOTH STREET FACES, ALWAYS. flipPlan mirrors the boxes and not the skins, so a
+// setback or an awning on one face alone lands on the doorless face in variant
+// 1. Every step here is taken on +a and +b alike.
+const brickWall = (h, opts = {}) => walled(litSkin(BRICK, { grain: brickGrain, height: h }), h, { storey: 8, sill: 3, winH: 3, period: 4, winW: 2, from: 1, ...opts });
+
 function twoStorey() {
-  const H = 16;
-  const wall = walled(litSkin(BRICK, { grain: brickGrain, height: H }), H, { storey: 8, sill: 3, winH: 3, period: 4, winW: 2, from: 1, door: doorAt(8) });
+  // The upper storey stands 2.5 units back from the street under its hipped
+  // roof, and the ground floor's exposed ring carries a terracotta porch roof
+  // in two courses — the pent roof between storeys that a house has and a
+  // shop does not.
+  const S = 8;
   return [
-    box(1.5, 14.5, 1.5, 14.5, 0, H, wall),
-    box(0.5, 15.5, 0.5, 15.5, H, H + 1.5, R_ROOF),
-    box(3, 13, 3, 13, H + 1.5, H + 4, R_ROOF),
-    box(5.5, 10.5, 5.5, 10.5, H + 4, H + 6, R_ROOF),
-    box(11, 13, 3, 5, H, H + 7, litSkin(BRICK, { grain: brickGrain, height: 7 })),
+    box(1.5, 14.5, 1.5, 14.5, 0, S, brickWall(S, { door: doorAt(8) })),
+    box(1, 15, 1, 15, S, S + 0.8, R_ROOF),
+    box(1.5, 13.5, 1.5, 13.5, S + 0.8, S + 1.6, R_ROOF),
+    box(1.5, 12, 1.5, 12, S, 2 * S, brickWall(S)),
+    box(1, 12.5, 1, 12.5, 2 * S, 2 * S + 1.5, R_ROOF),
+    box(3, 10.5, 3, 10.5, 2 * S + 1.5, 2 * S + 3.5, R_ROOF),
+    box(5, 8.5, 5, 8.5, 2 * S + 3.5, 2 * S + 5, R_ROOF),
+    box(9, 11, 2.5, 4.5, 2 * S, 2 * S + 7, litSkin(BRICK, { grain: brickGrain, height: 7 })),
   ];
 }
 
 function apartment() {
-  const H = 32;
-  const wall = walled(litSkin(BRICK, { grain: brickGrain, height: H }), H, { storey: 8, sill: 3, winH: 3, period: 4, winW: 2, from: 1, door: doorAt(8) });
-  const boxes = [box(1, 15, 1, 15, 0, H, wall)];
-  // Balcony strips stop at the tile edge (b = 16): a box past the plan is a
-  // pixel outside the footprint, which check.mjs now gates.
-  for (let k = 1; k <= 3; k++) boxes.push(box(2, 14, 15, 16, 8 * k, 8 * k + 1, SLATE_SKIN));
-  boxes.push(box(0.5, 15.5, 0.5, 15.5, H, H + 1.5, R_ROOF));
-  boxes.push(box(3, 13, 3, 13, H + 1.5, H + 3, R_ROOF));
-  boxes.push(box(10, 13, 10, 13, H + 3, H + 6, litSkin(CONC, { height: 3 })));
-  return boxes;
+  // Two storeys on the whole plot; above them the front corner — the one
+  // nearest the camera — is a TERRACE, and the two upper storeys are an L
+  // round the back of it. The corner is on the a = b diagonal, so the mirror
+  // keeps it.
+  //
+  // THE BALUSTRADE IS IN THE PLAN, NOT LEFT TO THE ROOF FURNITURE. A terrace
+  // without an edge is a lower roof, and `furnish` cannot find this one: it
+  // rails a deck only when less than 0.35 of it is covered, and measured over
+  // every deck in the game a terrace is covered 0.22–1.24 (median 0.63) and a
+  // pitch step 0.35–1.73 (median 0.65) — the same number, so the rule cannot
+  // tell them apart and only what stands on the deck could. That is a class
+  // question for roof-furniture.js; this edge is architecture, and is drawn.
+  const S = 8, P = 2 * S, W = 7; // podium height, the wings' depth — an 8×8 terrace
+  const T = P + 1; // the terrace floor
+  const rail = flatSkin(TILE[3], TILE[2], TILE[1]); // a rung lighter than the terrace it rings
+  return [
+    box(1, 15, 1, 15, 0, P, brickWall(P, { door: doorAt(8) })),
+    // Balcony strips stop at the tile edge (b = 16): a box past the plan is a
+    // pixel outside the footprint, which check.mjs now gates.
+    box(2, 14, 15, 16, S, S + 1, SLATE_SKIN),
+    box(0.5, 15.5, 0.5, 15.5, P, T, R_ROOF),
+    box(1, 15, 1, W, T, T + 2 * S, brickWall(2 * S)),
+    box(1, W, W, 15, T, T + 2 * S, brickWall(2 * S)),
+    box(W, 15.5, 14.6, 15.5, T, T + 1.3, rail),
+    box(14.6, 15.5, W, 14.6, T, T + 1.3, rail),
+    box(W + 0.5, W + 3, W + 0.5, W + 3, T, T + 1, TIMBER),
+    box(W + 0.8, W + 2.7, W + 0.8, W + 2.7, T + 1, T + 1.7, PLINTH),
+    box(2, W - 1, 15, 16, T + S, T + S + 1, SLATE_SKIN),
+    box(0.5, 15.5, 0.5, W + 0.5, T + 2 * S, T + 1.5 + 2 * S, R_ROOF),
+    box(0.5, W + 0.5, W + 0.5, 15.5, T + 2 * S, T + 1.5 + 2 * S, R_ROOF),
+  ];
 }
 
 // ------------------------------------------------------------- commercial
@@ -306,28 +354,75 @@ function shop() {
   ];
 }
 
+/**
+ * A shop floor: glass from knee to lintel on both street faces, a pier every
+ * `bay` units, the door cut into the side face. The emporium's ground floor,
+ * cut down to one tile.
+ */
+function shopFloor(H, { door = null, bay = 5, pier = 1, sill = 1, head = 6 } = {}) {
+  const base = litSkin(CONC_WALL, { height: H });
+  const glassAt = (u, g) => g >= sill && g < head && u % bay >= pier;
+  return {
+    glazing: true,
+    top: base.top,
+    side: (a, k, x, y) => { const g = H - k; if (door && door(a, g)) return "+"; if (glassAt(a, g)) return "="; return base.side(a, k, x, y); },
+    end: (b, k, x, y) => { const g = H - k; if (glassAt(b, g)) return END_GLASS; return base.end(b, k, x, y); },
+  };
+}
+
 function store() {
-  const H = 22;
-  const wall = walled(litSkin(CONC_WALL, { height: H }), H, { storey: 7, sill: 3, winH: 3, period: 1, winW: 1, from: 0, endGlass: END_GLASS, door: doorAt(9, 6, 1.5) });
+  // A glass shop floor under a canvas awning on both street faces, and the
+  // two storeys of ribbon windows above it set back 2 units behind a
+  // terrace — the department store's cut, the emporium's on one tile.
+  //
+  // THE AWNING STOPS SHORT OF THE DOOR, and further on the far side than the
+  // near one. An awning d deep hides the wall below it for 2d units — hung
+  // over the door, the first draft left 15 of the door's 36 px — and it is
+  // SHEARED on screen: its lip stands d units nearer along b, so its far end
+  // reaches d units of a further left than where it meets the wall. The door
+  // runs a 8.5–11.5; the awning resumes at 11.5 + 1.5. Both faces take the
+  // same gap so the mirror keeps it over the door.
+  const F = 8, U = 14; // the shop floor, the storeys over it
+  const D = 1.5; // the awning's depth
+  const upper = walled(litSkin(CONC_WALL, { height: U }), U, { storey: 7, sill: 3, winH: 3, period: 1, winW: 1, from: 0, endGlass: END_GLASS });
+  const awning = (u0, u1) => [box(u0, u1, 16 - D, 16, 5.5, 6.7, AWNING), box(16 - D, 16, u0, Math.min(u1, 16 - D), 5.5, 6.7, AWNING)];
   return [
-    box(1, 15, 1, 15, 0, H, wall),
-    box(0.5, 15.5, 0.5, 15.5, H, H + 1, C_ROOF),
-    box(9, 13, 3, 7, H + 1, H + 4, litSkin(CONC, { height: 3 })),
-    box(3, 6, 9, 12, H + 1, H + 2.5, litSkin(CONC, { height: 1.5 })),
+    box(1, 16 - D, 1, 16 - D, 0, F, shopFloor(F, { door: doorAt(9, 6, 1.5) })),
+    ...awning(1, 8),
+    ...awning(11.5 + D, 16),
+    box(0.5, 15, 0.5, 15, F, F + 1, C_ROOF),
+    box(1, 12.5, 1, 12.5, F + 1, F + 1 + U, upper),
+    box(0.5, 13, 0.5, 13, F + 1 + U, F + 2 + U, C_ROOF),
   ];
 }
 
 function tower() {
-  const H = 48;
-  const wall = walled(litSkin(CONC_WALL, { height: H }), H, { storey: 6, sill: 2, winH: 3, period: 3, winW: 2, from: 1, endGlass: END_GLASS, door: doorAt(8, 6, 1.5) });
+  // The tower stands back from the street: a lobby of glass and one storey
+  // over it fill the plot, and the shaft rises from the back of that podium
+  // 3 units clear of both street faces, the plant on its crown.
+  //
+  // NO CANOPY. The first draft hung a slab over each lobby front and it hid
+  // the door — 36 px down to 9, an awning's 2d again — while reading at zoom
+  // 1 as two light slivers. The podium is this building's street; the store
+  // is the one with the awning.
+  const P = 12, S = 36; // the podium, the shaft
+  const wall = (h) => walled(litSkin(CONC_WALL, { height: h }), h, { storey: 6, sill: 2, winH: 3, period: 3, winW: 2, from: 1, endGlass: END_GLASS });
+  const lobby = shopFloor(P, { door: doorAt(8, 6, 1.5), bay: 3, pier: 0.8, sill: 0.5, head: 5 });
+  const upperBand = wall(P);
+  const podium = {
+    ...lobby,
+    side: (a, k, x, y) => (P - k >= 6 ? upperBand.side(a, k, x, y) : lobby.side(a, k, x, y)),
+    end: (b, k, x, y) => (P - k >= 6 ? upperBand.end(b, k, x, y) : lobby.end(b, k, x, y)),
+  };
   return [
-    box(1.5, 14.5, 1.5, 14.5, 0, H, wall),
-    box(1, 15, 1, 15, H, H + 1, C_ROOF),
-    box(3, 8, 3, 8, H + 1, H + 5, litSkin(CONC, { height: 4 })),
+    box(1, 15, 1, 15, 0, P, podium),
+    box(0.5, 15.5, 0.5, 15.5, P, P + 1, C_ROOF),
+    box(1.5, 12, 1.5, 12, P + 1, P + 1 + S, wall(S)),
+    box(1, 12.5, 1, 12.5, P + 1 + S, P + 2 + S, C_ROOF),
     // The rooftop stack is a 2×2-unit concrete box: at 1.2 units in slate
     // its top was the same '?' as the cap it stood on and it vanished into a
     // 2-px near-black slit beside the AC unit (round 2). Now it has a top.
-    box(10, 12, 11, 13, H + 1, H + 11, litSkin(CONC, { height: 10 })),
+    box(7.5, 9.5, 2.5, 4.5, P + 2 + S, P + 12 + S, litSkin(CONC, { height: 10 })),
   ];
 }
 

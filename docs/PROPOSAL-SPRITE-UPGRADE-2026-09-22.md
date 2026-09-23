@@ -363,7 +363,7 @@ them, which is the difference between an evening and an overcast afternoon.
 
 ### Tier 3 — the living city
 
-**T3.1 BUILT 2026-09-23.** `tools/art-dump.mjs` on the finished tree:
+**T3.1 and T3.2 BUILT 2026-09-23; T3.3 open.** For T3.1, `tools/art-dump.mjs` on the finished tree:
 **3,651 sprites and 74 palette keys, none moved** — a window state adds no
 colour, the same claim T1.5 made and for the same reason: everything a pane
 can hold was already in the palette.
@@ -453,8 +453,86 @@ The A/B is `docs/shots/sheet-windows.png` (`tools/window-sheet.mjs`).
   about what the pass painted — ask the wrapper and a blind widens its own
   aperture one probe at a time.
 
-- [ ] **T3.2 — setbacks and awnings** on R/C mid-tiers, so the skyline has
+- [x] **T3.2 — setbacks and awnings** on R/C mid-tiers, so the skyline has
   profile (D3). Recipe boxes; the tower already shows the pattern.
+
+  **BUILT 2026-09-23.** `tools/art-dump.mjs` on the finished tree: **eight
+  sprites moved and nothing else** — four plans and their mirrors — and the
+  PALETTE line did not: no new colour. `TOTAL 86cc0399` → `f910d9fe`. The
+  picture is `docs/shots/sheet-skyline.png` (`tools/skyline-sheet.mjs`); the
+  number is `tools/massprobe.mjs`, which is passive, like faceprobe. The
+  before/after is `docs/shots/skyline-before-after.png` — the same block and
+  camera through the real renderer, the committed tree on the left (a detached
+  worktree at `4a60a99`, in the same process) and T3.2 on the right, zoom 1
+  magnified 2× above and zoom 2 below. It cannot be redrawn from this tree:
+  once a recipe changes, the only before there is lives in the history.
+
+  **THE MEASUREMENT SET THE SCOPE, AND IT RE-READ "MID-TIERS".** `massprobe`
+  asks two things of a plan: how much of its glazed mass fills its bounding
+  prism (`fill`, 1.00 is one box) and how much of the sprite at zoom 1 is a
+  deck standing between the street and the top (`deck`). Over the twenty-four
+  R and C plans at tiers 2 and 3, **exactly four were one box with a lid — the
+  ORIGINAL two-storey, apartment, store and tower, from session 1 — and their
+  mirrors:** fill 1.00, deck 0.0–5.3% (the 5.3 is the apartment's balcony
+  slats). Every plan authored later already stepped (medians 0.715 and 16%),
+  bar one: the store family's skylight market is flat-fronted and carries an
+  awning, and was left as the family's one. A third of every mid- and
+  high-rise lot draws one of the eight. The list said "mid-tiers"; two of the
+  four are tier 3, and they are the TALLEST prisms on the skyline, so they are
+  in. (The works, `I3` plans 0/1, is also one box. T3.2 names R and C, and the
+  works reads by its stack; recorded, not fixed.)
+
+  | plan | before · fill, deck | after | what it became |
+  |---|---|---|---|
+  | two-storey | 1.00 · 0.0% | 0.83 · 18.1% | the upper storey 2.5 units back under its hip; a terracotta porch roof in two courses round both street faces |
+  | apartment | 1.00 · 5.3% | 0.84 · 12.8% | two storeys on the whole plot, and above them the front corner is an 8×8 terrace with a balustrade and a planter, the upper storeys an L round it |
+  | store | 1.00 · 0.0% | 0.83 · 19.4% | a glass shop floor under a canvas awning on both street faces, the ribbon-windowed storeys 2 units back behind a terrace |
+  | tower | 1.00 · 0.0% | 0.67 · 12.4% | a lobby podium of glass filling the plot, the shaft 3 units clear of both street faces |
+
+  City-wide, **51 of the 192 zoned plans were one box → 43**, and the eight are
+  the only ones that moved. The 43 are tier-1 shops and cottages, the
+  industrial sheds and works and the meat stalls: outside T3.2, and now a list
+  anyone can print (`node tools/massprobe.mjs`).
+
+  **Every step is taken on BOTH street faces.** `flipPlan` mirrors the boxes
+  and not the skins, so a setback or an awning on one face alone lands on the
+  doorless face in variant 1 — the meat hall's annex trap. **And size on screen
+  set the depths:** a setback of s units shows at zoom 1 as a band 2s px tall,
+  so 2 units is the least that reads as a STEP rather than a stripe.
+
+  **AN AWNING OVER A DOOR EATS THE DOOR, and the pre-registered door count
+  caught it.** An awning d units deep hides the wall under it for 2d units —
+  the stall's lesson, again — so the first draft's canopies took the store's
+  door from 36 px to 15 and the tower's to 9. The store's awning now stops
+  short of its door bay, and FURTHER on the far side than the near one: on
+  screen the awning is sheared, its lip standing d units nearer along b, so
+  its far end reaches d units of a further left than where it meets the wall.
+  The tower lost its canopies; its podium is its street, and every door is
+  back to its baseline in both mirrors.
+
+  **The pre-registered bar caught my own metric.** `fill` first counted the
+  roof slab a setback stands on as empty space, which flattered any plan that
+  sandwiches a cap between two storeys: the apartment passed at 0.848 that way
+  and failed at 0.875 honestly. The metric was fixed — occupied layers only —
+  every plan re-read, and the apartment's terrace grown from 7×7 to 8×8 units
+  (0.84), rather than the bar moved.
+
+  **The roof furniture cannot see a terrace, measured.** The standing brief
+  flagged `coveredShare < 0.35` in `roof-furniture.js` as a guess a new roof
+  shape could land between. Over every deck in the game, a TERRACE (a storey
+  standing on it) is covered 0.22–1.24, median 0.63, and a PITCH STEP
+  0.35–1.73, median 0.65 — the same number. So the apartment's balustrade is
+  in its plan, drawn as architecture, and the rule is recorded as a class
+  question for roof-furniture.js rather than changed here: changing it moves
+  every setback in the game, and sawtooth teeth and ground plinths muddy "what
+  stands on it".
+
+  **Two fixtures were repaired first, each in a commit of its own, so this one
+  can be read.** `check-dusk`'s four "open-lawn samples" were three parts
+  building, river and tree, and passed because nearly every key changes at
+  dusk — until the stepped apartment put a lit window on one (`b39866c`); and
+  `sheet-shadows` / `sheet-dusk` had not been drawn since before T3.1
+  (`c61920c`).
 - [ ] **T3.3 — ground:** more grass variants, scatter keyed off tile index,
   worn paths where walkers cross grass. The tiling repeat is visible at zoom 2.
 
@@ -603,7 +681,9 @@ Only the genuinely undecided; everything else is decided above.
 5. **Tier 3** — T3.1 (window states) **DONE 2026-09-23**, its own commit for
    the same reason T1.5 got one: it is raster-time rather than geometry, and
    it needed a second predicate on the box (`aperture`) that T3.2's recipe
-   boxes have no use for. T3.2 and T3.3 next, then Tier 4.
+   boxes have no use for. **T3.2 (setbacks and awnings) DONE 2026-09-23** —
+   eight sprites, four plans and their mirrors, after two fixtures it exposed
+   were repaired in commits of their own. T3.3 next, then Tier 4.
 
 ---
 

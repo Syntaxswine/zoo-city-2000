@@ -1793,15 +1793,18 @@ Glades law, kept.
 ### 12.2 Buildings — box solids per zone × tier (world units: 1 tile = 16)
 | zone | tier 1 | tier 2 | tier 3 |
 |---|---|---|---|
-| R (brick + slate roof) | cottage 11×10×8 + hipped roof (two stepped boxes) + chimney 2×2×4 | 2-storey 13×13×16 + gable step | apartment 14×14×32 + balcony strip + roof box |
-| C (concrete + glass) | **the shop pool** (§12.2d): eleven small businesses by the tile's variant byte; kind 0 the corner shop 13×11×10 + awning box (accent) | store 14×14×22 with glass-strip rows | tower 13×13×48 + roof plant |
+| R (brick + terracotta roof, T2.2) | cottage 11×10×8 + hipped roof (two stepped boxes) + chimney 2×2×4 | 2-storey: ground floor 13×13×8, upper storey 10.5×10.5×8 set 2.5 back from both street faces under its hip, a terracotta porch roof in two courses round them (T3.2) | apartment: two storeys 14×14×16, then an L of two storeys round the back with the front corner an 8×8 terrace — balustrade, planter — balcony strips (T3.2) |
+| C (concrete + glass) | **the shop pool** (§12.2d): eleven small businesses by the tile's variant byte; kind 0 the corner shop 13×11×10 + awning box (accent) | store: a glass shop floor 13.5×13.5×8 under a canvas awning on both street faces (stopping short of the door), two storeys of glass-strip rows 11.5×11.5×14 set 2 back (T3.2) | tower: a lobby podium 14×14×12, the shaft 10.5×10.5×36 set 3 back from both street faces, a roof stack (T3.2) |
 | I (rust) | shed 14×11×8 + chimney 2×2×14 | factory 14×14×14 + 2 chimneys + sawtooth | works 15×15×20 + chimney 3×3×34 + tank |
 Civics: park (low plinth 16×16×1 + 2 tree stamps + bench box), zoo 2×2
 (fence boxes on 4 sides, gate box, 3 canopy clumps, a hut box). Overlays:
-scaffold (1), fire (2 frames), flood (1), rubble (earth-ramp ground). Four
-plans per original family: the first mirrored pair plus two authored plans
-(§12.2e). Occupancy lights and majority-species stamps identify the people
-in the building without changing its zone ramp.
+scaffold (1), fire (2 frames), flood (1), rubble (earth-ramp ground). Six
+plans per original family: the first mirrored pair plus four authored plans
+(§12.2e; `building-plans.js`), chosen by `variant % 6`. The first pair of the
+R and C tier-2 and tier-3 families were one box with a lid until T3.2 stepped
+them back — `tools/massprobe.mjs` measures it. Occupancy lights and
+majority-species stamps identify the people in the building without changing
+its zone ramp.
 
 ### 12.2b The blocks — box solids per zone × side (`js/art/blocks.js`; 2×2 plans a, b ∈ [0, 32], 3×3 [0, 48])
 | zone | 2×2 | 3×3 |
