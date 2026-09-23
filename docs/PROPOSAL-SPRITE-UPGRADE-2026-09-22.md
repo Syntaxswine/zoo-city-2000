@@ -31,16 +31,21 @@ in `tools/check.mjs` Part C and `tools/check-closeups.mjs`.
 |---|---|
 | sprites in `allSprites()` | **3,651** — 315 box-recipe, 73 ground-diamond, 3,263 with no recipe (2,726 of those citizens) |
 | palette | **62 keys** — 12 ramps (52) + 10 accents |
-| opaque pixels across the 315 box recipes | **1,621,148** |
-| …that are a **TOP** face | **1,069,841 — 66.0%** |
-| …**SIDE** (the +ty face, down-left) | 285,882 — 17.6% |
-| …**END** (the +tx face, down-right) | 265,425 — 16.4% |
+| art receipt | `TOTAL 3651 b000b07f` · `PALETTE 62 keys dd798a15` |
+| opaque pixels across the 315 box recipes | **1,634,087** |
+| …that are a **TOP** face | **1,080,104 — 66.1%** |
+| …**SIDE** (the +ty face, down-left) | 287,331 — 17.6% |
+| …**END** (the +tx face, down-right) | 266,652 — 16.3% |
 | sprites that cast a shadow | **0** |
 
-The face shares are the shares the player sees: they were measured by
-re-rendering every recipe with the three faces replaced by marker keys and
-counting which face won each pixel through the real z-buffer
-(`out/faceshare.mjs`, scratch; promoted to `tools/faceprobe.mjs` in §6).
+The face shares are the shares the player sees: `tools/faceprobe.mjs`
+re-renders every recipe with the three face functions replaced by marker
+keys — the marker only where the real skin returned a key, so cut doorways
+stay holes — and counts the winning key per pixel through the real z-buffer.
+`stamps` are stripped: a sign or a yard tree is not a face, and leaving it in
+credits its pixels to whichever face it covers. (The first reading, taken in
+scratch with stamps passing through, said 66.0% of 1,621,148 — the definition
+moved the number by a tenth of a point, which is the whole of the difference.)
 
 ---
 
@@ -58,12 +63,26 @@ It is the single largest visual deficit and it is **not** a hand-art problem —
 computable from what is already there.
 
 **D2 — Two thirds of the city is roof, and the roof is the least worked
-surface.** 66.0% of every standing pixel is a top face. At 2:1 a 1×1 building's
-roof is a whole diamond; the cemetery's is 94% of its sprite, the 3×3 blocks
-run 44–58%. Almost every one of them is a single flat slate or concrete quad
-with at most one plant box. Roofs are also what the player *actually* looks at,
+surface.** 66.1% of every standing pixel is a top face. At 2:1 a 1×1 building's
+roof is a whole diamond, and the bigger the footprint the more it dominates —
+by family (`--family`):
+
+| family | sprites | px | roof |
+|---|---|---|---|
+| `civic-cemetery` | 6 | 124,998 | **90%** |
+| `civic-largePark` | 5 | 37,647 | **88%** |
+| `civic-sanitation` | 3 | 29,827 | 82% |
+| `I3x3-honey` / `I3x3-truffle` | 4 each | ~42,000 | 75% |
+| `I3x3-the…` | 8 | 88,494 | 74% |
+| `R3x3-the…` | 16 | 189,664 | 63% |
+| `R3x3-towers` | 2 | 31,576 | 44% |
+
+Almost every one of those roofs is a single flat slate or concrete quad with
+at most one plant box. The industrial blocks and the civic campuses are very
+nearly *nothing but* roof. Roofs are also what the player *actually* looks at,
 because the game is played at zoom 1–2. The largest surface in the game is
-carrying the least information per pixel.
+carrying the least information per pixel. Only the towers — the one family
+with a setback loop — get below half.
 
 **D3 — One mass, many skins.** R, C and I are the same prism plus a roof slab;
 they differ by material, not silhouette. The only place mass does any work is
@@ -233,21 +252,37 @@ Only the genuinely undecided; everything else is decided above.
 
 ## §6 Instruments (built before the work they check)
 
-- **I1 — `tools/art-dump.mjs`.** Dump every sprite's rows to one hashed file;
-  diff a later tree against it. This is what makes "Tier 1 changes nothing that
-  existed" a *number* instead of a claim, and it is what T2.1 needs to prove an
-  additive palette really is additive. Written and baselined FIRST.
-- **I2 — `tools/faceprobe.mjs`.** The face-share measurement of §0, promoted
-  out of scratch. T2.3 is crossed off by moving the number it prints.
-- **I3 — the before/after sheet.** `--scene` at day and dusk, and a `--sheet`
-  contact sheet per family, both committed, per the render-upgrade rule: an
-  upgrade nobody can see in a frame did not happen.
+- [x] **I1 — `tools/art-dump.mjs` — THE GATE.** One line per sprite
+  (`name · w×h · anchor · ink · hash8`) in `docs/fixtures/art-baseline.txt`,
+  plus a `PALETTE` line hashing key→hex, plus a `TOTAL`. Drift is **exit 1**,
+  so a deliberate art change carries its re-baselined receipt in the same
+  commit and the diff says which families moved. It is now the first step of
+  `npm run check`. This is what makes "Tier 1 changes nothing that existed"
+  a number instead of a claim.
+  **Baselined on `4bb38b6`: 3,651 sprites, `TOTAL 3651 b000b07f`,
+  `PALETTE 62 keys dd798a15`** (192 KB).
+  **Falsified — it can fail, and it catches the class row-hashing alone would
+  miss:** one pixel flipped in a shared citizen body row → **512 sprites named
+  MOVED, exit 1**; one hex digit in grass mid `#74863C` → `#74863D`, which
+  changes no row in the tree and every pixel on screen → **`MOVED 1: PALETTE`,
+  exit 1**; reverted tree → exit 0. (First run of that falsifier read `exit=0`
+  because the status came through a `| head` — the pipe's, not node's. Measured
+  again without the pipe.)
+- [x] **I2 — `tools/faceprobe.mjs` — a PASSIVE INSTRUMENT, not a gate.** It
+  refuses nothing; it gives D2 a number so that "the roofs are bare" and "the
+  roofs are no longer bare" are both readings. `--family` and `--top N`.
+  **Baselined: 315 recipes, 1,634,087 px, TOP 66.1%** (§0, §1 D2).
+  T2.3 is crossed off by that share **falling**.
+- [ ] **I3 — the before/after sheet.** `--scene` at day and dusk, and a
+  `--sheet` contact sheet per family, both committed, per the render-upgrade
+  rule: an upgrade nobody can see in a frame did not happen.
 
 ---
 
 ## §7 Build order
 
-1. I1 + I2, baselined on `4bb38b6`. *(No art touched.)*
+1. ~~I1 + I2, baselined on `4bb38b6`.~~ **DONE** — `36aa06d`'s successor;
+   no art touched, `art-dump` wired in as the suite's first step.
 2. **Tier 1** — T1.1, T1.2, T1.3, T1.4, T1.5 — one commit, with I1 proving no
    existing sprite moved and the before/after frames attached.
 3. Q1/Q2/Q3 frames to the owner.
