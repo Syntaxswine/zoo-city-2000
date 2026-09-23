@@ -1991,10 +1991,26 @@ record — passes the stored look made from that citizen's id.
 ### 12.4 Roads, ground, water, trees
 Roads: 16 tiles from the 4-bit mask, composed from 3 authored strips
 (straight, corner, stub) + busy variant. Bridge: deck box + 2 piers, road
-strip on top. Ground: grass ×3 variants, zone chalk 3 × {Low, High}, rubble.
+strip on top. Ground: grass, zone chalk 3 × {Low, High}, rubble.
 Water: 1 cycled tile; land/water edge gets a 1-px darker kerb (no shore
 autotile in v1). Trees: 3 hand-authored (round, tall, willow near water).
 Zots 4, tent 1, plaza glyph 1, cursor/ghost 2.
+
+**The grass is keyed off its CORNERS, not its tile (T3.3, 2026-09-23).** Three
+levels — kept · meadow · rough, which ARE grass-0 · grass-1 · grass-2 — live
+on the tile vertices, and a tile draws its four corner levels interpolated
+across the diamond (`art.meadow(corners, byte)`; 31 reachable combinations ×
+6 dithers = 186 tiles, the three grasses among them). Two tiles that share an
+edge share its corners, so the grass cannot change at the edge: the patches
+are the shape of the land. `js/meadow.js` reads the corners off the world,
+writing nothing: **kept wherever anything made touches a corner** (a road, a
+rail, a lot, a civic, a wall, rubble — so every road and chalk margin, all
+grass-0, meets kept grass); elsewhere the mean of the tile bytes over the 6×6
+round it, in thirds; a rough corner beside a kept one steps down, so no tile
+holds both. `tools/check-ground.mjs` is the gate; `tools/groundprobe.mjs`
+measures, off the renderer's own frame, how much a tile's edge steps against
+a line through it (the old quilt 3.8 at zoom 2, the meadow 1.0) and how often
+a pixel repeats one tile over.
 
 ### 12.4b Walls and tunnels (`js/art/walls.js`)
 

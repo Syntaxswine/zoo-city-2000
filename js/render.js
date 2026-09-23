@@ -47,6 +47,7 @@ import { KNOBS } from "./sim/rules.js";
 import { tunnelAxis } from "./sim/reach.js";
 import { isWorker } from "./sim/census.js";
 import { BAG_FALL } from "./walkers.js";
+import { meadowField } from "./meadow.js";
 import { line as needLine } from "./sim/voice.js";
 
 const MARGIN = 256; // projection px around the viewport kept in the static layer
@@ -351,6 +352,8 @@ export function createRenderer(canvas, initialWorld, art) {
     const range = tileRange(G);
     const items = [];
     const flood = art.overlay("flood");
+    // The grass is keyed off its corners, and the corners off the world (js/meadow.js): read afresh on every rebuild, as the roads' masks are.
+    const meadow = meadowField(world);
     for (let ty = range.y0; ty <= range.y1; ty++) {
       for (let tx = range.x0; tx <= range.x1; tx++) {
         const [sx, sy] = toScreen(tx, ty);
@@ -373,7 +376,7 @@ export function createRenderer(canvas, initialWorld, art) {
           else if (world.zone[i] !== ZONE.NONE && world.tier[i] === 0) {
             sprite = art.chalk(world.zone[i], world.maxTier[i] === 3);
             if (world.zone[i] === ZONE.R) tint = R_CHALK_TINT;
-          } else sprite = art.ground("grass", world.variant[i] % 3);
+          } else sprite = art.meadow(meadow.corners(tx, ty), world.variant[i]);
           items.push({ sprite, tx, ty, kind: "ground", tint });
           if (waterAt(tx, ty - 1)) items.push({ sprite: art.ground("kerb", 0), tx, ty, kind: "ground", z: 1 });
           if (waterAt(tx + 1, ty)) items.push({ sprite: art.ground("kerb", 1), tx, ty, kind: "ground", z: 1 });

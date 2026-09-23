@@ -85,11 +85,14 @@ const WATER = keysOf("water"); // F G H I J K
  * Grass key at a pixel. Base 'o'; 'n' tufts, rare 'p' blades. The three
  * variants differ in dither: 0 even, 1 patchier (light clumps), 2 darker
  * (more tufts). Called by the chalk tiles too so chalk sits on real grass.
+ * `seed` is another draw of the same dither (the meadow below); seed 0 is
+ * the dither the game has always had.
  */
-export function grassKey(px, py, variant = 0) {
-  const h = hash(px, py, 11 + variant);
+export function grassKey(px, py, variant = 0, seed = 0) {
+  const salt = 16 * seed;
+  const h = hash(px, py, 11 + variant + salt);
   if (variant === 1) {
-    const clump = hash(px >> 2, py >> 1, 5) < 0.3;
+    const clump = hash(px >> 2, py >> 1, 5 + salt) < 0.3;
     if (clump && h < 0.55) return G[3];
     return h < 0.12 ? G[1] : G[2];
   }
@@ -105,6 +108,82 @@ export function grassKey(px, py, variant = 0) {
 export const GRASS = [0, 1, 2].map((v) =>
   groundSprite({ name: `grass-${v}`, anchor: TILE_ANCHOR, tags: ["ground", "grass"] }, (a, b, px, py) => grassKey(px, py, v))
 );
+
+// -------------------------------------------------------------------- meadow
+
+/**
+ * GRASS IS KEYED OFF ITS CORNERS, NOT ITS TILE (T3.3). The three grasses
+ * above are three brightnesses — tile means 117.5 / 122.8 / 112.6 luma at 1× —
+ * and for as long as each was exactly one tile, chosen by the tile's byte,
+ * an open field was a quilt of diamonds: the step in brightness across a
+ * tile edge was 2.4× the step across a line through a tile (zoom 2). The eye
+ * counts the tiles.
+ *
+ * So the grass is a LEVEL that lives on the tile's four CORNERS — 0 kept,
+ * 1 meadow, 2 rough, which are grass-0, grass-1 and grass-2 — and a tile's
+ * sprite is its four corner levels. Its predicate interpolates the level
+ * bilinearly across the diamond and draws whichever grass the level says,
+ * with a jitter so the boundary is ragged rather than ruled. Two tiles that
+ * share an edge share its two corners, and along that edge the bilinear
+ * level depends on those two alone, so the grass is continuous across every
+ * edge: the patches are the shape of the land, not of the tile. Which level
+ * a corner holds is the renderer's reading of the world (js/meadow.js).
+ *
+ * `corners` is [N, E, S, W]: the levels at (a, b) = (0, 0), (16, 0),
+ * (16, 16), (0, 16). No tile holds both 0 and 2 (meadow.js steps a rough
+ * corner beside a kept one down to meadow), which leaves 31 of the 81
+ * combinations reachable; the rest are not drawn, and asking for one throws.
+ *
+ * THE SEEDS. Inside one patch every tile has the same four corners, and the
+ * same sprite would put the same tufts in the same place tile after tile —
+ * variant 1's clumps read as wallpaper at zoom 2 when a field is all one
+ * variant (+37 pts of lattice agreement). Each combination is drawn in
+ * MEADOW_SEEDS dithers, and the renderer picks one from the tile's byte.
+ *
+ * THE JITTER IS WORLD-SIZED — one draw per 2×1 pixel at 1×, per 4×2 at 2× —
+ * so a patch's edge is the same shape at every zoom; the dither inside it is
+ * finer at 2×, as every ground is. And it never moves a uniform tile off its
+ * level (±0.45 of a level), so the three uniform seed-0 tiles ARE grass-0,
+ * grass-1 and grass-2, pixel for pixel, and are those sprites.
+ */
+export const MEADOW_LEVELS = 3;
+export const MEADOW_SEEDS = 6;
+const MEADOW_JITTER = 0.45;
+const cornerIndex = (c) => c[0] + 3 * c[1] + 9 * c[2] + 27 * c[3];
+function meadowFn(c, seed) {
+  return (a, b, px, py, s = 1) => {
+    const u = a / 16, v = b / 16;
+    const f = c[0] * (1 - u) * (1 - v) + c[1] * u * (1 - v) + c[2] * u * v + c[3] * (1 - u) * v;
+    const j = hash(Math.floor(px / (2 * s)), Math.floor(py / s), 97 + seed) - 0.5;
+    const t = f + 2 * MEADOW_JITTER * j;
+    return grassKey(px, py, t < 0.5 ? 0 : t < 1.5 ? 1 : 2, seed);
+  };
+}
+const MEADOW_TABLE = new Array(81 * MEADOW_SEEDS).fill(null);
+/** The meadow sprites that are not grass-0/1/2 themselves, for the audit. */
+export const MEADOW = [];
+for (let n = 0; n < 81; n++) {
+  const c = [n % 3, ((n / 3) | 0) % 3, ((n / 9) | 0) % 3, ((n / 27) | 0) % 3];
+  if (Math.max(...c) - Math.min(...c) > 1) continue;
+  const uniform = c.every((l) => l === c[0]);
+  for (let seed = 0; seed < MEADOW_SEEDS; seed++) {
+    let s;
+    if (uniform && seed === 0) s = GRASS[c[0]];
+    else {
+      s = groundSprite({ name: `meadow-${c.join("")}-${seed}`, anchor: TILE_ANCHOR, tags: ["ground", "grass"] }, meadowFn(c, seed));
+      MEADOW.push(s);
+    }
+    MEADOW_TABLE[cornerIndex(c) * MEADOW_SEEDS + seed] = s;
+  }
+}
+
+/** The grass tile whose corners hold `corners` ([N, E, S, W] levels), in dither `seed`. Throws on a combination no tile can hold. */
+export function meadowSprite(corners, seed = 0) {
+  const ok = Array.isArray(corners) && corners.length === 4 && corners.every((l) => Number.isInteger(l) && l >= 0 && l < MEADOW_LEVELS);
+  const s = ok ? MEADOW_TABLE[cornerIndex(corners) * MEADOW_SEEDS + (((seed % MEADOW_SEEDS) + MEADOW_SEEDS) % MEADOW_SEEDS)] : null;
+  if (!s) throw new Error(`art.meadow: no grass tile holds corners [${corners}] — a tile spans at most one step of level`);
+  return s;
+}
 
 // --------------------------------------------------------------------- chalk
 
@@ -490,6 +569,7 @@ export const GHOST = groundSprite({ name: "ghost", anchor: TILE_ANCHOR, tags: ["
 export function allTerrain() {
   const out = [];
   GRASS.forEach((s) => out.push({ name: s.name, sprite: s }));
+  MEADOW.forEach((s) => out.push({ name: s.name, sprite: s }));
   for (const zone of [1, 2, 3, 4]) CHALK[zone].forEach((s) => out.push({ name: s.name, sprite: s }));
   out.push({ name: RUBBLE.name, sprite: RUBBLE });
   out.push({ name: WATER_TILE.name, sprite: WATER_TILE });

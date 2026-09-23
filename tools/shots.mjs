@@ -34,7 +34,8 @@ import { hires } from "../js/art/hires.js";
 import { ROADS, BRIDGES, N, E, S, W, DECK_TOP } from "../js/art/roads.js";
 import { WALLS, TUNNELS } from "../js/art/walls.js";
 import { RAILS, STATIONS, squareOnCrossings, crossingSprite } from "../js/art/rail.js";
-import { GRASS, CHALK, CHALK_KEYS, RUBBLE, WATER_TILE, KERB, TREE_LIST, ZOTS, PLAZA, CURSOR, GHOST, waterTint, WATER_FRAMES } from "../js/art/terrain.js";
+import { GRASS, CHALK, CHALK_KEYS, RUBBLE, WATER_TILE, KERB, TREE_LIST, ZOTS, PLAZA, CURSOR, GHOST, waterTint, WATER_FRAMES, hash } from "../js/art/terrain.js";
+import { meadowField } from "../js/meadow.js";
 import { ink } from "../js/art/format.js";
 import { citizenSprite, SPECIES_IDS, FACINGS, TENT, HAT, MEETING, SACKS } from "../js/art/citizens.js";
 import { paintScene, Z_BUILDING } from "../js/iso/painter.js";
@@ -171,11 +172,12 @@ function sheets(z) {
     cells.forEach((cell, i) => {
       const cx = (i % cols) * cellW + cellW / 2;
       const cy = Math.floor(i / cols) * cellH + groundY;
-      // The footprint's ground: side × side grass diamonds round the footprint's centre, back to front.
+      // The footprint's ground: side × side grass diamonds round the footprint's centre, back to front —
+      // KEPT grass, as the game lays it: a footprint is made, so every corner of it is kept (js/meadow.js).
       const s = cell.side;
       for (let ty = 0; ty < s; ty++) for (let tx = 0; tx < s; tx++) {
         const [dx, dy] = toScreen(tx - (s - 1) / 2, ty - (s - 1) / 2);
-        blitAt(ctx, GRASS[(tx + ty) % 3], cx + dx, cy + dy);
+        blitAt(ctx, art.meadow([0, 0, 0, 0], tx + 3 * ty), cx + dx, cy + dy);
       }
       blitAt(ctx, cell.sprite, cx, cy);
       console.log(`  blocks [r${Math.floor(i / cols)} c${i % cols}] ${cell.sprite.name} (${cell.sprite.w}×${cell.sprite.h})`);
@@ -202,7 +204,7 @@ function sheets(z) {
       const cy = Math.floor(i / cols) * cellH + groundY;
       for (let ty = 0; ty < 3; ty++) for (let tx = 0; tx < 3; tx++) {
         const [dx, dy] = toScreen(tx - 1, ty - 1);
-        blitAt(ctx, GRASS[(tx + ty) % 3], cx + dx, cy + dy);
+        blitAt(ctx, art.meadow([0, 0, 0, 0], tx + 3 * ty), cx + dx, cy + dy); // kept, as under the blocks
       }
       blitAt(ctx, cell.sprite, cx, cy);
       console.log(`  landmarks [r${Math.floor(i / cols)} c${i % cols}] ${cell.sprite.name} — ${cell.name} (${cell.sprite.w}×${cell.sprite.h})`);
@@ -320,6 +322,7 @@ function sheets(z) {
     const canvas = createCanvas(340, 200);
     const ctx = background(canvas);
     const items = [];
+    const grassAt = meadowFor(5, 5, (x, y) => net[y][x] === 1);
     for (let ty = 0; ty < 5; ty++)
       for (let tx = 0; tx < 5; tx++) {
         const isRoad = (x, y) => y >= 0 && y < 5 && x >= 0 && x < 5 && net[y][x] === 1;
@@ -327,7 +330,7 @@ function sheets(z) {
         if (net[ty][tx]) {
           const mask = (isRoad(tx, ty - 1) ? N : 0) | (isRoad(tx + 1, ty) ? E : 0) | (isRoad(tx, ty + 1) ? S : 0) | (isRoad(tx - 1, ty) ? W : 0);
           sprite = ROADS[ty >= 3 ? 1 : 0][mask];
-        } else sprite = GRASS[(tx + ty) % 3];
+        } else sprite = grassAt(tx, ty);
         items.push({ sprite, tx, ty, kind: "ground" });
       }
     paintScene(items, (sprite, sx, sy) => blit(ctx, sprite, sx + 170, sy + 20));
@@ -545,6 +548,24 @@ function bubbleSheet(z) {
   return save("sheet-bubbles.png", canvas, z);
 }
 
+/**
+ * The grass the game lays (T3.3) for a hand-built layout that has no world:
+ * `meadowField` over a stand-in holding what the layout has made, and a tile
+ * byte per tile — so a sheet's lawn is keyed off its corners exactly as the
+ * renderer's is, kept round anything made and meadow where nothing is.
+ */
+function meadowFor(w, h, isMade) {
+  const stand = { w, h };
+  for (const k of ["variant", "road", "rail", "zone", "civic", "wall", "rubble"]) stand[k] = new Uint8Array(w * h);
+  for (let ty = 0; ty < h; ty++) for (let tx = 0; tx < w; tx++) {
+    const i = ty * w + tx;
+    stand.variant[i] = Math.floor(hash(tx, ty, 2027) * 256);
+    if (isMade(tx, ty)) stand.zone[i] = 1;
+  }
+  const field = meadowField(stand);
+  return (tx, ty) => art.meadow(field.corners(tx, ty), stand.variant[ty * w + tx]);
+}
+
 function maskName(m) {
   return [m & N ? "N" : "", m & E ? "E" : "", m & S ? "S" : "", m & W ? "W" : ""].join("") || "-";
 }
@@ -577,6 +598,15 @@ function scene(z) {
   ];
   const chalk = { "4,3": art.chalk(1, false), "3,4": art.chalk(2, true), "8,3": art.chalk(3, true), "11,7": art.chalk(1, true), "11,8": art.chalk(2, false), "11,9": art.chalk(3, false) };
   const rubble = new Set(["11,3", "4,4"]);
+  // The grass is the game's (T3.3): made here is a road, a lot, a civic, chalk
+  // or rubble, over every tile of its footprint; a tree and water are not.
+  const madeTiles = new Set();
+  for (const [tx, ty, s] of placed) {
+    if (TREE_LIST.includes(s)) continue;
+    const [fw, fh] = s.footprint || [1, 1];
+    for (let y = ty; y < ty + fh; y++) for (let x = tx; x < tx + fw; x++) madeTiles.add(`${x},${y}`);
+  }
+  const grassAt = meadowFor(SIZE, SIZE, (x, y) => !isWater(x, y) && (isRoad(x, y) || madeTiles.has(`${x},${y}`) || !!chalk[`${x},${y}`] || rubble.has(`${x},${y}`)));
 
   // TWO PASSES, as render.js: the ground (the static layer there) first, in
   // its own paintScene, then everything that stands or moves. A pull-back
@@ -605,7 +635,7 @@ function scene(z) {
         sprite = ROADS[ty === 6 || tx === 6 ? 1 : 0][mask];
       } else if (rubble.has(k)) sprite = RUBBLE;
       else if (chalk[k]) sprite = chalk[k];
-      else sprite = GRASS[(tx * 7 + ty * 3) % 3];
+      else sprite = grassAt(tx, ty);
       groundItems.push({ sprite, tx, ty, kind: "ground" });
       // Kerbs on land beside water.
       if (isWater(tx, ty - 1)) groundItems.push({ sprite: KERB[0], tx, ty, kind: "ground", z: 1 });
