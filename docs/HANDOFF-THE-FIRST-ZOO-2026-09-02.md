@@ -3808,3 +3808,224 @@ browser     the DEPLOYED Pages build, since all five preview slots were held by 
 Maker's mark — Claude Opus 5.5, session 22 continued: the one whose own
 pre-registered bar failed the apartment, and who changed the metric that had
 been flattering it and then the apartment, in that order and not the other.
+
+## 47. The ground — a quilt and not a repeat, the grass keyed off its corners, and the path I said nobody walked (session 22 continued, 2026-09-23)
+
+The owner: *"lets continue on, you are doing great work."* The standing
+brief's next open item was T3.3 — *"more grass variants, scatter keyed off
+tile index, worn paths where walkers cross grass. The tiling repeat is
+visible at zoom 2."* **The list is still
+`docs/PROPOSAL-SPRITE-UPGRADE-2026-09-22.md`**; §4's T3.3 carries the numbers.
+This is the why and the traps. Four commits: `e2ace35` regenerated two
+picture sets that had gone stale, alone on an unchanged tree; `692b2b3` is the
+meadow; `a416748` the worn paths; this section is the fourth. **Tier 3 is
+built.**
+
+### What the eye was counting
+
+There was no instrument for the ground, so the first thing built was a rig
+that photographs an open field through the real renderer and measures it.
+The list said *repeat*. The frame said **quilt**: the three grasses are three
+brightnesses — tile means 117.5 / 122.8 / 112.6 luma at 1× — and each was
+exactly one tile, chosen by `variant % 3`, so a field was a patchwork of
+light, dark and middling diamonds, and the eye counted the tiles. The repeat
+was real, and second: a pixel agreed with the pixel one tile over 13 points
+more often than with one a pixel off the lattice, and in a field of one
+variant 33–46 points, where grass-1's clumps read as wallpaper at zoom 2.
+
+`tools/groundprobe.mjs` is that rig, kept: passive like faceprobe and
+massprobe, it reads SEAM (the step in mean luma across a tile edge over the
+step across a line through a tile) and REPEAT off the renderer's frame, for
+an open field, a control that cannot have a seam, and the old pick.
+
+### The grass keyed off its corners
+
+A level lives on every tile VERTEX — 0 kept, 1 meadow, 2 rough, which ARE
+grass-0, -1 and -2 — and a tile draws its four corner levels interpolated
+across the diamond, with a jitter so the boundary is ragged. Two tiles that
+share an edge share its two corners, and along that edge the level depends
+on those two alone: **the grass cannot change at an edge.** `js/meadow.js`
+reads the corners off the world and writes nothing on it:
+
+- a corner of anything MADE — road, rail, lot (built or chalked), civic, wall,
+  rubble — is kept, and grass-0 is exactly what every road, rail and chalk
+  tile already draws in its margins, so where the city meets the land there
+  is nothing to see;
+- elsewhere, the mean of the world's own tile bytes over the 6×6 tiles round
+  the corner, cut in thirds of what a mean of that many bytes does. The byte is
+  `world.variant`, written once when the world is made and saved, so the
+  meadow is a property of the map — a saved city loads the same one;
+- a rough corner with a kept one among its eight neighbours steps down to
+  meadow, so no tile holds both, and 31 of the 81 combinations are all there
+  is to draw.
+
+Each combination is drawn in **six dithers**, chosen by the tile's byte, so a
+patch is not one sprite repeated. 186 tiles; the three uniform seed-0 ones
+ARE grass-0, -1 and -2, pixel for pixel, and are those sprites — so `art-dump`
+says **183 added, none moved, the palette line untouched**, and not a key but
+m, n, o and p.
+
+| open field (`groundprobe --cams 7`) | seam, zoom 1 · 2 · 4 | repeat, zoom 1 · 2 |
+|---|---|---|
+| the quilt, before | 2.46 · 3.80 · 5.13 | 13.6 · 13.5 |
+| **the meadow** | **0.96 · 0.99 · 1.01** | **4.9 · 4.7** |
+| the control — every corner kept, the dithers random (the floor) | 0.96 · 0.99 · 1.16 | 4.0 · 3.7 |
+
+### The metric that failed its control, and the design that failed its bar
+
+Both were pre-registered, and both did their job by failing.
+
+**The seam bar indicted its metric.** The first reading compared the edge
+against ONE pair of strips inside the tile. The pre-registration asked for
+the metric's floor on a seamless control, and the control read **1.71** at
+zoom 2 — a seam where none can exist. Sampling the textures directly found
+nothing wrong with them (0.64 inside a tile, 0.57 across two); the fault was
+that with six dither patterns, one fixed pair of strips reads the patterns.
+The baseline became every interior line in both edge directions, every state
+was re-read with it — the quilt 3.69, the meadow 1.02, the control 0.97 — and
+only then was a bar applied.
+
+**The repeat bar indicted the design.** Four dithers read 6.4 / 6.5 against a
+pre-registered ≤ 6. Six read 4.9 / 5.0. The design moved; the bar did not.
+
+### The path I said nobody walked
+
+The pre-registration said *"nobody crosses the grass"*, and I believed it for
+most of the day: every walk in `walkers.js` is a `roadSearch` over road
+tiles, and the camper only stands. It was written into `meadow.js`, SPEC and
+this section's first draft, and it was **wrong**. Checking every path
+constructor before writing it down for good, line 255 was the one that did
+not search: a commuter walks **the path the sim stored**, and `fields.js` lays
+a station's FORECOURT — the tiles between a platform and the road that serves
+it — into that path one step at a time. `world.traffic` already counts those
+steps, and `check.mjs` has asserted since Part R that *"the four grass tiles
+crossed are in it"*. So riders do cross grass, in exactly one place, and the
+list's third clause was buildable from real state all along.
+
+`wornPaths(world)` reads the steps off the stored paths themselves — which
+neighbour each walked tile was entered from and left towards, and how many
+times — so a track runs exactly where the walks run and not towards every
+busy tile beside it. `art.footpath(mask, worn)` overlays an earth track from
+the tile's centre to each walked edge's midpoint, bowed a little so it reads
+as a desire line (the first bow, 0.9 units, made two walked tiles a sine
+wave; 0.5 does not), trodden below four walks and worn bare from four. 30
+sprites, none moved. The scripted mayor never lays track — its `stations`
+flag means fire and police — so **no scripted town wears a path**; a player's
+station set back from its road wears one or two tiles at each end. The
+meadow was committed first (`692b2b3`), with the false sentence taken out of
+it, and the paths after.
+
+**And the suite's own twin gate refused the first paths.** A trodden path is
+thin and sparse — 41 to 146 pixels of earth at 1× — and its dither was drawn
+per pixel, so the 2× twin was a different path: `path-SW-trodden` came out
+19% light against the hi-res gate's 12%. `check-ground` could not see it (it
+looked only at 1× and the zoom-1 frame); `check.mjs` Part C could. Which
+pixels are earth is decided world-sized now, one draw per 1× pixel shared by
+its 2×2, and only the grain per pixel — the worst twin is 3.0% off — and
+`check-ground` holds that claim itself: a path is the same path at every zoom.
+
+### What a gate on a ground can see
+
+`tools/check-ground.mjs`, **51 checks**, in `npm run check` after dusk. The
+sprites (every combination in every dither; the three members; no uniform
+tile leaking another level at 1× or 2×; an unreachable combination throws;
+grass keys only), the field (kept round everything made; no span; writes
+nothing, same twice, survives a save; one road moves only the corners round
+it; an open map grows all three), the paths (every walked direction in both
+wears; mask 0 throws; earth only; each track reaches exactly the edges it
+names and is centred where it crosses them; the same path at every zoom; a
+real rider's commute wears exactly its four forecourt tiles, as the sim's own
+traffic count says, walk for walk) and the frame. **24 of 24 mutants killed.**
+
+Two things in it are worth knowing. **The renderer is checked pixel for
+pixel**: at zoom 1, every open tile in the frame must be exactly the sprite
+its own corners and byte name, with its path over it — because a renderer
+that asks for the NEXT tile's corners is still perfectly continuous, and no
+seam reading would ever see it; that mutant, the one that ignores the byte,
+the one that keys the grass off the tile again and the ones that draw no path
+or wear it a walk late all die there. **And only the frame's seam reading
+caught a transposed interpolation** (1.56 against the 1.3 bar) — every check
+on the parts passed it. The forecourt frame check compares the road side of
+the line only, with shadows off: the platform and its shelter stand in front
+of the tiles south of it, and cast over them.
+
+### Two picture sets that had stopped being true
+
+Base rate first, on a worktree of `d38b5d0`: every tool that writes into
+`docs/shots`, run in turn. Two sets moved with nothing changed, and
+regenerated twice were byte-identical — stale, not random.
+`docs/shots/building-variants/` had not been drawn since **T1's shadows**
+(`8bccb62`, found by walking the arc's commits): its tool is not a sheet tool,
+and neither sheet refresh ran it. `scene.png` had not been drawn since
+**T3.2**, which regenerated its sheets by name and never ran `shots.mjs` — my
+own miss. Both regenerated on the unchanged art, alone (`e2ace35`). And
+`shots.mjs` drew its own grass by a formula of its own, so after T3.3 the
+arc's judged frame would have gone on showing the quilt; the scene, the
+blocks, the landmarks and the road network now lay the game's grass through
+the same corner field.
+
+### The lawn check-dusk measures
+
+`check-dusk`'s lawn is where the full city and the empty map agree (§46). The
+kept grass beside a building now differs from the empty map's meadow, so it
+is left out rather than failed: 6,095 → 5,616 px, eleven times the check's
+floor. It still holds every pixel it reads to the ground's table.
+
+| what you see | what it is |
+|---|---|
+| a ground whose tiles you can count | **the variants are brightnesses cut into diamonds.** Key the grass off the corners, so no edge can step |
+| a patch of one grass that reads as wallpaper | **one sprite per level, repeated.** Draw each corner combination in several dithers |
+| a seam reading on a ground that cannot have a seam | **one fixed pair of strips reads the dither patterns.** Baseline on every interior line, and read a control before any bar |
+| a pre-registered bar missed by half a point | **change the design, not the bar** — six dithers, not four |
+| a renderer drawing the wrong tile's grass, and no seam anywhere | **a consistent shift is continuous.** Compare each tile with the sprite its own corners name, pixel for pixel |
+| "nobody walks there", read off the code that draws the walker | **the walker draws a path it was HANDED.** Read the producer — here `fields.js`, which lays forecourts into the stored commute — and look for the check that already asserts it |
+| a thin overlay's 2× twin refused by the hi-res gate | **a per-pixel dither drawn again at 2× is a different drawing.** Decide coverage world-sized and only the grain per pixel — and run the WHOLE suite: the gate that saw it was not the one written for the feature |
+| a desire line that reads as a sine wave | **a bow per arm repeats per tile.** Halve it; two walked tiles are the most a forecourt has |
+| a frame check failing on the tiles in front of a station | **a standing thing and its shadow cover the ground in front of it.** Turn shadows off and compare the side of the line the check is about |
+| a fixture tile that turns out to be a pond | **the sample is a claim** (trap 13): find the tile, and assert it is what it says |
+| a regex that emptied a string after a scripted edit | **two escaping layers ate its backslash** — `/\./` arrived as `/./`. Edit a regex with the Edit tool |
+| a picture that moves with no change at all | **its writer is not a sheet tool.** The base rate runs EVERY tool that writes into `docs/shots` |
+| `scene.png` stale after an art change | **`shots.mjs` writes it**, and a commit that names its sheet tools does not run it |
+| the dusk check's lawn shrinking | **lawn is agreement with the empty map;** kept grass by a building disagrees now, and is excluded, not failed |
+
+### The state of it
+
+```
+art-dump    3864 sprites · 74 palette keys · TOTAL 33aeb45e   (213 added — 183 meadow tiles, 30 paths; none moved; palette untouched)
+groundprobe open field: seam 0.96 / 0.99 / 1.01 at zoom 1/2/4 (the quilt 2.46 / 3.80 / 5.13, the floor 0.96 / 0.99 / 1.16)
+            repeat 4.9 / 4.7 at zoom 1/2 (the quilt 13.6 / 13.5)
+gate        tools/check-ground.mjs — 51 checks · 24/24 mutants
+cost        ground rebuild 9.5 → 9.6 ms (zoom 1), 16.5 → 16.6 (zoom 2), within noise; corner field 0.41 ms, path reader 0.13 ms (1,599 citizens)
+sheets      docs/shots/sheet-ground.png (tools/ground-sheet.mjs) · ground-before-after.png (two trees, one process)
+            eight sheets and eleven variant-review frames regenerated; building-variants/ and scene.png in e2ace35
+suite       980 checks 0 failures · close-ups 315/2,688 · shadows 22 · dusk 114 · ground 51 · NPM_EXIT=0
+browser     the DEPLOYED Pages build, the preview slots all being held by other chats: 3,864 sprites, and
+            grass-0, grass-1, meadow-2211-5 and three paths hash as art-dump says; in the browser's own canvas
+            at zoom 2 the open field's seam reads 0.95 (the control 0.99, the old quilt 3.69) and its repeat 3.5
+            (11.9); the forecourt wears +614 px of earth at three riders and +1,590 at six; one console
+            warning, the test's own pixel readback; no city entered
+```
+
+### What is open
+
+- **Tier 4 — the animals.** Fourteen species in eight coats; the standing
+  brief has the table. The next item on the list.
+- **Q1, the shadow length, is still the owner's.**
+- **Scatter as objects** — flowers, stones — was not built: at zoom 1 each is
+  one pixel of a key that is not grass, and every such key on the ground
+  already means something. It wants a size-on-screen answer, not a sprinkle.
+- **The meadow's numbers are taste**: the 6×6 window, the thirds, the jitter
+  of 0.45, six dithers, the path's bow and its four-walk threshold. Read off
+  pictures and two measured bars; nobody has tuned them in play.
+- **A path is drawn on open grass only.** A forecourt across an empty zoned
+  lot, a park or rubble is walked too, and shows nothing — the chalk is the
+  zone's mark and was left alone.
+- **Still open from T3.2**: the roof furniture's terrace question; no gate
+  sees a hidden door; 43 plans are one box.
+- **Nobody has played this.** Not a shadow, not an evening, not a blind, not a
+  terrace, not a meadow, not a path.
+
+Maker's mark — Claude Opus 5.5, session 22 continued: the one who was asked
+to break up a repeat and found a quilt, who set a control beside the first
+number it drew, and who wrote "nobody walks there" into three files before
+reading the one that hands the walker its path.

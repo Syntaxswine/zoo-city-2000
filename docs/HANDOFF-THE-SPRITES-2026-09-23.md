@@ -1,13 +1,13 @@
 # The sprites handoff — 2026-09-23
 
 For whoever takes Tier 3 or Tier 4, or touches `js/art/` at all. Sessions 21
-and 22 built the shadows, the roofs, the evening, the windows and the
-setbacks; this is what
+and 22 built the shadows, the roofs, the evening, the windows, the setbacks
+and the ground; this is what
 I know now that I did not know when I started, written down so you do not have
 to find it the way I did.
 
-**Last true on `38b187b`, 2026-09-23** — T1 closed, T2 closed, T3.1 and T3.2
-built; T3.3 and Tier 4 open.
+**Last true on `a416748`, 2026-09-23** — Tiers 1, 2 and 3 closed; Tier 4
+open.
 Every number in this file was re-measured on that tip. If you are reading it
 much later, the numbers are the first thing to distrust and `npm run check`
 is the first thing to run: it prints most of them.
@@ -17,11 +17,11 @@ is the first thing to run: it prints most of them.
 | document | what it is for |
 |---|---|
 | `docs/PROPOSAL-SPRITE-UPGRADE-2026-09-22.md` | **the list.** §4 is the checklist, each item with the verification written down *before* it was built. §2c is the five art gates. Cross things off there |
-| handoff §43–§46 (`HANDOFF-THE-FIRST-ZOO-2026-09-02.md`) | **the sessions.** What was measured on the day, and the thirty-seven traps in four symptom-keyed tables |
+| handoff §43–§47 (`HANDOFF-THE-FIRST-ZOO-2026-09-02.md`) | **the sessions.** What was measured on the day, and the fifty traps in five symptom-keyed tables |
 | this file | **the standing brief.** The laws, the instruments, what is proven against what is a guess, and what is still open |
 | `SPEC.md` §12, §13 | the design record. It outranks all three |
 
-Read this one and §4. Do not read §43–§46 front to back until
+Read this one and §4. Do not read §43–§47 front to back until
 something breaks; then read the trap tables, which are keyed by the symptom
 you are looking at.
 
@@ -60,9 +60,10 @@ commit.
    twin**, not the 1× rows scaled. Anything new in the dynamic pass must
    honour `S > 1 && art.hires`, as `blitScaled` does.
 7. **Art cannot move a `stateHash`.** The sprite a variant byte selects is not
-   in the hashed shape. Across the whole arc — **seventeen commits** of shadows,
-   roofs, an evening, a set of windows and four buildings stepped back — `git
-   diff --name-only 4bb38b6..HEAD -- js/sim/` is **empty**, and
+   in the hashed shape. Across the whole arc — **twenty-one commits** of
+   shadows, roofs, an evening, a set of windows, four buildings stepped back
+   and a meadow — `git diff --name-only 4bb38b6..HEAD -- js/sim/` is
+   **empty**, and
    `tools/play.mjs --dusk` renders the same scripted city at the same hash
    `86cc1587` by day and at nightfall. Keep it that way: if an art change
    needs a sim field, it is not an art change.
@@ -138,10 +139,13 @@ carries its re-baselined receipt in the same commit.** That is what turns
 | `tools/check-closeups.mjs` | GATE | 315 buildings, 2,688 citizens; a twin may not expand its silhouette |
 | `tools/check-shadows.mjs` | GATE, 22 checks | every recipe casts, one key only, the mask never lands on a standing sprite's pixels, shadows off is byte-exact |
 | `tools/check-dusk.mjs` | GATE, 114 checks | amount 0 is the ABSENCE of a table, no ramp inverts, the lights are fixed points, the ground takes less light than the walls — and the lawn it samples is MEASURED lawn: the same frame with nothing standing agrees with it by day and at dusk |
+| `tools/check-ground.mjs` | GATE, 51 checks | the grass keyed off its corners and the paths worn where riders cross it: every corner combination and walked direction drawn; kept round everything made; no tile spanning kept and rough; the paths exactly where the sim's own traffic count says a walk crosses grass, and the same path at every zoom; and the FRAME — every open tile pixel for pixel as its own corners, byte and walks name, and no seam, with the instrument proven able to see the old quilt in the same run |
+| `tools/groundprobe.mjs` | **passive instrument** — refuses nothing | does the ground show its tiles? SEAM (the step across a tile edge over the step across a line through a tile; 1 is seamless) and REPEAT (agreement one tile over, above chance), off the renderer's frame, for an open field, a control that cannot have a seam, and the pick before T3.3. `--cams N` |
 | `tools/faceprobe.mjs` | **passive instrument** — refuses nothing | how much of the city is roof, and how much of a roof is one bare quad. `--family`, `--top N` |
 | `tools/massprobe.mjs` | **passive instrument** — refuses nothing | how much of each plan is one box: `fill` (its rooms over their bounding prism) and `deck` (a level between the street and the top, seen at zoom 1). Bare, it names the plans that are still ONE BOX WITH A LID. `--family`, or a name pattern |
 | `tools/shadow-sheet.mjs`, `tools/dusk-sheet.mjs` | passive | one town, one camera, one process, only the knob moving |
 | `tools/skyline-sheet.mjs` | passive | the four families T3.2 stepped back, all six plans side by side, and a 218-lot block at zoom 1 and 2. `docs/shots/skyline-before-after.png` is the before/after — two trees in one process, the only way a "before" survives a recipe change |
+| `tools/ground-sheet.mjs` | passive | the 31 corner combinations, an open field at zoom 1 and 2, a town's edge where the kept grass meets the meadow, and a forecourt trodden and worn. `docs/shots/ground-before-after.png` is the before/after — two trees, one process |
 | `tools/window-sheet.mjs` | passive | 24 facades at 4× for the state ART, then a dense block through the real renderer at zoom 1, 2 and dusk for the only question that decides it — at the zoom the game is played at, is this a city of different windows or is it noise? |
 | `tools/play.mjs` | passive | the real renderer on a real mayor-built town. `--no-shadows`, `--shadow-k N`, `--dusk` |
 
@@ -152,11 +156,12 @@ have not decided about yet.
 **The state of the tree as this is written:**
 
 ```
-art-dump    3651 sprites · 74 palette keys · TOTAL f910d9fe   (T3.2 moved 8 sprites; the palette line has not moved since T2.1)
+art-dump    3864 sprites · 74 palette keys · TOTAL 33aeb45e   (T3.3 added 213 and moved none; the palette line has not moved since T2.1)
 faceprobe   315 box recipes (of 387 registered) · TOP 63.4% · bare quad 42.9%
 massprobe   192 zoned plans · 43 one box with a lid (51 before T3.2) · R/C tiers 2–3: one, the skylight market
-suite       980 checks 0 failures · close-ups 315/2,688 · shadows 22 · dusk 114 · Part E 18
-gates       art-dump → check → close-ups → shadows → dusk → suits → …
+groundprobe open field: seam 0.96 / 0.99 / 1.01 at zoom 1/2/4 (the quilt before 2.46 / 3.80 / 5.13) · repeat 4.9 / 4.7 (13.6 / 13.5)
+suite       980 checks 0 failures · close-ups 315/2,688 · shadows 22 · dusk 114 · ground 51 · Part E 18
+gates       art-dump → check → close-ups → shadows → dusk → ground → suits → …
 ```
 
 ---
@@ -192,7 +197,16 @@ a proxy that happens to work.
   up backlights strictly more of its cloth than it did before.
 - T3.2 moved exactly eight sprites — four plans and their mirrors — and no
   colour: the art-dump names them and the palette line did not move.
-- Art has not moved a sim hash, anywhere in the arc — seventeen commits, zero
+- The grass cannot step at a tile edge: two tiles that share an edge share its
+  corners, and the gate holds the frame to it — seam ≤ 1.3 at zoom 1 and 2
+  (it reads 0.9–1.0), in a run that must also read the old quilt as ≥ 2.0
+  (2.4–3.9) or prove nothing.
+- The renderer lays every open tile's grass and path exactly as its own
+  corners, byte and walks name — pixel for pixel, at zoom 1, trodden and worn.
+- A path is worn exactly where a stored commute walks on grass, walk for walk
+  with the sim's own traffic count; the three grasses are three of the 186
+  meadow tiles, byte for byte; and T3.3 added 213 sprites and moved none.
+- Art has not moved a sim hash, anywhere in the arc — twenty-one commits, zero
   files touched under `js/sim/`.
 
 **A guess.**
@@ -245,6 +259,10 @@ a proxy that happens to work.
 - **A lit blind hiding at noon and showing at dusk is EMERGENT and ungated.**
   It falls out of two tables that do not know about each other (see *The four
   passes*); retune `dusk.js` and it can go without a check saying a word.
+- **The meadow's numbers are taste**: the 6×6 window, the thirds, a jitter of
+  0.45 of a level, six dithers — and the path's bow (0.5 units) and its
+  four-walk threshold. Read off pictures and two measured bars; the bars are
+  the seam and the repeat, not how a meadow ought to look.
 - **Nobody has played this.** Every frame in `docs/shots/` was taken by me,
   through the real renderer, on a scripted town. No player has seen a shadow,
   an evening or a drawn blind in this game yet. Treat the owner's first
@@ -254,8 +272,8 @@ a proxy that happens to work.
 
 ## Traps that are classes
 
-Thirty-seven are recorded in §43–§46, keyed by the symptom you are staring
-at. These thirteen are the ones that are not incidents: each has either
+Fifty are recorded in §43–§47, keyed by the symptom you are staring at.
+These fifteen are the ones that are not incidents: each has either
 already happened twice, or cost a whole session once and will cost the next
 one too. **Renumbering this list breaks a comment in the source — run
 `grep -rn "standing brief" js/ tools/` before you do.**
@@ -327,7 +345,10 @@ one too. **Renumbering this list breaks a comment in the source — run
    sheets changed under T3.1 — and the same fifteen change on a tree with no
    working changes at all, because nothing regenerated them through Tier 2.
    They went in a commit of their own, on an unchanged tree, so that T3.1's
-   own four could be read.
+   own four could be read. **And run every tool that writes into
+   `docs/shots`, not the ones called sheets:** T3.3 found the variant review's
+   city frames stale since T1's shadows, and `scene.png` since T3.2, because
+   no refresh had run the tools that write them.
 10. **The ground layer is offscreen and survives frames.** It rebuilds only
     when the camera leaves its margin. Anything that changes how the ground is
     painted must mark `dirty` — otherwise the lawn stays at noon under a city
@@ -353,13 +374,23 @@ one too. **Renumbering this list breaks a comment in the source — run
     unpainted map. A sample that is "lawn", a fixture that "took", a town that
     "has a hall" — assert it in the check itself, so the day it stops being
     true the fixture fails as a FIXTURE and not as the feature.
+14. **A CLAIM ABOUT WHAT A CONSUMER DOES IS A CLAIM ABOUT ITS PRODUCER.** T3.3
+    read "walkers never cross grass" off `walkers.js` — every search in it is
+    over roads — and wrote it into three files. The commuter walks a path it
+    is HANDED, and `fields.js` lays a station's forecourt into that path tile
+    by tile; `check.mjs` had asserted it for months. Read the thing that makes
+    the data, and search the suite for the check that already says so.
+15. **A METRIC NEEDS A CONTROL BEFORE IT GETS A BAR.** T3.3's seam measure read
+    1.71 on a ground that cannot have a seam: one fixed pair of strips was
+    reading six dither patterns. Build the case that must read the floor and
+    the case that must read the fault, run the instrument on both, and only
+    then hold the thing you built to a number.
 
 ---
 
 ## The brief for Tier 3 — the living city
 
-Three items (§4 T3.1–T3.3). **T3.1 and T3.2 are built** (2026-09-23, §45 and
-§46); T3.3 is open.
+Three items (§4 T3.1–T3.3). **All three are built** (2026-09-23, §45–§47).
 
 **T3.1, window states — BUILT.** The widening was one return in one face
 function, exactly as this brief predicted; everything that cost a day was
@@ -403,10 +434,29 @@ the order they will bite:
    the `art-dump` receipt in the same commit. The footprint gate (G2) never
    bit: every box was written inside `[0, 16]` from the start.
 
-**T3.3, ground.** More grass variants, scatter keyed off the tile index, worn
-paths where walkers cross grass. The tiling repeat is visible at zoom 2. Note
-that the ground now has a second reader — `duskTable(amount, true)`, the flat
-table — so a new ground key is a key at dusk too.
+**T3.3, ground — BUILT.** Measured, the repeat was a QUILT: three grass
+brightnesses cut into diamonds. The grass is now keyed off its CORNERS
+(`js/meadow.js` reads them off the world; `art.meadow` draws a tile from its
+four), kept round everything the city has made, and a path is worn where a
+rider's stored commute crosses a station's forecourt (`wornPaths`,
+`art.footpath`). **If you are changing the ground**, the five things to know:
+
+1. **Key variation off corners, never off a tile.** Anything tile-shaped that
+   differs from its neighbour is a seam; `groundprobe` will read it.
+2. **The ground has its own evening table** (`duskTable(amount, true)`), so
+   a new ground key is a key at dusk too — the meadow and the paths added
+   none (grass keys, and the earth ramp's two middle keys).
+3. **The frame check composites every open tile's expectation.** A new
+   overlay on grass must be added to it, or the pixel-for-pixel check fails —
+   which is the point.
+4. **A sparse overlay decides its coverage world-sized.** A per-pixel dither
+   drawn again at 2× is a different drawing, and `check.mjs`'s twin gate (ink
+   within 12% of 4×) refused the first trodden path at 19% — decide which
+   pixels are covered once per 1× pixel, and only the grain per pixel. Run
+   the whole suite: that gate is not in `check-ground`.
+5. **Read the control before the bar** (trap 15), and run the probe on the
+   previous tip as well as yours: the quilt is the fault it must be able to
+   see.
 
 **Where the roof still is.** `node tools/faceprobe.mjs --family`, today:
 
@@ -509,3 +559,9 @@ my own pre-registered bar failed the apartment, and the first thing it caught
 was not the apartment but the metric that had been flattering it. I fixed the
 metric, then the building, in that order. And I learned the lesson of this
 file's trap 13 from a check I had never touched — its "lawn" was a wall.
+
+And beneath that — the same, T3.3. I was asked for a repeat and measured a
+quilt; I set a control beside the first number I drew, and the control threw
+the number away. And I wrote "nobody walks on the grass" into three files
+before reading the one file that hands every walker its path. Trap 14 is
+mine.

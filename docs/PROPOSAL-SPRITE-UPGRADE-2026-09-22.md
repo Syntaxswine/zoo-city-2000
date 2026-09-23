@@ -363,7 +363,7 @@ them, which is the difference between an evening and an overcast afternoon.
 
 ### Tier 3 — the living city
 
-**T3.1 and T3.2 BUILT 2026-09-23; T3.3 open.** For T3.1, `tools/art-dump.mjs` on the finished tree:
+**TIER 3 IS BUILT — T3.1, T3.2 and T3.3, 2026-09-23.** For T3.1, `tools/art-dump.mjs` on the finished tree:
 **3,651 sprites and 74 palette keys, none moved** — a window state adds no
 colour, the same claim T1.5 made and for the same reason: everything a pane
 can hold was already in the palette.
@@ -533,8 +533,114 @@ The A/B is `docs/shots/sheet-windows.png` (`tools/window-sheet.mjs`).
   dusk — until the stepped apartment put a lit window on one (`b39866c`); and
   `sheet-shadows` / `sheet-dusk` had not been drawn since before T3.1
   (`c61920c`).
-- [ ] **T3.3 — ground:** more grass variants, scatter keyed off tile index,
+- [x] **T3.3 — ground:** more grass variants, scatter keyed off tile index,
   worn paths where walkers cross grass. The tiling repeat is visible at zoom 2.
+  **BUILT 2026-09-23 — and measured first, which re-read two of its four
+  clauses.** The picture is `docs/shots/sheet-ground.png`
+  (`tools/ground-sheet.mjs`); the before/after is
+  `docs/shots/ground-before-after.png`, the same field and town through the
+  previous tip and this one in one process.
+
+  **What the eye counted was not a repeat but a QUILT.** The three grasses are
+  three brightnesses — tile means 117.5 / 122.8 / 112.6 luma at 1× — and each
+  was exactly one tile, chosen by `variant % 3`: an open field was a
+  patchwork of diamonds. `tools/groundprobe.mjs` measures it off the
+  renderer's own frame as the step in mean luma across a tile edge over the
+  step across a line through a tile. The repeat was real too, and second.
+
+  | open field (`groundprobe --cams 7`) | seam, zoom 1 · 2 · 4 | repeat, zoom 1 · 2 (pts) |
+  |---|---|---|
+  | the quilt, before | 2.46 · 3.80 · 5.13 | 13.6 · 13.5 |
+  | **the meadow** | **0.96 · 0.99 · 1.01** | **4.9 · 4.7** |
+  | a control that cannot have a seam (the floor) | 0.96 · 0.99 · 1.16 | 4.0 · 3.7 |
+
+  **THE GRASS IS KEYED OFF ITS CORNERS, NOT ITS TILE.** Three levels — kept,
+  meadow, rough, which ARE grass-0, -1 and -2 — live on the tile vertices, and
+  a tile draws its four corner levels interpolated across the diamond. Two
+  tiles that share an edge share its corners, so the grass cannot change at
+  the edge. `js/meadow.js` reads the corners off the world and writes
+  nothing: kept wherever anything made touches a corner; elsewhere the mean of
+  the tile bytes over the 6×6 round it, in thirds; a rough corner beside a kept
+  one steps down to meadow, so no tile holds both and 31 of the 81
+  combinations are all there is to draw. Each is drawn in six dithers, so a
+  patch is not one tile repeated. **186 tiles, 183 of them new** — the three
+  uniform seed-0 ones ARE grass-0/1/2, pixel for pixel. `art-dump` after the
+  meadow: 3,834 sprites, none moved, the palette line untouched, no key but
+  m n o p; after the footpaths below, 3,864.
+
+  **"More grass variants"** is those 183. **"Scatter keyed off tile index"**:
+  the tile index keys the ground twice — the corner levels (the mean of the
+  tile bytes round each corner) and the dither (the tile's own byte, mod 6) —
+  and NO scatter of objects was built: at zoom 1 a flower or a stone is one
+  pixel of a key that is not grass, which is speckle, and every such key on
+  the ground already means something (a chalk line, rubble, a zot). Open.
+
+  **"Worn paths where walkers cross grass" — built, after I first wrote that
+  nobody does.** Reading `walkers.js` alone, every walk is a `roadSearch` over
+  road tiles, and that was the draft's claim. It was wrong: a commuter walks
+  the SIM's stored path, and `fields.js` lays a station's FORECOURT — the
+  tiles between a platform and the road that serves it — into that path one
+  step at a time, and `world.traffic` already counts those steps (`check.mjs`
+  has asserted it since Part R: "the four grass tiles crossed are in it").
+  That is the one place a walk crosses grass. `wornPaths(world)`
+  (`js/meadow.js`) reads the steps off the stored paths themselves — which
+  neighbour each walked tile was entered from and left towards, and how many
+  times — and `art.footpath(mask, worn)` overlays an earth track from the
+  tile's centre to the middle of each walked edge, bowed a little so it reads
+  as a desire line, trodden below four walks and worn bare from four. 30
+  sprites, none moved. **How often:** the scripted mayor never lays track, so
+  no scripted town wears a path; a player's station set back from its road
+  wears one or two tiles at each end. The gate holds it to the sim's own
+  traffic count, walk for walk, and to the frame pixel for pixel on either
+  side of the threshold. **The suite's twin gate refused the first version**:
+  a trodden path is thin and sparse, its dither was drawn per pixel, and the
+  2× twin of `path-SW-trodden` came out 19% light against the 12% the hi-res
+  gate allows. Which pixels are earth is decided world-sized now and only the
+  grain per pixel (the worst twin 3.0% off), and the ground gate holds it
+  directly: a path is the same path at every zoom.
+
+  **The pre-registered seam bar indicted its own metric first.** The first
+  measurement compared the edge against ONE fixed pair of strips inside the
+  tile, and a control that cannot have a seam (every corner kept, the dithers
+  random) read 1.71 at zoom 2: with six dither patterns, one fixed pair reads
+  the patterns, not the seam. The baseline became every interior line, in
+  both edge directions, and every state was re-read with it — the quilt, the
+  meadow and the control — before any bar was applied. **And the repeat bar
+  indicted the design:** four dithers read 6.4 / 6.5 against a pre-registered
+  ≤ 6, so the design went to six dithers (4.9 / 5.0) and the bar did not move.
+
+  **Measured, the costs:** the ground-layer rebuild 9.5 → 9.6 ms at zoom 1,
+  16.5 → 16.6 at zoom 2, within the rig's noise (the corner field is one pass
+  over (w + 1)·(h + 1) corners with an integral image); the art registry's
+  import is within its noise; the corner field costs 0.41 ms and the path
+  reader 0.13 ms a call on a 1,599-citizen town. **The gate is
+  `tools/check-ground.mjs`, 51 checks, 24 of 24 mutants killed** — including
+  the one that matters most: at zoom 1 every open tile in the frame is, pixel
+  for pixel, the sprite its own corners and byte name, so
+  a renderer that asked for the wrong tile's corners, ignored the byte or
+  keyed the grass off the tile again goes red. Only the frame's seam reading
+  caught a transposed interpolation (1.56 against the 1.3 bar).
+
+  **`check-dusk`'s measured lawn shrank and stayed honest.** Its lawn is where
+  the full city and the empty one agree; kept grass beside a building now
+  differs from the empty map's meadow, so it is left out rather than failed:
+  6,095 → 5,616 px, still 11× the check's floor of 500.
+
+  **A picture was stale, and one of the causes was T3.2.** Base rate first, on
+  a worktree of the previous tip: `docs/shots/building-variants/` had not been
+  drawn since T1 put shadows under the city (`8bccb62`) — its tool is not a
+  sheet tool, and neither sheet refresh ran it — and `scene.png` not since
+  T3.2, which never ran `shots.mjs`. Regenerated on the unchanged art in a
+  commit of their own (`e2ace35`). `shots.mjs` now lays the scene's, the
+  blocks', the landmarks' and the road network's grass through the same
+  corner field, so the arc's judged frame shows the ground the game draws.
+
+  **Verified on the deployed Pages build** (`692b2b3` the meadow, `a416748`
+  the paths), the preview slots all being held by other chats: 3,864 sprites,
+  and six of them hash as `art-dump` says; in the browser's own canvas at
+  zoom 2 the open field's seam reads 0.95 against the control's 0.99 and the
+  old quilt's 3.69; the forecourt wears 614 px of earth at three riders and
+  1,590 at six. No console errors; no city entered.
 
 ### Tier 4 — the animals
 
@@ -683,7 +789,11 @@ Only the genuinely undecided; everything else is decided above.
    it needed a second predicate on the box (`aperture`) that T3.2's recipe
    boxes have no use for. **T3.2 (setbacks and awnings) DONE 2026-09-23** —
    eight sprites, four plans and their mirrors, after two fixtures it exposed
-   were repaired in commits of their own. T3.3 next, then Tier 4.
+   were repaired in commits of their own. **T3.3 (ground) DONE 2026-09-23** —
+   the grass keyed off its corners and paths worn where riders cross it,
+   213 sprites added (183 meadow tiles, 30 paths) and none moved, after two
+   stale picture sets were regenerated in a commit of their own. Tier 4
+   next.
 
 ---
 
