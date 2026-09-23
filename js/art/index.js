@@ -18,7 +18,8 @@ import { allGovernor } from './governor.js';
 //                                       | 'chalk' variant = zone*2 + (high?1:0)
 //                                       | 'kerb' side 0..3 (N E S W)
 //   art.chalk(zone, high)               the same, spelled out
-//   art.meadow(corners, seed)           the grass tile whose corners hold [N, E, S, W] levels (0 kept · 1 meadow · 2 rough), dither seed 0..3 (terrain.js, T3.3)
+//   art.meadow(corners, seed)           the grass tile whose corners hold [N, E, S, W] levels (0 kept · 1 meadow · 2 rough), dither seed 0..5 (terrain.js, T3.3)
+//   art.footpath(mask, worn)            the path worn across a walked grass tile, towards the neighbours in mask (N=1 E=2 S=4 W=8); an overlay (terrain.js, T3.3)
 //   art.tree(kind)                      'round' | 'tall' | 'willow' or 0..2
 //   art.citizen(species, facing, frame, age, opts)   opts.look, opts.suit, opts.hat, opts.carry 'sack'|'cart'
 //   art.camera(yaw)                     a security camera, yaw 0 | 1 (which drawn face wears the lens)
@@ -55,7 +56,7 @@ import { shadow, billboardShadow } from "./shadow.js"; // what a solid puts on t
 import { roadSprite, bridgeSprite, allRoads } from "./roads.js";
 import { wallSprite, tunnelSprite, allWalls } from "./walls.js";
 import { railSprite, railBridgeSprite, stationSprite, crossingSprite, allRail } from "./rail.js";
-import { GRASS, meadowSprite, CHALK, RUBBLE, WATER_TILE, KERB, TREES, TREE_LIST, ZOTS, PLAZA, CURSOR, GHOST, waterTint, WATER_FRAMES, allTerrain } from "./terrain.js";
+import { GRASS, meadowSprite, footpathSprite, CHALK, RUBBLE, WATER_TILE, KERB, TREES, TREE_LIST, ZOTS, PLAZA, CURSOR, GHOST, waterTint, WATER_FRAMES, allTerrain } from "./terrain.js";
 import { citizenSprite, portraitSprite, TENT, HAT, MEETING, SACKS, allCitizens } from "./citizens.js";
 import { bubbleSprite, BUBBLE_SAMPLES } from "./bubbles.js";
 
@@ -150,6 +151,7 @@ export const art = Object.freeze({
   ground,
   chalk,
   meadow: meadowSprite,
+  footpath: footpathSprite,
   tree,
   citizen: citizenSprite,
   overlay,

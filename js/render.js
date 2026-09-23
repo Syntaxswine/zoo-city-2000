@@ -40,6 +40,7 @@ import { rasterize } from "./art/format.js";
 import { floodplain } from "./sim/progression.js";
 import { ZONE, CIVIC, TERRAIN, ROAD, capacityOf, isPart, anchorOf, sideOf, civicAnchorOf, civicSideOf } from "./sim/world.js";
 import { DECK_TOP } from "./art/roads.js";
+import { WORN_WALKS } from "./art/terrain.js";
 import { lotScore, REASON } from "./sim/lots.js";
 import { siteRoadDist, asksAccess, served } from "./sim/fields.js";
 import { useTint } from "./sim/use.js";
@@ -47,7 +48,7 @@ import { KNOBS } from "./sim/rules.js";
 import { tunnelAxis } from "./sim/reach.js";
 import { isWorker } from "./sim/census.js";
 import { BAG_FALL } from "./walkers.js";
-import { meadowField } from "./meadow.js";
+import { meadowField, wornPaths } from "./meadow.js";
 import { line as needLine } from "./sim/voice.js";
 
 const MARGIN = 256; // projection px around the viewport kept in the static layer
@@ -354,6 +355,7 @@ export function createRenderer(canvas, initialWorld, art) {
     const flood = art.overlay("flood");
     // The grass is keyed off its corners, and the corners off the world (js/meadow.js): read afresh on every rebuild, as the roads' masks are.
     const meadow = meadowField(world);
+    const walked = wornPaths(world); // and the paths worn into it where a commute crosses grass: a station's forecourt
     for (let ty = range.y0; ty <= range.y1; ty++) {
       for (let tx = range.x0; tx <= range.x1; tx++) {
         const [sx, sy] = toScreen(tx, ty);
@@ -378,6 +380,8 @@ export function createRenderer(canvas, initialWorld, art) {
             if (world.zone[i] === ZONE.R) tint = R_CHALK_TINT;
           } else sprite = art.meadow(meadow.corners(tx, ty), world.variant[i]);
           items.push({ sprite, tx, ty, kind: "ground", tint });
+          const path = walked.get(i);
+          if (path) items.push({ sprite: art.footpath(path.mask, path.walks >= WORN_WALKS), tx, ty, kind: "ground", z: 1 });
           if (waterAt(tx, ty - 1)) items.push({ sprite: art.ground("kerb", 0), tx, ty, kind: "ground", z: 1 });
           if (waterAt(tx + 1, ty)) items.push({ sprite: art.ground("kerb", 1), tx, ty, kind: "ground", z: 1 });
           if (waterAt(tx, ty + 1)) items.push({ sprite: art.ground("kerb", 2), tx, ty, kind: "ground", z: 1 });

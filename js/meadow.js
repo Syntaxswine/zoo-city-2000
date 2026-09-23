@@ -3,6 +3,7 @@
 // scratch on the world object, nothing written). SPEC §12.4, T3.3.
 //
 //   meadowField(world) → { level, corners(tx, ty) → [N, E, S, W] }
+//   wornPaths(world)   → Map(tile → { mask, walks }): the grass a commute walks
 //
 // The levels are 0 kept · 1 meadow · 2 rough, and art.meadow draws a tile
 // from its four (terrain.js says why a corner and not a tile: two tiles that
@@ -23,7 +24,8 @@
 // neighbours steps down to meadow, so no tile holds both: the grass grades
 // kept → meadow → rough, and 31 corner combinations are all art.meadow draws.
 
-import { ROAD, ZONE } from "./sim/world.js";
+import { ROAD, ZONE, TERRAIN } from "./sim/world.js";
+import { TILE } from "./sim/fields.js";
 
 const REACH = 3; // the window: the 6×6 tiles round a corner
 const BYTE_SD = Math.sqrt((256 * 256 - 1) / 12); // the spread of one uniform byte
@@ -82,4 +84,45 @@ export function meadowField(world) {
   }
   const at = (vx, vy) => level[vy * W + vx];
   return { level, corners: (tx, ty) => [at(tx, ty), at(tx + 1, ty), at(tx + 1, ty + 1), at(tx, ty + 1)] };
+}
+
+// WORN PATHS, WHERE WALKERS CROSS GRASS. The list's T3.3 asked for them, and
+// there is exactly one place it happens: a station's FORECOURT. Every other
+// step of every walk is a road; a rider's commute is the sim's stored path,
+// and fields.js lays the tiles between a platform and the road that serves it
+// into that path one step at a time — so a walker is drawn across them, and
+// `world.traffic` already counts them. A path is worn where those steps are:
+// read off the stored paths themselves, so a track runs exactly where the
+// walks run — towards the neighbour each step came from and went to, not
+// towards every busy tile that happens to be beside it.
+const TOWARDS = [[0, -1, 1], [1, 0, 2], [0, 1, 4], [-1, 0, 8]]; // N E S W, the roads' mask bits
+
+/** Is tile i open grass the ground draws as meadow — the only ground a path is worn into? */
+export function openGrass(world, i) {
+  return !madeAt(world, i) && world.terrain[i] !== TERRAIN.WATER;
+}
+
+/** Every grass tile a stored commute walks: tile → { mask (N 1 · E 2 · S 4 · W 8, the neighbours walked to or from), walks }. */
+export function wornPaths(world) {
+  const out = new Map();
+  const { w } = world;
+  const toward = (from, to) => {
+    const dx = (to % w) - (from % w), dy = ((to / w) | 0) - ((from / w) | 0);
+    for (const [x, y, bit] of TOWARDS) if (dx === x && dy === y) return bit;
+    return 0;
+  };
+  for (const c of world.citizens) {
+    const p = c.path;
+    if (!p) continue;
+    for (let k = 0; k < p.length; k++) {
+      const t = p[k] & TILE;
+      if (!openGrass(world, t)) continue;
+      const e = out.get(t) || { mask: 0, walks: 0 };
+      if (k > 0) e.mask |= toward(t, p[k - 1] & TILE);
+      if (k + 1 < p.length) e.mask |= toward(t, p[k + 1] & TILE);
+      e.walks++;
+      out.set(t, e);
+    }
+  }
+  return out;
 }

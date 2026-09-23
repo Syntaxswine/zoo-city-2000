@@ -3301,6 +3301,36 @@ overlay-rubble-0	64x32	32,16	1024	ae4163d3
 overlay-scaffold-0	63x55	31,38	975	04270f92
 pacification-centre	58x39	30,25	1286	a4528450
 park	67x70	33,52	1430	b756cc09
+path-E-trodden	64x32	32,16	45	c50ebf08
+path-E-worn	64x32	32,16	116	440212b5
+path-ES-trodden	64x32	32,16	73	06c50457
+path-ES-worn	64x32	32,16	198	7617252d
+path-ESW-trodden	64x32	32,16	109	12cf32ff
+path-ESW-worn	64x32	32,16	278	bd7c525d
+path-EW-trodden	64x32	32,16	77	93de7ed6
+path-EW-worn	64x32	32,16	201	1ee3a372
+path-N-trodden	64x32	32,16	41	e3eb1cc7
+path-N-worn	64x32	32,16	111	03b7ec3f
+path-NE-trodden	64x32	32,16	81	6bb7eee5
+path-NE-worn	64x32	32,16	198	6e35aa7b
+path-NES-trodden	64x32	32,16	110	b70ff317
+path-NES-worn	64x32	32,16	275	11a37d04
+path-NESW-trodden	64x32	32,16	146	9cf44cf6
+path-NESW-worn	64x32	32,16	353	fecb08cc
+path-NEW-trodden	64x32	32,16	106	0b269432
+path-NEW-worn	64x32	32,16	278	1692e119
+path-NS-trodden	64x32	32,16	78	1863b086
+path-NS-worn	64x32	32,16	203	f9084345
+path-NSW-trodden	64x32	32,16	110	1ff959ac
+path-NSW-worn	64x32	32,16	275	86e4aba1
+path-NW-trodden	64x32	32,16	72	dbcb3255
+path-NW-worn	64x32	32,16	195	6d478ad8
+path-S-trodden	64x32	32,16	46	6e314f58
+path-S-worn	64x32	32,16	111	db59f321
+path-SW-trodden	64x32	32,16	96	7916eed1
+path-SW-worn	64x32	32,16	195	c692bad5
+path-W-trodden	64x32	32,16	42	f2f64622
+path-W-worn	64x32	32,16	111	a81d3fb7
 plaza	20x9	10,5	82	f5c13da8
 police-station	55x43	27,29	1430	c0385b36
 portrait-bear|adult|s0m0g0|flat	16x16	8,15	256	27ea4276
@@ -3907,4 +3937,4 @@ zot-nodemand	13x14	6,12	143	f5788835
 zot-nojob	13x14	6,12	143	439ab5fc
 zot-noroad	13x14	6,12	143	75554088
 zot-smog	13x14	6,12	143	42795e03
-TOTAL	3834	bd5686f5
+TOTAL	3864	33aeb45e

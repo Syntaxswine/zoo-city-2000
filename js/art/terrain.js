@@ -1,6 +1,7 @@
 // terrain.js — the ground the city stands on, and the loose things that sit
-// on it: grass, zone chalk, rubble, water (and its kerb), three trees, the
-// zots, the plaza glyph, the cursor and the ghost. SPEC §12.4.
+// on it: grass (the meadow and its footpaths), zone chalk, rubble, water (and
+// its kerb), three trees, the zots, the plaza glyph, the cursor and the
+// ghost. SPEC §12.4.
 //
 // GROUND TILES ARE GENERATED IN WORLD SPACE, NOT DRAWN. A 64×32 diamond is
 // 1024 pixels; the honest way to author one is a predicate on (a, b) — the
@@ -175,6 +176,69 @@ for (let n = 0; n < 81; n++) {
     }
     MEADOW_TABLE[cornerIndex(c) * MEADOW_SEEDS + seed] = s;
   }
+}
+
+// ----------------------------------------------------------------- footpaths
+
+/**
+ * WORN PATHS, WHERE WALKERS CROSS GRASS (T3.3). A walk crosses grass in one
+ * place in this game: a station's FORECOURT, the tiles between a platform and
+ * the road that serves it, which fields.js lays into a rider's commute tile
+ * by tile (every other step of every walk is a road). js/meadow.js reads
+ * those steps off the stored paths and says which tiles are walked, towards
+ * which neighbours, and how often.
+ *
+ * The path is an OVERLAY on the tile's own grass: earth where feet have worn
+ * it, transparent elsewhere, from the tile's centre to the middle of each
+ * edge a walk crosses (`mask`, N 1 · E 2 · S 4 · W 8, the roads' convention).
+ * Each arm is centred on its edge's midpoint where it meets the edge and on
+ * the centre where it meets the others, and bows between — so two walked
+ * neighbours' tracks meet at their shared edge, and a track is a desire line
+ * rather than a ruled one. Two wears: TRODDEN (a few walks — broken earth,
+ * the grass showing through) and WORN (many — a bare track in a trodden
+ * margin). Earth keys only: the ground's evening table has met every one.
+ *
+ * Mask 0 is a tile walked towards no neighbour, which a commute cannot make —
+ * every step of one is a tile from the last — so it throws.
+ */
+export const WORN_WALKS = 4; // walks through a tile before its path is worn bare rather than trodden
+const PATH_CORE = [1.0, 1.3]; // the earth's half-width, trodden · worn (units)
+const PATH_EDGE = [0, 2.1]; // the trodden margin's half-width (worn only)
+const PATH_BOW = 0.5; // how far an arm strays off the straight, halfway along it
+// WHICH PIXELS ARE EARTH IS DECIDED WORLD-SIZED — one draw per 1× pixel, the
+// same draw for its 2×2 at zoom 2 — and only the grain inside them per pixel.
+// A trodden path is thin and sparse (41 to 146 pixels of earth at 1×), and a
+// per-pixel draw at 2× is a different path: path-SW-trodden's twin came out
+// 19% light and the hi-res gate (ink within 12% of 4×) refused it.
+function footpathFn(mask, worn) {
+  return (a, b, px, py, s = 1) => {
+    let d = Infinity;
+    if (mask & 1 && b <= 8) d = Math.min(d, Math.abs(a - 8 - PATH_BOW * Math.sin((Math.PI * b) / 8)));
+    if (mask & 2 && a >= 8) d = Math.min(d, Math.abs(b - 8 + PATH_BOW * Math.sin((Math.PI * (16 - a)) / 8)));
+    if (mask & 4 && b >= 8) d = Math.min(d, Math.abs(a - 8 + PATH_BOW * Math.sin((Math.PI * (16 - b)) / 8)));
+    if (mask & 8 && a <= 8) d = Math.min(d, Math.abs(b - 8 - PATH_BOW * Math.sin((Math.PI * a) / 8)));
+    if (Math.abs(a - 8) < PATH_CORE[worn] && Math.abs(b - 8) < PATH_CORE[worn]) d = 0; // the hub, so a turn has no notch
+    const cover = hash(Math.floor(px / s), Math.floor(py / s), 131 + 2 * mask + worn);
+    const grain = hash(px, py, 163 + worn);
+    if (d < PATH_CORE[worn]) {
+      if (!worn && cover >= 0.62) return null; // trodden: the grass shows through
+      return grain < 0.8 ? E[3] : E[2];
+    }
+    if (d < PATH_EDGE[worn]) return cover < 0.3 ? E[3] : null;
+    return null;
+  };
+}
+const FOOTPATHS = [0, 1].map((worn) => [...Array(16).keys()].map((mask) =>
+  mask ? groundSprite({ name: `path-${"NESW".split("").filter((_, k) => mask & (1 << k)).join("")}-${worn ? "worn" : "trodden"}`, anchor: TILE_ANCHOR, tags: ["ground", "path"] }, footpathFn(mask, worn)) : null
+));
+/** Every footpath sprite, for the audit. */
+export const FOOTPATH_LIST = FOOTPATHS.flat().filter(Boolean);
+
+/** The path worn across a grass tile walked towards the neighbours in `mask` (N 1 · E 2 · S 4 · W 8); `worn` after WORN_WALKS walks. Throws on mask 0. */
+export function footpathSprite(mask, worn = false) {
+  const s = Number.isInteger(mask) && mask > 0 && mask < 16 ? FOOTPATHS[worn ? 1 : 0][mask] : null;
+  if (!s) throw new Error(`art.footpath: no path is walked towards mask ${mask} — a walked tile has at least one walked neighbour`);
+  return s;
 }
 
 /** The grass tile whose corners hold `corners` ([N, E, S, W] levels), in dither `seed`. Throws on a combination no tile can hold. */
@@ -570,6 +634,7 @@ export function allTerrain() {
   const out = [];
   GRASS.forEach((s) => out.push({ name: s.name, sprite: s }));
   MEADOW.forEach((s) => out.push({ name: s.name, sprite: s }));
+  FOOTPATH_LIST.forEach((s) => out.push({ name: s.name, sprite: s }));
   for (const zone of [1, 2, 3, 4]) CHALK[zone].forEach((s) => out.push({ name: s.name, sprite: s }));
   out.push({ name: RUBBLE.name, sprite: RUBBLE });
   out.push({ name: WATER_TILE.name, sprite: WATER_TILE });

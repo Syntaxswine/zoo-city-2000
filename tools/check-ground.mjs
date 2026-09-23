@@ -13,6 +13,12 @@
 //                 field writes nothing and is the same twice · it loads from a
 //                 save unchanged · making one thing moves only the corners
 //                 round it · an open map grows all three
+//   THE PATHS     every walked direction is drawn, trodden and worn · a tile
+//                 walked towards nothing throws · earth only · each track
+//                 reaches exactly the edges it names, centred where it
+//                 crosses them · a real rider's commute wears exactly its four
+//                 forecourt tiles, as the sim's own traffic count says ·
+//                 trodden at three riders, worn at four, pixel for pixel
 //   THE FRAME     through the real renderer, an open field shows no seam and
 //                 less repeat than the quilt did — and the instrument, pointed
 //                 at the quilt the game drew before, reads a seam, or the
@@ -29,9 +35,10 @@ installCanvas();
 
 const { art, allSprites } = await import("../js/art/index.js");
 const { GRASS, grassKey, diamond } = await import("../js/art/terrain.js");
-const { meadowField } = await import("../js/meadow.js");
+const { meadowField, wornPaths, openGrass } = await import("../js/meadow.js");
 const { createWorld, ZONE, ROAD, CIVIC, TERRAIN } = await import("../js/sim/world.js");
-await import("../js/sim/ops.js");
+const { apply } = await import("../js/sim/ops.js");
+const { computeFields, commutePath, computeTraffic, RIDE } = await import("../js/sim/fields.js");
 await import("../js/sim/tick.js");
 const { save, load } = await import("../js/sim/save.js");
 const { createRenderer } = await import("../js/render.js");
@@ -184,6 +191,141 @@ for (let vy = 0; vy <= T.h; vy++) for (let vx = 0; vx <= T.w; vx++) {
 }
 check("laying one road tile moves its own corners and at most their neighbours — nothing further off", moved > 0 && far.length === 0, `${moved} moved, far: ${far.slice(0, 5).join(" ")}`);
 check("…and its four corners are kept", [[0, 0], [1, 0], [1, 1], [0, 1]].every(([dx, dy]) => G2.level[(ry + dy) * (T.w + 1) + rx + dx] === 0));
+
+// ---- the footpaths --------------------------------------------------------------
+// SPELT OUT: fifteen masks (N 1 · E 2 · S 4 · W 8, never none) in two wears,
+// drawn in the earth ramp's two middle keys, and worn bare from FOUR walks.
+const EARTH_PATH = new Set(["s", "t"]), WORN_AT = 4;
+const paths = [];
+for (const worn of [false, true]) for (let mask = 1; mask < 16; mask++) {
+  let s = null;
+  try { s = art.footpath(mask, worn); } catch { s = null; }
+  paths.push({ mask, worn, s });
+}
+check("every walked direction is drawn, trodden and worn — 30 paths, all different", paths.every((p) => p.s && p.s.rows.length === 32) && new Set(paths.map((p) => p.s)).size === 30);
+check("…and the audit walks all 30", allSprites().filter(({ name }) => /^path-[NESW]+-(trodden|worn)$/.test(name)).length === 30);
+check("a tile walked towards NO neighbour THROWS — every step of a commute is one tile from the last", [0, 16, -1, 1.5, null].every((m) => throws(() => art.footpath(m, false))));
+const pathKeys = new Set(paths.flatMap((p) => p.s.rows.join("").replace(/\./g, "").split("")));
+check("a path is drawn in earth and nothing else, and leaves the grass under it transparent", [...pathKeys].every((k) => EARTH_PATH.has(k)) && paths.every((p) => p.s.rows.join("").includes(".")), [...pathKeys].join(""));
+// Where a path's ink is, in the tile's own units: the same mapping diamond() samples.
+const inkAt = (s) => {
+  const out = [];
+  s.rows.forEach((r, py) => { for (let px = 0; px < r.length; px++) if (r[px] !== ".") { const x = px + 0.5 - 32, y = py + 0.5; out.push([(y + x / 2) / 2, (y - x / 2) / 2]); } });
+  return out;
+};
+// Each edge's midpoint: N b = 0, E a = 16, S b = 16, W a = 0.
+const nearEdge = [([a, b]) => b < 1.5 && Math.abs(a - 8) < 2.5, ([a, b]) => a > 14.5 && Math.abs(b - 8) < 2.5, ([a, b]) => b > 14.5 && Math.abs(a - 8) < 2.5, ([a, b]) => a < 1.5 && Math.abs(b - 8) < 2.5];
+const wrongEdges = [];
+for (const p of paths) {
+  const ink = inkAt(p.s);
+  nearEdge.forEach((near, k) => { if (ink.some(near) !== !!(p.mask & (1 << k))) wrongEdges.push(`${p.s.name} ${"NESW"[k]}`); });
+}
+check("each path reaches exactly the edges its mask names, and no other", wrongEdges.length === 0, wrongEdges.slice(0, 5).join(" "));
+// Two walked neighbours' tracks MEET: where a track crosses its edge it is
+// centred on that edge's midpoint, so the tile across finds it there too.
+const offCentre = [];
+for (const p of paths) {
+  const ink = inkAt(p.s);
+  [[1, ([a, b]) => b < 1, ([a]) => a], [2, ([a]) => a > 15, ([, b]) => b], [4, ([, b]) => b > 15, ([a]) => a], [8, ([a]) => a < 1, ([, b]) => b]].forEach(([bit, onEdge, along]) => {
+    if (!(p.mask & bit)) return;
+    const at = ink.filter(onEdge).map(along);
+    const mid = at.reduce((s, v) => s + v, 0) / at.length;
+    if (!at.length || Math.abs(mid - 8) > 0.6) offCentre.push(`${p.s.name} ${bit}:${at.length ? mid.toFixed(2) : "none"}`);
+  });
+}
+check("where a track crosses an edge it is centred on the edge's midpoint — so the neighbour's track meets it", offCentre.length === 0, offCentre.slice(0, 5).join(" "));
+// THE SAME PATH AT EVERY ZOOM. Which pixels are earth is decided world-sized
+// and only the grain per pixel, so a twin's earth is its 1× earth scaled, to
+// within the band's edge. Drawn per pixel, a thin trodden path was another
+// path at 2× — 19% light — and the suite's twin gate (12%) refused it.
+const drift = [];
+for (const p of paths) for (const S of [2, 4]) {
+  const one = p.s.rows.join("").replace(/\./g, "").length;
+  const big = art.hires(p.s, S).rows.join("").replace(/\./g, "").length / (S * S);
+  if (Math.abs(big - one) > 0.06 * one) drift.push(`${p.s.name}@${S}x ${one}→${big.toFixed(0)}`);
+}
+check("a path is the same path at every zoom — its 2× and 4× twins carry its earth to within 6%", drift.length === 0, drift.slice(0, 4).join(" "));
+const thin = paths.filter((p) => !p.worn).filter((p) => inkAt(p.s).length >= inkAt(art.footpath(p.mask, true)).length);
+check("a worn path carries more earth than a trodden one, for every mask", thin.length === 0, thin.map((p) => p.s.name).join(" "));
+
+// THE WALKS, read off a real commute: a road, a rail line three tiles off it,
+// a station at each end — the platform fixture in check.mjs — and a rider's
+// path from the sim's own commutePath.
+function forecourt(riders) {
+  const w = openField(createWorld, { seed: "check-ground-forecourt" });
+  const fat = (x, y) => y * w.w + x;
+  const road = [], line = [];
+  for (let x = 4; x <= 34; x++) road.push(fat(x, 6));
+  for (let x = 6; x <= 32; x++) line.push(fat(x, 9));
+  const ok = apply(w, { kind: "road", tiles: road }).ok && apply(w, { kind: "rail", tiles: line }).ok
+    && apply(w, { kind: "station", tx: 8, ty: 9 }).ok && apply(w, { kind: "station", tx: 30, ty: 9 }).ok;
+  computeFields(w);
+  const ride = commutePath(w, "rabbit", [fat(6, 6)], [fat(32, 6)]);
+  w.citizens = Array.from({ length: riders }, () => ({ path: ride ? ride.path : null }));
+  computeTraffic(w);
+  return { w, ok: ok && !!ride && Array.from(ride.path).some((p) => p & RIDE), fat };
+}
+const one = forecourt(1);
+check("the forecourt fixture is real: a road, a line, two stations, and a commute that RIDES", one.ok);
+const worn1 = wornPaths(one.w);
+const fc = [one.fat(8, 7), one.fat(8, 8), one.fat(30, 7), one.fat(30, 8)];
+check("a rider's walk crosses grass on exactly the four forecourt tiles, each walked north–south (N | S)",
+  worn1.size === 4 && fc.every((t) => worn1.has(t) && worn1.get(t).mask === (1 | 4) && worn1.get(t).walks === 1),
+  [...worn1].map(([t, e]) => `${t % one.w.w},${(t / one.w.w) | 0}:${e.mask}/${e.walks}`).join(" "));
+// Two readers of the same stored paths must agree: the sim's traffic count.
+const trafficGrass = [];
+for (let i = 0; i < one.w.w * one.w.h; i++) if (one.w.traffic[i] > 0 && openGrass(one.w, i)) trafficGrass.push(i);
+check("…and they are exactly the open-grass tiles the sim's own traffic count says are walked, walk for walk",
+  trafficGrass.length === worn1.size && trafficGrass.every((t) => worn1.has(t) && worn1.get(t).walks === one.w.traffic[t]));
+check("a town with no riders wears no path", T.citizens.length === 0 && wornPaths(T).size === 0);
+{
+  const before2 = bytesOf(one.w);
+  wornPaths(one.w);
+  check("reading the paths writes nothing on the world", bytesOf(one.w) === before2);
+}
+// THE FRAME: every open tile is its meadow with its path over it, pixel for
+// pixel — trodden at three riders, worn at four.
+for (const riders of [WORN_AT - 1, WORN_AT]) {
+  const { w: FW, fat } = forecourt(riders);
+  const canvas = createCanvas(...PANEL);
+  const r = createRenderer(canvas, FW, art);
+  r.resize();
+  r.setShadows(false); // this is the ground; the shadow pass has its own gate
+  const [cx, cy] = toScreen(8, 7.5);
+  r.draw({ x: cx, y: cy, zoom: 1 }, null, null, "off", 0);
+  const [PW, PH] = PANEL;
+  const d = canvas.getContext("2d").getImageData(0, 0, PW, PH).data;
+  const bx = -Math.round(r.view.left), by = -Math.round(r.view.top);
+  const names = meadowField(FW), walks = wornPaths(FW);
+  let tiles = 0, pathed = 0;
+  const wrong = [];
+  for (let ty = 0; ty < FW.h; ty++) for (let tx = 0; tx < FW.w; tx++) {
+    const i = ty * FW.w + tx;
+    // The road side of the line, where the forecourt is: south of it the
+    // platform and its shelter stand in front of the ground.
+    if (!openGrass(FW, i) || ty >= 9) continue;
+    const [sx, sy] = toScreen(tx, ty);
+    const X0 = sx - 32 + bx, Y0 = sy + by;
+    if (X0 < 0 || Y0 < 0 || X0 + 64 > PW || Y0 + 32 > PH) continue;
+    const under = art.meadow(names.corners(tx, ty), FW.variant[i]);
+    const e = walks.get(i);
+    const over = e ? art.footpath(e.mask, e.walks >= WORN_AT) : null;
+    let bad = 0;
+    for (let py = 0; py < 32; py++) for (let px = 0; px < 64; px++) {
+      const k = over && over.rows[py][px] !== "." ? over.rows[py][px] : under.rows[py][px];
+      if (k === ".") continue;
+      const rgb = colourOf(k), j = ((Y0 + py) * PW + X0 + px) * 4;
+      if (d[j] !== rgb[0] || d[j + 1] !== rgb[1] || d[j + 2] !== rgb[2]) bad++;
+    }
+    tiles++;
+    if (over) pathed++;
+    if (bad) wrong.push(`(${tx},${ty}) ${bad} px`);
+  }
+  const wear = riders >= WORN_AT ? "worn" : "trodden";
+  check(`${riders} riders: every open tile in the frame is its meadow with its own path over it — ${wear} on the two forecourt tiles in view, nothing on the rest — pixel for pixel`,
+    tiles > 100 && pathed === 2 && wrong.length === 0 && [fat(8, 7), fat(8, 8)].every((t) => (walks.get(t).walks >= WORN_AT) === (riders >= WORN_AT)),
+    `${tiles} tiles, ${pathed} pathed · wrong ${wrong.slice(0, 4).join(" ")}`);
+}
 
 // ---- the frame ------------------------------------------------------------------
 // The renderer lays the meadow and nothing else: traced, every grass tile it

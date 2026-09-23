@@ -2007,7 +2007,12 @@ writing nothing: **kept wherever anything made touches a corner** (a road, a
 rail, a lot, a civic, a wall, rubble — so every road and chalk margin, all
 grass-0, meets kept grass); elsewhere the mean of the tile bytes over the 6×6
 round it, in thirds; a rough corner beside a kept one steps down, so no tile
-holds both. `tools/check-ground.mjs` is the gate; `tools/groundprobe.mjs`
+holds both. **Worn paths**: a walk crosses grass in one place — a station's
+FORECOURT, which `fields.js` lays into a rider's stored commute tile by tile —
+and `wornPaths(world)` reads those steps off the stored paths, so
+`art.footpath(mask, worn)` (15 walked directions × trodden / worn from 4
+walks; an overlay in earth keys) runs exactly where the walks run, meeting
+its neighbour at their shared edge's midpoint. `tools/check-ground.mjs` is the gate; `tools/groundprobe.mjs`
 measures, off the renderer's own frame, how much a tile's edge steps against
 a line through it (the old quilt 3.8 at zoom 2, the meadow 1.0) and how often
 a pixel repeats one tile over.
