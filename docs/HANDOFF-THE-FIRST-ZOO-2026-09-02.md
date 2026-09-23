@@ -3362,3 +3362,135 @@ gates      art-dump → check → close-ups → shadows → suits → … (art-d
 
 Maker's mark — Claude Opus 5, session 21: the one who built the receipt before
 the art, and let the geometry correct two of its own pre-registered claims.
+
+## 44. The evening — one table, no new colour, and four claims the palette corrected (session 22, 2026-09-23)
+
+The owner, on what to take next: *"lets do the next open section."* That is
+T1.5, dusk — the one item Tier 1 was left holding, and with it the tier is
+closed.
+
+**The list is still `docs/PROPOSAL-SPRITE-UPGRADE-2026-09-22.md` and it is
+the document to read.** §4's T1.5 carries the measurements and §5 Q2 the
+answer. This section is the why and the traps.
+
+**Nothing in `js/sim/` was touched, and nothing in the art registry either.**
+`docs/fixtures/art-baseline.txt` does not appear in the diff: 3,651 sprites,
+74 palette keys, `TOTAL 86cc0399` — byte for byte the fixture Tier 2 left
+behind. An evening that repaints every pixel in the game added no colour to
+it, and that is the receipt.
+
+### The ramp index is the face
+
+A real evening is not everything darker. It is a low warm sun on the faces
+that can see it and a cold sky filling the faces that cannot, and the two are
+told apart by which way a surface points. A key → key table knows nothing
+about facing, which is why a tint table looked like the wrong instrument for
+the job.
+
+It is not, because **`litSkin` has always given a ramp's bright rung to the
+TOP face, its middle to the side and its darkest to the END.** Within a ramp
+the index already *is* the facing. Warm the bright rungs toward a low sun,
+cool the dark ones toward the sky, and a table with no geometry in it lights
+the city from a direction nobody told it about. Every key's evening colour is
+then projected onto the nearest key the palette already has — found, not
+authored, the same move `roof-furniture.js` makes with the decks a recipe
+already exposes — with a 60% toll on leaving its own ramp, because two keys
+can sit a pixel apart in RGB and mean brick and roof tile. Terracotta at dusk
+is terracotta a rung down (`BCDE → 1BCD`); 36 of the 64 surface keys stay
+home.
+
+The lights and the marks are fixed points: the lit window, fire, its tip, the
+zot, and the four zone chalks. A lamp does not dim because the sun went down,
+and the chalk was hand-tuned once already to not vanish into the lawn —
+measured, re-projecting it puts R chalk *on* grass light and takes 101 units
+of separation down to 46. **Unlit glass is deliberately not in that set.** It
+is the pane a light is not behind, and the gap between it and a lit one
+opening from 33 to 122 is what "the lights are on" looks like from the
+street.
+
+### Four claims broke on the palette
+
+1. **"Every ramp a rung cooler" is half of it.** The palette's floor is
+   PINNED — `check-shadows` holds `+` within 3 of the darkest key there is —
+   so an evening that took its darkness out of VALUE ran every shadow-side
+   face in the game onto the same key: all fifteen ramps' dark rungs land on
+   FOUR keys between them. So the dim is a fifth, the cool is two thirds, and
+   the rest of the darkness comes from the shadows, which is where a low sun
+   actually puts it. **Dusk multiplies `SHADOW_K` (×3.2); it does not set
+   one**, so Q1 still owns the length.
+2. **A `night` ramp was built for that and taken out again.** Four cool darks
+   for the shadow sides to land on, above slate so the floor would not move;
+   12 keys did land on them. Rendered both ways it was worth **0.1 of a
+   luminance point** and nothing the eye could find, and the rung-0 collapse
+   was four destinations either way — what starves the dark end is the floor,
+   not the hues available at it.
+3. **"The ground is never brighter than the same key standing up" is false**,
+   and false of the transform before any projection. The sky is a light
+   source with a luminance of its own (65.3), so a key darker than the sky
+   GAINS by seeing more of it. That is what a blue hour does. The claim that
+   holds is the mean.
+4. **The monotone floor never fired once.** A lower bound carried down each
+   ramp so its image could not invert, swept over 100 amounts × both tables ×
+   6,000 adjacent pairs: the ceiling alone leaves not one inversion, and a
+   mutant deleting the floor left the whole suite green. It is gone.
+
+### The ground plane, and the one setting
+
+The index is a guess for anything that stands. For the ground it is not a
+guess at all: the static layer IS the horizontal plane, and a horizontal
+surface meets a low sun at a grazing angle. So the lawn, the roads and the
+river are projected with their rungs capped at the cool end and fall one rung
+further than the walls beside them — the frame's mean moves −30 without that
+and −45 with, which is the difference between an evening and an overcast
+afternoon.
+
+**And the knob is not smooth, which is what decides the UI.** A ramp's rungs
+are ~25 luminance apart: 5 of 64 keys move at amount 0.1, 42 at 0.4, 67 at
+1.0, and between 0.4 and 0.7 only 11–20 are still in their own ramp — a
+half-lit town with one roof lit up like a lamp. The middle panels of
+`sheet-dusk.png` are that, on purpose. There is one coherent setting and it
+ships as one switch.
+
+### The state of it
+
+```
+art-dump    3651 sprites · 74 palette keys · TOTAL 86cc0399   (UNCHANGED by T1.5)
+sheet       docs/shots/sheet-dusk.png — 0.25 −2.8 · 0.55 −24.8 · 1 −45.3 mean luminance
+suite       970 checks 0 failures · close-ups 315 · shadows 22 · dusk 113 · NPM_EXIT=0
+gates       art-dump → check → close-ups → shadows → DUSK → suits → …
+rig         tools/play.mjs --dusk · same city, same month, sim hash 86cc1587 either way
+```
+
+| what you see | what it is |
+|---|---|
+| `FAIL zone chalk '6' still separates from the lawn (0.55) — 99 → 89` | **a mark does not have to get MORE legible for an evening to be right.** The lawn darkens and cools, which moves it toward a dark blue mark and away from a pale green one. What the palette requires is a FLOOR, and it states its own: the tightest chalk-to-nearest-grass-rung margin daylight already ships, 48. Derive the bar, never demand monotone improvement |
+| a mutant deleting a constraint, and the whole suite still green | **the constraint never fired.** The monotone floor was dead code across 6,000 adjacent pairs. Worse than dead: a constraint that silently straightens a ramp the transform bent HIDES a bad transform, where the check that asks the question names it. Assert the property, do not enforce it |
+| the lit window dimming with the city, and the gate passing | **a check that iterates the module's own list moves with the code.** `FIXED.filter(k => t[k] !== k)` is the code agreeing with itself — the same shape as `check-shadows`' surviving `SHADOW_KEY` mutant, which makes it a CLASS. Spell the nine keys out in the check file and assert the module's list equals them |
+| every shadow-side face in the city the same grey | **the palette's floor is pinned by the shadow key's own near-black claim**, so an evening cannot get its darkness from value. Take it out of hue, and get the dark from a longer light: `SHADOW_K` × the amount |
+| a terracotta roof BRIGHTER at dusk than at noon | **the projection walked the key up into a neighbouring ramp** at the same luminance. A ceiling of the key's own daylight value is the whole fix, and without it a roof reads as a lamp at amount 0.55 |
+| the lawn at noon under a city at nightfall | **the ground layer is offscreen and survives frames.** `setDusk` must mark it dirty or the roads and grass stay where the last camera move left them — and every table-level check still passes |
+| `--dusk` doing nothing at all, silently | **a bare flag parsed by a value-taking helper reads the NEXT FLAG.** `num("--dusk", 1)` took `"--out"`, made NaN, and clamped back to daylight. A flag that quietly does nothing is worse than one that fails |
+| a byte-for-byte frame comparison failing for no reason | **the renderer's clock advances on every draw and the river cycles on it.** Two frames a few draws apart differ by the water, not by the setting. Grab with `dt = 0` and let the one check that wants time ask for it |
+| four new palette keys nobody can see | **render it both ways and diff the frame.** A `night` ramp with twelve keys landing on it moved the mean by 0.1. A ramp the picture cannot see is a guess with a consumer, which is still a guess |
+| a scratch script leaving the tree mutated | **a harness that edits files restores in a `finally`.** A probe that crashed on a missing env var between the write and the restore left `-Infinity` in the projection, and the next measurement was of the mutant |
+
+### What is open
+
+- **Tier 3** — window states in the `glazing` skin, setbacks and awnings on
+  the R/C mid-tiers (D3: R, C and I are still the same prism), ground
+  variety. The cemetery is still 88% roof and 74% of that one quad.
+- **Tier 4** — authored 2× species heads, a third body build, species idles.
+- **Q1, the shadow length, is still the owner's** and T1.5 did not close it:
+  the evening multiplies `SHADOW_K` rather than setting a number of its own,
+  so whatever is chosen from `docs/shots/sheet-shadows.png` is the length
+  dusk lengthens.
+- **A recipe's own horizontal top is still read through its rung.** The
+  ground-plane rule reaches the static layer only, so a farm's field goes
+  gold at dusk because its top face holds a bright rung. It happens to be
+  right for a field at golden hour; it is a guess for a park's lawn.
+- **The surviving mutant is `ACCENT_RUNG`** — which blue a dark pane is. It
+  breaks no stated property. It is taste, and it is recorded rather than
+  given a check invented to catch it.
+
+Maker's mark — Claude Opus 5, session 22: the one who built a ramp for the
+dark, measured it at a tenth of a luminance point, and took it out again.
