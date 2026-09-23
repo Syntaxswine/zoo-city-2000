@@ -148,6 +148,21 @@ export function createTitle(app) {
     btn.addEventListener("click", () => { app.cheat(); sync(); });
     sync();
 
+    // Dusk: a view, and this BROWSER'S, like the cheat switch above — it
+    // changes nothing a save records, so a city handed to someone else does
+    // not arrive at nightfall. The '/' key flips the same preference.
+    const row3 = el("div", "row");
+    const dk = el("input");
+    dk.type = "checkbox";
+    dk.id = "optDusk";
+    dk.checked = !!app.prefs.get().dusk;
+    const dkl = el("label", "", " Dusk — draw the city in the evening light");
+    dkl.htmlFor = dk.id;
+    dk.addEventListener("change", () => app.setDusk(dk.checked));
+    row3.append(dk, dkl);
+    box.append(row3);
+    box.append(el("p", "note", "The sun goes low: every surface is repainted through one table, the shadows run long, and the lit windows are the brightest thing left. Nothing about the city changes — the same month, the same citizens, the same save. '/' toggles it without coming in here."));
+
     // Disasters, per city: the same toggle op the found form uses, so it is saved and logged.
     const row2 = el("div", "row");
     const nd = el("input");

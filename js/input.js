@@ -333,6 +333,9 @@ export function createInput(canvas, app) {
       case "u": case "U": setTool("use"); break;
       case "l": case "L": app.load(); break;
       case "o": case "O": app.cycleOverlay(); break;
+      // Every letter is a tool or a command already; the evening gets the
+      // slash, and takes the browser's quick-find with it below.
+      case "/": app.toggleDusk(); break;
       case "r": case "R": app.news.toggle(); break;
       case "+": case "=": app.zoomAt(1); repickAfterCameraMove(); break;
       case "-": case "_": app.zoomAt(-1); repickAfterCameraMove(); break;
@@ -393,7 +396,7 @@ export function createInput(canvas, app) {
     }
     if (e.ctrlKey || e.metaKey || e.altKey) return;
     if (app.ui.modalOpen()) { if (key === "Backspace") e.preventDefault(); return; }
-    if (key === " " || key === "Backspace" || PAN_KEYS[e.code] || /^[nN+=\-_]$/.test(key)) e.preventDefault();
+    if (key === " " || key === "Backspace" || PAN_KEYS[e.code] || /^[nN+=\-_/]$/.test(key)) e.preventDefault();
     if (PAN_KEYS[e.code]) {
       held.add(e.code);
       return;

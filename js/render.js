@@ -35,6 +35,7 @@ import { buildingAge, wearLevel } from "./sim/building-age.js";
 import { toScreen, toWorld, pickTile, HALF_H, HALF_W, TILE_W, TILE_H } from "./iso/iso.js";
 import { paintScene, Z_BUILDING } from "./iso/painter.js";
 import { SHADOW_K, SHADOW_ALPHA, CONTACT_ALPHA } from "./art/shadow.js";
+import { duskTable, withDusk, duskBackground } from "./art/dusk.js";
 import { rasterize } from "./art/format.js";
 import { floodplain } from "./sim/progression.js";
 import { ZONE, CIVIC, TERRAIN, ROAD, capacityOf, isPart, anchorOf, sideOf, civicAnchorOf, civicSideOf } from "./sim/world.js";
@@ -131,6 +132,19 @@ export function createRenderer(canvas, initialWorld, art) {
   const waterTints = [0, 1, 2, 3, 4, 5].map((f) => art.waterTint(f)); // reused objects: one cache entry each
   const textWidths = new Map(); // need line → screen-pixel width; at most the voice table
 
+  // ---- the evening ------------------------------------------------------------
+  // One table for the whole world (art/dusk.js). `null` is DAYLIGHT and it is
+  // the neutral knob: not an identity table that happens to change nothing,
+  // but the absence of one, so every blit takes the branch it took before
+  // this existed and the frame is the old frame to the byte.
+  let duskAmount = 0;
+  let dusk = null;
+  let duskFlat = null;
+  // What a full evening does to the shadow knobs, as multipliers — see the
+  // shadow block in `draw`.
+  const DUSK_K_GAIN = 2.2;
+  const DUSK_ALPHA_GAIN = 0.55;
+
   // ---- sprite cache -----------------------------------------------------------
   const cache = new Map(); // sprite → Map(tintKey → canvas)
   const tintKeys = new Map(); // tint object → its key string (tints are reused objects or tiny)
@@ -161,7 +175,16 @@ export function createRenderer(canvas, initialWorld, art) {
    * placeAt returns. A twin is drawn at base.z / S, positioned so its anchor
    * sits on the same projection point.
    */
-  function blitScaled(c, base, S, sprite, sx, sy, tint) {
+  function blitScaled(c, base, S, sprite, sx, sy, tint, flat = false) {
+    // THE EVENING RIDES ON THE ITEM'S OWN TINT, and it is applied HERE rather
+    // than in `raster` on purpose: this is the world. The speech bubbles go
+    // through `raster` directly and stay in daylight, because a bubble is
+    // chrome with 10 px of near-black type on it; and the shadow masks go
+    // through `blitMask`, which is what makes the shadow pass provably the
+    // same pass at every amount (check-dusk.mjs asserts it).
+    // `flat` is the ground plane — the lawn, the roads, the water — which
+    // takes the sky's light rather than the sun's (art/dusk.js).
+    tint = withDusk(tint, flat ? duskFlat : dusk);
     const h = S > 1 && art.hires ? art.hires(sprite, S) : null;
     if (!h) {
       c.setTransform(base.z, 0, 0, base.z, base.tx, base.ty);
@@ -360,7 +383,7 @@ export function createRenderer(canvas, initialWorld, art) {
         if (world.flooded[i]) items.push({ sprite: flood, tx, ty, kind: "ground", z: 2 });
       }
     }
-    paintScene(items, (sprite, sx, sy, item) => blitScaled(gctx, base, S, sprite, sx, sy, item.tint || null));
+    paintScene(items, (sprite, sx, sy, item) => blitScaled(gctx, base, S, sprite, sx, sy, item.tint || null, true));
     gctx.setTransform(1, 0, 0, 1, 0, 0);
     computeZots(range);
     computePlaza();
@@ -575,7 +598,7 @@ export function createRenderer(canvas, initialWorld, art) {
     const z = view.zoom;
 
     ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.fillStyle = BG;
+    ctx.fillStyle = duskBackground(BG, duskAmount);
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     ctx.imageSmoothingEnabled = false;
     // Projection space → device: scale by zoom, translate by the view's top-left.
@@ -587,7 +610,7 @@ export function createRenderer(canvas, initialWorld, art) {
     const waterSprite = art.ground("water");
     const waterTint = waterTints[Math.floor(clock * 4) % 6];
     const vl = view.left - TILE_W, vt = view.top - TILE_H, vr = view.left + view.w + TILE_W, vb = view.top + view.h + TILE_H;
-    for (const [sx, sy] of water) if (sx > vl && sx < vr && sy > vt && sy < vb) blitScaled(ctx, base, S, waterSprite, sx - HALF_W, sy, waterTint);
+    for (const [sx, sy] of water) if (sx > vl && sx < vr && sy > vt && sy < vb) blitScaled(ctx, base, S, waterSprite, sx - HALF_W, sy, waterTint, true);
     // The ground layer was built at G.S device px per projection px (needsRebuild remakes it when the detail scale changes).
     ctx.setTransform(z / G.S, 0, 0, z / G.S, base.tx, base.ty);
     ctx.drawImage(ground, G.left * G.S, G.top * G.S);
@@ -725,13 +748,24 @@ export function createRenderer(canvas, initialWorld, art) {
     // of a building that is not there yet, and a thing that is not there does
     // not put anything on the ground.
     if (shadowsOn) {
+      // THE EVENING LENGTHENS THE LIGHT, IT DOES NOT SET IT. A low sun is
+      // where a dusk gets its darkness: the palette's floor is pinned by the
+      // shadow key's own near-black claim, so the table can only dim a fifth
+      // (art/dusk.js), and the rest has to come from the ground — which is
+      // exactly where the sun going down puts it. These are MULTIPLIERS on whatever length the owner settles
+      // Q1 at, not a second opinion about it. Quantised because art.shadow
+      // caches per `k@scale`, and a continuous knob would mint a sprite set
+      // per frame.
+      const kNow = Math.round(100 * shadowK * (1 + DUSK_K_GAIN * duskAmount)) / 100;
+      const castAlpha = Math.min(0.85, shadowAlpha * (1 + DUSK_ALPHA_GAIN * duskAmount));
+      const nearAlpha = Math.min(0.85, contactAlpha * (1 + DUSK_ALPHA_GAIN * duskAmount));
       const cast = [], contact = [];
       for (const item of items) {
         if (item.alpha != null) continue;
-        const mask = art.shadow(item.sprite, { k: shadowK });
+        const mask = art.shadow(item.sprite, { k: kNow });
         if (mask) {
           const flat = art.shadow(item.sprite, { k: 0 }); // at k = 0 this is the same cached sprite: the union pass absorbs it, and the density stays the one a contact patch has at every other k
-          cast.push({ ...item, sprite: mask, source: item.sprite, k: shadowK, kind: "ground", z: 0, dy: item.dy || 0 });
+          cast.push({ ...item, sprite: mask, source: item.sprite, k: kNow, kind: "ground", z: 0, dy: item.dy || 0 });
           if (flat) contact.push({ ...item, sprite: flat, source: item.sprite, k: 0, kind: "ground", z: 0, dy: item.dy || 0 });
           continue;
         }
@@ -740,8 +774,8 @@ export function createRenderer(canvas, initialWorld, art) {
         const blob = art.billboardShadow(item.sprite, { width });
         if (blob) contact.push({ ...item, sprite: blob, source: item.sprite, billboard: true, width, kind: "ground", z: 0, dy: item.dy || 0 });
       }
-      paintShadowPass(cast, base, S, shadowAlpha);
-      paintShadowPass(contact, base, S, contactAlpha);
+      paintShadowPass(cast, base, S, castAlpha);
+      paintShadowPass(contact, base, S, nearAlpha);
     }
 
     paintScene(items, (sprite, sx, sy, item) => {
@@ -807,5 +841,20 @@ export function createRenderer(canvas, initialWorld, art) {
     dirty = true;
   }
 
-  return { draw, drawBubbles, invalidate, pick, pickWalker, resize, setWorld, viewportTiles, tileToScreen, setShadows, get shadows() { return shadowsOn; }, get view() { return view; } };
+  /**
+   * How much evening, 0 → 1. The GROUND LAYER is the reason this marks dirty:
+   * it is an offscreen canvas that survives across frames and is only rebuilt
+   * when the camera leaves its margin, so without this the roads and the lawn
+   * would still be at noon while everything standing on them went dark.
+   */
+  function setDusk(amount) {
+    const a = Math.max(0, Math.min(1, Number(amount) || 0));
+    if (a === duskAmount) return;
+    duskAmount = a;
+    dusk = duskTable(a);
+    duskFlat = duskTable(a, true);
+    dirty = true;
+  }
+
+  return { draw, drawBubbles, invalidate, pick, pickWalker, resize, setWorld, viewportTiles, tileToScreen, setShadows, get shadows() { return shadowsOn; }, setDusk, get dusk() { return duskAmount; }, get view() { return view; } };
 }

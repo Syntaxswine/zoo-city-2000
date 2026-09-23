@@ -187,7 +187,7 @@ export function createUI(app) {
     sep();
     mk("btnNew", "N", "new city", "N: found a new city / load a saved one", () => openNewCity());
     mk("btnMenu", "Esc", "menu", "Esc: the title screen — new game, continue, load, save, options", () => app.title.open());
-    dom.help.textContent = `${toolHelp()} · H density · U use checkboxes · Space pause · , . speed · Backspace/Ctrl+Z undo · Ctrl+S save · L load · O overlays · R news · +/− zoom · arrows/WASD/right-drag pan · N new city · Esc menu`;
+    dom.help.textContent = `${toolHelp()} · H density · U use checkboxes · Space pause · , . speed · Backspace/Ctrl+Z undo · Ctrl+S save · L load · O overlays · / dusk · R news · +/− zoom · arrows/WASD/right-drag pan · N new city · Esc menu`;
   }
 
   const useChecks = [];

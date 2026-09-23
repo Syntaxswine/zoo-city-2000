@@ -25,6 +25,7 @@ import { computeFields, recountRosters } from "./sim/fields.js";
 import { art } from "./art/index.js";
 import { toScreen, HALF_H } from "./iso/iso.js";
 import { createRenderer } from "./render.js";
+import { DUSK_AMOUNT } from "./art/dusk.js";
 import { createWalkers } from "./walkers.js";
 import { createInput } from "./input.js";
 import { createUI } from "./ui.js";
@@ -256,6 +257,30 @@ app.cycleOverlay = () => {
   app.ui.flash(app.overlays === "off" ? "Overlay off" : { health: "Overlay: health — teal = doctor (+2% lifespan), blue = hospital (+3%), red homes = no operating medical facilities (−3% citywide). Untinted = normal lifespan.", lv: "Overlay: land value (greener = higher)", pol: "Overlay: pollution (browner = worse)", crime: "Overlay: crime (redder = worse; blue = police cover; a ring = an open file)", dread: "Overlay: dread (wine = a meat hall's smell; herbivores keep away)", use: "Overlay: use — rust is predator, teal is prey, species have their own colours, combinations blend them, and untinted is mixed (U paints it)", access: "Overlay: road access — untinted is on the road, then sand, mauve and aubergine for one, two and three tiles from it; rust is out of reach, and only where something is asking", watch: "Overlay: camera cover (a ring is a camera; it solves crimes, it does not prevent them)", score: "Overlay: lot score (blue grows, red decays)" }[app.overlays]);
   app.ui.refresh();
 };
+/**
+ * DUSK IS A MODE, NOT A CLOCK, and the sim is what settles it: a tick here is
+ * a MONTH (sim/tick.js), so there is no hour in this game for an evening to
+ * be tied to — a clock built on the only clock there is would be a SEASON,
+ * which is a different feature with a different name. So it is a switch.
+ *
+ * It is this BROWSER'S preference and not the city's, for the same reason the
+ * cheat switch is (zoo.pref): it changes nothing a save records, and a city
+ * sent to someone else must not arrive at nightfall because the sender liked
+ * it that way. One amount, not a slider — see art/dusk.js on why a projected
+ * palette has one good setting and not a hundred.
+ */
+app.setDusk = (on) => {
+  app.prefs.set({ dusk: !!on });
+  app.renderer.setDusk(on ? DUSK_AMOUNT : 0);
+  app.ui.refresh();
+};
+app.toggleDusk = () => {
+  const on = !app.prefs.get().dusk;
+  app.setDusk(on);
+  app.ui.flash(on
+    ? "Dusk — the sun is low, the shadows run long and the lights are on. It is a view, not the clock; the city is unchanged."
+    : "Daylight.");
+};
 app.zoomAt = (dir, sx, sy) => {
   if (!zoomCamera(app.camera, dir, canvas.width, canvas.height, sx, sy)) return;
   app.input.syncCamera();
@@ -367,6 +392,7 @@ function boot() {
   app.input = createInput(canvas, app);
   app.palette = createPalette(app);
   app.renderer.resize(); // the canvas measures its real box after the left remote is populated
+  if (app.prefs.get().dusk) app.renderer.setDusk(DUSK_AMOUNT); // the view this browser was left in
   app.title = createTitle(app);
   if (resumed) {
     const meta = (() => { try { return JSON.parse(store.get(META(name)) || "null"); } catch { return null; } })();

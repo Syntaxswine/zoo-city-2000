@@ -149,9 +149,13 @@ number recorded in this file.
 
 ### Tier 1 — the flatness (hash-neutral: no existing sprite changes)
 
-**BUILT 2026-09-22, except T1.5.** `tools/art-dump.mjs` on the finished tree:
-**3,651 sprites and the palette, none moved** — the additive claim, proven,
-not asserted. `tools/check-shadows.mjs`, **22 checks**, in `npm run check`.
+**BUILT — T1.1–T1.4 on 2026-09-22, T1.5 on 2026-09-23. The tier is closed.**
+`tools/art-dump.mjs` on the finished tree:
+**3,651 sprites and 74 palette keys, none moved** — the additive claim,
+proven, not asserted, and the evening added nothing to it: the baseline
+fixture is byte-identical either side of T1.5.
+`tools/check-shadows.mjs` (**22 checks**) and `tools/check-dusk.mjs`
+(**113**), both in `npm run check`.
 The A/B is `docs/shots/sheet-shadows.png` (`tools/shadow-sheet.mjs`): one
 town, one camera, one process, only the knob moving.
 
@@ -194,13 +198,73 @@ town, one camera, one process, only the knob moving.
   (`billboardShadow`), sized off each sprite's own width. **Not** composed into
   the pose: `allCitizens()` is still 3236, no citizen's rows changed, and no
   shadow sprite reaches `allSprites()`.
-- [ ] **T1.5 — dusk.** Not built. It is the one Tier 1 item with an owner
-  question attached (§5 Q2) and it is a raster-time change rather than a
-  geometry one, so it is split out rather than bundled.
+- [x] **T1.5 — dusk.** `js/art/dusk.js`, built 2026-09-23. **One table, and
+  nothing drawn.** The evening is a key → key map through the same
+  `rasterize(rows, tint)` door a species skin and the water's palette cycle
+  already use, so the whole city changes and not one sprite is re-authored.
+  **The receipt is that there is no receipt:** `docs/fixtures/art-baseline.txt`
+  is byte-identical to the one Tier 2 left behind — 3,651 sprites, 74 keys,
+  `TOTAL 86cc0399` — and the fixture does not appear in the diff at all. An
+  evening that repaints every pixel in the game added no colour to it.
+  `tools/check-dusk.mjs`, **113 checks**, in `npm run check`;
+  **9 of 10 mutants caught**. The A/B is `docs/shots/sheet-dusk.png`
+  (`tools/dusk-sheet.mjs`), and `tools/play.mjs --dusk` shoots it on a real
+  mayor-built town — the same sim hash `86cc1587` either side, because an
+  evening cannot move one.
+  **The mechanism, which the proposal did not have:** `litSkin` has always
+  given a ramp's bright rung to the TOP face and its dark rung to the END, so
+  **the ramp index already says which way a surface points.** Warm the bright
+  rungs toward a low sun and cool the dark ones toward the sky, and a table
+  with no geometry in it lights the city from a direction. Each key's evening
+  colour is then projected onto the nearest key the palette already has —
+  found, not authored — with a 60% toll on leaving its own ramp, which is
+  what keeps terracotta terracotta (`BCDE → 1BCD`) instead of trading it for
+  rust over a rounding error. 36 of the 64 surface keys stay home.
+  **Three claims broke on the palette, and the measurements are why:**
+  - *"every ramp a rung cooler"* is only half of it. The palette's floor is
+    PINNED — `check-shadows` holds `+` within 3 of it, so nothing may sit
+    below slate without breaking the shadow's claim on being a near-black —
+    and an evening that took its darkness out of VALUE ran every shadow-side
+    face in the game onto the same key: measured, the fifteen ramps' dark
+    rungs land on **four keys between them**. So the dim is a fifth, the cool
+    is two thirds, and the rest of the darkness comes from the shadows, which
+    is where a low sun actually puts it: dusk MULTIPLIES `SHADOW_K` (×3.2)
+    rather than setting it, so Q1 still owns the length.
+    **A `night` ramp was built for this and then taken out again**, which is
+    the measurement worth keeping. Four cool darks for the shadow sides to
+    land on; 12 keys did land on them; rendered both ways it was worth **0.1
+    of a luminance point** and nothing the eye could find, and the rung-0
+    collapse was **four destinations either way** — because what starves the
+    dark end is the floor, not the hues available at it. Four permanent keys
+    for that is a guess with a consumer, which is still a guess.
+  - *"the ground is never brighter than the same key standing up"* is false,
+    and it is false of the transform before any projection. The sky is a
+    light source with a luminance of its own (65.3), so a key darker than the
+    sky GAINS by seeing more of it — which is what a blue hour does. Three
+    keys do it. The claim that holds is about the mean.
+  - *the monotone floor* — a lower bound carried down each ramp so its image
+    could not invert — **never fired once** over 100 amounts × both tables ×
+    6,000 adjacent pairs, and a mutant deleting it left the suite green. It
+    is gone: a constraint that silently straightens a ramp the transform bent
+    hides a bad transform, where the check that asks names it.
+  **And the knob is not smooth, which is the finding that decides the UI.**
+  A ramp's rungs are ~25 luminance apart, so a middling amount moves the keys
+  near a boundary and leaves the rest at noon: **5 of 64 keys move at 0.1, 42
+  at 0.4, 67 at 1.0**, and between 0.4 and 0.7 only 11–20 are still in their
+  own ramp — a half-lit town with one roof lit up like a lamp. The middle
+  panels of the sheet are that, on purpose. **There is one coherent setting
+  and it ships as one switch.**
 
 **Measured** (`docs/shots/sheet-shadows.png`, 420×300 panels at zoom 2, px
 changed against the no-shadow frame): k=0 **0.77%** · k=0.25 **4.12%** ·
 k=0.55 **7.96%** · k=1.2 **10.30%**.
+
+**Measured** (`docs/shots/sheet-dusk.png`, 620×320 panels at zoom 2, against
+the daylight frame): amount 0.25 **29.9%** of the panel, mean luminance
+−2.8 · 0.55 **98.3%**, −24.8 · **1 — 98.7%, −45.3**. The ground layer takes
+its own, deeper table (the renderer knows the horizontal plane even where the
+index cannot): lawn and road fall one rung further than the walls beside
+them, which is the difference between an evening and an overcast afternoon.
 
 ### Tier 2 — material vocabulary (adds keys; existing keys untouched)
 
@@ -318,9 +382,21 @@ Only the genuinely undecided; everything else is decided above.
   contact diamond that never crosses a road; `0.5` puts a 48-unit tower's
   shadow ~1.5 tiles down-right, across the street, SimCity 4 style. I will
   build the knob and render the same scene at 0, 0.25 and 0.5 for the choice.
-- **Q2 — is dusk a mode or a clock?** A toggle the player holds, an Options
-  switch, or tied to the month? (A clock would make the lit-window data a
-  *cycle*; a toggle keeps it a photograph.)
+  **Still open, and T1.5 did not close it:** the evening MULTIPLIES this
+  number (×3.2 at full amount) rather than setting one of its own, so
+  whatever length is chosen here is the length dusk lengthens.
+- ~~**Q2 — is dusk a mode or a clock?**~~ **ANSWERED by the sim, 2026-09-23:
+  a mode, and the reason is that there is no clock to tie it to.** A tick in
+  this game is a MONTH (`js/sim/tick.js`), so the only clock available would
+  make dusk a SEASON — a different feature with a different name, and one
+  that would take the city dark for three months of play. It ships as both of
+  the other two, because they are the same switch: an Options checkbox beside
+  the cheat, and `/` to flip it without opening a menu. It is **this
+  browser's preference** (`zoo.pref`) and not the city's, for the same reason
+  the cheat switch is — it changes nothing a save records, and a city sent to
+  someone else must not arrive at nightfall because the sender liked it that
+  way. The amount survives as a parameter in `duskTable(amount)`, so if the
+  game ever grows an hour, the clock feeds it a fraction.
 - **Q3 — terracotta on R is a big look change.** It is the single most
   effective way to read zoning from the air, and it moves the town's whole
   colour. Worth one A/B frame before it is kept.
@@ -356,7 +432,15 @@ Only the genuinely undecided; everything else is decided above.
   changed-pixel count printed under each. `docs/shots/sheet-shadows.png`.
   `tools/play.mjs` also takes `--no-shadows` and `--shadow-k N`, so the A/B
   can be shot on a real mayor-built town at the same sim hash.
-  *(The dusk half of this waits on T1.5.)*
+  **The dusk half landed 2026-09-23** — `tools/dusk-sheet.mjs` →
+  `docs/shots/sheet-dusk.png`, same rig, the knob being the amount of
+  evening, with the mean luminance of each panel printed under it; and
+  `tools/play.mjs --dusk`, which shot the same scripted city at the same hash
+  `86cc1587` by day and at dusk. A bare `--dusk` is the shipped amount:
+  written out rather than reusing the shared `num()` helper, which takes the
+  next token whatever it is and read `--out` as the amount, made NaN, and
+  clamped silently back to daylight. A flag that quietly does nothing is
+  worse than one that fails.
 - [x] **I4 — `tools/check-shadows.mjs` — the gate, 22 checks**, in
   `npm run check`. **Mutation-tested, 5/5 caught, and the first round found
   two real gaps in it:** shadows-off-by-default survived (every other check
@@ -371,6 +455,38 @@ Only the genuinely undecided; everything else is decided above.
   The mutant that matters — **painting the shadows after the standing pass** —
   is caught with 3,122 of 9,117 building pixels gone to the shadow colour.
 
+- [x] **I5 — `tools/check-dusk.mjs` — the gate, 113 checks**, in
+  `npm run check`. **Mutation-tested, 9 of 10 caught**, and the first round
+  found four real gaps in it:
+  - the composition law was checked on `withDusk` and not on the RENDERER, so
+    a renderer that handed the evening over in PLACE of the item's own tint
+    passed. Closed by a river: the water palette-cycles through six frames,
+    and under that mutant it freezes at nightfall. (The check world grew a
+    river for it.)
+  - the fixed-point check iterated the module's own `FIXED`, so dropping the
+    lit window from that list moved the check with the code and the whole
+    gate stayed green — **the same shape as `check-shadows`' surviving
+    `SHADOW_KEY` mutant**, which is a class, not an incident. The nine lights
+    and marks are now spelt out in the check file and asserted to match.
+  - the blaze check read `lumOf("-")`, the DAY colour, so a lit window that
+    dimmed with the city was measured against its own noon value.
+  - "the ground layer went to dusk" only asked whether those pixels CHANGED,
+    which a ground layer taking the standing table also does. It now reads
+    each lawn pixel's key out of the daylight frame and demands exactly what
+    the flat table says that key becomes — 6,375 px, and the two tables
+    disagree about grass.
+  The survivor is `ACCENT_RUNG`, which decides that unlit glass shows the
+  SKY rather than taking the neutral middle. It changes which blue a dark
+  pane is and breaks no stated property; it is taste, and it is recorded here
+  rather than given a check invented to catch it.
+  **The chalk check was wrong twice before it was right**, both times because
+  the palette knew better: it first demanded every mark's separation from the
+  lawn GROW (C chalk fell 99 → 89 as the lawn cooled toward it, correctly),
+  then measured against grass MID when a lawn is painted from every rung of
+  the ramp. It now measures the nearest rung against the floor daylight
+  itself ships — 48 — and at the shipped amount the margins are 136 / 89 /
+  80 / 52.
+
 ---
 
 ## §7 Build order
@@ -382,9 +498,14 @@ Only the genuinely undecided; everything else is decided above.
    `sheet-shadows.png` attached. T1.5 (dusk) split off: it is raster-time
    rather than geometry, and it carries the one open owner question in the
    tier (Q2), so bundling it would have held the flatness fix behind a
-   decision that does not block it.
+   decision that does not block it. **T1.5 done 2026-09-23**, and splitting
+   it was right for a second reason nobody predicted: it needed a palette
+   ramp, a second table for the ground plane and a multiplier on the shadow
+   knob, none of which belonged in a commit about geometry.
 3. Q1/Q2/Q3 frames to the owner. **Q1's frames are shot** —
-   `docs/shots/sheet-shadows.png`.
+   `docs/shots/sheet-shadows.png`. **Q2 is answered by the sim** (see §5).
+   **Q3's frame is every dusk shot there is**: terracotta is the one roof
+   that still reads as its own material at nightfall.
 4. **Tier 2** on the rulings.
 5. Tier 3, Tier 4.
 

@@ -7,6 +7,7 @@
 //   node tools/play.mjs --years 30 --overlay crime --stations --every 60
 //   node tools/play.mjs --years 12 --at 2011-12 --no-shadows        the frame as it was
 //   node tools/play.mjs --years 12 --at 2011-12 --shadow-k 0.25     the A/B
+//   node tools/play.mjs --years 12 --at 2011-12 --dusk              the evening
 //
 // The scripted mayor of `tools/mayor.mjs` builds a town in the real sim, and
 // the REAL renderer — js/render.js, the same file the browser loads, through
@@ -53,6 +54,7 @@ const { art } = await import("../js/art/index.js");
 const { toScreen, HALF_H, mapBounds } = await import("../js/iso/iso.js");
 const { TICKER_FLASH } = await import("../js/sim/events.js");
 const { stateHash } = await import("../js/sim/save.js");
+const { DUSK_AMOUNT } = await import("../js/art/dusk.js");
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const argv = process.argv.slice(2);
@@ -71,6 +73,21 @@ const ZOOM = num("--zoom", 2);
 // height (0 = a contact patch that never crosses a road).
 const NO_SHADOWS = flag("--no-shadows");
 const SHADOW_K_ARG = argv.includes("--shadow-k") ? num("--shadow-k", 0.55) : null;
+// The evening, on a real mayor-built town. A BARE `--dusk` is the amount the
+// game ships (art/dusk.js); `--dusk N` is the knob. Spelt out rather than
+// reusing num(), which takes the NEXT TOKEN whatever it is: `--dusk --out x`
+// read "--out" as the amount, made NaN, and clamped silently to daylight —
+// a flag that quietly does nothing is worse than one that fails, and this
+// file's own header says invalid input fails.
+const DUSK_ARG = (() => {
+  const i = argv.indexOf("--dusk");
+  if (i < 0) return null;
+  const next = argv[i + 1];
+  if (next == null || next.startsWith("--")) return DUSK_AMOUNT;
+  const v = Number(next);
+  if (!Number.isFinite(v) || v < 0 || v > 1) throw new Error(`play: --dusk wants an amount from 0 to 1, got "${next}"`);
+  return v;
+})();
 const OUT = resolve(ROOT, arg("--out", "docs/play"));
 const EVERY = num("--every", 0);
 const AT = list("--at", "");
@@ -115,6 +132,7 @@ const mayor = SAVED ? null : createMayor(world, {
 const canvas = createCanvas(W, H);
 const renderer = createRenderer(canvas, world, art);
 renderer.setShadows(!NO_SHADOWS, SHADOW_K_ARG == null ? {} : { k: SHADOW_K_ARG });
+if (DUSK_ARG != null) renderer.setDusk(DUSK_ARG);
 const walkers = createWalkers(world);
 const camera = { x: 0, y: 0, zoom: ZOOM };
 

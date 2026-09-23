@@ -47,6 +47,17 @@ export const RAMPS = {
   tile:     { keys: "BCDE",   hex: ["#46261C", "#6E3A24", "#9C552F", "#C47A45"] },
   timber:   { keys: "LMNO",   hex: ["#3D352C", "#5E5344", "#85775F", "#AE9E82"] },
   fabric:   { keys: "PQRS",   hex: ["#4C443C", "#71665A", "#9C8F7E", "#C8BCA8"] },
+  // 2026-09-23, the evening (PROPOSAL-SPRITE-UPGRADE, T1.5): NOTHING WAS
+  // ADDED HERE, and the measurement is the reason. `art/dusk.js` projects
+  // every key's evening colour onto the nearest key this palette already
+  // has, and a `night` ramp of four cool darks was built for the shadow
+  // sides to land on — 12 of them do land on it. Rendered both ways it was
+  // worth 0.1 of a luminance point on the frame and nothing the eye can
+  // find: the rungs of all fifteen ramps collapse onto FOUR destinations
+  // with it and the same four without, because what starves the dark end
+  // is the pinned floor (see the shadow note above), not the hues
+  // available at it. A ramp the picture cannot see is a guess with a
+  // consumer, which is still a guess.
 };
 
 export const ACCENT = {
