@@ -247,12 +247,51 @@ for (let i = 0; i < day.length; i += 4) if (day[i] !== night[i] || day[i + 1] !=
 check("the evening changes the frame at all", changed > 0.8 * (W * H), `${changed} of ${W * H} px`);
 check("…and darkens it", meanLum(night) < meanLum(day) - 15, `${meanLum(day).toFixed(1)} → ${meanLum(night).toFixed(1)}`);
 
+// WHAT IS LAWN IS MEASURED, NOT READ OFF THE COLOUR. A grass key is also what
+// a park's plinth, a block's garden and a terrace planter are painted with, and
+// those STAND: they take the standing table by design (a recipe's own top face
+// is the standing brief's recorded guess). This rig had nothing green standing
+// in view until T3.2's apartment grew a planter on its terrace, and the lawn
+// check below failed on it. So the same frame is drawn once more with nothing
+// standing on the map — the river alone — and a pixel is open lawn only where
+// the two frames agree BY DAY AND AT DUSK. By day alone is not enough: the
+// planter's soil is 'p', and at (90, 63) so is the grass texture under it, so
+// the two frames agreed at noon and parted at nightfall. This is not circular —
+// the lawn is then held to dusk.js's FLAT TABLE, not to the empty frame, so a
+// renderer that paints the ground with the wrong table is wrong in both frames
+// alike and still fails below.
+const bareWorld = createWorld({ seed: "dusk-check" });
+for (let t = 4; t < 20; t++) bareWorld.terrain[6 * bareWorld.w + t] = TERRAIN.WATER;
+const bareCanvas = createCanvas(W, H);
+const bareR = createRenderer(bareCanvas, bareWorld, art);
+bareR.resize();
+const grabBare = () => { bareR.draw(camera, null, null, "off", 0); return bareCanvas.getContext("2d").getImageData(0, 0, W, H).data.slice(); };
+const bareDay = grabBare();
+bareR.setDusk(DUSK_AMOUNT);
+const bareNight = grabBare();
+const same = (a, b, p) => a[p] === b[p] && a[p + 1] === b[p + 1] && a[p + 2] === b[p + 2];
+const open = (x, y) => { const p = 4 * (y * W + x); return same(day, bareDay, p) && same(night, bareNight, p); };
+
 // THE GROUND LAYER. It is offscreen and it survives frames, so a `setDusk`
 // that forgot to mark it dirty would leave the lawn at noon under a city at
 // nightfall — and every other check in this file would still pass. Sample
 // only tiles the buildings cannot reach.
+//
+// AND SAY SO IN THE CHECK. The first four samples were placed by eye, and
+// measured, three of them were not lawn at all: (40, 40) was the R3
+// apartment's brick, (380, 60) the river, (400, 270) a tree's canopy. They
+// passed because nearly every key changes at dusk — until T3.2 stepped the
+// apartment back and put a LIT WINDOW, a dusk fixed point, on (40, 40), and
+// "the ground layer went to dusk" failed on a building. These four are grass
+// in the daylight frame and the same colour with every building, tree and road
+// taken away (scanned on the tree before T3.2 and after it), and the premise is
+// a check of its own, so the next building that reaches one fails as a broken
+// FIXTURE rather than as a broken evening.
 {
-  const LAWN = [[30, 250], [380, 60], [400, 270], [40, 40]];
+  const LAWN = [[30, 250], [390, 20], [380, 130], [320, 270]];
+  const GRASS = RAMPS.grass.keys.split("").map((k) => colourOf(k).join(","));
+  const notLawn = LAWN.filter(([x, y]) => { const p = 4 * (y * W + x); return !open(x, y) || !GRASS.includes([day[p], day[p + 1], day[p + 2]].join(",")); });
+  check("the open-lawn samples are lawn — grass in daylight, with nothing standing on it (the fixture's premise)", notLawn.length === 0, notLawn.map(([x, y]) => `(${x},${y})`).join(" "));
   let moved = 0;
   for (const [x, y] of LAWN) { const p = 4 * (y * W + x); if (day[p] !== night[p] || day[p + 1] !== night[p + 1] || day[p + 2] !== night[p + 2]) moved++; }
   check("the static ground layer went to dusk with everything else", moved === LAWN.length, `${moved} of ${LAWN.length} open-lawn samples changed`);
@@ -290,14 +329,14 @@ check("…and darkens it", meanLum(night) < meanLum(day) - 15, `${meanLum(day).t
   // The lawn, key for key. Sampled rather than listed by coordinate: at dusk
   // the light is lower and the shadows are longer, so a patch of grass that
   // was clear at noon may be under one — and a shadowed pixel is a blend, not
-  // a key. Take the pixels that are a GRASS key in both frames and hold every
-  // one of them to the flat table.
+  // a key. Take the pixels that are a GRASS key in both frames, with nothing
+  // standing on them (`open`, above), and hold every one to the flat table.
   const GRASS_KEYS = RAMPS.grass.keys.split("");
   let lawn = 0, lawnWrong = 0, lawnStanding = 0;
   for (let x = 6; x < W - 6; x += 3) {
     for (let y = 6; y < H - 6; y += 3) {
       const k = keyAt(day, x, y);
-      if (!k || !GRASS_KEYS.includes(k)) continue;
+      if (!k || !GRASS_KEYS.includes(k) || !open(x, y)) continue;
       const got = rgbAt(night, x, y);
       if (!keyAt(night, x, y)) continue; // under a shadow: a blend, not a key
       lawn++;
