@@ -969,10 +969,17 @@ const CARRY_LIFT = 3; // the sack's top rides 3 px above the frame's top row —
 // Composition.
 // =========================================================================
 
-const BUILD = {
+/**
+ * THE BUILDS — which `BODY` each species wears. Like `COATS`, it is exported
+ * because an instrument reads tables that are not live: tools/zooprobe.mjs
+ * draws the animals in the builds they wore before, as it reads the coats
+ * they wore before, and `citizenSprite` takes one species' build by name in
+ * `opts.build` for exactly that. The game never passes it.
+ */
+export const BUILDS = Object.freeze({
   rabbit: "small", mouse: "small", fox: "small", owl: "small", raccoon: "small", cat: "small", hawk: "small", skunk: "small",
   beaver: "big", bear: "big", tortoise: "big", pig: "big", cow: "big", wolf: "big",
-};
+});
 const AUTHOR_KEYS = keysOf("furWarm"); // w x y z — the authoring ramp
 
 /**
@@ -1305,13 +1312,13 @@ function normLook(opts = {}) {
   return { shade, mark };
 }
 
-function composeAdult(species, facing, frame, elder, hat, carry = false, suit = false) {
+function composeAdult(species, facing, frame, elder, hat, carry = false, suit = false, build = BUILDS[species]) {
   const lift = (hat ? 4 : 0) + (carry === "sack" ? CARRY_LIFT : 0);
   const ox = carry ? CARRY_OX : 0;
   const H = 20 + lift;
   const g = blank(12 + 2 * ox, H);
   const idle = frame === 3;
-  const body = BODY[BUILD[species]][facing][idle ? 0 : frame];
+  const body = BODY[build][facing][idle ? 0 : frame];
   const tail = TAIL[species] && TAIL[species][facing];
   const put = (rows, x, y) => stamp(g, rows, x + ox, y + lift);
   // The sack over the shoulder: BEHIND the figure when we see its face (SE),
@@ -1405,9 +1412,11 @@ const PORTRAIT_CACHE = new Map();
  * goes over the shoulder and the cart stays on the ground. The grid widens
  * to 18 and the anchor
  * follows the feet, so the figure stays on its tile).
+ * `opts.build` is for instruments only: a name in `BODY` to draw the adult
+ * in (tools/zooprobe.mjs).
  */
 export function citizenSprite(species, facing = "se", frame = 0, age = "adult", opts = {}) {
-  if (!(species in HEAD_SPECIES)) throw new Error(`citizens: no kit for species '${species}' — author its HEAD/BUILD/CUB_MARK here and add it to HEAD_SPECIES (check.mjs asserts every species.js row has kit art)`);
+  if (!(species in HEAD_SPECIES)) throw new Error(`citizens: no kit for species '${species}' — author its HEAD/BUILDS/CUB_MARK here and add it to HEAD_SPECIES (check.mjs asserts every species.js row has kit art)`);
   const f = normFacing(facing);
   const fr = normFrame(frame);
   const ag = normAge(species, age);
@@ -1415,15 +1424,23 @@ export function citizenSprite(species, facing = "se", frame = 0, age = "adult", 
   const hat = !!opts.hat && ag !== "cub";
   const suit = !!opts.suit;
   const carry = (opts.carry === "sack" || opts.carry === "cart") && ag !== "cub" ? opts.carry : false;
+  // An instrument's hook, never the game's: `opts.build` draws an adult in
+  // another species' body (tools/zooprobe.mjs reads the builds the game wore
+  // before). A sprite drawn so is keyed apart — even in its own build, so the
+  // hook is a path of its own that a check can hold against the plain one —
+  // and no list the audit walks contains it. A cub has one body.
+  const other = opts.build != null && ag !== "cub";
+  const build = other ? opts.build : BUILDS[species];
+  if (!BODY[build]) throw new Error(`citizens: unknown build '${opts.build}'`);
   // Shade is itself a stable hash bit, so tying glasses to it gives exactly
   // half of elder looks glasses without making a mark toggle change pixels
   // outside that species' declared mark box.
   const glasses = ag === "elder" && look.shade === 1;
-  const key = `${species}|${f}|${fr}|${ag}|s${look.shade}m${look.mark}g${glasses ? 1 : 0}|${hat ? "h" : ""}${carry === "sack" ? "s" : carry === "cart" ? "r" : ""}${suit ? "|suit" : ""}`;
+  const key = `${species}|${f}|${fr}|${ag}|s${look.shade}m${look.mark}g${glasses ? 1 : 0}|${hat ? "h" : ""}${carry === "sack" ? "s" : carry === "cart" ? "r" : ""}${suit ? "|suit" : ""}${other ? `|b${build}` : ""}`;
   let s = CACHE.get(key);
   if (s) return s;
   const authored = f === "sw" ? "se" : f === "nw" ? "ne" : f;
-  let rows = ag === "cub" ? composeCub(species, authored, fr, suit) : composeAdult(species, authored, fr, ag === "elder", hat, carry, suit);
+  let rows = ag === "cub" ? composeCub(species, authored, fr, suit) : composeAdult(species, authored, fr, ag === "elder", hat, carry, suit, build);
   // Mirror the AUTHORED grid (so the light stays upper-left), THEN skin it.
   if (f === "sw" || f === "nw") rows = mirrorLit(rows, suit);
   if (ag === "cub" && look.mark) rows = cubCoatTreatment(rows, f === "sw" || f === "nw");

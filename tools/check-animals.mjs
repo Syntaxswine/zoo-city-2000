@@ -13,7 +13,9 @@
 //                key added to the palette
 //   THE CONTROL  the coats the game wore before T4.0, spelt out below and read
 //                in the same run by the same instrument — every bar above must
-//                REFUSE them, exactly as measured, or passing proves nothing
+//                REFUSE them, exactly as measured, or passing proves nothing —
+//                on the figures T4.0 was measured on: the builds are spelt
+//                out too, and drawn through the kit's own composer
 //   THE PANEL    the census paints each species in its own coat
 //
 // The 2× pass is not here: whether each species' twin reworks its FUR is
@@ -27,9 +29,9 @@ import { installDom } from "./dom-shim.mjs";
 
 installDom();
 
-const { COATS, coatMap, coatMapOf, SPECIES_IDS } = await import("../js/art/citizens.js");
+const { COATS, BUILDS, coatMap, coatMapOf, citizenSprite, CITIZEN_DETAILS, SPECIES_IDS } = await import("../js/art/citizens.js");
 const { KEYS, RAMPS, colourOf } = await import("../js/art/palette.js");
-const { zooReadings, lost, GROUND_KEYS, LOST_CONTROL } = await import("./zooprobe.mjs");
+const { zooReadings, bareFigure, lost, GROUND_KEYS, LOST_CONTROL } = await import("./zooprobe.mjs");
 const { SPECIES_BY_ID } = await import("../js/sim/species.js");
 const { createWorld } = await import("../js/sim/world.js");
 await import("../js/sim/ops.js");
@@ -54,6 +56,12 @@ const BEFORE = {
   owl: ["furCool", 0], bear: ["furWarm", -1], tortoise: ["furWarm", 0], raccoon: ["furCool", -1],
   pig: ["furWarm", 1], cow: ["furCool", 1], wolf: ["furCool", -1], cat: ["furWarm", 0],
   hawk: ["earth", 0], skunk: ["furCool", -1],
+};
+// …on the bodies they were worn on: the kit's build table the day T4.0 was
+// measured — eight small, six big.
+const BEFORE_BUILDS = {
+  rabbit: "small", mouse: "small", fox: "small", owl: "small", raccoon: "small", cat: "small", hawk: "small", skunk: "small",
+  beaver: "big", bear: "big", tortoise: "big", pig: "big", cow: "big", wolf: "big",
 };
 // …and what the instrument read off them the day T4.0 was measured.
 const BEFORE_READS = {
@@ -84,7 +92,11 @@ check("every coat is a real ramp and a shift that lands inside it", FOURTEEN.eve
 
 // ---- the coats --------------------------------------------------------------------
 const now = zooReadings();
-const was = zooReadings({ coats: BEFORE });
+// The control: the coats before T4.0 on the bodies before T4.0, both spelt
+// out above, the bodies drawn by the kit's composer through `opts.build`.
+const was = zooReadings({ coats: BEFORE, builds: BEFORE_BUILDS });
+// Today's coats on those same bodies: the figures the control is read on.
+const built = zooReadings({ builds: BEFORE_BUILDS });
 const lostNow = FOURTEEN.filter((sp) => now.species[sp].lost.distance <= now.lostControl);
 const lostWas = FOURTEEN.filter((sp) => was.species[sp].lost.distance <= was.lostControl);
 
@@ -104,11 +116,39 @@ check("no coat is as lost on its ground as the olive tortoise was, in any look o
 check("no ONE ANIMAL — no figures under the stride floor wearing coats under the shade floor", now.oneAnimal.length === 0, now.oneAnimal.map(pairName).join(", "));
 check("no two close figures on one ramp — a shaded one would wear the other's coat", now.closeOnOneRamp.length === 0, now.closeOnOneRamp.map(pairName).join(", "));
 check("not one key added to the palette", KEYS.length === PALETTE_KEYS && !Object.keys(RAMPS).some((r) => /dark/i.test(r)), `${KEYS.length} keys`);
-// FORM does not depend on the coat, so the two readings must agree on every
-// pair's FORM to the last digit — the proof that the control read the SAME
-// figures and only the coats differed.
-check("the control and the live table read the same figures: every pair's FORM identical",
-  now.pairs.every((p, i) => p.form === was.pairs[i].form && p.formFloor === was.pairs[i].formFloor));
+// FORM does not depend on the coat — which is not proved by two readings
+// agreeing: both read the SAME sprites, drawn in the live coats, whatever
+// table is passed, so they agree even when FORM is read off the coloured rows
+// (T4.2 found this by mutation; the check that stood here from T4.0 compared
+// them and could not fail). What makes FORM the figure's is `bareFigure`: every
+// pixel the composer drew as fur goes back to the authoring key it was drawn
+// in, every other pixel stays as drawn. That is asserted directly.
+const unbared = [];
+for (const sp of FOURTEEN) for (const f of ["se", "ne"]) {
+  const s = citizenSprite(sp, f, 0, "adult"), info = CITIZEN_DETAILS.get(s), bare = bareFigure(s);
+  for (let y = 0; y < s.h; y++) for (let x = 0; x < s.w; x++) {
+    const drawn = info.authored[y][x];
+    if (bare[y][x] !== ("wxyz".includes(drawn) ? drawn : s.rows[y][x])) { unbared.push(`${sp} ${f} (${x},${y})`); break; }
+  }
+}
+check("FORM is the figure's alone: the bare figure puts every fur pixel back to the key it was drawn in and leaves every other pixel as drawn", unbared.length === 0, unbared.slice(0, 4).join("; "));
+// …and those bodies are the kit's. The build hook is a path of its own —
+// every sprite through it keyed apart from the plain one — that draws the
+// plain rows in a species' own build and other rows in another's, and the
+// control's figures are the ones it drew.
+const kept = (sp) => BEFORE_BUILDS[sp] === BUILDS[sp];
+const plainBear = citizenSprite("bear", "se", 0, "adult");
+const hookedBear = citizenSprite("bear", "se", 0, "adult", { build: BEFORE_BUILDS.bear });
+const smallBear = citizenSprite("bear", "se", 0, "adult", { build: "small" });
+check("the build hook draws the kit's bodies: a sprite of its own, the plain rows in the species' own build, other rows in another's — and the control is drawn through it",
+  plainBear !== hookedBear && plainBear.name !== hookedBear.name && plainBear.rows.join() === hookedBear.rows.join()
+    && smallBear.rows.join() !== plainBear.rows.join() && was.species.bear.stand[0] === hookedBear && built.species.bear.stand[0] === hookedBear);
+// So every pair of species whose build is the same in both tables reads, to
+// the last digit, the FORM the plain sprites read.
+const compared = now.pairs.filter((p) => kept(p.a) && kept(p.b)).length;
+check("…so every pair of species in an unmoved build reads the plain sprites' FORM through it",
+  compared > 0 && now.pairs.every((p, i) => !(kept(p.a) && kept(p.b)) || (p.form === built.pairs[i].form && p.formFloor === built.pairs[i].formFloor)),
+  `${compared} pairs compared`);
 
 // ---- the panel ------------------------------------------------------------------
 // The census histogram, through the REAL createUI and the dom shim: each

@@ -45,11 +45,22 @@
 //          (round 4, js/art/citizens.js): no coat may be as lost as that.
 //
 // `zooReadings({ coats })` reads any table of `[ramp, shift]` — FORM does not
-// depend on the coat, so a table that is not live is read exactly.
+// depend on the coat, so a table that is not live is read exactly. And
+// `zooReadings({ builds })` reads any table of builds (`BUILDS`, the body each
+// species wears): the figures are drawn through the kit's own composer in the
+// body named, so the builds the game wore before are read exactly too.
+//
+// One reading about a pair that neither control makes alone:
+//
+//   IN ONE COAT   a pair whose COAT is under the shade control: the fur cannot
+//                 split them, and whatever the eye has is their FIGURE — so
+//                 these are listed by FORM against the stride floor, closest
+//                 first. (The beaver and the pig were the closest such pair
+//                 when this reading was added: 1.08 strides apart.)
 
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { citizenSprite, coatMapOf, COATS, CITIZEN_DETAILS, SPECIES_IDS } from "../js/art/citizens.js";
+import { citizenSprite, coatMapOf, COATS, BUILDS, CITIZEN_DETAILS, SPECIES_IDS } from "../js/art/citizens.js";
 import { colourOf } from "../js/art/palette.js";
 
 const RUNGS = ["w", "x", "y", "z"];
@@ -139,19 +150,25 @@ export function lost(map) {
 
 /** The figures a coat is judged on: adult, standing, facing SE and NE. */
 const FACINGS = ["se", "ne"];
-const adult = (sp, facing, frame = 0, look = { shade: 0, mark: 0 }) => citizenSprite(sp, facing, frame, "adult", { look });
+const adult = (sp, facing, frame = 0, build = null, look = { shade: 0, mark: 0 }) =>
+  citizenSprite(sp, facing, frame, "adult", build == null ? { look } : { look, build });
 
 /**
  * Every species and every pair. Pure: reads the art, writes nothing.
  * `coats` — any table of `[ramp, shift]` by species (default: the live one).
+ * `builds` — any table of body names by species (default: the kit's own,
+ * drawn the plain way; a table given is drawn through `opts.build`, every
+ * species of it, even one in its own build).
  */
-export function zooReadings({ ids = SPECIES_IDS, coats = COATS } = {}) {
+export function zooReadings({ ids = SPECIES_IDS, coats = COATS, builds = null } = {}) {
   const species = {};
   for (const sp of ids) {
     const coat = coats[sp];
     if (!coat) throw new Error(`zooprobe: no coat for '${sp}'`);
-    const stand = FACINGS.map((f) => adult(sp, f));
-    const stride = FACINGS.map((f) => adult(sp, f, 1));
+    const build = builds ? builds[sp] : null;
+    if (builds && !build) throw new Error(`zooprobe: no build for '${sp}'`);
+    const stand = FACINGS.map((f) => adult(sp, f, 0, build));
+    const stride = FACINGS.map((f) => adult(sp, f, 1, build));
     const counts = rungCounts(stand);
     const strideForm = FACINGS.reduce((t, _, i) => t + figureDistance(bareFigure(stand[i]), stand[i].anchor, bareFigure(stride[i]), stride[i].anchor), 0) / FACINGS.length;
     const looks = coatLooks(coat);
@@ -159,7 +176,7 @@ export function zooReadings({ ids = SPECIES_IDS, coats = COATS } = {}) {
     const flat = looks.filter((l) => l.map.x === l.map.y).map((l) => l.look);
     let worst = { distance: Infinity };
     for (const l of looks) { const r = lost(l.map); if (r.distance < worst.distance) worst = { ...r, look: l.look }; }
-    species[sp] = { coat, stand, counts, strideForm, shadeCoat, map: looks[0].map, flat, lost: worst };
+    species[sp] = { coat, build: build ?? BUILDS[sp], stand, counts, strideForm, shadeCoat, map: looks[0].map, flat, lost: worst };
   }
   const pairs = [];
   for (let i = 0; i < ids.length; i++) for (let j = i + 1; j < ids.length; j++) {
@@ -168,9 +185,9 @@ export function zooReadings({ ids = SPECIES_IDS, coats = COATS } = {}) {
     const both = { w: A.counts.w + B.counts.w, x: A.counts.x + B.counts.x, y: A.counts.y + B.counts.y, z: A.counts.z + B.counts.z };
     const coat = coatDistance(A.map, B.map, both);
     const formFloor = Math.max(A.strideForm, B.strideForm), coatFloor = Math.max(A.shadeCoat, B.shadeCoat);
-    pairs.push({ a: ids[i], b: ids[j], form, coat, formFloor, coatFloor,
+    pairs.push({ a: ids[i], b: ids[j], form, coat, formFloor, coatFloor, strides: form / formFloor,
       oneForm: form < formFloor, oneCoat: coat < coatFloor, close: form < 2 * formFloor,
-      sameRamp: A.coat[0] === B.coat[0] });
+      sameRamp: A.coat[0] === B.coat[0], sameBuild: A.build === B.build });
   }
   const tables = new Map();
   for (const sp of ids) { const k = species[sp].coat.join(""); tables.set(k, [...(tables.get(k) || []), sp]); }
@@ -181,6 +198,7 @@ export function zooReadings({ ids = SPECIES_IDS, coats = COATS } = {}) {
     oneAnimal: pairs.filter((p) => p.oneForm && p.oneCoat),
     twoCoats: pairs.filter((p) => p.oneForm && !p.oneCoat),
     closeOnOneRamp: pairs.filter((p) => p.close && p.sameRamp),
+    inOneCoat: pairs.filter((p) => p.oneCoat).sort((p, q) => p.strides - q.strides),
     flat: ids.filter((sp) => species[sp].flat.length),
     lostControl: lost(coatMapOf(LOST_CONTROL, false, 0)).distance,
   };
@@ -195,14 +213,17 @@ if (process.argv[1] && resolve(process.argv[1]) === resolve(here)) {
   const R = zooReadings();
   const { species, pairs } = R;
   console.log("zooprobe — adult, standing, SE and NE averaged. FORM = the figures in one coat, on grass 'o'; COAT = the coats on one figure.");
-  console.log(`\nspecies    coat         w x y z   stride FORM · shade COAT   flat looks            LOST (the olive control: ${R.lostControl.toFixed(1)})`);
+  console.log(`\nspecies    build  coat         w x y z   stride FORM · shade COAT   flat looks            LOST (the olive control: ${R.lostControl.toFixed(1)})`);
   for (const [sp, s] of Object.entries(species))
-    console.log(`  ${sp.padEnd(9)} ${(s.coat[0] + (s.coat[1] >= 0 ? "+" : "") + s.coat[1]).padEnd(11)} ${RUNGS.map((k) => s.map[k]).join(" ")}   ${s.strideForm.toFixed(1).padStart(5)} · ${s.shadeCoat.toFixed(1).padStart(5)}        ${(s.flat.join(", ") || "-").padEnd(20)}  ${s.lost.distance.toFixed(1).padStart(5)} ${s.lost.look}, ${s.lost.nearest}${s.lost.distance <= R.lostControl ? "   LOST" : ""}`);
+    console.log(`  ${sp.padEnd(9)} ${s.build.padEnd(6)} ${(s.coat[0] + (s.coat[1] >= 0 ? "+" : "") + s.coat[1]).padEnd(11)} ${RUNGS.map((k) => s.map[k]).join(" ")}   ${s.strideForm.toFixed(1).padStart(5)} · ${s.shadeCoat.toFixed(1).padStart(5)}        ${(s.flat.join(", ") || "-").padEnd(20)}  ${s.lost.distance.toFixed(1).padStart(5)} ${s.lost.look}, ${s.lost.nearest}${s.lost.distance <= R.lostControl ? "   LOST" : ""}`);
   for (const key of ["form", "coat"]) {
     console.log(`\nclosest ${N} by ${key.toUpperCase()}:`);
     for (const p of [...pairs].sort((p, q) => p[key] - q[key]).slice(0, N))
       console.log(`  ${p.a.padEnd(9)} ${p.b.padEnd(9)} FORM ${p.form.toFixed(1).padStart(5)} (floor ${p.formFloor.toFixed(1)})  COAT ${p.coat.toFixed(1).padStart(5)} (floor ${p.coatFloor.toFixed(1)})${p.oneForm && p.oneCoat ? "   ONE ANIMAL" : p.oneForm ? "   one animal in two coats" : p.close && p.sameRamp ? "   close, one ramp" : ""}`);
   }
+  console.log(`\nin one coat — the fur cannot split them, the figure has to (FORM in strides, closest first):`);
+  for (const p of R.inOneCoat.slice(0, N))
+    console.log(`  ${p.a.padEnd(9)} ${p.b.padEnd(9)} ${p.strides.toFixed(2)} strides  (FORM ${p.form.toFixed(1)}, floor ${p.formFloor.toFixed(1)} · COAT ${p.coat.toFixed(1)} under ${p.coatFloor.toFixed(1)})${p.sameBuild ? "   one build" : ""}`);
   const names = (ps) => ps.map((p) => `${p.a}/${p.b}`).join(", ");
   console.log(`\n${R.distinct} distinct coats for ${Object.keys(species).length} species${R.shared.length ? " — shared: " + R.shared.map((v) => v.join("+")).join(", ") : ""}`);
   console.log(`ONE ANIMAL ${R.oneAnimal.length}${R.oneAnimal.length ? " (" + names(R.oneAnimal) + ")" : ""} · one animal in two coats ${R.twoCoats.length}${R.twoCoats.length ? " (" + names(R.twoCoats) + ")" : ""} · close figures on one ramp ${R.closeOnOneRamp.length}${R.closeOnOneRamp.length ? " (" + names(R.closeOnOneRamp) + ")" : ""}`);
