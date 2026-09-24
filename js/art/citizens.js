@@ -11,8 +11,8 @@
 // that survive at 12 px on a busy map:
 //
 //   SILHOUETTE   the head/ear overlay and the tail overlay
-//   RAMP         warm / cool / olive, from js/sim/species.js
-//   VALUE        furShift: rabbit and mouse light, beaver/bear/raccoon dark
+//   RAMP         the species' coat ramp (`COATS`, below — the kit's table)
+//   VALUE        the coat's shift: rabbit and mouse light, beaver/bear/raccoon dark
 //
 // Every part is authored in the WARM fur keys w x y z (dark → light) and
 // remapped to the species' ramp at compose time; '&' '^' are the shirt (a
@@ -23,8 +23,8 @@
 // limbs. The limbs are NOT olive either, any more (round 4): the species
 // table says olive, but olive 'h' sits between grass 'n' and 'o' and the
 // whole animal vanished into the lawn (luminance 43/68/96/132 against
-// grass 65/91/120/151). The kit overrides the skin ramp for the tortoise
-// alone (`SKIN`): warm tan (furWarm 0) limbs under the brown shell, and a
+// grass 65/91/120/151). The kit paints the tortoise's limbs in its own
+// coat instead (`COATS`): warm tan (furWarm 0) under the brown shell, and a
 // 1-px '+' outline — the only near-black — so its silhouette closes
 // against grass and asphalt alike. The palette is untouched.
 //
@@ -975,27 +975,53 @@ const BUILD = {
 const AUTHOR_KEYS = keysOf("furWarm"); // w x y z — the authoring ramp
 
 /**
- * Skin overrides: where the ART disagrees with the species table's ramp.
- * The tortoise's table row says olive; olive vanished into the lawn (see
- * the header), so the kit paints its limbs warm tan instead. The sim is
- * not consulted for colour anywhere else, so nothing else moves.
+ * THE COATS — `[ramp, shift]` per species: the authoring rungs w x y z land
+ * on `ramp`'s keys, `shift` rungs up. This is the only table the art reads
+ * for an animal's colour.
+ *
+ * It used to be two columns of the sim's roster (`fur`, `furShift` in
+ * js/sim/species.js) with an override here for the one species where the
+ * art disagreed: the tortoise's row says olive, olive vanished into the
+ * lawn (see the header), so the kit painted its limbs warm tan. A colour
+ * is not a thing the simulation knows — SPEC §12.3 puts the fur ramp under
+ * the art — and the sprite arc does not edit js/sim/ (art must never move
+ * a sim hash), so the table lives with the art that reads it.
  */
-const SKIN = { tortoise: { fur: "furWarm", furShift: 0 } };
+export const COATS = Object.freeze({
+  rabbit: Object.freeze(["furWarm", 1]),
+  mouse: Object.freeze(["furCool", 1]),
+  fox: Object.freeze(["furWarm", 0]),
+  beaver: Object.freeze(["furWarm", -1]),
+  owl: Object.freeze(["furCool", 0]),
+  bear: Object.freeze(["furWarm", -1]),
+  tortoise: Object.freeze(["furWarm", 0]),
+  raccoon: Object.freeze(["furCool", -1]),
+  pig: Object.freeze(["furWarm", 1]),
+  cow: Object.freeze(["furCool", 1]),
+  wolf: Object.freeze(["furCool", -1]),
+  cat: Object.freeze(["furWarm", 0]),
+  hawk: Object.freeze(["earth", 0]),
+  skunk: Object.freeze(["furCool", -1]),
+});
 
 /**
- * Key map: authoring fur keys → the species' ramp, shifted. Elder = one
+ * Key map: authoring fur keys → the species' coat. Elder = one
  * rung lighter ONLY when the light body rung 'y' has headroom; a coat
- * already at the top (rabbit, mouse: furShift +1) keeps its adult map, so
+ * already at the top (rabbit, mouse: shift +1) keeps its adult map, so
  * every elder keeps two body values and the light law survives. Age on
  * those coats is carried by the ELDER marks instead.
  */
-function furMap(species, elder, shade = 0) {
-  const sp = SPECIES_BY_ID[species];
-  if (!sp) throw new Error(`citizens: unknown species '${species}'`);
-  const skin = SKIN[species] || sp;
-  const ramp = keysOf(skin.fur);
+export function coatMap(species, elder, shade = 0) {
+  const coat = COATS[species];
+  if (!coat || !SPECIES_BY_ID[species]) throw new Error(`citizens: unknown species '${species}'`);
+  return coatMapOf(coat, elder, shade);
+}
+
+/** The same map for any `[ramp, shift]` — a coat need not be anybody's (tools/zooprobe.mjs reads tables that are not live). */
+export function coatMapOf([rampName, furShift], elder = false, shade = 0) {
+  const ramp = keysOf(rampName);
   const n = ramp.length - 1;
-  const idx = (i) => Math.max(0, Math.min(n, i + skin.furShift));
+  const idx = (i) => Math.max(0, Math.min(n, i + furShift));
   const up = elder && idx(2) < n ? 1 : 0;
   const map = {};
   AUTHOR_KEYS.forEach((k, i) => {
@@ -1016,7 +1042,7 @@ function lumOf(key) {
  * authoring ramp, so the species remap leaves them alone.
  */
 function elderMarkKey(species) {
-  return lumOf(furMap(species, true, 0).y) > 190 ? "Y" : "Z";
+  return lumOf(coatMap(species, true, 0).y) > 190 ? "Y" : "Z";
 }
 
 /**
@@ -1382,14 +1408,19 @@ export function citizenSprite(species, facing = "se", frame = 0, age = "adult", 
     stampGlasses(g, species, authored, lift, carry ? CARRY_OX : 0, f === "sw" || f === "nw");
     rows = toRows(g);
   }
-  rows = remap(rows, furMap(species, ag === "elder", look.shade));
+  // The figure in AUTHORING keys, before its coat: every pixel still says
+  // what it IS (w x y z fur, & ^ shirt, q..u shell) rather than what colour
+  // it came out — which is what a later pass needs and cannot read back off
+  // the coloured rows (standing brief, "the four passes").
+  const figure = Object.freeze(rows.slice());
+  rows = remap(rows, coatMap(species, ag === "elder", look.shade));
   if (species === "tortoise") rows = outline(rows, "+");
   const h = rows.length;
   const anchor = ag === "cub" ? [4, 11] : [6 + (carry ? CARRY_OX : 0), h - 1];
   s = defineSprite({ name: `citizen-${key}`, rows, anchor, tags: ["citizen", species, ag] });
   CITIZEN_DETAILS.set(s, { species, facing: f, age: ag, frame: fr, suit,
     lift: (hat ? 4 : 0) + (carry === "sack" ? CARRY_LIFT : 0),
-    ox: carry ? CARRY_OX : 0, eyes: FACE_EYES[species] });
+    ox: carry ? CARRY_OX : 0, eyes: FACE_EYES[species], authored: figure, coat: COATS[species] });
   CACHE.set(key, s);
   return s;
 }
@@ -1431,9 +1462,9 @@ export function portraitSprite(species, opts = {}) {
     if (look.mark) stampLookMark(hg, species, "se", 0, 0, false);
     if (glasses) stampGlasses(hg, species, "se", 0, 0, false);
   }
-  let headRows = remap(toRows(hg), furMap(species, ag === "elder", look.shade));
+  let headRows = remap(toRows(hg), coatMap(species, ag === "elder", look.shade));
   if (species === "tortoise") headRows = outline(headRows, "+");
-  const coat = furMap(species, ag === "elder", look.shade);
+  const coat = coatMap(species, ag === "elder", look.shade);
   // Remove the street-sized eye/teeth punctuation; the enlarged expression
   // below owns one uncluttered face zone. Species silhouettes and fixed coat
   // markings remain untouched.
