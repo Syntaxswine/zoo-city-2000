@@ -1,13 +1,13 @@
 # The sprites handoff — 2026-09-23
 
 For whoever takes Tier 3 or Tier 4, or touches `js/art/` at all. Sessions 21
-and 22 built the shadows, the roofs, the evening, the windows, the setbacks
-and the ground; this is what
+and 22 built the shadows, the roofs, the evening, the windows, the setbacks,
+the ground and the coats; this is what
 I know now that I did not know when I started, written down so you do not have
 to find it the way I did.
 
-**Last true on `a416748`, 2026-09-23** — Tiers 1, 2 and 3 closed; Tier 4
-open.
+**Last true on `bfb93e8`, 2026-09-23** — Tiers 1, 2 and 3 closed; Tier 4
+begun: T4.0, the coats, built.
 Every number in this file was re-measured on that tip. If you are reading it
 much later, the numbers are the first thing to distrust and `npm run check`
 is the first thing to run: it prints most of them.
@@ -17,11 +17,11 @@ is the first thing to run: it prints most of them.
 | document | what it is for |
 |---|---|
 | `docs/PROPOSAL-SPRITE-UPGRADE-2026-09-22.md` | **the list.** §4 is the checklist, each item with the verification written down *before* it was built. §2c is the five art gates. Cross things off there |
-| handoff §43–§47 (`HANDOFF-THE-FIRST-ZOO-2026-09-02.md`) | **the sessions.** What was measured on the day, and the fifty traps in five symptom-keyed tables |
+| handoff §43–§48 (`HANDOFF-THE-FIRST-ZOO-2026-09-02.md`) | **the sessions.** What was measured on the day, and the sixty-three traps in six symptom-keyed tables |
 | this file | **the standing brief.** The laws, the instruments, what is proven against what is a guess, and what is still open |
 | `SPEC.md` §12, §13 | the design record. It outranks all three |
 
-Read this one and §4. Do not read §43–§47 front to back until
+Read this one and §4. Do not read §43–§48 front to back until
 something breaks; then read the trap tables, which are keyed by the symptom
 you are looking at.
 
@@ -60,10 +60,10 @@ commit.
    twin**, not the 1× rows scaled. Anything new in the dynamic pass must
    honour `S > 1 && art.hires`, as `blitScaled` does.
 7. **Art cannot move a `stateHash`.** The sprite a variant byte selects is not
-   in the hashed shape. Across the whole arc — **twenty-one commits** of
-   shadows, roofs, an evening, a set of windows, four buildings stepped back
-   and a meadow — `git diff --name-only 4bb38b6..HEAD -- js/sim/` is
-   **empty**, and
+   in the hashed shape. Across the whole arc — **twenty-five commits** of
+   shadows, roofs, an evening, a set of windows, four buildings stepped back,
+   a meadow and fourteen coats — `git diff --name-only 4bb38b6..HEAD -- js/sim/`
+   is **empty**, and
    `tools/play.mjs --dusk` renders the same scripted city at the same hash
    `86cc1587` by day and at nightfall. Keep it that way: if an art change
    needs a sim field, it is not an art change.
@@ -118,6 +118,15 @@ Three things fall out of that order, and all three have already cost a session:
 character pass lit their new boxes, the detail pass framed their windows, the
 evening tinted them, and the window gate held both ways at 1×, 2× and 4×.
 
+**The animals have a detail pass too, and it made pass 3's mistake twice.**
+`citizen-detail.js` refines each citizen at 2× and 4× and decided what was
+FUR by colour (three ramps) and where an EDGE was by transparency. The hawk's
+coat is `earth`, so its fur was never reworked at all (0.0%, for as long as
+the kit has existed); the tortoise wears a 1-px outline, so its limbs never
+touched a transparent pixel (2.4%). The composer now hands the pass its figure
+in authoring keys — `CITIZEN_DETAILS.authored`, the animals' `aperture` — and
+the pass asks that, not the ink (§48).
+
 **The shadow is not in this chain.** It is its own sprite with its own tag,
 drawn by the renderer between the ground and the standing pass — because G2
 (the footprint prism) and G4 (ink identity) between them forbid a shadow from
@@ -136,16 +145,19 @@ carries its re-baselined receipt in the same commit.** That is what turns
 | `tools/art-dump.mjs` | **GATE** — exit 1, and the FIRST step of `npm run check` | one line per sprite (`name · w×h · anchor · ink · hash8`), one line per palette key, one `TOTAL`. Drift against `docs/fixtures/art-baseline.txt` fails |
 | `tools/check.mjs` | GATE, 980 checks | the footprint prism, the hi-res set's visibility, `allCitizens() === 3236`, 504 portraits |
 | `tools/check-building-character.mjs` | GATE — **Part E**, called by `check.mjs`, no verdict of its own | the windows. 18 assertions: the ownership law both ways at 1×, 2× and 4×; the twelve pane keys spelt out; a boarded pane is never lit; a plant never swallows its pane; and the three that would have caught the locked hash |
-| `tools/check-closeups.mjs` | GATE | 315 buildings, 2,688 citizens; a twin may not expand its silhouette |
+| `tools/check-closeups.mjs` | GATE | 315 buildings, 2,688 citizens; a twin may not expand its silhouette, and every species' twin reworks its FUR (by the composer's figure) at least half as much as the median species', at 2× and at 4× |
 | `tools/check-shadows.mjs` | GATE, 22 checks | every recipe casts, one key only, the mask never lands on a standing sprite's pixels, shadows off is byte-exact |
 | `tools/check-dusk.mjs` | GATE, 114 checks | amount 0 is the ABSENCE of a table, no ramp inverts, the lights are fixed points, the ground takes less light than the walls — and the lawn it samples is MEASURED lawn: the same frame with nothing standing agrees with it by day and at dusk |
 | `tools/check-ground.mjs` | GATE, 51 checks | the grass keyed off its corners and the paths worn where riders cross it: every corner combination and walked direction drawn; kept round everything made; no tile spanning kept and rough; the paths exactly where the sim's own traffic count says a walk crosses grass, and the same path at every zoom; and the FRAME — every open tile pixel for pixel as its own corners, byte and walks name, and no seam, with the instrument proven able to see the old quilt in the same run |
+| `tools/check-animals.mjs` | GATE, 15 checks | the coats: fourteen, all different; none FLAT in any look or age; none as LOST on grass or road as the olive tortoise; no ONE ANIMAL; no two close figures on one ramp; no key added — and the pre-T4 table, spelt out, read in the same run and refused exactly as measured; and the census bars in the coats |
+| `tools/zooprobe.mjs` | **passive instrument** — refuses nothing | can you tell the animals apart? FORM (two figures in one coat, against one animal mid-stride) and COAT (two coats on one figure, against one animal shaded); FLAT and LOST per coat. `zooReadings({ coats })` reads any table, live or not |
 | `tools/groundprobe.mjs` | **passive instrument** — refuses nothing | does the ground show its tiles? SEAM (the step across a tile edge over the step across a line through a tile; 1 is seamless) and REPEAT (agreement one tile over, above chance), off the renderer's frame, for an open field, a control that cannot have a seam, and the pick before T3.3. `--cams N` |
 | `tools/faceprobe.mjs` | **passive instrument** — refuses nothing | how much of the city is roof, and how much of a roof is one bare quad. `--family`, `--top N` |
 | `tools/massprobe.mjs` | **passive instrument** — refuses nothing | how much of each plan is one box: `fill` (its rooms over their bounding prism) and `deck` (a level between the street and the top, seen at zoom 1). Bare, it names the plans that are still ONE BOX WITH A LID. `--family`, or a name pattern |
 | `tools/shadow-sheet.mjs`, `tools/dusk-sheet.mjs` | passive | one town, one camera, one process, only the knob moving |
 | `tools/skyline-sheet.mjs` | passive | the four families T3.2 stepped back, all six plans side by side, and a 218-lot block at zoom 1 and 2. `docs/shots/skyline-before-after.png` is the before/after — two trees in one process, the only way a "before" survives a recipe change |
 | `tools/ground-sheet.mjs` | passive | the 31 corner combinations, an open field at zoom 1 and 2, a town's edge where the kept grass meets the meadow, and a forecourt trodden and worn. `docs/shots/ground-before-after.png` is the before/after — two trees, one process |
+| `tools/zoo-sheet.mjs` | passive | the fourteen on grass and road, each in its four coats (adult, shaded, elder, elder shaded), and a crowd of 84 through the real renderer at zoom 1 and 2. `docs/shots/zoo-before-after.png` is the before/after — two trees, one process |
 | `tools/window-sheet.mjs` | passive | 24 facades at 4× for the state ART, then a dense block through the real renderer at zoom 1, 2 and dusk for the only question that decides it — at the zoom the game is played at, is this a city of different windows or is it noise? |
 | `tools/play.mjs` | passive | the real renderer on a real mayor-built town. `--no-shadows`, `--shadow-k N`, `--dusk` |
 
@@ -156,12 +168,16 @@ have not decided about yet.
 **The state of the tree as this is written:**
 
 ```
-art-dump    3864 sprites · 74 palette keys · TOTAL 33aeb45e   (T3.3 added 213 and moved none; the palette line has not moved since T2.1)
+art-dump    3864 sprites · 74 palette keys · TOTAL f5b0e407   (T4.0 moved 2,774 — twelve species' street sprites and
+            portraits, no size, anchor or ink; the palette line has not moved since T2.1)
 faceprobe   315 box recipes (of 387 registered) · TOP 63.4% · bare quad 42.9%
 massprobe   192 zoned plans · 43 one box with a lid (51 before T3.2) · R/C tiers 2–3: one, the skylight market
 groundprobe open field: seam 0.96 / 0.99 / 1.01 at zoom 1/2/4 (the quilt before 2.46 / 3.80 / 5.13) · repeat 4.9 / 4.7 (13.6 / 13.5)
-suite       980 checks 0 failures · close-ups 315/2,688 · shadows 22 · dusk 114 · ground 51 · Part E 18
-gates       art-dump → check → close-ups → shadows → dusk → ground → suits → …
+zooprobe    14 coats (7 before T4.0) · ONE ANIMAL 0 (beaver/bear) · FLAT 0 (5) · LOST 0 (4) · close figures on one ramp 0 (9)
+            · one animal in two coats: bear/pig FORM 3.5, beaver/bear 4.0, under a stride floor of 5.7 — T4.2's
+suite       980 checks 0 failures · close-ups 315/2,688, fur reworked 2× median 18.3% least 10.0% · shadows 22 · dusk 114
+            · ground 51 · animals 15 · Part E 18
+gates       art-dump → check → close-ups → shadows → dusk → ground → animals → suits → …
 ```
 
 ---
@@ -206,8 +222,19 @@ a proxy that happens to work.
 - A path is worn exactly where a stored commute walks on grass, walk for walk
   with the sim's own traffic count; the three grasses are three of the 186
   meadow tiles, byte for byte; and T3.3 added 213 sprites and moved none.
-- Art has not moved a sim hash, anywhere in the arc — twenty-one commits, zero
-  files touched under `js/sim/`.
+- Fourteen species wear fourteen coats; no coat goes flat in any look or age;
+  no coat's lit rung, in any look or age, is as near a key of the grass or the
+  road as the olive tortoise's was; no two species are ONE ANIMAL; and no two
+  close figures share a ramp — each checked against the table the game wore
+  before, spelt out and read in the same run, which must fail every one of
+  them exactly as measured.
+- Every species' 2× and 4× twin reworks its fur — what the composer drew as
+  fur, not what a ramp says — at least half as much as the median species'.
+- T4.0 moved exactly 2,774 sprites, every one of them an animal of a species
+  whose coat changed; none changed size, anchor or ink; no palette key was
+  added or moved. The census paints each species in its coat.
+- Art has not moved a sim hash, anywhere in the arc — twenty-five commits,
+  zero files touched under `js/sim/`.
 
 **A guess.**
 
@@ -263,6 +290,18 @@ a proxy that happens to work.
   0.45 of a level, six dithers — and the path's bow (0.5 units) and its
   four-walk threshold. Read off pictures and two measured bars; the bars are
   the seam and the repeat, not how a meadow ought to look.
+- **The coats are taste inside four rules.** The rules are checked; which
+  table the game wears — the search found 280 that pass them inside its
+  shortlists alone, and the one chosen is not among them — was picked from
+  four rendered crowds by me: a red fox, a coral pig, a ginger cat, warm greys
+  because the cool ones are the road's. And the rules' own lines are mine: zooprobe's two
+  controls (one animal mid-stride, one animal shaded), "close" as under twice
+  the stride floor, the olive tortoise's 9.8 as the camouflage bar, and the 2×
+  fur bar at half the median. Each is a control or a local threshold read off
+  the measurement, not a law about animals.
+- **A coat at the top of its ramp gets less edge light at 2×.** The pass
+  lights an edge one rung lighter and there is none: the wolf on fabric +1
+  reworks 10.0% of its fur, against 18.2% on its old coat. Inside the gate.
 - **Nobody has played this.** Every frame in `docs/shots/` was taken by me,
   through the real renderer, on a scripted town. No player has seen a shadow,
   an evening or a drawn blind in this game yet. Treat the owner's first
@@ -272,8 +311,8 @@ a proxy that happens to work.
 
 ## Traps that are classes
 
-Fifty are recorded in §43–§47, keyed by the symptom you are staring at.
-These fifteen are the ones that are not incidents: each has either
+Sixty-three are recorded in §43–§48, keyed by the symptom you are staring at.
+These seventeen are the ones that are not incidents: each has either
 already happened twice, or cost a whole session once and will cost the next
 one too. **Renumbering this list breaks a comment in the source — run
 `grep -rn "standing brief" js/ tools/` before you do.**
@@ -385,6 +424,23 @@ one too. **Renumbering this list breaks a comment in the source — run
     reading six dither patterns. Build the case that must read the floor and
     the case that must read the fault, run the instrument on both, and only
     then hold the thing you built to a number.
+16. **ANY SHIFT ALONG A RAMP THAT CLAMPS PUTS TWO RUNGS ON ONE KEY.** Three
+    times in T4.0, in three places: the `shade` look one rung down a coat
+    already one rung down (the lit and the shaded body on one key — five
+    species drawn FLAT for half their number); an elder's lightening at the
+    top (the beaver's pale chest painted in the key of the shoulders under it);
+    and the 2× pass lighting an edge a rung up on a coat with no rung left
+    (the wolf's fur 18.2% → 10.0% reworked). The elder rule had a headroom
+    guard; nothing else did. Any time a rung index is shifted and clamped, ask
+    what else lands on the same key — and assert the property (two keys), do
+    not repair it silently (trap 6).
+17. **A MUTANT KILLED BY THE WRONG CHECK PROVES NOTHING ABOUT THE RIGHT ONE,
+    AND A SURVIVOR MAY NOT BE A FAULT.** T4.0's first harness aimed a coat at
+    ONE ANIMAL and the close-ramp check refused it first; its second survived
+    and was, by the instrument's own reading, two animals. Record WHICH check
+    refuses every mutant; read every survivor with the instrument before
+    calling the gate weak — and keep the one that is not a fault in the
+    harness as the gate's neutral control, the mutant that must pass.
 
 ---
 
@@ -474,29 +530,44 @@ wants a different answer, probably at the recipe.
 
 ## The brief for Tier 4 — the animals
 
-Fourteen species share two body builds and **eight coats**, which is the
-number to start from. A coat is a (ramp, shift) pair from `js/sim/species.js`,
-and there are only eight distinct ones for fourteen animals:
+**T4.0, the coats — BUILT** (§48). This brief said to start from the coats,
+and they were worse than it said: SEVEN for fourteen (the kit painted the
+tortoise in the fox's and the cat's), the beaver and the bear ONE ANIMAL by
+`tools/zooprobe.mjs`, five dark coats FLAT in their shaded look, and the dark
+greys closer to the road than the olive tortoise ever was to the lawn. The
+table is the kit's now (`COATS`, SPEC §12.3): fourteen coats, all from ramps
+that existed. **If you are changing a coat or adding a species**, the five
+things to know:
 
-| coat | species |
-|---|---|
-| `furCool-1` | raccoon, wolf, **skunk** |
-| `furWarm+1` | rabbit, pig |
-| `furCool+1` | mouse, cow |
-| `furWarm+0` | fox, cat |
-| `furWarm-1` | beaver, bear |
-| `furCool+0` | owl |
-| `olive+0` | tortoise |
-| `earth+0` | hawk |
+1. **The coat is the art's.** `COATS` in `js/art/citizens.js`; the sim's
+   `fur`/`furShift` columns are read by nothing but `check-animals`' control.
+2. **Four rules, all in `check-animals`**: fourteen different coats; no shift
+   below 0 on a four-rung ramp (or the shaded look goes flat — trap 16); the
+   lit rung of every look further from grass n o p and road 3 2 than the olive
+   tortoise's 9.8; and no two figures zooprobe calls close on one ramp.
+   `node tools/zooprobe.mjs` reads a table before you commit it;
+   `zooReadings({ coats })` reads one that is not live.
+3. **Read the crowd, not the table.** A search found 280 tables that pass
+   the rules inside its shortlists and chose a light-grey skunk. `node
+   tools/zoo-sheet.mjs` draws a crowd through the real renderer.
+4. **A new ramp is a new place for the evening to land.** `furDark` was built
+   for this tier and taken out: its keys were within ΔE 4.2 of keys the
+   palette has, and it re-mapped seven keys of existing art at dusk.
+5. **The 2× pass asks the composer** (`CITIZEN_DETAILS.authored`) what is fur
+   and where the figure ends — and `check-closeups` refuses a species whose
+   fur the twin merely enlarges.
 
-Six of the fourteen are wearing a coat somebody else already has, a wolf and
-a skunk are the same colour, and the hawk is painted in `earth` — the SOIL
-ramp, standing in for feathers, which is half of what diagnosis D4 was about.
-That is why they read as one animal in fourteen coats, and it is a cheaper
-fix than any of the art below.
+**T4.2 — the third build — is next, and now it is measured.** The coats keep
+the big-build animals apart; their figures do not: bear/pig FORM 3.5 and
+beaver/bear 4.0, both under a stride floor of 5.7, with beaver/pig (5.9),
+bear/wolf (6.7) and pig/wolf (6.9) just over it. The big build carries four
+figures the eye cannot split without the fur. The idles the list asks for
+exist (`2fcfe8e`, 2026-09-03): fourteen species-specific pauses of a few
+pixels each.
 
-T4.1 is authored 2× heads per species — the head is the ID mark; leave the
-body procedural. `citizen-detail.js` today is generic chamfering.
+**T4.1** is authored 2× heads per species — the head is the ID mark; leave the
+body procedural. `CITIZEN_DETAILS.authored` is what an authored head will need
+to know where it may paint.
 
 Two hard constraints, both pinned exactly:
 
@@ -508,8 +579,9 @@ Two hard constraints, both pinned exactly:
   outline it replaces.
 
 `furDark` was deliberately NOT added in T2.1 — a ramp with no consumer is a
-guess, and its consumer is here. Add it when you need it, in the same commit
-as the art that uses it, with the per-key receipt.
+guess — and was built for its consumer in T4.0 and not added then either,
+measured: see point 4 above. If a black animal is ever needed, the palette's
+floor is the constraint, and timber's and fabric's dark ends are the answer.
 
 ---
 
@@ -565,3 +637,9 @@ quilt; I set a control beside the first number I drew, and the control threw
 the number away. And I wrote "nobody walks on the grass" into three files
 before reading the one file that hands every walker its path. Trap 14 is
 mine.
+
+And the same again, T4.0. I was pointed at seven coats and found the light
+gone out of five of them; my first reading for an animal lost on its ground
+could not see the one animal known to have vanished; and I built the black
+this brief had saved for me, measured it, and took it out. Traps 16 and 17
+are mine — the second one twice in an afternoon.

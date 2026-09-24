@@ -644,10 +644,48 @@ The A/B is `docs/shots/sheet-windows.png` (`tools/window-sheet.mjs`).
 
 ### Tier 4 — the animals
 
+- [x] **T4.0 — fourteen coats** (added to the list 2026-09-23; the standing
+  brief: *"the number to start from… a cheaper fix than any of the art
+  below"*). **BUILT, `b72bea7` · `a2dc8ea` · `bfb93e8`, handoff §48.**
+  Measured first, by an instrument built for it — `tools/zooprobe.mjs` pulls
+  each animal apart into its FORM (the figure in one coat, against one animal
+  mid-stride) and its COAT (against one animal one rung darker):
+
+  | | before | after |
+  |---|---|---|
+  | distinct coats | **7** (the brief said 8: the tortoise wore the fox's) | **14** |
+  | ONE ANIMAL | beaver/bear (FORM 4.0 under 5.7, COAT 0.0) | 0 |
+  | close figures on one ramp | 9 | 0 |
+  | FLAT in a look — lit and shaded body on one key | 5 (half of each; 18% of citizen sprites) | 0 |
+  | LOST — lit rung nearer the ground than the olive tortoise's 9.8 | 4 (the dark greys 4.0 from the road) | 0 (least 15.5) |
+
+  The coat table moved from the sim's roster into the kit (`COATS`, byte for
+  byte first), and every new coat is from a ramp the palette had: **no key
+  added** — `furDark` was built, its keys were within ΔE 4.2 of existing ones
+  and it re-mapped seven keys of existing art at dusk, so it was taken out.
+  **2,774 sprites moved**, all animals of the twelve species whose coat
+  changed, none in size, anchor or ink; the palette line untouched. The gate
+  is `tools/check-animals.mjs` (15 checks; the pre-T4 table read in the same
+  run as a control that must fail exactly as measured; 15/15 fault mutants by
+  aim and one neutral that passes). On the way: **the 2× pass had never
+  reworked the hawk's fur** (0.0% — it found fur by ramp, and the hawk is
+  `earth`) nor the tortoise's (2.4% — its outline meant no edge ever fired);
+  it now asks the composer, and `check-closeups` asks how much FUR changed.
+  The suite caught one regression — an elder beaver's marked portrait lost
+  its mark to a clamp at the top of the ramp — fixed before the commit.
+  **Not done by T4.0, and measured for T4.2:** bear/pig (FORM 3.5) and
+  beaver/bear (4.0) are one animal in two coats — the coats keep them apart,
+  the figures do not.
 - [ ] **T4.1 — authored 2× heads per species.** The head is the ID mark; leave
-  the body procedural. `citizen-detail.js` today is generic chamfering.
+  the body procedural. `citizen-detail.js` today is generic chamfering — and,
+  since T4.0, it is handed the composer's figure (`CITIZEN_DETAILS.authored`).
 - [ ] **T4.2 — a third body build and species idles.** Two builds × fourteen
-  species is why they read as one animal in fourteen coats.
+  species is why they read as one animal in fourteen coats. **The idles
+  exist** (`2fcfe8e`, PEOPLE D, 2026-09-03 — fourteen species-specific pauses;
+  this line was written without them). **The build is measured now:** the big
+  build carries four figures the eye cannot split without the fur — bear/pig
+  FORM 3.5 and beaver/bear 4.0 under a stride floor of 5.7, beaver/pig 5.9,
+  bear/wolf 6.7, pig/wolf 6.9 just over it (`node tools/zooprobe.mjs`).
 
 ---
 
@@ -792,8 +830,13 @@ Only the genuinely undecided; everything else is decided above.
    were repaired in commits of their own. **T3.3 (ground) DONE 2026-09-23** —
    the grass keyed off its corners and paths worn where riders cross it,
    213 sprites added (183 meadow tiles, 30 paths) and none moved, after two
-   stale picture sets were regenerated in a commit of their own. Tier 4
-   next.
+   stale picture sets were regenerated in a commit of their own.
+6. **Tier 4** — started 2026-09-23 with an item the list did not have:
+   **T4.0 (the coats) DONE** — the coat table into the art byte for byte with
+   its instrument (`b72bea7`), the 2× pass taught to ask the composer what is
+   fur (`a2dc8ea`), then the fourteen coats (`bfb93e8`). The base rate was
+   clean this time: every picture tool, run on the previous tip, reproduced
+   every picture. Next T4.2 (the third build — measured), then T4.1.
 
 ---
 

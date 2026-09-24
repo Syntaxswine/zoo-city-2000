@@ -4029,3 +4029,233 @@ Maker's mark — Claude Opus 5.5, session 22 continued: the one who was asked
 to break up a repeat and found a quilt, who set a control beside the first
 number it drew, and who wrote "nobody walks there" into three files before
 reading the one that hands the walker its path.
+
+## 48. The coats — seven for fourteen, the light that went out of five, and the pass that never knew the hawk was furred (session 22 continued, 2026-09-23)
+
+The owner: *"lets start on tier 4."* The list's Tier 4 is T4.1 (authored 2×
+heads) and T4.2 (a third body build and species idles); the standing brief
+said to start from the coats — *"fourteen species share two body builds and
+eight coats, which is the number to start from… a cheaper fix than any of the
+art below."* So the first Tier 4 item is one the list did not have: **T4.0,
+the coats.** Four commits: `b72bea7` moved the coat table into the art, byte
+for byte, and built the instrument; `a2dc8ea` fixed a 2× pass that did not
+know the hawk was furred; `bfb93e8` is the coats; this section is the fourth.
+
+### What the instrument reads
+
+`tools/zooprobe.mjs` is passive. The kit composes every figure in AUTHORING
+keys (`w x y z`) and only then lays a coat over it, so an animal can be pulled
+apart into its FORM (both figures in one coat, feet on one pixel, on grass:
+mean ΔE over the union) and its COAT (the two coats on one figure: ΔE per
+authoring rung, weighted by use). Each has a control from inside one species:
+the animal against itself mid-stride, and against itself one rung darker (the
+`shade` look bit, half of every species). FORM under the stride control is
+ONE ANIMAL IN TWO COATS; with COAT under the shade control too, ONE ANIMAL.
+
+On the pre-T4 table:
+
+| | |
+|---|---|
+| coats | **7 for 14** — not the brief's 8: the kit paints the tortoise in the fox's and the cat's coat |
+| ONE ANIMAL | **beaver/bear** — FORM 4.0 under a stride floor of 5.7, COAT 0.0 |
+| one animal in two coats | **bear/pig** — FORM 3.5. The big build carries four figures (beaver, bear, pig, wolf) the eye cannot separate without the fur |
+| close figures on one ramp | 9 |
+
+And two readings about a coat on its own, both defects nobody had seen:
+
+- **FLAT.** The `shade` look moves a coat one rung down. A coat already one
+  rung down a four-rung ramp has nowhere to go: its lit rung and its shaded
+  rung land on one key and the light goes out of the body. Beaver, bear,
+  raccoon, wolf and skunk, half of each — 18% of the kit's citizen sprites.
+  The elder rule had a headroom guard for exactly this at the top of a ramp;
+  the shade rule never had one at the bottom.
+- **LOST.** The lit rung's distance to the nearest key its ground is drawn in
+  (grass n o p, the road's 3 2), against the olive tortoise that "vanished
+  into the lawn" in round 4: 9.8. The dark greys stood **4.0** from the road's
+  '2' — closer than that tortoise ever stood to the grass — and the shaded owl
+  7.8 from its '3'. **The first version of this reading could not see the
+  olive tortoise at all**: the MEAN distance from a body to its ground read it
+  at 25.0, comfortably clear. Camouflage is a body colour sitting next to SOME
+  ground colour, not the average of them — the nearest-key reading puts olive
+  at 9.8 and the known fault where it belongs. Trap 15, doing its job before a
+  bar existed.
+
+### The idles already exist
+
+The list's T4.2 asks for "species idles". There are fourteen, since
+`2fcfe8e` (PEOPLE D, 2026-09-03): a sitting rabbit, a head-turning owl, a
+scratching bear, a washing cat, a withdrawn tortoise. The list was written
+three weeks later without them. T4.2 is the third build; its idle half is
+done unless someone wants idles bigger than a few pixels.
+
+### The pass that went by colour
+
+At zoom 2 and 4 every citizen gets a detailed twin (`citizen-detail.js`,
+since 2026-09-06). It decided what is FUR by ramp — furWarm, furCool, olive —
+and the hawk's coat is `earth`. **Of every pixel the composer drew as the
+hawk's fur, the twin reworked 0.0%**, against a median of 20.1%: no chamfer,
+no edge light, and its own feather rule (`["owl", "hawk"]…`) never fired. It
+passed `check-closeups` for as long as the kit has existed because its SHIRT
+was detailed — "changed > 0" was the whole question (trap 2, existence, again).
+The composer now hands the pass the figure in authoring keys
+(`CITIZEN_DETAILS.authored`), and a pixel drawn in `w x y z` is fur whatever
+coat went over it.
+
+**The check written for the hawk found the tortoise the same afternoon.** It
+wears a 1-px '+' outline round its figure, so no fur pixel of it ever touched
+a transparent pixel and no edge rule fired: 2.4%. The edge is now where the
+composer's FIGURE ends, and a corner is cut to the outline rather than to a
+hole inside it. Hawk 0.0 → 19.1%, tortoise 2.4 → 23.6% at 2×; 5,452 twins
+hashed before and after, and twelve species' did not move. `check-closeups`
+now asks how much of each species' fur is reworked and refuses any species
+under half the median; both halves of the fix, undone, go red.
+
+### Choosing fourteen coats
+
+Four rules, each now a check (below): OWN (no two species share a
+`[ramp, shift]`), CLOSE (two figures FORM calls close — under twice the stride
+floor — never share a ramp, or a shaded one wears the other's plain coat),
+LIT (no shift below 0, or FLAT), FOUND (every look's lit rung further from the
+ground than olive's 9.8).
+
+A search over shortlists of each species' plausible coats found 3,390 tables
+that are OWN, LIT and CLOSE, 280 of them FOUND too — and, choosing by numbers,
+dressed the skunk light grey. The rules came from the search; the colours came
+from four rendered crowds, and the pictures said what the numbers could not:
+a brick-red hawk reads as a cardinal, a golden beaver is the cat, a sandy owl
+is the rabbit. Three of the final coats were never on the search's
+shortlists. The table (SPEC §12.3):
+
+| species | coat | | species | coat |
+|---|---|---|---|---|
+| rabbit | furWarm +1 cream (kept) | | raccoon | fabric +0 warm grey |
+| mouse | timber +1 grey-brown | | pig | brick +1 coral |
+| fox | tile +1 red-orange | | cow | furCool +1 white (kept) |
+| beaver | furWarm +0 warm tan | | wolf | fabric +1 pale grey |
+| owl | earth +1 tawny | | cat | rust +1 ginger |
+| bear | earth +0 dark brown | | hawk | tile +0 rufous |
+| tortoise | rust +0 ochre limbs | | skunk | timber +0 dark grey-brown |
+
+The greys are warm because the cool ones are the road's: furCool's two
+lower rungs sit within 8 of the asphalt, and only its +1 coat keeps its lit
+rung off them in every look — that coat is the cow's. So the mouse, raccoon,
+wolf and skunk wear the only greys the road leaves visible.
+
+**`furDark` was built and taken out**, the second ramp this arc has done that
+to. The brief left it for this tier. Its four keys landed within ΔE 2.2–4.2 of
+keys the palette already has ('+', timber 'L', fabric 'P' and 'Q') — a black
+that stays above the pinned floor and off the road is already there — and at
+the shipped dusk amount it re-mapped one standing key and six ground keys of
+existing art, because every ramp key is a place the evening can project to.
+
+### The gate, and its control in the same run
+
+`tools/check-animals.mjs`, 15 checks, after check-ground in `npm run check`.
+The pre-T4 table is spelt out in it and read by the same instrument in the
+same run; it must read **exactly** as measured — 7 coats, 5 flat, 4 lost,
+beaver/bear, 9 close on one ramp — or the live table passing proves nothing.
+Its premise is a claim (trap 13) and is asserted: the roster's `fur` columns
+ARE that table. The census is run through the real `createUI`: fourteen bars in
+fourteen coats. They were three CSS classes named after ramps — fourteen
+species in three colours — and the hawk's `earth` had no class at all, so its
+bar was the panel's accent green.
+
+Mutation: 15 of 15 fault mutants refused, each by the check it was aimed at,
+and one NEUTRAL mutant passed as it must. The harness was wrong twice first,
+and both are worth knowing. A mutant aimed at ONE ANIMAL (the beaver in brick)
+was refused by the close-ramp check, because the pig is on brick — the kill
+said nothing about the check it was aimed at, so the harness now records WHICH
+check refuses. And a mutant that survived (the beaver in terracotta beside the
+bear) turned out not to be a fault: 19.1 from the bear's coat against a floor
+of 17.5 is two animals by the instrument's own definition. A sweep of every
+coat found the one that is (the skunk's grey-brown beside the bear, 12.9
+against 14.7), and the terracotta beaver stays in the harness as the gate's
+neutral control. And the table's sanity check first refused any shift below
+0 — which would have refused every FLAT mutant before the FLAT check saw it,
+a constraint that could never fire (trap 6). It leaves that to the check that
+can say why.
+
+### The suite caught the clamp at the other end
+
+`check.mjs` Part D: an elder beaver's four portrait looks were three. An
+elder lightens a rung where the coat has room; on the beaver's furWarm +0
+that lands its lit rung and its top rung on one key, and the portrait paints
+the pale chest in the top rung over shoulders in the lit one. FLAT again, at
+the TOP of the ramp. Where the coat cannot make the chest paler than the
+shoulders it takes the grey of age; three portraits moved.
+
+And a third instance, measured and left: the 2× pass lights an edge one rung
+lighter, and a coat at the top of its ramp has none. The wolf on fabric +1
+reworks 10.0% of its fur at 2× (18.2% on its old coat); inside the gate's
+half-the-median (9.2), and open below. **Any shift along a ramp that clamps
+puts two rungs on one key** — the standing brief's trap 16.
+
+### Where the coats landed
+
+The receipt: 2,774 sprites moved — 192 street sprites and 36 portraits for
+each of the twelve species whose coat changed, with the fox's and wolf's
+carries and the tortoise's hat — and the rabbit and the cow not at all.
+Nothing outside the animals moved, no moved sprite changed size, anchor or
+ink, and the PALETTE line is byte-identical. Base rate first: every tool that
+writes `docs/shots`, run on `60b845a`, reproduced every picture, so the seven
+that moved are the coats'.
+
+| what you see | what it is |
+|---|---|
+| species that read as one animal in different coats | **measure FORM with the coat taken away**, against one animal mid-stride. Two builds were carrying fourteen figures; the big one carries four the eye cannot split |
+| a species' shaded look drawn as a flat silhouette | **the shade bit clamped at the bottom of the ramp.** No coat below shift 0 on a four-rung ramp |
+| grey animals dissolving on the road | **the cool greys are the road's greys.** Read the lit rung against the nearest ground key, not the mean |
+| a camouflage reading that passes the coat known to vanish | **a mean distance cannot see camouflage.** Nearest key; and run the known fault through it first (trap 15) |
+| a 2× twin whose fur is merely enlarged, and a gate that passes it | **the pass found fur by COLOUR.** Ask the composer (`CITIZEN_DETAILS.authored`), and ask how much FUR changed, not whether anything did |
+| an outlined animal with no edge light at 2× | **its fur never touches a transparent pixel.** Find the edge where the figure ends |
+| a search's best table that looks wrong | **it chose by numbers.** Take the rules from the search and the colours from rendered crowds |
+| a new ramp that the palette seems to need | **measure its keys against the palette's** — furDark's four were within ΔE 4.2 of existing keys — and run the evening: every ramp key is a place dusk can project to |
+| a mutant killed, and the check it was aimed at never ran | **record which check refused.** A kill by the wrong check proves nothing about the right one |
+| a mutant that survives | **read it with the instrument first.** The terracotta beaver was two animals; keep it as the gate's neutral control |
+| a mark that vanishes from an elder's portrait | **the elder's lightening clamped at the top**: lit rung and top rung on one key. Paint the mark in a key the coat cannot reach (the grey of age) |
+| a flat check no mutant can reach | **a sanity bound was refusing the same input first** (trap 6). Bound the shape, not the property |
+| the census bar green for one species | **a CSS class per ramp**, and that ramp had none. Colour it from the coat |
+
+### The state of it
+
+```
+art-dump    3864 sprites · 74 palette keys · TOTAL f5b0e407   (2,774 moved — twelve species' street sprites and
+            portraits; the rabbit and the cow not at all; no size, anchor or ink changed; palette untouched)
+zooprobe    14 coats (7) · ONE ANIMAL 0 (beaver/bear) · close figures on one ramp 0 (9) · FLAT 0 (5) · LOST 0 (4;
+            least the shaded raccoon, 15.5, against olive's 9.8) · one animal in two coats: bear/pig (FORM 3.5),
+            beaver/bear (4.0), both under a stride floor of 5.7 — T4.2's
+gates       tools/check-animals.mjs — 15 checks · 15/15 fault mutants by aim, 1 neutral passes
+            tools/check-closeups.mjs — fur reworked per species at 2× and 4×: median 18.3% / 50.0%, least 10.0%
+            (the wolf) / 35.6%; hawk 0.0 → 19.1%, tortoise 2.4 → 23.6% at 2×
+sheets      docs/shots/sheet-zoo.png (tools/zoo-sheet.mjs) · zoo-before-after.png (two trees, one process)
+            seven sheets moved by the coats: scene, citizens, citizens-close, looks, portraits, meat, predation
+suite       980 checks 0 failures · close-ups 315/2,688 · shadows 22 · dusk 114 · ground 51 · animals 15 ·
+            NPM_EXIT=0 — b72bea7 and a2dc8ea each verified alone on a clean worktree of itself
+browser     the DEPLOYED Pages build of bfb93e8: 3,864 sprites; seven sprites hash as art-dump says (moved
+            and unmoved, and the fixed beaver portrait); the served COATS is the table above and ui.js paints
+            the census from it; a crowd of 84 through the deployed renderer into the browser's own canvas at
+            zoom 1 and 2 shows all fourteen lit coat colours, fourteen different; the hawk's 2× fur 20.3%
+            reworked; an empty console; no city entered
+```
+
+### What is open
+
+- **T4.2 — the third build.** Measured now, not asserted: bear/pig (FORM 3.5)
+  and beaver/bear (4.0) are under the stride floor of 5.7, beaver/pig 5.9 and
+  bear/wolf 6.7 just over it. The coats keep them apart; the figures do not.
+- **T4.1 — authored 2× heads.** The composer now hands the 2× pass its figure,
+  which is what an authored head will need to know where it may paint.
+- **A coat at the top of its ramp gets less edge light at 2×** — the wolf at
+  10.0% of its fur, down from 18.2%. Inside the gate; a clamp.
+- **`species.js` still carries `fur`/`furShift`.** Nothing reads them but
+  check-animals' control. Removing them is a sim-side commit and not this
+  arc's.
+- **The beaver's 2× rule reads `ramp === "earth"` below row 10** and has never
+  fired on a beaver not carrying a sack. Its intent is not in the code.
+- **The coats are taste inside four rules.** Nobody has watched them in play.
+
+Maker's mark — Claude Opus 5.5, session 22 continued: the one who was pointed
+at the coats and found the light missing from five of them, whose first
+camouflage reading could not see the one animal known to have vanished, and
+who wrote a mutation harness that twice accused the gate of something the
+instrument said was not a fault.
