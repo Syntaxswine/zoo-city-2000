@@ -2,7 +2,7 @@
 import assert from "node:assert/strict";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { art, allSprites } from "../js/art/index.js";
-import { SPECIES_IDS, FACINGS, AGES, FRAMES } from "../js/art/citizens.js";
+import { SPECIES_IDS, FACINGS, AGES, FRAMES, CITIZEN_DETAILS } from "../js/art/citizens.js";
 import { RECIPES } from "../js/art/solid.js";
 import { renderRecipe } from "../js/art/buildings.js";
 import { defineSprite, rasterize, ink } from "../js/art/format.js";
@@ -66,6 +66,35 @@ for (const species of SPECIES_IDS) for (const facing of FACINGS) for (const age 
     assert.equal(baseHash(s), original);
     stats.citizens++;
   }
+}
+// "Pixels must change" is not enough, and the hawk is why: its coat is
+// `earth`, the pass went looking for fur by RAMP, and for as long as the
+// detail kit existed its fur was merely enlarged while its shirt was detailed
+// — so every hawk twin "changed" and none of its feathers did. Ask about the
+// FUR, by what the composer says is fur (`CITIZEN_DETAILS.authored`): the
+// share of it whose block the twin reworks, per species, against the others.
+stats.furReworked = {};
+for (const scale of [2, 4]) {
+  const share = {};
+  for (const species of SPECIES_IDS) {
+    let fur = 0, worked = 0;
+    for (const facing of FACINGS) {
+      const s = art.citizen(species, facing, 0, "adult", { look: { shade: 0, mark: 0 } });
+      const a = CITIZEN_DETAILS.get(s).authored, h = art.hires(s, scale);
+      for (let y = 0; y < s.h; y++) for (let x = 0; x < s.w; x++) {
+        if (!"wxyz".includes(a[y][x])) continue;
+        fur++;
+        let same = true;
+        for (let v = 0; v < scale && same; v++) for (let u = 0; u < scale; u++) if (h.rows[y * scale + v][x * scale + u] !== s.rows[y][x]) { same = false; break; }
+        if (!same) worked++;
+      }
+    }
+    share[species] = worked / fur;
+  }
+  const sorted = Object.values(share).sort((p, q) => p - q), median = sorted[Math.floor(sorted.length / 2)];
+  const idle = SPECIES_IDS.filter((sp) => share[sp] < 0.5 * median);
+  assert(median > 0.1 && idle.length === 0, `${scale}x: fur merely enlarged — ${idle.map((sp) => `${sp} ${(100 * share[sp]).toFixed(1)}%`).join(", ")} (median ${(100 * median).toFixed(1)}%)`);
+  stats.furReworked[`${scale}x`] = `median ${(100 * median).toFixed(1)}%, least ${(100 * sorted[0]).toFixed(1)}%`;
 }
 // Repeated events without a frame between them must preserve the cursor point.
 for (const point of [[40, 80], [799, 599], [400, 300]]) {

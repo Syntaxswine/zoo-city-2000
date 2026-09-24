@@ -3,6 +3,18 @@
 import { CITIZEN_DETAILS } from "./citizens.js";
 import { rampOf, shift } from "./palette.js";
 
+// What is FUR. The composer says so: a pixel it drew in an authoring rung
+// (w x y z, `CITIZEN_DETAILS.authored`) is fur whatever coat was laid over
+// it. The three ramps below are what this pass used to go by alone — and
+// they still catch the coat's own keys that a look, an age or a stripe
+// stamps straight in (a fox's white tail-tip, an elder's grey brows, the
+// skunk's stripe), which are fur too. Going by the ramp alone, the hawk —
+// whose coat is `earth` — was never fur here: its twin was a plain
+// enlargement with a detailed shirt, 3% of its pixels touched against
+// 7–16% for every other species, and its feather rule below never fired.
+const FUR_RAMPS = new Set(["furWarm", "furCool", "olive"]);
+const AUTHORED_FUR = new Set(["w", "x", "y", "z"]);
+
 export function detailedCitizen(sprite, scale) {
   const info = CITIZEN_DETAILS.get(sprite);
   if (!info) return null;
@@ -10,23 +22,32 @@ export function detailedCitizen(sprite, scale) {
   const cub = age === "cub", west = facing === "sw" || facing === "nw";
   const front = facing === "se" || facing === "sw";
   const at = (x, y) => sprite.rows[y]?.[x] || ".";
-  const rows = Array.from({ length: sprite.h * scale }, () => Array(sprite.w * scale).fill("."));
+  // Where the FIGURE ends — the composer's, not the ink's. For every species
+  // but one they are the same place. The tortoise wears a 1-px '+' outline
+  // round its figure (citizens.js), so its limbs never touch a transparent
+  // pixel and no edge rule below ever fired on them: 2.4% of its fur was
+  // reworked at 2× against a median of 19.1%. The outline is ink the composer
+  // drew OUTSIDE its authored figure; a corner cut there is cut to the
+  // outline, not to a hole inside it.
+  const off = (x, y) => ((info.authored ? info.authored[y]?.[x] : at(x, y)) ?? ".") === ".";
+  const cut = (ax, ay, bx, by) => (at(ax, ay) === "." || at(bx, by) === "." ? "." : at(ax, ay));
+  const rows =Array.from({ length: sprite.h * scale }, () => Array(sprite.w * scale).fill("."));
   for (let y = 0; y < sprite.h; y++) for (let x = 0; x < sprite.w; x++) {
     const key = at(x, y);
     if (key === ".") continue;
     const ramp = rampOf(key)?.name;
-    const fur = ramp === "furWarm" || ramp === "furCool" || ramp === "olive";
+    const fur = AUTHORED_FUR.has(info.authored?.[y]?.[x]) || FUR_RAMPS.has(ramp);
     const localY = y - lift;
     const shirt = (key === "&" || key === "^") && y >= (cub ? 7 : lift + 8) && y <= (cub ? 9 : lift + 12);
     for (let sy = 0; sy < scale; sy++) for (let sx = 0; sx < scale; sx++) {
       const u = sx / scale, v = sy / scale;
       let ink = key;
       // Chamfer exposed corners; keep the silhouette connected.
-      if (fur && at(x - 1, y) === "." && at(x, y - 1) === "." && u + v < 0.5) ink = ".";
-      else if (fur && at(x + 1, y) === "." && at(x, y - 1) === "." && 1 - u + v < 0.5) ink = ".";
+      if (fur && off(x - 1, y) && off(x, y - 1) && u + v < 0.5) ink = cut(x - 1, y, x, y - 1);
+      else if (fur && off(x + 1, y) && off(x, y - 1) && 1 - u + v < 0.5) ink = cut(x + 1, y, x, y - 1);
       else if (fur) {
-        if (at(x - 1, y) === "." && u < 0.25) ink = shift(key, 1);
-        else if (at(x + 1, y) === "." && u > 0.6) ink = shift(key, -1);
+        if (off(x - 1, y) && u < 0.25) ink = shift(key, 1);
+        else if (off(x + 1, y) && u > 0.6) ink = shift(key, -1);
         else if (["owl", "hawk"].includes(species) && localY > 8 && (x + y) % 3 === 0 && v > 0.6 && u < 0.5) ink = shift(key, -1);
         else if ((x * 3 + y * 5) % 11 === 0 && u < 0.25 && v > 0.5) ink = shift(key, 1);
         if (y >= sprite.h - 2 && u > 0.6 && v > 0.6 && at(x + 1, y) !== ".") ink = shift(key, -1);
