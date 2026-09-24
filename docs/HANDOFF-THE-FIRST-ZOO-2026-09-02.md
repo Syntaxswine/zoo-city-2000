@@ -4267,3 +4267,211 @@ at the coats and found the light missing from five of them, whose first
 camouflage reading could not see the one animal known to have vanished, and
 who wrote a mutation harness that twice accused the gate of something the
 instrument said was not a fault.
+
+## 49. The builds — a round pig, a beaver that shows its tail, and a check that could not fail (session 22 continued, 2026-09-24)
+
+The owner: *"lets start on T4.2."* The list's T4.2 is *"a third body build and
+species idles"*; the idles have existed since `2fcfe8e` (§48), so T4.2 is the
+build. Three commits: `01cf866` taught the instrument to read the bodies the
+animals wore before; `4ea9e5e` is the build; this section is the third.
+
+### What one new build could not do
+
+T4.0 left it measured (`node tools/zooprobe.mjs`, FORM — two figures in one
+coat, feet on one pixel — against one animal mid-stride):
+
+| pair | FORM | in strides | |
+|---|---|---|---|
+| bear / pig | 3.5 | 0.62 | one animal in two coats |
+| beaver / bear | 4.0 | 0.71 | one animal in two coats |
+| beaver / pig | 5.9 | 1.08 | and their COATS too alike to split: 13.6 under the beaver's own shade floor of 22.5 |
+| bear / wolf | 6.7 | 1.18 | |
+| pig / wolf | 6.9 | 1.28 | |
+| beaver / wolf | 7.1 | 1.55 | |
+
+The third row is the one that decided it. The beaver and the pig are the only
+pair of the four whose coats the eye cannot split, so their figures must — and
+two figures on one body differ only by their heads and tails. Three animals
+that must each stand apart from the other two need three bodies, and a third
+build is one body. In a lab worktree (the kit patched to read candidate
+bodies from a file, never the tree) every assignment of the six big-build
+species to small, big and a new body was read by zooprobe:
+
+- **the first body tried**, a pear with wide hips and the pig and the beaver
+  both on it, made them ONE ANIMAL: FORM 5.8 under the pig's new stride floor
+  of 6.6, coats under the shade floor. Its hips also hid the pig's tail
+  entirely and all but a column or two of the beaver's — tails hang behind.
+  Shorter legs: 1.04 strides. The body built, with a flat back: 1.10 (mutant
+  M3, below). Their tails are all a shared body leaves them.
+- **the tables that brought every pair of the four to the small build's own
+  closest (1.48)** all put the wolf or the pig on the small body. Drawn, the
+  small wolf is the fox's body under a big head — and this is the predator
+  that carries the sack (§14); the small pig is a slim pig. The numbers do not
+  know what a pig looks like. T4.0 said the same about coats.
+
+So **the pig took the third build and the beaver moved to small**:
+
+- **`stout`** — a round barrel on thin, short legs: narrow at the shoulder,
+  widest at the belly, where the big build is widest at the shoulder and
+  straight to the hip. The belly is pushed out on the side the figure faces
+  (screen-right; SE and NE both walk that way and the west facings mirror it),
+  and the back is flat, so the curly tail still shows. It keeps the other two
+  builds' row plan — the shirt on body rows 0–4, fur below, the feet on the
+  anchor — so the look marks, the elder marks, the glasses, the hat, the sack
+  and the cart all land where they did, and the suit dresses it with no change
+  (the jacket on the belly, trousers below).
+- **the beaver to `small`.** Facing SE its paddle hangs behind the legs; the
+  big build's legs hid all but two columns of it, the small build's show three.
+  The beaver's mark, facing the viewer, for the first time.
+
+| pair | FORM | strides |
+|---|---|---|
+| bear / pig | 3.5 → 10.4 | 0.62 → 1.69 |
+| beaver / bear | 4.0 → 14.0 | 0.71 → 2.46 |
+| beaver / pig | 5.9 → 14.6 | 1.08 → 2.37 |
+| pig / wolf | 6.9 → 12.9 | 1.28 → 2.10 |
+| beaver / wolf | 7.1 → 16.2 | 1.55 → 3.34 |
+| bear / wolf | 6.7 | 1.18, both still big — their coats stand 35.1 apart against a shade floor of 16.6 |
+
+The cow on the stout build passes every rule too; it was not needed, so it did
+not move, and it is the harness's neutral mutant. `docs/shots/zoo-builds-before-after.png`
+is the six, before and now.
+
+### The control needed the old bodies
+
+The standing brief warned that `check-animals`' control — the coats before
+T4.0 — is read on the CURRENT figures, so a new build would move its expected
+readings (beaver/bear one animal, nine close pairs on one ramp) and they would
+have to be changed "deliberately". Changing a control's expected numbers to
+whatever the new art reads is how a control stops controlling. The honest move
+is to read it on the bodies it was measured on, and that needed the art to be
+able to draw them.
+
+So the first commit, with no sprite moving: the build table is exported
+(`BUILDS`, beside `COATS`), and `citizenSprite(…, { build })` draws an adult
+in a named body — an instrument's hook, never the game's, keyed apart from the
+plain sprite even in the species' own build so a check can hold the two paths
+against each other. `zooReadings({ builds })` draws every species through it.
+The T4.0 control is now read as it was measured: the old coats on the old
+bodies, both spelt out in the check. T4.2's own control is the old bodies in
+today's coats, and must read exactly `bear/pig` and `beaver/bear` one animal in
+two coats and `beaver/pig` in one coat under the bar. And because the old
+bodies are drawn by the kit in the same tree, the before/after picture needed
+one tree, not two.
+
+### A check that could not fail
+
+T4.0 left a check in `check-animals` to prove FORM does not depend on the coat:
+*"the control and the live table read the same figures: every pair's FORM
+identical."* A mutant that reads FORM off the COLOURED rows — the coat leaking
+into FORM — was refused, but by the T4.0 control, which saw its effect on the
+close-pair count first. With that control neutralised, **the check it was
+aimed at stayed green.** Both readings draw the SAME sprites, in the live
+coats, whatever coat table is passed, so they agree whatever FORM is made of:
+the comparison could only ever have caught nondeterminism. It is replaced by
+the property itself — `bareFigure` puts every pixel the composer drew as fur
+back to the key it was drawn in and leaves every other pixel as drawn —
+asserted over every standing adult, and the neutralised mutant is refused by
+it. Trap 17 said a survivor may not be a fault; this one was, and the check
+was the weak thing. Standing brief, trap 18.
+
+### A rule the coats and the figures share
+
+T4.0's CLOSE rule says two figures zooprobe calls close must not share a ramp:
+where the figure cannot split two animals, the coat must. T4.2 adds the mirror
+— **where the coat cannot split two animals (COAT under the shade floor), the
+figure must: 1.4 strides or more.** The bar is read off the kit, not guessed at
+the eye. Of the pairs in one coat, the closest the kit already drew as two
+animals is the rabbit and the mouse — long ears against round — at 1.48; the
+bar sits under that witness. Before T4.2 it refused exactly the beaver and the
+pig (1.08). After, the closest pair in one coat is the rabbit and the mouse
+again, and the beaver's new neighbours on the small build stand at 1.58 (the
+cat) and 1.68 (the owl). Raise the bar to 1.5 and the witness fails it (M6′) —
+it binds 5% under what it was read from.
+
+### The gate and the mutants
+
+`check-animals`: 15 → 17 (the instrument commit) → 21 checks. Each mutant
+restored in a `finally`, the refusing check recorded (trap 17):
+
+| mutant | refused by |
+|---|---|
+| A the kit ignores `opts.build` · B zooprobe ignores the builds it is given · C the cache key forgets the build | the build-hook check, by aim |
+| D FORM read off the coloured rows | the T4.0 control, first |
+| D′ the same, that control neutralised | the new `bareFigure` check — the check it replaced let this through |
+| E the hook mis-draws the fox alone · E′ the same, the T4.0 control neutralised | the T4.0 control · the unmoved-pairs check (91 pairs compared then, 66 now) |
+| M1 the pig back on big · M2 the beaver back on big · M4 the stout body drawn as the big one | no two figures closer than a stride — bear/pig 3.5, beaver/bear 4.0, bear/pig |
+| M3 the beaver on stout beside the pig | the one-coat rule — beaver/pig 1.10 |
+| M5 the control's builds "updated" to today's · M5′ T4.0's control neutralised | T4.0's control (read on those bodies too) · T4.2's control |
+| M6 the bar raised to 1.5 · M6′ the control neutralised | T4.2's control (it records exactly what the bar refuses) · the one-coat rule, rabbit/mouse 1.48 |
+| M7 NEUTRAL the cow on stout too | only the record of what moved — every property passes |
+| M8 the kit ignores `opts.build` (after the build) · M8′ | the T4.0 control first · the build-hook check |
+
+### Where it landed
+
+The receipt: **256 sprites moved** — 64 each of the beaver adult, beaver elder,
+pig adult and pig elder (four facings × four poses × four looks) — none in size
+or anchor; no cub (every cub wears one body), no portrait (a portrait is a
+head), no other species, no carry fixture, no palette key. Base rate first:
+every tool that writes `docs/shots`, run on a clean worktree of `01cf866`,
+reproduced every picture (the variant review's `coverage.json` differed in
+line endings only). Five moved with the build — scene, sheet-citizens,
+sheet-citizens-close, sheet-looks, sheet-zoo — and they are the five with a
+pig or a beaver in them.
+
+| what you see | what it is |
+|---|---|
+| two animals the eye cannot tell apart, in coats that are fine | **the same body**; measure FORM with the coat taken away. On one body a species is only its head and its tail |
+| one new build and four figures to part | **three animals that must each stand apart need three bodies.** Move one to a build that exists |
+| a new body that parts two animals and hides their tails | **the tails hang behind.** Keep the back flat; push the belly out on the side the figure faces |
+| a sweep's best table puts a pig on the slim body | **the numbers do not know what a pig looks like.** Take the rules from the sweep and the table from the pictures |
+| a control whose expected numbers an art change would move | **it is being read on the current art.** Read it on the art it was measured on — a hook that draws the old art in one tree |
+| a comparison of two readings that stays green under a plain fault | **both readings share the thing under test.** Assert the property (trap 18) |
+| a bar you are about to guess | **read it off the kit**: the closest pair it already gets right is the witness; put the bar under it and prove it binds |
+| every build-table mutant refused by the record | **the record refuses any change.** Neutralise it to aim at the properties, and keep one neutral mutant only the record refuses |
+| the deployed page runs the OLD kit after Pages serves the new one | **the browser's HTTP cache** (Pages sends `max-age=600`): `fetch(url, { cache: 'reload' })` the changed modules, reload, and check an export only the new version has before measuring anything |
+
+### The state of it
+
+```
+art-dump    3864 sprites · 74 palette keys · TOTAL 61937044   (256 moved: the beaver's and the pig's adults and
+            elders; no size or anchor; no cub, portrait, carry or palette key)
+zooprobe    builds small 9 · big 4 · stout 1 · one animal in two coats 0 (bear/pig, beaver/bear) · ONE ANIMAL 0 ·
+            close figures on one ramp 0 · closest in one coat rabbit/mouse 1.48 strides (beaver/pig 1.08) ·
+            closest by FORM bear/wolf 6.7, 1.18 strides, coats 2.1 shade floors apart
+gates       tools/check-animals.mjs — 21 checks · T4.0's control on the old bodies, T4.2's in the same run ·
+            every fault mutant refused and the refusing check recorded; one neutral refused only by the record
+suite       980 checks 0 failures · close-ups 315/2,688, fur reworked 2× median 18.4% least 10.0% (the wolf) ·
+            shadows 22 · dusk 114 · ground 51 · animals 21 · suits 2,688 · NPM_EXIT=0 — 01cf866 and 4ea9e5e
+            each verified alone on a clean worktree of itself
+sheets      docs/shots/zoo-builds-before-after.png (one tree: the old bodies through opts.build) ·
+            five sheets moved by the build: scene, citizens, citizens-close, looks, zoo
+browser     the DEPLOYED Pages build of 4ea9e5e: the whole art receipt recomputed in the page — TOTAL 3864
+            61937044, as committed; the served build hook draws the pig and the beaver in the big body and
+            four of those sprites hash exactly as the receipt BEFORE T4.2 did (ec3ad08b, 6a9f206d, 736b481e,
+            ddf2b1aa) — the control is the old figures, byte for byte; a crowd of 56 through the deployed
+            renderer at zoom 1 and 2: the round pig, the slim beaver and its paddle, the broad bear; an empty
+            console; no city entered
+```
+
+### What is open
+
+- **T4.1 — authored 2× heads.** Now the next item on the list.
+- **The bear and the wolf share the big build**, 1.18 strides apart; their
+  coats split them twice over. If a later coat change brought those two coats
+  within the shade floor, the one-coat rule would refuse it — which is the
+  rule doing its job.
+- **Cubs share one body and zooprobe has never read them.** It reads adults.
+  The kit's own comments say the beaver cub was the bear cub minus ears until a
+  two-pixel tail went on.
+- **The stout's shape and who moved are taste inside two rules**, read off
+  pictures by me. Nobody has watched a round pig walk down a street in play.
+- Standing: `species.js`'s dead `fur`/`furShift` columns (the T4.0 control's
+  premise still asserts them); the wolf's 2× edge light; the beaver's
+  `ramp === "earth"` rule.
+
+Maker's mark — Claude Opus 5.5, session 22 continued: the one who could not
+part four animals with one body and moved a beaver instead, whose first round
+body hid the tails that were left to tell two animals apart, and who
+found a check of the coats' that had been green for a whole tier because it
+compared a thing with itself.

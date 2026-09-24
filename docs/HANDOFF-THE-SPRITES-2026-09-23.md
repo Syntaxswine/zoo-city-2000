@@ -2,12 +2,12 @@
 
 For whoever takes Tier 3 or Tier 4, or touches `js/art/` at all. Sessions 21
 and 22 built the shadows, the roofs, the evening, the windows, the setbacks,
-the ground and the coats; this is what
+the ground, the coats and the builds; this is what
 I know now that I did not know when I started, written down so you do not have
 to find it the way I did.
 
-**Last true on `bfb93e8`, 2026-09-23** — Tiers 1, 2 and 3 closed; Tier 4
-begun: T4.0, the coats, built.
+**Last true on `4ea9e5e`, 2026-09-24** — Tiers 1, 2 and 3 closed; Tier 4:
+T4.0 (the coats) and T4.2 (the builds) built, T4.1 next.
 Every number in this file was re-measured on that tip. If you are reading it
 much later, the numbers are the first thing to distrust and `npm run check`
 is the first thing to run: it prints most of them.
@@ -17,11 +17,11 @@ is the first thing to run: it prints most of them.
 | document | what it is for |
 |---|---|
 | `docs/PROPOSAL-SPRITE-UPGRADE-2026-09-22.md` | **the list.** §4 is the checklist, each item with the verification written down *before* it was built. §2c is the five art gates. Cross things off there |
-| handoff §43–§48 (`HANDOFF-THE-FIRST-ZOO-2026-09-02.md`) | **the sessions.** What was measured on the day, and the sixty-three traps in six symptom-keyed tables |
+| handoff §43–§49 (`HANDOFF-THE-FIRST-ZOO-2026-09-02.md`) | **the sessions.** What was measured on the day, and the seventy-two traps in seven symptom-keyed tables |
 | this file | **the standing brief.** Where the arc stands (next section), the laws, the instruments, what is proven against what is a guess, the traps that are classes |
 | `SPEC.md` §12, §13 | the design record. It outranks all three |
 
-Read this one and §4. Do not read §43–§48 front to back until
+Read this one and §4. Do not read §43–§49 front to back until
 something breaks; then read the trap tables, which are keyed by the symptom
 you are looking at.
 
@@ -29,7 +29,7 @@ you are looking at.
 
 ## Where the arc stands — done and unfinished
 
-*The ledger, 2026-09-24: the code as of `bfb93e8`, the record as of this
+*The ledger, 2026-09-24: the code as of `4ea9e5e`, the record as of this
 commit. Every "done" row has a gate that
 refuses if it stops being true, except where the row says otherwise; every
 "unfinished" row says where to start.*
@@ -47,36 +47,28 @@ refuses if it stops being true, except where the row says otherwise; every
 | T3.1 | window states: blinds, plants, boarded panes; no key added | `1adb3dd` (stale sheets first: `9983766`) | `check.mjs` Part E, 18 assertions |
 | T3.2 | the four original R/C plans stepped back: porch roof, terrace, canopy, podium | `38b187b` (fixtures first: `b39866c`, `c61920c`) | art-dump; `massprobe` is passive — nothing refuses a one-box plan |
 | T3.3 | grass keyed off its tile CORNERS (no seam); paths worn where riders cross a forecourt | `692b2b3`, `a416748` (stale pictures first: `e2ace35`) | `check-ground`, 51 checks |
-| T4.0 | fourteen coats from existing ramps, the table the kit's own; the 2× pass asks the composer what is fur and where the figure ends | `b72bea7`, `a2dc8ea`, `bfb93e8` | `check-animals`, 15 checks; `check-closeups`' fur share |
-| the record | this brief and handoff §43–§48 (§45 went in with `1adb3dd`) | `1f511e2`, `4a60a99`, `27577d3`, `543ecbf`, `7e85b59`, `d38b5d0`, `60b845a`, `ad0d872` | — |
+| T4.0 | fourteen coats from existing ramps, the table the kit's own; the 2× pass asks the composer what is fur and where the figure ends | `b72bea7`, `a2dc8ea`, `bfb93e8` | `check-animals`; `check-closeups`' fur share |
+| T4.2 | three builds: the pig in a third, `stout` — a barrel on thin legs — and the beaver on the small build, where its paddle shows; the table the kit's own (`BUILDS`). Its "species idles" half had been done since `2fcfe8e` | `01cf866` (the instrument first), `4ea9e5e` | `check-animals`, 21 checks, against the builds before, read in the same run |
+| the record | this brief and handoff §43–§49 (§45 went in with `1adb3dd`) | `1f511e2`, `4a60a99`, `27577d3`, `543ecbf`, `7e85b59`, `d38b5d0`, `60b845a`, `ad0d872`, the ledger `5f06264`, and the commit that wrote this row | — |
 | owner's Q2 | dusk is a MODE, not a clock — a tick is a month | `9a123e1` | answered by the sim |
 | owner's Q3 | terracotta on R kept, on a frame | the roofs `c98e87f`, the answer recorded `7e85b59` | answered by `scene.png` |
 
-Twenty-six commits with this ledger, **nothing under `js/sim/`**, every one
+Twenty-nine commits with this record, **nothing under `js/sim/`**, every one
 pushed and live.
-The suite on `bfb93e8`, the last commit that touched code: 980 checks and
+The suite on `4ea9e5e`, the last commit that touched code: 980 checks and
 fourteen more gates, green.
 
 ### Unfinished — on the list, in the order I would take them
 
-1. **T4.2 — a third body build.** Measured, not asserted: bear/pig (FORM 3.5)
-   and beaver/bear (4.0) are one animal in two coats, under a stride floor of
-   5.7; beaver/pig 5.9, bear/wolf 6.7 and pig/wolf 6.9 are just over it. The
-   big build carries four figures the eye cannot split without the fur. Its
-   "species idles" half is done (`2fcfe8e`, 2026-09-03). **Before you start:**
-   `check-animals`' control reads the OLD coats on the CURRENT figures, so a
-   new build moves its expected one-animal and close-pair readings — change
-   them in the same commit, deliberately, and say why. A build of another
-   height moves everything placed by row (look marks, elder marks, glasses,
-   hats, the sack, the cart). Start with `node tools/zooprobe.mjs`.
-2. **T4.1 — authored 2× heads per species.** Twenty-eight heads (SE and NE;
+1. **T4.1 — authored 2× heads per species.** Twenty-eight heads (SE and NE;
    west is mirrored) at 24×18. A twin may not expand the 1× silhouette and
    may not erode below 0.88 of its ink (`check-closeups`), and its ink must
    stay within 12% of 4× (`check.mjs`). It has to compose with everything
    stamped over a head — elder marks, look marks, glasses, the idle poses,
    hats, the carry offset. `CITIZEN_DETAILS.authored` says what the composer
-   drew and where.
-3. **Q1 — how long is the shadow?** The owner's call.
+   drew and where. The head is where a species lives once the body is shared:
+   on one build, two animals are only their heads and their tails (§49).
+2. **Q1 — how long is the shadow?** The owner's call.
    `docs/shots/sheet-shadows.png` is the frame that answers it. `SHADOW_K
    0.55` is mine, and dusk multiplies it ×3.2.
 
@@ -85,6 +77,8 @@ fourteen more gates, green.
 | what | where it is written | what it wants |
 |---|---|---|
 | `species.js` still carries `fur`/`furShift`, read by nothing but `check-animals`' control | handoff §48 | a sim-side commit to remove them — which must also rewrite the control's premise check, since it asserts those columns ARE the pre-T4 table |
+| the bear and the wolf share the big build, 1.18 strides apart — the closest pair by figure in the kit | §49 | nothing while their coats split them (35.1 against a shade floor of 16.6); `check-animals`' one-coat rule refuses the day a coat change closes that gap |
+| cubs share one body and zooprobe has never read them — it reads adults | §49 | a cub reading; the kit's own comment says the beaver cub was the bear cub minus ears until a two-pixel tail went on |
 | a coat at the top of its ramp gets less edge light at 2× (the wolf, 18.2% → 10.0% of its fur) | §48, trap 16 | a lighter key the pass may reach for, or a coat off the top rung; inside the gate today |
 | the beaver's 2× rule reads `ramp === "earth"` below row 10 and has never fired on a beaver without a sack | §48 | its author's intent; it is not in the code |
 | roof furniture cannot tell a TERRACE from a pitch step (`coveredShare` medians 0.63 vs 0.65) | the GUESS list, §46 | a class change: what stands on the deck, with a height floor |
@@ -94,7 +88,7 @@ fourteen more gates, green.
 | scatter as objects (flowers, stones) not built | §47 | a size-on-screen answer: at zoom 1 each is one pixel of a key that already means something |
 | a path shows on open grass only, not a forecourt across chalk, a park or rubble | §47 | a decision about the zone's chalk first |
 | the lit blind that hides at noon and shows at dusk is emergent and ungated; `ACCENT_RUNG` survives `check-dusk` | *The four passes*; the GUESS list | a check only if someone decides it is a property |
-| **taste nobody has argued about** — `SHADOW_K`, the dusk constants, the window mix, the setback depths, the meadow's numbers and the path's bow, the fourteen coats | the GUESS list | the owner's eye |
+| **taste nobody has argued about** — `SHADOW_K`, the dusk constants, the window mix, the setback depths, the meadow's numbers and the path's bow, the fourteen coats, the stout's shape and who moved | the GUESS list | the owner's eye |
 | **nobody has played any of this** | the GUESS list | a player; their first reaction outranks every number here |
 
 The rest of the game's open work — not the sprites — is `BACKLOG.md`.
@@ -134,9 +128,9 @@ commit.
    twin**, not the 1× rows scaled. Anything new in the dynamic pass must
    honour `S > 1 && art.hires`, as `blitScaled` does.
 7. **Art cannot move a `stateHash`.** The sprite a variant byte selects is not
-   in the hashed shape. Across the whole arc — **twenty-six commits** of
+   in the hashed shape. Across the whole arc — **twenty-nine commits** of
    shadows, roofs, an evening, a set of windows, four buildings stepped back,
-   a meadow and fourteen coats — `git diff --name-only 4bb38b6..HEAD -- js/sim/`
+   a meadow, fourteen coats and three builds — `git diff --name-only 4bb38b6..HEAD -- js/sim/`
    is **empty**, and
    `tools/play.mjs --dusk` renders the same scripted city at the same hash
    `86cc1587` by day and at nightfall. Keep it that way: if an art change
@@ -223,15 +217,15 @@ carries its re-baselined receipt in the same commit.** That is what turns
 | `tools/check-shadows.mjs` | GATE, 22 checks | every recipe casts, one key only, the mask never lands on a standing sprite's pixels, shadows off is byte-exact |
 | `tools/check-dusk.mjs` | GATE, 114 checks | amount 0 is the ABSENCE of a table, no ramp inverts, the lights are fixed points, the ground takes less light than the walls — and the lawn it samples is MEASURED lawn: the same frame with nothing standing agrees with it by day and at dusk |
 | `tools/check-ground.mjs` | GATE, 51 checks | the grass keyed off its corners and the paths worn where riders cross it: every corner combination and walked direction drawn; kept round everything made; no tile spanning kept and rough; the paths exactly where the sim's own traffic count says a walk crosses grass, and the same path at every zoom; and the FRAME — every open tile pixel for pixel as its own corners, byte and walks name, and no seam, with the instrument proven able to see the old quilt in the same run |
-| `tools/check-animals.mjs` | GATE, 15 checks | the coats: fourteen, all different; none FLAT in any look or age; none as LOST on grass or road as the olive tortoise; no ONE ANIMAL; no two close figures on one ramp; no key added — and the pre-T4 table, spelt out, read in the same run and refused exactly as measured; and the census bars in the coats |
-| `tools/zooprobe.mjs` | **passive instrument** — refuses nothing | can you tell the animals apart? FORM (two figures in one coat, against one animal mid-stride) and COAT (two coats on one figure, against one animal shaded); FLAT and LOST per coat. `zooReadings({ coats })` reads any table, live or not |
+| `tools/check-animals.mjs` | GATE, 21 checks | the coats: fourteen, all different; none FLAT in any look or age; none as LOST on grass or road as the olive tortoise; no ONE ANIMAL; no two close figures on one ramp; no key added. The figures: no two closer than one animal mid-stride; where two coats are too alike to split, figures 1.4 strides apart or more; the builds that moved are the beaver's and the pig's. Two controls, spelt out and read in the same run, each refused exactly as measured — the coats before T4.0 on the bodies before T4.2, and the bodies before T4.2 in today's coats — drawn by the kit's own composer through `opts.build`; that hook proven faithful; `bareFigure` proven to take the coat off; and the census bars in the coats |
+| `tools/zooprobe.mjs` | **passive instrument** — refuses nothing | can you tell the animals apart? FORM (two figures in one coat, against one animal mid-stride) and COAT (two coats on one figure, against one animal shaded); FLAT and LOST per coat; IN ONE COAT — the pairs the fur cannot split, closest by figure first. `zooReadings({ coats, builds })` reads any table of either, live or not |
 | `tools/groundprobe.mjs` | **passive instrument** — refuses nothing | does the ground show its tiles? SEAM (the step across a tile edge over the step across a line through a tile; 1 is seamless) and REPEAT (agreement one tile over, above chance), off the renderer's frame, for an open field, a control that cannot have a seam, and the pick before T3.3. `--cams N` |
 | `tools/faceprobe.mjs` | **passive instrument** — refuses nothing | how much of the city is roof, and how much of a roof is one bare quad. `--family`, `--top N` |
 | `tools/massprobe.mjs` | **passive instrument** — refuses nothing | how much of each plan is one box: `fill` (its rooms over their bounding prism) and `deck` (a level between the street and the top, seen at zoom 1). Bare, it names the plans that are still ONE BOX WITH A LID. `--family`, or a name pattern |
 | `tools/shadow-sheet.mjs`, `tools/dusk-sheet.mjs` | passive | one town, one camera, one process, only the knob moving |
 | `tools/skyline-sheet.mjs` | passive | the four families T3.2 stepped back, all six plans side by side, and a 218-lot block at zoom 1 and 2. `docs/shots/skyline-before-after.png` is the before/after — two trees in one process, the only way a "before" survives a recipe change |
 | `tools/ground-sheet.mjs` | passive | the 31 corner combinations, an open field at zoom 1 and 2, a town's edge where the kept grass meets the meadow, and a forecourt trodden and worn. `docs/shots/ground-before-after.png` is the before/after — two trees, one process |
-| `tools/zoo-sheet.mjs` | passive | the fourteen on grass and road, each in its four coats (adult, shaded, elder, elder shaded), and a crowd of 84 through the real renderer at zoom 1 and 2. `docs/shots/zoo-before-after.png` is the before/after — two trees, one process |
+| `tools/zoo-sheet.mjs` | passive | the fourteen on grass and road, each in its four coats (adult, shaded, elder, elder shaded), and a crowd of 84 through the real renderer at zoom 1 and 2. `docs/shots/zoo-before-after.png` is the coats' before/after — two trees, one process; `docs/shots/zoo-builds-before-after.png` the builds' — ONE tree, the old bodies drawn through `opts.build` |
 | `tools/window-sheet.mjs` | passive | 24 facades at 4× for the state ART, then a dense block through the real renderer at zoom 1, 2 and dusk for the only question that decides it — at the zoom the game is played at, is this a city of different windows or is it noise? |
 | `tools/play.mjs` | passive | the real renderer on a real mayor-built town. `--no-shadows`, `--shadow-k N`, `--dusk` |
 
@@ -242,15 +236,16 @@ have not decided about yet.
 **The state of the tree as this is written:**
 
 ```
-art-dump    3864 sprites · 74 palette keys · TOTAL f5b0e407   (T4.0 moved 2,774 — twelve species' street sprites and
-            portraits, no size, anchor or ink; the palette line has not moved since T2.1)
+art-dump    3864 sprites · 74 palette keys · TOTAL 61937044   (T4.2 moved 256 — the beaver's and the pig's adults and
+            elders, no size or anchor; T4.0 moved 2,774; the palette line has not moved since T2.1)
 faceprobe   315 box recipes (of 387 registered) · TOP 63.4% · bare quad 42.9%
 massprobe   192 zoned plans · 43 one box with a lid (51 before T3.2) · R/C tiers 2–3: one, the skylight market
 groundprobe open field: seam 0.96 / 0.99 / 1.01 at zoom 1/2/4 (the quilt before 2.46 / 3.80 / 5.13) · repeat 4.9 / 4.7 (13.6 / 13.5)
 zooprobe    14 coats (7 before T4.0) · ONE ANIMAL 0 (beaver/bear) · FLAT 0 (5) · LOST 0 (4) · close figures on one ramp 0 (9)
-            · one animal in two coats: bear/pig FORM 3.5, beaver/bear 4.0, under a stride floor of 5.7 — T4.2's
-suite       980 checks 0 failures · close-ups 315/2,688, fur reworked 2× median 18.3% least 10.0% · shadows 22 · dusk 114
-            · ground 51 · animals 15 · Part E 18
+            · builds small 9, big 4, stout 1 · one animal in two coats 0 (bear/pig, beaver/bear before T4.2) · closest
+            in one coat rabbit/mouse 1.48 strides (beaver/pig 1.08) · closest by figure bear/wolf, 1.18
+suite       980 checks 0 failures · close-ups 315/2,688, fur reworked 2× median 18.4% least 10.0% · shadows 22 · dusk 114
+            · ground 51 · animals 21 · Part E 18
 gates       art-dump → check → close-ups → shadows → dusk → ground → animals → suits → …
 ```
 
@@ -307,7 +302,17 @@ a proxy that happens to work.
 - T4.0 moved exactly 2,774 sprites, every one of them an animal of a species
   whose coat changed; none changed size, anchor or ink; no palette key was
   added or moved. The census paints each species in its coat.
-- Art has not moved a sim hash, anywhere in the arc — twenty-six commits,
+- No two figures stand closer than one animal to itself mid-stride, and every
+  pair in coats too alike to split stands 1.4 strides apart or more — each
+  checked against the builds before T4.2, drawn by the kit's own composer and
+  read in the same run, which must fail both exactly as measured (bear/pig and
+  beaver/bear; beaver/pig).
+- FORM is the figure's alone: the bare figure puts every fur pixel back to the
+  key it was drawn in — asserted directly, since the check that stood for it
+  compared two readings of the same sprites and could not fail (trap 18).
+- T4.2 moved exactly 256 sprites, the beaver's and the pig's adults and elders;
+  none changed size or anchor; no cub, portrait, carry or palette key moved.
+- Art has not moved a sim hash, anywhere in the arc — twenty-nine commits,
   zero files touched under `js/sim/`.
 
 **A guess.**
@@ -376,6 +381,13 @@ a proxy that happens to work.
 - **A coat at the top of its ramp gets less edge light at 2×.** The pass
   lights an edge one rung lighter and there is none: the wolf on fabric +1
   reworks 10.0% of its fur, against 18.2% on its old coat. Inside the gate.
+- **The builds are taste inside two rules.** The stout's shape — a barrel on
+  thin legs, the belly out on the side it faces — and the choice to move the
+  beaver rather than the wolf or the pig are read off pictures by me: the
+  tables that brought every pair of the big four to 1.48 strides all put the
+  wolf or the pig on the slim body, and a slim pig is not a pig. The one-coat
+  bar (1.4) is set under its witness, the rabbit and the mouse at 1.48 — a
+  pair everyone reads as two animals — not derived from an eye.
 - **Nobody has played this.** Every frame in `docs/shots/` was taken by me,
   through the real renderer, on a scripted town. No player has seen a shadow,
   an evening or a drawn blind in this game yet. Treat the owner's first
@@ -385,8 +397,8 @@ a proxy that happens to work.
 
 ## Traps that are classes
 
-Sixty-three are recorded in §43–§48, keyed by the symptom you are staring at.
-These seventeen are the ones that are not incidents: each has either
+Seventy-two are recorded in §43–§49, keyed by the symptom you are staring at.
+These eighteen are the ones that are not incidents: each has either
 already happened twice, or cost a whole session once and will cost the next
 one too. **Renumbering this list breaks a comment in the source — run
 `grep -rn "standing brief" js/ tools/` before you do.**
@@ -515,6 +527,16 @@ one too. **Renumbering this list breaks a comment in the source — run
     refuses every mutant; read every survivor with the instrument before
     calling the gate weak — and keep the one that is not a fault in the
     harness as the gate's neutral control, the mutant that must pass.
+18. **TWO READINGS THAT SHARE THE THING UNDER TEST AGREE WHATEVER IT DOES.**
+    Trap 3's other face. T4.0 proved "FORM does not depend on the coat" by
+    reading every pair's FORM under two coat tables and asserting they agreed
+    — but both readings drew the SAME sprites, in the live coats, so they
+    agreed with FORM read straight off the coloured rows too, and the check
+    stood green for a whole tier. T4.2 found it by mutation, with the one
+    check that saw the fault first neutralised (trap 17's discipline). A
+    comparison can only fail on what differs between its two sides: vary the
+    input the property is about, or assert the property itself — here, that
+    the bare figure puts every fur pixel back to the key it was drawn in.
 
 ---
 
@@ -631,17 +653,38 @@ things to know:
    and where the figure ends — and `check-closeups` refuses a species whose
    fur the twin merely enlarges.
 
-**T4.2 — the third build — is next, and now it is measured.** The coats keep
-the big-build animals apart; their figures do not: bear/pig FORM 3.5 and
-beaver/bear 4.0, both under a stride floor of 5.7, with beaver/pig (5.9),
-bear/wolf (6.7) and pig/wolf (6.9) just over it. The big build carries four
-figures the eye cannot split without the fur. The idles the list asks for
-exist (`2fcfe8e`, 2026-09-03): fourteen species-specific pauses of a few
-pixels each.
+**T4.2, the builds — BUILT** (§49). The big build carried four figures the
+eye could not split without the fur — the bear and the pig 3.5 apart, the
+beaver and the bear 4.0, against a bear mid-stride 5.7 from itself — and the
+beaver and the pig, in coats too alike to split, 1.08 strides apart. The pig
+wears a third build, `stout`; the beaver wears `small`, where its paddle shows.
+**If you are changing a body or a species' build**, the four things to know:
 
-**T4.1** is authored 2× heads per species — the head is the ID mark; leave the
-body procedural. `CITIZEN_DETAILS.authored` is what an authored head will need
-to know where it may paint.
+1. **The builds are the art's, and the instrument reads any table.**
+   `BUILDS` in `js/art/citizens.js`; `zooReadings({ builds })` draws every
+   species in the body named, through the kit's own composer (`opts.build` —
+   an instrument's hook; the game never passes it).
+2. **Two rules, both in `check-animals`**: no two figures closer than one
+   animal is to itself mid-stride; and where two coats are too alike to split,
+   figures 1.4 strides apart or more (the rabbit and the mouse, 1.48, are the
+   witness the bar sits under). T4.0's CLOSE rule is the same idea the other
+   way round — where the figure cannot split two animals, the coat must.
+3. **One new body cannot part three animals that must all stand apart.** On
+   a shared body a species is only its head and its tail; the tails hang
+   behind, so a body that bulges at the back hides the one thing left to tell
+   them apart. Keep the back flat.
+4. **Every build keeps the same row plan** — the shirt on body rows 0–4, fur
+   below, the feet on the anchor — which is why the look marks, the elder
+   marks, the glasses, the hat, the sack, the cart and the suit needed no
+   change. A build of another HEIGHT would move all of them.
+
+The idles the list asked for with T4.2 have existed since `2fcfe8e`
+(2026-09-03): fourteen species-specific pauses of a few pixels each.
+
+**T4.1 — authored 2× heads — is next.** The head is the ID mark; leave the
+body procedural. On one build two animals are only their heads and their
+tails, so the head carries more than it did. `CITIZEN_DETAILS.authored` is
+what an authored head will need to know where it may paint.
 
 Two hard constraints, both pinned exactly:
 
@@ -717,3 +760,9 @@ gone out of five of them; my first reading for an animal lost on its ground
 could not see the one animal known to have vanished; and I built the black
 this brief had saved for me, measured it, and took it out. Traps 16 and 17
 are mine — the second one twice in an afternoon.
+
+And T4.2. I was asked for one body and found that one body could not do it;
+my first round body hid the tails that were left to tell two animals apart;
+and when I turned the mutation harness on my own T4.0 gate, a check I
+had written to prove the coat stays out of FORM turned out to compare a
+thing with itself. Trap 18 is mine, and it had been green for a tier.

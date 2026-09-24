@@ -679,13 +679,39 @@ The A/B is `docs/shots/sheet-windows.png` (`tools/window-sheet.mjs`).
 - [ ] **T4.1 — authored 2× heads per species.** The head is the ID mark; leave
   the body procedural. `citizen-detail.js` today is generic chamfering — and,
   since T4.0, it is handed the composer's figure (`CITIZEN_DETAILS.authored`).
-- [ ] **T4.2 — a third body build and species idles.** Two builds × fourteen
+- [x] **T4.2 — a third body build and species idles.** Two builds × fourteen
   species is why they read as one animal in fourteen coats. **The idles
   exist** (`2fcfe8e`, PEOPLE D, 2026-09-03 — fourteen species-specific pauses;
-  this line was written without them). **The build is measured now:** the big
-  build carries four figures the eye cannot split without the fur — bear/pig
-  FORM 3.5 and beaver/bear 4.0 under a stride floor of 5.7, beaver/pig 5.9,
-  bear/wolf 6.7, pig/wolf 6.9 just over it (`node tools/zooprobe.mjs`).
+  this line was written without them). **BUILT, `01cf866` · `4ea9e5e`,
+  handoff §49.** Measured first: the big build carried four figures the eye
+  could not split without the fur, and the beaver and the pig stood 1.08
+  strides apart in coats too alike to split. One new body cannot part three
+  animals that must each stand apart, so the pig wears a third build —
+  `stout`, a barrel on thin legs, the belly out on the side it faces and the
+  back flat so its tail still shows — and the beaver wears the small one,
+  where its paddle shows facing SE for the first time:
+
+  | pair | FORM before → after | strides |
+  |---|---|---|
+  | bear / pig | 3.5 → 10.4 | 0.62 → 1.69 |
+  | beaver / bear | 4.0 → 14.0 | 0.71 → 2.46 |
+  | beaver / pig | 5.9 → 14.6 | 1.08 → 2.37 |
+  | pig / wolf | 6.9 → 12.9 | 1.28 → 2.10 |
+  | beaver / wolf | 7.1 → 16.2 | 1.55 → 3.34 |
+  | bear / wolf | 6.7 | 1.18 — both big; coats 2.1 shade floors apart |
+
+  The instrument first, with no sprite moving: the build table exported
+  (`BUILDS`) and an instrument's hook (`opts.build`) so zooprobe draws the old
+  bodies through the kit's own composer — T4.0's control is read on the bodies
+  it was measured on, T4.2's in the same run. The gate
+  (`tools/check-animals.mjs`, 15 → 21 checks): no two figures closer than a
+  stride; where two coats are too alike to split, figures 1.4 strides apart
+  (the rabbit and the mouse, 1.48, the witness the bar sits under); only the
+  beaver and the pig moved. **256 sprites moved**, the beaver's and the pig's
+  adults and elders, none in size or anchor; no cub, portrait or colour. On
+  the way: T4.0's check that FORM ignores the coat compared two readings of
+  the same sprites and could not fail — replaced by the property (standing
+  brief, trap 18).
 
 ---
 
@@ -836,7 +862,10 @@ Only the genuinely undecided; everything else is decided above.
    its instrument (`b72bea7`), the 2× pass taught to ask the composer what is
    fur (`a2dc8ea`), then the fourteen coats (`bfb93e8`). The base rate was
    clean this time: every picture tool, run on the previous tip, reproduced
-   every picture. Next T4.2 (the third build — measured), then T4.1.
+   every picture. **T4.2 (the builds) DONE** — the instrument taught to draw
+   the old bodies (`01cf866`), then the pig's stout build and the beaver on
+   the small one (`4ea9e5e`); the base rate clean again, on a clean worktree
+   of the instrument commit. Next T4.1, authored 2× heads.
 
 ---
 
