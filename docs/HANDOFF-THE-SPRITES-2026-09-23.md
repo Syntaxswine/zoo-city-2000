@@ -18,12 +18,86 @@ is the first thing to run: it prints most of them.
 |---|---|
 | `docs/PROPOSAL-SPRITE-UPGRADE-2026-09-22.md` | **the list.** §4 is the checklist, each item with the verification written down *before* it was built. §2c is the five art gates. Cross things off there |
 | handoff §43–§48 (`HANDOFF-THE-FIRST-ZOO-2026-09-02.md`) | **the sessions.** What was measured on the day, and the sixty-three traps in six symptom-keyed tables |
-| this file | **the standing brief.** The laws, the instruments, what is proven against what is a guess, and what is still open |
+| this file | **the standing brief.** Where the arc stands (next section), the laws, the instruments, what is proven against what is a guess, the traps that are classes |
 | `SPEC.md` §12, §13 | the design record. It outranks all three |
 
 Read this one and §4. Do not read §43–§48 front to back until
 something breaks; then read the trap tables, which are keyed by the symptom
 you are looking at.
+
+---
+
+## Where the arc stands — done and unfinished
+
+*The ledger, 2026-09-24: the code as of `bfb93e8`, the record as of this
+commit. Every "done" row has a gate that
+refuses if it stops being true, except where the row says otherwise; every
+"unfinished" row says where to start.*
+
+### Done
+
+| item | what it is now | commits | what holds it |
+|---|---|---|---|
+| the list | the diagnosis (D1–D4), the five art gates, the checklist | `36aa06d` | — |
+| I1, I2 | `art-dump` — one line per sprite and per palette key, drift is exit 1; `faceprobe` — how much of the city is roof | `abf08bd` | art-dump is the FIRST step of `npm run check`; faceprobe is passive |
+| T1.1–T1.4 | every box solid casts (the shadow of a box is a rectangle), unioned at one density; contact darkening; walker, tree and tent ellipses | `8bccb62` | `check-shadows`, 22 checks |
+| T2.1, T2.2 | three ramps added (`tile`, `timber`, `fabric`), none moved; the roof says the zone | `c98e87f` | art-dump, the palette lines |
+| T2.3 | roof furniture found on the decks a recipe already has, and it casts | `58520ef` | art-dump; faceprobe's bare-quad share |
+| T1.5 | the evening: one key → key table, no key added; `/` and an Options box | `9a123e1` | `check-dusk`, 114 checks |
+| T3.1 | window states: blinds, plants, boarded panes; no key added | `1adb3dd` (stale sheets first: `9983766`) | `check.mjs` Part E, 18 assertions |
+| T3.2 | the four original R/C plans stepped back: porch roof, terrace, canopy, podium | `38b187b` (fixtures first: `b39866c`, `c61920c`) | art-dump; `massprobe` is passive — nothing refuses a one-box plan |
+| T3.3 | grass keyed off its tile CORNERS (no seam); paths worn where riders cross a forecourt | `692b2b3`, `a416748` (stale pictures first: `e2ace35`) | `check-ground`, 51 checks |
+| T4.0 | fourteen coats from existing ramps, the table the kit's own; the 2× pass asks the composer what is fur and where the figure ends | `b72bea7`, `a2dc8ea`, `bfb93e8` | `check-animals`, 15 checks; `check-closeups`' fur share |
+| the record | this brief and handoff §43–§48 (§45 went in with `1adb3dd`) | `1f511e2`, `4a60a99`, `27577d3`, `543ecbf`, `7e85b59`, `d38b5d0`, `60b845a`, `ad0d872` | — |
+| owner's Q2 | dusk is a MODE, not a clock — a tick is a month | `9a123e1` | answered by the sim |
+| owner's Q3 | terracotta on R kept, on a frame | the roofs `c98e87f`, the answer recorded `7e85b59` | answered by `scene.png` |
+
+Twenty-six commits with this ledger, **nothing under `js/sim/`**, every one
+pushed and live.
+The suite on `bfb93e8`, the last commit that touched code: 980 checks and
+fourteen more gates, green.
+
+### Unfinished — on the list, in the order I would take them
+
+1. **T4.2 — a third body build.** Measured, not asserted: bear/pig (FORM 3.5)
+   and beaver/bear (4.0) are one animal in two coats, under a stride floor of
+   5.7; beaver/pig 5.9, bear/wolf 6.7 and pig/wolf 6.9 are just over it. The
+   big build carries four figures the eye cannot split without the fur. Its
+   "species idles" half is done (`2fcfe8e`, 2026-09-03). **Before you start:**
+   `check-animals`' control reads the OLD coats on the CURRENT figures, so a
+   new build moves its expected one-animal and close-pair readings — change
+   them in the same commit, deliberately, and say why. A build of another
+   height moves everything placed by row (look marks, elder marks, glasses,
+   hats, the sack, the cart). Start with `node tools/zooprobe.mjs`.
+2. **T4.1 — authored 2× heads per species.** Twenty-eight heads (SE and NE;
+   west is mirrored) at 24×18. A twin may not expand the 1× silhouette and
+   may not erode below 0.88 of its ink (`check-closeups`), and its ink must
+   stay within 12% of 4× (`check.mjs`). It has to compose with everything
+   stamped over a head — elder marks, look marks, glasses, the idle poses,
+   hats, the carry offset. `CITIZEN_DETAILS.authored` says what the composer
+   drew and where.
+3. **Q1 — how long is the shadow?** The owner's call.
+   `docs/shots/sheet-shadows.png` is the frame that answers it. `SHADOW_K
+   0.55` is mine, and dusk multiplies it ×3.2.
+
+### Unfinished — found on the way, not on the list
+
+| what | where it is written | what it wants |
+|---|---|---|
+| `species.js` still carries `fur`/`furShift`, read by nothing but `check-animals`' control | handoff §48 | a sim-side commit to remove them — which must also rewrite the control's premise check, since it asserts those columns ARE the pre-T4 table |
+| a coat at the top of its ramp gets less edge light at 2× (the wolf, 18.2% → 10.0% of its fur) | §48, trap 16 | a lighter key the pass may reach for, or a coat off the top rung; inside the gate today |
+| the beaver's 2× rule reads `ramp === "earth"` below row 10 and has never fired on a beaver without a sack | §48 | its author's intent; it is not in the code |
+| roof furniture cannot tell a TERRACE from a pitch step (`coveredShare` medians 0.63 vs 0.65) | the GUESS list, §46 | a class change: what stands on the deck, with a height floor |
+| **no gate sees a hidden door** — twice (the meat hall's annex, T3.2's canopies) | trap 12 | a door-pixel count in both mirrors, as a check; today it is done by hand |
+| 43 zoned plans are one box with a lid — industrial sheds and works, tier-1 shops and cottages, meat stalls | `node tools/massprobe.mjs` | massing, family by family, as T3.2 did |
+| the cemetery is 88% roof and 74% of that one bare quad; furniture cannot reach it | *Where the roof still is*, below | a different recipe |
+| scatter as objects (flowers, stones) not built | §47 | a size-on-screen answer: at zoom 1 each is one pixel of a key that already means something |
+| a path shows on open grass only, not a forecourt across chalk, a park or rubble | §47 | a decision about the zone's chalk first |
+| the lit blind that hides at noon and shows at dusk is emergent and ungated; `ACCENT_RUNG` survives `check-dusk` | *The four passes*; the GUESS list | a check only if someone decides it is a property |
+| **taste nobody has argued about** — `SHADOW_K`, the dusk constants, the window mix, the setback depths, the meadow's numbers and the path's bow, the fourteen coats | the GUESS list | the owner's eye |
+| **nobody has played any of this** | the GUESS list | a player; their first reaction outranks every number here |
+
+The rest of the game's open work — not the sprites — is `BACKLOG.md`.
 
 ---
 
@@ -60,7 +134,7 @@ commit.
    twin**, not the 1× rows scaled. Anything new in the dynamic pass must
    honour `S > 1 && art.hires`, as `blitScaled` does.
 7. **Art cannot move a `stateHash`.** The sprite a variant byte selects is not
-   in the hashed shape. Across the whole arc — **twenty-five commits** of
+   in the hashed shape. Across the whole arc — **twenty-six commits** of
    shadows, roofs, an evening, a set of windows, four buildings stepped back,
    a meadow and fourteen coats — `git diff --name-only 4bb38b6..HEAD -- js/sim/`
    is **empty**, and
@@ -233,7 +307,7 @@ a proxy that happens to work.
 - T4.0 moved exactly 2,774 sprites, every one of them an animal of a species
   whose coat changed; none changed size, anchor or ink; no palette key was
   added or moved. The census paints each species in its coat.
-- Art has not moved a sim hash, anywhere in the arc — twenty-five commits,
+- Art has not moved a sim hash, anywhere in the arc — twenty-six commits,
   zero files touched under `js/sim/`.
 
 **A guess.**

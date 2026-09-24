@@ -39,6 +39,14 @@ measurement and SPEC gets edited — never the reverse.
 - **Before touching a file:** `node tools/check.mjs` — 139 checks, exits 1.
   Green at the commit this file lands in. If it is red when you arrive, that
   is the first job; `git log -p` on the file it names is the fastest route.
+  *Corrected 2026-09-24, the line above left as written:* the suite is now
+  **`npm run check`** — `tools/art-dump.mjs` first (the art receipt), then
+  `check.mjs` (980 checks) and thirteen more gates, every one exiting 1. Write
+  its exit code into the log (`echo "NPM_EXIT=$?" >> out/suite.txt`); read
+  through a pipe it is the pipe's. **Where the work stands:** `BACKLOG.md` is
+  the game's open work; the sprite upgrade (§43–§48) has a standing brief,
+  `docs/HANDOFF-THE-SPRITES-2026-09-23.md`, whose first section is what is
+  done and what is unfinished — read it before touching `js/art/`.
 - **Run:**
   ```
   node tools/serve.mjs [--port 8139]        # static, no-store; the launch entry "zoo-city-2000" is 8139
