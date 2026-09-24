@@ -1,29 +1,32 @@
 #!/usr/bin/env node
 // tools/check-animals.mjs — the gate on the animals (Tier 4). SPEC §12.3.
-// docs/PROPOSAL-SPRITE-UPGRADE-2026-09-22.md, T4.0; tools/zooprobe.mjs reads it.
+// docs/PROPOSAL-SPRITE-UPGRADE-2026-09-22.md, T4.0 and T4.2; tools/zooprobe.mjs
+// reads it.
 //
 // The claims registered BEFORE the work, run here:
 //
-//   THE COATS    fourteen coats, no two the same · none goes FLAT in any look
-//                or age (the lit rung and the shaded rung stay two keys, or
-//                the light is gone from the body) · none as LOST on its
-//                ground as the olive tortoise was · no ONE ANIMAL (figures
+//   THE COATS    (T4.0) fourteen coats, no two the same · none goes FLAT in
+//                any look or age (the lit rung and the shaded rung stay two
+//                keys, or the light is gone from the body) · none as LOST on
+//                its ground as the olive tortoise was · no ONE ANIMAL (figures
 //                closer than one animal mid-stride AND coats closer than one
 //                animal shaded) · no two CLOSE figures on one ramp · not one
 //                key added to the palette
-//   THE CONTROL  the coats the game wore before T4.0, spelt out below and read
-//                in the same run by the same instrument — every bar above must
-//                REFUSE them, exactly as measured, or passing proves nothing —
-//                on the figures T4.0 was measured on: the builds are spelt
-//                out too, and drawn through the kit's own composer
+//   THE FIGURES  (T4.2) no ONE ANIMAL IN TWO COATS — no two figures closer
+//                than one animal is to itself mid-stride, whatever their coats
+//                · where two coats are too alike for the eye to split, the
+//                figures split them, 1.4 strides apart or more · the builds
+//                that moved are the beaver's and the pig's, and no other
+//   THE CONTROLS the coats the game wore before T4.0, and the builds it wore
+//                before T4.2, spelt out below and read in the same run by the
+//                same instrument — every bar above must REFUSE them, exactly
+//                as measured, or passing proves nothing. The old bodies are
+//                drawn by the kit's own composer (`opts.build`), and T4.0's
+//                control is read on the bodies it was measured on
 //   THE PANEL    the census paints each species in its own coat
 //
 // The 2× pass is not here: whether each species' twin reworks its FUR is
 // tools/check-closeups.mjs's, beside every other claim about the twins.
-//
-// NOT CLAIMED: "one animal in two coats" — figures under the stride floor
-// with coats apart. That is a fault of FORM, which a coat cannot fix; it is
-// T4.2's, and this gate reports it without refusing it.
 
 import { installDom } from "./dom-shim.mjs";
 
@@ -57,8 +60,8 @@ const BEFORE = {
   pig: ["furWarm", 1], cow: ["furCool", 1], wolf: ["furCool", -1], cat: ["furWarm", 0],
   hawk: ["earth", 0], skunk: ["furCool", -1],
 };
-// …on the bodies they were worn on: the kit's build table the day T4.0 was
-// measured — eight small, six big.
+// …on the bodies they were worn on: the kit's build table until T4.2 — the
+// bodies T4.0 was measured on, and T4.2's control: eight small, six big.
 const BEFORE_BUILDS = {
   rabbit: "small", mouse: "small", fox: "small", owl: "small", raccoon: "small", cat: "small", hawk: "small", skunk: "small",
   beaver: "big", bear: "big", tortoise: "big", pig: "big", cow: "big", wolf: "big",
@@ -150,6 +153,36 @@ check("…so every pair of species in an unmoved build reads the plain sprites' 
   compared > 0 && now.pairs.every((p, i) => !(kept(p.a) && kept(p.b)) || (p.form === built.pairs[i].form && p.formFloor === built.pairs[i].formFloor)),
   `${compared} pairs compared`);
 
+// ---- the figures (T4.2) -----------------------------------------------------------
+// A coat cannot part two figures; a build can. Six species wore the big build
+// and four of them stood closer than the eye can split without the fur: the
+// bear and the pig 3.5 apart, the beaver and the bear 4.0, against a bear
+// mid-stride 5.7 from itself — ONE ANIMAL IN TWO COATS — and the beaver and
+// the pig 1.08 strides apart in coats too alike to split at all.
+//
+// The second bar is read off the kit, not guessed at the eye: of the pairs in
+// one coat (COAT under the shade floor) the closest the kit already draws as
+// two animals is the rabbit and the mouse — long ears against round — at 1.48
+// strides. 1.4 sits under that witness; the beaver and the pig stood at 1.08.
+const MOVED = ["beaver", "pig"];
+const IN_ONE_COAT_STRIDES = 1.4;
+// …and what the instrument read off the builds before, the day T4.2 was measured.
+const BUILT_READS = { twoCoats: ["bear/pig", "beaver/bear"], inOneCoatUnder: ["beaver/pig"] };
+const under = (R) => R.inOneCoat.filter((p) => p.strides < IN_ONE_COAT_STRIDES);
+check("CONTROL: the builds before T4.2, in today's coats, read as measured — the bear and the pig, the beaver and the bear one animal in two coats; the beaver and the pig in one coat under 1.4 strides",
+  sameSet(built.twoCoats.map(pairName), BUILT_READS.twoCoats) && sameSet(under(built).map(pairName), BUILT_READS.inOneCoatUnder),
+  `two coats ${built.twoCoats.map(pairName).join(",")} · in one coat under ${IN_ONE_COAT_STRIDES}: ${under(built).map((p) => `${pairName(p)} ${p.strides.toFixed(2)}`).join(",")}`);
+check("no two figures closer than one animal is to itself mid-stride — no one animal in two coats", now.twoCoats.length === 0,
+  now.twoCoats.map((p) => `${pairName(p)} ${p.form.toFixed(1)} under ${p.formFloor.toFixed(1)}`).join(", "));
+check(`where two coats are too alike to split, the figures split them — every pair in one coat ${IN_ONE_COAT_STRIDES} strides apart or more`, under(now).length === 0,
+  under(now).map((p) => `${pairName(p)} ${p.strides.toFixed(2)}`).join(", "));
+// The record of what T4.2 moved, spelt out: every other species' figure is
+// the one the control reads (the unmoved-pairs check above is exact only for
+// those), and a later change to the builds has to come through here.
+const moved = FOURTEEN.filter((sp) => BEFORE_BUILDS[sp] !== BUILDS[sp]);
+check("three builds, each worn, and the ones that moved are the beaver's and the pig's alone",
+  new Set(Object.values(BUILDS)).size === 3 && sameSet(moved, MOVED), `builds ${[...new Set(Object.values(BUILDS))].join(", ")} · moved ${moved.join(", ")}`);
+
 // ---- the panel ------------------------------------------------------------------
 // The census histogram, through the REAL createUI and the dom shim: each
 // species' bar in the colour its coat lays on the shaded body rung. It used to
@@ -172,5 +205,5 @@ check("the census paints each species' bar in its own coat — fourteen bars, fo
 check("…and no bar is coloured by a ramp's CSS class", bars.every((b) => !["furWarm", "furCool", "olive", "earth"].some((c) => b.fill.classList.contains(c))));
 void ui;
 
-const two = now.twoCoats.map(pairName);
-console.log(`Animal checks passed: ${checks} checks · 14 coats (were ${was.distinct}) · flat ${now.flat.length} (were ${was.flat.length}) · lost ${lostNow.length} (were ${lostWas.length}; the olive control ${now.lostControl.toFixed(1)}) · one animal ${now.oneAnimal.length} (was ${was.oneAnimal.length}) · close pairs on one ramp ${now.closeOnOneRamp.length} (were ${was.closeOnOneRamp.length}) · one animal in two coats ${two.length} (${two.join(", ") || "none"}) — FORM, T4.2's`);
+const nearest = (R) => R.inOneCoat[0] ? `${pairName(R.inOneCoat[0])} ${R.inOneCoat[0].strides.toFixed(2)}` : "none";
+console.log(`Animal checks passed: ${checks} checks · 14 coats (were ${was.distinct}) · flat ${now.flat.length} (were ${was.flat.length}) · lost ${lostNow.length} (were ${lostWas.length}; the olive control ${now.lostControl.toFixed(1)}) · one animal ${now.oneAnimal.length} (was ${was.oneAnimal.length}) · close pairs on one ramp ${now.closeOnOneRamp.length} (were ${was.closeOnOneRamp.length}) · one animal in two coats ${now.twoCoats.length} (were ${built.twoCoats.length}: ${built.twoCoats.map(pairName).join(", ")}) · closest in one coat ${nearest(now)} strides (was ${nearest(built)})`);

@@ -1946,9 +1946,9 @@ docs/HANDOFF-CIVIC-CAMPUSES-2026-09-05.md for migration and verification.
 ### 12.3 Citizens — hand-authored kit, the organic exception
 12×20 px adults, 8×12 cubs; facings SE and NE authored, SW/NW mirrored and
 re-lit; 2 walk frames + 1 stand. Kit = shared body rows (2 facings × 3
-frames × 2 builds) + species head/ears/tail overlays (8 × 2 facings) + cub
-body → composed at boot and cached. Elder = one step lighter where the coat
-has headroom. Centenary hat = 1 piece. Anchor = feet at the tile centre.
+frames × 3 builds) + species head/ears/tail overlays (14 × 2 facings) + cub
+body → composed at first use and cached. Elder = one step lighter where the
+coat has headroom. Centenary hat = 1 piece. Anchor = feet at the tile centre.
 
 **The coats are the art's** (`COATS` in `js/art/citizens.js`, T4.0,
 2026-09-23; they were `fur`/`furShift` columns of the sim's roster, which the
@@ -1977,6 +1977,31 @@ the pre-T4 dark coats went flat for half their wearers); and no coat's lit rung
 is as near a key of the grass or the road as the olive tortoise's was (9.8
 ΔE — the coat that vanished). The census histogram paints each species in its
 coat.
+
+**The builds are the art's too** (`BUILDS` in `js/art/citizens.js`, T4.2,
+2026-09-24). Three bodies, one row plan — the shirt on body rows 0–4, fur
+below, the feet on the anchor — so nothing placed by row moves between them:
+
+| build | the body | worn by |
+|---|---|---|
+| small | narrow, long in the leg | rabbit, mouse, fox, beaver, owl, raccoon, cat, hawk, skunk |
+| big | broad at the shoulder, straight to the hip | bear, tortoise, cow, wolf |
+| stout | a round barrel on thin short legs, the belly pushed out on the side the figure faces, the back flat so a tail still shows | pig |
+
+Six species wore the big build until T4.2, and four of them could not be told
+apart without their fur: the bear and the pig stood 3.5 apart (coat-free FORM,
+`tools/zooprobe.mjs`), the beaver and the bear 4.0 — closer than a bear is to
+itself mid-stride (5.7) — and the beaver and the pig, in coats too alike to
+split, 1.08 strides apart. The pig took the new build; the beaver moved to
+small, where facing SE its paddle shows past its legs. Two rules hold the
+table, each a check in `tools/check-animals.mjs`, read against the builds
+before as a control in the same run (the old bodies drawn by the kit's own
+composer): no two figures closer than one animal is to itself mid-stride; and
+where two coats are too alike for the eye to split (COAT under the shade
+floor), figures at least 1.4 strides apart — the rabbit and the mouse, long
+ears against round, the closest such pair the kit already drew as two
+animals, stand at 1.48. The bear and the wolf share the big build 1.18
+strides apart, in coats twice the shade floor apart.
 
 ### 12.3b Looks, portraits and the idle pose
 

@@ -6,13 +6,15 @@
 //   [tail, if it hangs BEHIND]   body   [tail, if it hangs in FRONT]   head   [hat]
 //
 // stacked BOTTOM UP and BACK TO FRONT in one pass. The body is shared —
-// two builds (small, big) × three frames (stand, stride, pass) — and the
-// species is carried by three things only, because three things are all
-// that survive at 12 px on a busy map:
+// three builds (small, big, stout: `BUILDS`, below) × three frames (stand,
+// stride, pass) — and the species is carried by three things only, because
+// three things are all that survive at 12 px on a busy map:
 //
-//   SILHOUETTE   the head/ear overlay and the tail overlay
+//   SILHOUETTE   the build, the head/ear overlay and the tail overlay
 //   RAMP         the species' coat ramp (`COATS`, below — the kit's table)
-//   VALUE        the coat's shift: rabbit and mouse light, beaver/bear/raccoon dark
+//   VALUE        the coat's shift: +1 lifts a coat a rung (the rabbit, the cow,
+//                the wolf light), +0 keeps the ramp's own (the bear's dark
+//                brown, the skunk's dark grey)
 //
 // Every part is authored in the WARM fur keys w x y z (dark → light) and
 // remapped to the species' ramp at compose time; '&' '^' are the shirt (a
@@ -174,9 +176,73 @@ const BIG_SE = [
   ]),
 ];
 
+// THE THIRD BUILD (T4.2, 2026-09-24): a round barrel on thin, short legs —
+// narrow at the shoulder and widest at the belly, where the big build is
+// widest at the shoulder and straight to the hip. The belly is pushed out on
+// the side the figure faces (screen-right: SE and NE both walk that way, and
+// the west facings mirror it) and the back is kept flat, so a tail that hangs
+// behind still shows past it. The shirt rides on the belly and stops short
+// of its underside, which is fur. The rows keep the other builds' order — the
+// shirt on body rows 0–4 (the suit's jacket, the 2× pass's shirt), fur below,
+// the feet on the anchor — so nothing placed by row moves.
+//
+// Worn by the pig. tools/zooprobe.mjs found the big build carrying figures
+// the eye could not split without the fur: the bear and the pig stood 3.5
+// apart, the beaver and the bear 4.0, against a bear mid-stride 5.7 from
+// itself (SPEC §12.3; `BUILDS`, below).
+const STOUT_SE = [
+  part([
+    "....x&&^x...",
+    "...xy&&&^yx.",
+    "..xy&&&&^^yx",
+    "..y&&&&&^^^x",
+    "..y&&&&&^^^x",
+    "..yyxxxxxxxx",
+    "..yyyyxxxxx.",
+    "...yyy.xxx..",
+    "...yy..xx...",
+    "...yy..xx...",
+    "..yyy..xxx..",
+    "..yyy..xxx..",
+  ]),
+  // stride: screen-right leg forward (down-right), screen-left leg and arm
+  // back (up-left)
+  part([
+    "....x&&^x...",
+    "...xy&&&^yx.",
+    "..xy&&&&^^yx",
+    "...y&&&&^^^x",
+    "...&&&&&^^^x",
+    "..yyxxxxxxxx",
+    "..yyyyxxxxx.",
+    "..yyy..xxx..",
+    ".yyy....xx..",
+    ".yy.....xxx.",
+    "yyy.....xxx.",
+    "........xxx.",
+  ]),
+  // pass: legs together, the screen-right foot lifted and that hand swung in
+  // over the belly
+  part([
+    "....x&&^x...",
+    "...xy&&&^yx.",
+    "..xy&&&&^^yx",
+    "..y&&&&&^^^x",
+    "..y&&&&&^^x.",
+    "..yyxxxxxxxx",
+    "..yyyyxxxxx.",
+    "...yyy.xxx..",
+    "...yy..xx...",
+    "...yy..xx...",
+    "..yyy..xxx..",
+    "..yyy.......",
+  ]),
+];
+
 export const BODY = {
   small: { se: SMALL_SE, ne: SMALL_SE },
   big: { se: BIG_SE, ne: BIG_SE },
+  stout: { se: STOUT_SE, ne: STOUT_SE },
 };
 
 // =========================================================================
@@ -555,11 +621,13 @@ const TAIL = {
     se: [part([".yy.", "yzyy", "yzyy", "yyyy", ".xyy", "..zz"]), 0, 11, true],
     ne: [part([".yy.", "yzyy", "yzyy", ".yyy", ".xyy", "..zz"]), 5, 12, false],
   },
-  // The flat tail is authored in x/y, not w/x: the beaver's furShift −1
-  // sends both w and x to 'w', and a w/x scale hatch came out one block.
-  // A dark rim 'x' (→ 'w') round a LIGHT fill 'z' (→ 'y', the one rung the
-  // beaver's dark body never uses): with an x/y hatch the paddle was 6×4
-  // dark on dark and, from the back, the beaver was the bear (round 2).
+  // The flat tail: a dark rim 'x' round a LIGHT fill 'z'. It was authored
+  // when the beaver's coat sat a rung down (round 2), where a w/x hatch came
+  // out one block and an x/y one left the paddle 6×4 dark on dark — from the
+  // back, the beaver was the bear. On its own coat since T4.0 the rim and the
+  // fill are the coat's own 'x' and 'z'. Facing SE it hangs behind the legs:
+  // on the big build they hid all but two columns of it; on the small build
+  // (T4.2) three columns show — the beaver's mark, facing the viewer at last.
   beaver: {
     se: [part(["xxxxx", "xzxzx", "xzxzx", "xxxxx"]), 0, 15, true],
     ne: [part([".xxxx.", "xzzzzx", "xzxzzx", ".xxxx."]), 3, 15, false],
@@ -975,10 +1043,28 @@ const CARRY_LIFT = 3; // the sack's top rides 3 px above the frame's top row —
  * draws the animals in the builds they wore before, as it reads the coats
  * they wore before, and `citizenSprite` takes one species' build by name in
  * `opts.build` for exactly that. The game never passes it.
+ *
+ * THREE BUILDS, NOT TWO (T4.2, 2026-09-24). Six species wore the big build,
+ * and tools/zooprobe.mjs could not tell four of them apart without the fur:
+ * the bear and the pig, the beaver and the bear — figures closer than a bear
+ * is to itself mid-stride — and the beaver and the pig, in coats too alike
+ * for the eye to split, 1.08 strides apart. One new build cannot part four
+ * figures, so two species moved:
+ *
+ *   the pig      to the third build, `stout` — a barrel on thin legs
+ *   the beaver   to `small` — facing SE its paddle shows past its legs,
+ *                which on the big build it never did
+ *
+ * and the gate (tools/check-animals.mjs, against the builds before, read in
+ * the same run) holds two rules: no two figures closer than one animal is to
+ * itself mid-stride, and where two coats are too alike to split, figures at
+ * least 1.4 strides apart. The bear and the wolf still share the big build,
+ * 1.18 strides apart, in coats twice the shade floor apart.
  */
 export const BUILDS = Object.freeze({
-  rabbit: "small", mouse: "small", fox: "small", owl: "small", raccoon: "small", cat: "small", hawk: "small", skunk: "small",
-  beaver: "big", bear: "big", tortoise: "big", pig: "big", cow: "big", wolf: "big",
+  rabbit: "small", mouse: "small", fox: "small", beaver: "small", owl: "small", raccoon: "small", cat: "small", hawk: "small", skunk: "small",
+  bear: "big", tortoise: "big", cow: "big", wolf: "big",
+  pig: "stout",
 });
 const AUTHOR_KEYS = keysOf("furWarm"); // w x y z — the authoring ramp
 
