@@ -24,7 +24,8 @@
 // table says olive, but olive 'h' sits between grass 'n' and 'o' and the
 // whole animal vanished into the lawn (luminance 43/68/96/132 against
 // grass 65/91/120/151). The kit paints the tortoise's limbs in its own
-// coat instead (`COATS`): warm tan (furWarm 0) under the brown shell, and a
+// coat instead (`COATS`): ochre (rust 0; warm tan until T4.0 gave that coat
+// to the beaver) under the brown shell, and a
 // 1-px '+' outline — the only near-black — so its silhouette closes
 // against grass and asphalt alike. The palette is untouched.
 //
@@ -986,22 +987,52 @@ const AUTHOR_KEYS = keysOf("furWarm"); // w x y z — the authoring ramp
  * is not a thing the simulation knows — SPEC §12.3 puts the fur ramp under
  * the art — and the sprite arc does not edit js/sim/ (art must never move
  * a sim hash), so the table lives with the art that reads it.
+ *
+ * FOURTEEN COATS, NOT SEVEN (T4.0, 2026-09-23). The roster's columns put
+ * fourteen animals in seven coats — the rabbit and the pig, the mouse and the
+ * cow, the fox and the cat and the tortoise, the beaver and the bear, the
+ * raccoon and the wolf and the skunk — and tools/zooprobe.mjs found the
+ * beaver and the bear ONE ANIMAL: figures closer than a bear is to itself
+ * mid-stride, in one coat. Every coat below is its own, drawn from ramps the
+ * palette already had (no key added — a `furDark` ramp was built and
+ * measured: its keys landed within ΔE 4 of keys that exist, and it re-mapped
+ * seven keys of the evening), and four rules held it, each a check in
+ * tools/check-animals.mjs:
+ *
+ *   OWN       no two species wear the same [ramp, shift]
+ *   CLOSE     two figures zooprobe calls close (FORM under twice the stride
+ *             floor) never share a ramp: one rung of `shade` would put one
+ *             in the other's plain coat
+ *   LIT       no shift below 0. One rung down a four-rung ramp, the shaded
+ *             look lays one key on the lit rung and the shaded rung and the
+ *             light goes out of the body — which it did, for half of every
+ *             beaver, bear, raccoon, wolf and skunk
+ *   FOUND     the lit rung stands further from every key the ground is drawn
+ *             in than the olive tortoise's did. The dark greys stood 4.0 from
+ *             the road, closer than that tortoise ever stood to the lawn
+ *
+ * and, inside those, the animal's own colour where the palette has one: a
+ * red fox, a white cow, a coral pig (the nearest thing to pink), a ginger
+ * cat, a brown bear, a tawny owl, a rufous hawk; grey-browns for the mouse,
+ * the raccoon, the wolf and the skunk, the only greys the road leaves
+ * visible; the beaver a warm tan the bear is not. The tortoise's limbs are
+ * ochre under its brown shell.
  */
 export const COATS = Object.freeze({
   rabbit: Object.freeze(["furWarm", 1]),
-  mouse: Object.freeze(["furCool", 1]),
-  fox: Object.freeze(["furWarm", 0]),
-  beaver: Object.freeze(["furWarm", -1]),
-  owl: Object.freeze(["furCool", 0]),
-  bear: Object.freeze(["furWarm", -1]),
-  tortoise: Object.freeze(["furWarm", 0]),
-  raccoon: Object.freeze(["furCool", -1]),
-  pig: Object.freeze(["furWarm", 1]),
+  mouse: Object.freeze(["timber", 1]),
+  fox: Object.freeze(["tile", 1]),
+  beaver: Object.freeze(["furWarm", 0]),
+  owl: Object.freeze(["earth", 1]),
+  bear: Object.freeze(["earth", 0]),
+  tortoise: Object.freeze(["rust", 0]),
+  raccoon: Object.freeze(["fabric", 0]),
+  pig: Object.freeze(["brick", 1]),
   cow: Object.freeze(["furCool", 1]),
-  wolf: Object.freeze(["furCool", -1]),
-  cat: Object.freeze(["furWarm", 0]),
-  hawk: Object.freeze(["earth", 0]),
-  skunk: Object.freeze(["furCool", -1]),
+  wolf: Object.freeze(["fabric", 1]),
+  cat: Object.freeze(["rust", 1]),
+  hawk: Object.freeze(["tile", 0]),
+  skunk: Object.freeze(["timber", 0]),
 });
 
 /**
@@ -1492,7 +1523,11 @@ export function portraitSprite(species, opts = {}) {
   // falls below the head crop. Head marks above were fitted with the head.
   if (look.mark) switch (species) {
     case "fox": g[11][4] = g[11][5] = g[12][5] = "Z"; break; // white tail-tip as a white ruff
-    case "beaver": for (let x = 5; x <= 10; x++) g[12][x] = coat.z; break;
+    // The pale chest is the coat's top rung over shoulders in its lit rung —
+    // which is the SAME key wherever the coat is clamped at the top: an
+    // elder beaver since T4.0 (furWarm +0, one rung up for age). There the
+    // chest takes the grey of age instead, or the mark is not in the picture.
+    case "beaver": { const chest = coat.z !== coat.y ? coat.z : elderMarkKey(species); for (let x = 5; x <= 10; x++) g[12][x] = chest; break; }
     case "owl": g[5][4] = g[5][11] = "+"; break;
     case "tortoise": g[12][5] = g[12][8] = "r"; g[13][6] = g[13][9] = "r"; break;
     case "pig": g[6][4] = g[7][4] = "+"; break;

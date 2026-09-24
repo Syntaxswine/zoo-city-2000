@@ -1947,9 +1947,36 @@ docs/HANDOFF-CIVIC-CAMPUSES-2026-09-05.md for migration and verification.
 12×20 px adults, 8×12 cubs; facings SE and NE authored, SW/NW mirrored and
 re-lit; 2 walk frames + 1 stand. Kit = shared body rows (2 facings × 3
 frames × 2 builds) + species head/ears/tail overlays (8 × 2 facings) + cub
-body → composed at boot and cached. Fur ramp per species (warm: rabbit, fox,
-beaver, bear, raccoon; cool: mouse, owl; olive: tortoise); elder = one step
-lighter. Centenary hat = 1 piece. Anchor = feet at the tile centre.
+body → composed at boot and cached. Elder = one step lighter where the coat
+has headroom. Centenary hat = 1 piece. Anchor = feet at the tile centre.
+
+**The coats are the art's** (`COATS` in `js/art/citizens.js`, T4.0,
+2026-09-23; they were `fur`/`furShift` columns of the sim's roster, which the
+art no longer reads). Every part is authored in the warm keys `w x y z` and
+laid over with a `[ramp, shift]` coat at compose time; the composer hands its
+later passes the figure in those authoring keys (`CITIZEN_DETAILS.authored`)
+so the 2× pass knows fur and edges by what was drawn, not by colour. Fourteen
+coats, from ramps the palette already had:
+
+| species | coat | | species | coat |
+|---|---|---|---|---|
+| rabbit | furWarm +1 — cream | | raccoon | fabric +0 — warm grey |
+| mouse | timber +1 — grey-brown | | pig | brick +1 — coral |
+| fox | tile +1 — red-orange | | cow | furCool +1 — white (black patches) |
+| beaver | furWarm +0 — warm tan | | wolf | fabric +1 — pale grey |
+| owl | earth +1 — tawny | | cat | rust +1 — ginger |
+| bear | earth +0 — dark brown | | hawk | tile +0 — rufous |
+| tortoise | rust +0 — ochre limbs, earth shell | | skunk | timber +0 — dark grey-brown, white stripe |
+
+Four rules hold the table, each a check in `tools/check-animals.mjs`, read
+against the table the game wore before as a control in the same run: no two
+species share a coat; two figures `tools/zooprobe.mjs` calls close (their
+coat-free FORM under twice one animal's stride) never share a ramp; no coat's
+shaded look lays one key on the lit and the shaded rung (no shift below 0 —
+the pre-T4 dark coats went flat for half their wearers); and no coat's lit rung
+is as near a key of the grass or the road as the olive tortoise's was (9.8
+ΔE — the coat that vanished). The census histogram paints each species in its
+coat.
 
 ### 12.3b Looks, portraits and the idle pose
 
@@ -2107,12 +2134,18 @@ same at twice the resolution, the pixel-keyed grains (brick, the meat
 stripe, the grass dither, the road's speckle) finer. `render(boxes,
 { scale })`, `diamond(fn, scale)` (fn is handed `scale`; the water's bands
 read it and stay world-sized) — byte-identical at scale 1, which the suite
-holds against a hash of every 1× sprite. The animals, trees, zots, fire,
-sacks and tents have no recipe and are scaled by the renderer as before.
+holds against a hash of every 1× sprite. The trees, zots, fire, sacks and
+tents have no recipe and are scaled by the renderer as before. **The animals
+have twins too** (since 2026-09-06, `js/art/citizen-detail.js`, 2× and 4×):
+no recipe, so the 1× citizen is refined in place — corners chamfered, fur
+edges lit and shaded, shirt seams — never outside its own silhouette
+(`tools/check-closeups.mjs`), and every species' twin reworks as much of its
+FUR as the others' do (it asks the composer what fur is; by colour alone the
+hawk's was never reworked at all).
 Rendered lazily, cached per sprite. The suite: every twin twice the size
 (within the 6 px the grid's pad costs), anchored on the same world point,
-ink within 12% of 4×; every solid and ground diamond has one and the
-animals do not; the 2× prism gate; and the upgrade is VISIBLE — at zoom 2
+ink within 12% of 4×; every solid, ground diamond and citizen has one and the
+trees do not; the 2× prism gate; and the upgrade is VISIBLE — at zoom 2
 a frame has thousands of non-uniform 2×2 device blocks with the twins and
 none with them removed, while zoom 1 is byte-identical either way.
 `tools/shots.mjs --sheet` writes `sheet-hires.png`, eighteen 1× sprites

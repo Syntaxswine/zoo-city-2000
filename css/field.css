@@ -217,10 +217,7 @@ button.palette-tool.locked { background: #b4b8bd; border-color: #a5a9ae; box-sha
 #tabBody .hist .hrow { display: flex; align-items: center; gap: 6px; margin: 1px 0; }
 #tabBody .hist .lab { width: 64px; color: var(--dim); }
 #tabBody .hist .hbar { flex: 1; height: 8px; background: #e4e0d0; border: 1px solid var(--border); }
-#tabBody .hist .hfill { height: 100%; background: var(--accent); }
-#tabBody .hist .hfill.furCool { background: #6e7380; }
-#tabBody .hist .hfill.olive { background: #62663a; }
-#tabBody .hist .hfill.furWarm { background: #8a5a34; }
+#tabBody .hist .hfill { height: 100%; background: var(--accent); } /* ui.js paints each species' bar in its coat */
 #tabBody .hist .num { width: 34px; text-align: right; }
 #tabBody ul.log { list-style: none; margin: 0; padding: 0; }
 #tabBody ul.log li { margin: 0 0 3px; border-bottom: 1px dotted var(--border); padding-bottom: 2px; }

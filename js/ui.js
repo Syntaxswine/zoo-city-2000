@@ -31,6 +31,9 @@ import { exposure, asksAccess, nearReach, campusReach } from "./sim/fields.js";
 import { RULES, KNOBS } from "./sim/rules.js";
 import { yearlyFigures } from "./sim/budget.js";
 import { SPECIES, SPECIES_BY_ID, admits } from "./sim/species.js";
+// Each species' census bar is drawn in its COAT — the art's table, not the sim's.
+import { coatMap } from "./art/citizens.js";
+import { colourOf } from "./art/palette.js";
 import { pluralSpecies } from "./sim/landmarks.js";
 import { ageYears, isWorker } from "./sim/census.js";
 import { toolHelp } from "./tools.js";
@@ -1063,7 +1066,10 @@ export function createUI(app) {
       const bar = el("div", "hbar");
       const fill = el("div", "hfill");
       fill.style.width = `${(100 * c.shares[s.id]) / maxShare}%`;
-      fill.classList.add(s.fur);
+      // The colour the coat lays on the body's shaded rung: fourteen coats, so
+      // fourteen bars. (It was a CSS class per RAMP — three colours for
+      // fourteen species, and the hawk's `earth` had no class at all.)
+      fill.style.background = "#" + colourOf(coatMap(s.id, false, 0).x).map((v) => v.toString(16).padStart(2, "0")).join("");
       bar.append(fill);
       row.append(bar, el("span", "num", `${c.counts[s.id]}`));
       row.title = `${s.id}: ${pct(c.shares[s.id])} · arrival weight ${w.lastWeights ? w.lastWeights[s.id].toFixed(2) : "—"}`;
