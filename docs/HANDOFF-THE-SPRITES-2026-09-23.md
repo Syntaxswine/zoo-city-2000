@@ -1,6 +1,7 @@
 # The sprites handoff — 2026-09-23
 
-For whoever takes Tier 3 or Tier 4, or touches `js/art/` at all. Sessions 21
+For whoever takes what is left of Tier 4 — T4.1, the authored heads — or
+touches `js/art/` at all. Sessions 21
 and 22 built the shadows, the roofs, the evening, the windows, the setbacks,
 the ground, the coats and the builds; this is what
 I know now that I did not know when I started, written down so you do not have
@@ -49,11 +50,11 @@ refuses if it stops being true, except where the row says otherwise; every
 | T3.3 | grass keyed off its tile CORNERS (no seam); paths worn where riders cross a forecourt | `692b2b3`, `a416748` (stale pictures first: `e2ace35`) | `check-ground`, 51 checks |
 | T4.0 | fourteen coats from existing ramps, the table the kit's own; the 2× pass asks the composer what is fur and where the figure ends | `b72bea7`, `a2dc8ea`, `bfb93e8` | `check-animals`; `check-closeups`' fur share |
 | T4.2 | three builds: the pig in a third, `stout` — a barrel on thin legs — and the beaver on the small build, where its paddle shows; the table the kit's own (`BUILDS`). Its "species idles" half had been done since `2fcfe8e` | `01cf866` (the instrument first), `4ea9e5e` | `check-animals`, 21 checks, against the builds before, read in the same run |
-| the record | this brief and handoff §43–§49 (§45 went in with `1adb3dd`) | `1f511e2`, `4a60a99`, `27577d3`, `543ecbf`, `7e85b59`, `d38b5d0`, `60b845a`, `ad0d872`, the ledger `5f06264`, and the commit that wrote this row | — |
+| the record | this brief and handoff §43–§49 (§45 went in with `1adb3dd`) | `1f511e2`, `4a60a99`, `27577d3`, `543ecbf`, `7e85b59`, `d38b5d0`, `60b845a`, `ad0d872`, the ledger `5f06264`, §49 `e7dd341`, and the commit that wrote this row | — |
 | owner's Q2 | dusk is a MODE, not a clock — a tick is a month | `9a123e1` | answered by the sim |
 | owner's Q3 | terracotta on R kept, on a frame | the roofs `c98e87f`, the answer recorded `7e85b59` | answered by `scene.png` |
 
-Twenty-nine commits with this record, **nothing under `js/sim/`**, every one
+Thirty commits with this record, **nothing under `js/sim/`**, every one
 pushed and live.
 The suite on `4ea9e5e`, the last commit that touched code: 980 checks and
 fourteen more gates, green.
@@ -68,6 +69,11 @@ fourteen more gates, green.
    hats, the carry offset. `CITIZEN_DETAILS.authored` says what the composer
    drew and where. The head is where a species lives once the body is shared:
    on one build, two animals are only their heads and their tails (§49).
+   **Before you start:** nothing measures a head yet. `zooprobe` reads the 1×
+   figures and `check-closeups` the whole twin's fur. Build the reading first
+   — how alike two species' heads are at zoom 2, and how much of each head the
+   twin reworks — and read today's procedural twins with it: that is the base
+   rate an authored head has to beat.
 2. **Q1 — how long is the shadow?** The owner's call.
    `docs/shots/sheet-shadows.png` is the frame that answers it. `SHADOW_K
    0.55` is mine, and dusk multiplies it ×3.2.
@@ -128,7 +134,7 @@ commit.
    twin**, not the 1× rows scaled. Anything new in the dynamic pass must
    honour `S > 1 && art.hires`, as `blitScaled` does.
 7. **Art cannot move a `stateHash`.** The sprite a variant byte selects is not
-   in the hashed shape. Across the whole arc — **twenty-nine commits** of
+   in the hashed shape. Across the whole arc — **thirty commits** of
    shadows, roofs, an evening, a set of windows, four buildings stepped back,
    a meadow, fourteen coats and three builds — `git diff --name-only 4bb38b6..HEAD -- js/sim/`
    is **empty**, and
@@ -312,7 +318,7 @@ a proxy that happens to work.
   compared two readings of the same sprites and could not fail (trap 18).
 - T4.2 moved exactly 256 sprites, the beaver's and the pig's adults and elders;
   none changed size or anchor; no cub, portrait, carry or palette key moved.
-- Art has not moved a sim hash, anywhere in the arc — twenty-nine commits,
+- Art has not moved a sim hash, anywhere in the arc — thirty commits,
   zero files touched under `js/sim/`.
 
 **A guess.**

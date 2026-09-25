@@ -13,6 +13,24 @@ zoo; §10 crime and punishment; §11 the title screen and the cheat; §12 the
 walls / use-zoning / rail tranche; §13 the news. Two makers have signed it —
 the marks are at the foot, oldest first, and neither edits the other.
 
+*Corrected 2026-09-24, the paragraph above left as written:* sessions
+through the twenty-second have written into it now, over three weeks. The
+first makers signed in *Maker's mark* after §9; since session 19 each maker
+signs at the foot of their own section. A map, by arc (§9, the verification
+recipe, sits after §15):
+
+| sections | what |
+|---|---|
+| §1–§9 | the first zoo — the shape, the laws, the numbers, the method, the owner's rulings |
+| §10–§15 | crime and punishment, the title screen, zoning / rail / walls, the news, predation, what a station buys |
+| §16–§22 | The People (the keel, named saves, actionable thoughts), the building redux, the landmarks, the shop pool, the level crossing |
+| §23–§24i | the freeze on a zoned lot; road access standardized, and its seven reviews |
+| §25–§31 | People E and G, the civic campuses, economic camping, the campus halos, knowledge and culture |
+| §32–§35 | wealth and class — the ladder, the estate, the mansion |
+| §36–§40 | generations and skills, migration both ways, the push |
+| §41–§42 | the hostile review of the campaign, healthcare and governance; the targets lowered |
+| §43–§49 | the sprite upgrade — shadows, roofs, the evening, windows, setbacks, the ground, the coats, the builds. Its standing brief is `docs/HANDOFF-THE-SPRITES-2026-09-23.md` |
+
 The owner's ask, verbatim: *"lets build zoo city 2000, an isometric city
 builder where anthropomorphic characters live and grow together in a city.
 the builder must balance residential, commercial, and industrial zoning as
@@ -44,7 +62,7 @@ measurement and SPEC gets edited — never the reverse.
   `check.mjs` (980 checks) and thirteen more gates, every one exiting 1. Write
   its exit code into the log (`echo "NPM_EXIT=$?" >> out/suite.txt`); read
   through a pipe it is the pipe's. **Where the work stands:** `BACKLOG.md` is
-  the game's open work; the sprite upgrade (§43–§48) has a standing brief,
+  the game's open work; the sprite upgrade (§43–§49) has a standing brief,
   `docs/HANDOFF-THE-SPRITES-2026-09-23.md`, whose first section is what is
   done and what is unfinished — read it before touching `js/art/`.
 - **Run:**
