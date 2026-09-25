@@ -65,6 +65,11 @@ measurement and SPEC gets edited — never the reverse.
   the game's open work; the sprite upgrade (§43–§49) has a standing brief,
   `docs/HANDOFF-THE-SPRITES-2026-09-23.md`, whose first section is what is
   done and what is unfinished — read it before touching `js/art/`.
+  *Added 2026-09-25:* the next work asked for and not started — the owner's
+  meat market as a placeable 3×3, four looks I proposed, two questions — is
+  `docs/HANDOFF-THE-MEAT-MARKET-AND-FOUR-LOOKS-2026-09-25.md`. The meat
+  market is a sim change and reverses the owner's own ruling that it be a
+  zone; read its M.2 before touching `js/sim/meat.js`.
 - **Run:**
   ```
   node tools/serve.mjs [--port 8139]        # static, no-store; the launch entry "zoo-city-2000" is 8139

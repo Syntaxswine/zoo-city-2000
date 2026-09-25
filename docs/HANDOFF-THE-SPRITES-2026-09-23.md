@@ -73,10 +73,15 @@ fourteen more gates, green.
    figures and `check-closeups` the whole twin's fur. Build the reading first
    — how alike two species' heads are at zoom 2, and how much of each head the
    twin reworks — and read today's procedural twins with it: that is the base
-   rate an authored head has to beat.
+   rate an authored head has to beat. **And ask first which zoom the owner
+   plays at** — a 2× head is never seen at zoom 1
+   ([Qz](HANDOFF-THE-MEAT-MARKET-AND-FOUR-LOOKS-2026-09-25.md)).
 2. **Q1 — how long is the shadow?** The owner's call.
    `docs/shots/sheet-shadows.png` is the frame that answers it. `SHADOW_K
-   0.55` is mine, and dusk multiplies it ×3.2.
+   0.55` is mine, and dusk multiplies it ×3.2. That frame is one street on
+   open grass and the owner builds 6×6 blocks —
+   [Q1′](HANDOFF-THE-MEAT-MARKET-AND-FOUR-LOOKS-2026-09-25.md) asks for the
+   same panels on a dense block.
 
 ### Unfinished — found on the way, not on the list
 
@@ -89,13 +94,18 @@ fourteen more gates, green.
 | the beaver's 2× rule reads `ramp === "earth"` below row 10 and has never fired on a beaver without a sack | §48 | its author's intent; it is not in the code |
 | roof furniture cannot tell a TERRACE from a pitch step (`coveredShare` medians 0.63 vs 0.65) | the GUESS list, §46 | a class change: what stands on the deck, with a height floor |
 | **no gate sees a hidden door** — twice (the meat hall's annex, T3.2's canopies) | trap 12 | a door-pixel count in both mirrors, as a check; today it is done by hand |
-| 43 zoned plans are one box with a lid — industrial sheds and works, tier-1 shops and cottages, meat stalls | `node tools/massprobe.mjs` | massing, family by family, as T3.2 did |
+| 43 zoned plans are one box with a lid — industrial sheds and works, tier-1 shops and cottages, meat stalls | `node tools/massprobe.mjs` | massing, family by family, as T3.2 did — [L1](HANDOFF-THE-MEAT-MARKET-AND-FOUR-LOOKS-2026-09-25.md) takes the industry first; item M there redraws the meat stalls and cold stores |
 | the cemetery is 88% roof and 74% of that one bare quad; furniture cannot reach it | *Where the roof still is*, below | a different recipe |
 | scatter as objects (flowers, stones) not built | §47 | a size-on-screen answer: at zoom 1 each is one pixel of a key that already means something |
 | a path shows on open grass only, not a forecourt across chalk, a park or rubble | §47 | a decision about the zone's chalk first |
 | the lit blind that hides at noon and shows at dusk is emergent and ungated; `ACCENT_RUNG` survives `check-dusk` | *The four passes*; the GUESS list | a check only if someone decides it is a property |
 | **taste nobody has argued about** — `SHADOW_K`, the dusk constants, the window mix, the setback depths, the meadow's numbers and the path's bow, the fourteen coats, the stout's shape and who moved | the GUESS list | the owner's eye |
 | **nobody has played any of this** | the GUESS list | a player; their first reaction outranks every number here |
+
+Four more looks, proposed on 2026-09-24 and not yet ruled on — factory
+rooflines, street lamps, shirts, an earth edge — and the owner's own next
+change, the meat market as a placeable 3×3, are in
+[HANDOFF-THE-MEAT-MARKET-AND-FOUR-LOOKS-2026-09-25.md](HANDOFF-THE-MEAT-MARKET-AND-FOUR-LOOKS-2026-09-25.md).
 
 The rest of the game's open work — not the sprites — is `BACKLOG.md`.
 

@@ -1059,7 +1059,7 @@ P1–P3.
 DIET     herb = rabbit, mouse, beaver, tortoise, pig, cow · omni = bear, raccoon, skunk · carn = fox, owl, wolf, cat, hawk
          (fox and owl hunt without the `predator` flag, which stays the skunk-incident gate)
 
-ZONE M   key M, "Meat", §12 a tile, drag-zoned; tiers stall / meat hall / cold store, M_JOBS [0, 3, 8, 16];
+ZONE M   key 4, "Meat", §12 a tile, drag-zoned; tiers stall / meat hall / cold store, M_JOBS [0, 3, 8, 16];
          its own valve rM = clamp((0.06·carnivores + 10 − Jm)/max(Jm, 20), −1, 1), T_M = T_C — a 1,600 town wants ~72 hall jobs;
          Jm ∈ J and Lab, ∉ Jc (no crowd-out of shops); local_M = 0.6·clamp(carnivores within 5 / 40 − 0.5, ±0.3) + 0.4·(50 − LV)/200
          + 0.20·min(1, stock/8);
