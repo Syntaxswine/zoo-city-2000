@@ -53,7 +53,8 @@ function quarter(upTo = 2, { justice = false, seed = 'wealth', cottages = false 
   if (justice) {
     // The custody the sentences need, all on the street: a centre, a prison, a meat hall (the police station is the quarter's).
     apply(w, { kind: 'centre', tx: 24, ty: 13 }); apply(w, { kind: 'zoo', tx: 28, ty: 13 });
-    apply(w, { kind: 'zone', zone: ZONE.M, x0: 18, y0: 11, x1: 18, y1: 11, density: 3 }); w.tier[at(w, 18, 11)] = 1;
+    // A one-tile market at one stall (a legacy-sized civic): meat is placed, not zoned, since 2026-09-26, and a 3×3 has no room on this street.
+    { const m = at(w, 18, 11); w.civic[m] = CIVIC.MARKET; w.civicSize[m] = 1; w.maxTier[m] = 1; w.tier[m] = 1; }
   }
   w.valves.R = 0.5; // demand: a mansion needs score > GROW_THRESH like any growth
   refresh(w);

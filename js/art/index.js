@@ -1,4 +1,5 @@
 import { allGovernor } from './governor.js';
+import { allMarket } from './market.js';
 // index.js — the registry the renderer calls. SPEC §16.
 //
 //   art.building(zone, tier, variant, side, theme, character)   zone 1|2|3|4 or 'R'|'C'|'I'|'M', tier 1..3; side 2 | 3 → the zone's block (blocks.js), tier ignored;
@@ -8,6 +9,7 @@ import { allGovernor } from './governor.js';
 //   art.mansion(variant, character)     the MANSION (mansion.js; SPEC §9f): the affluent address's 3×3, risen not placed, lit and marked like every building
 //   art.civic(kind, side)               'park' | 'largePark' | 'zoo' | 'fire' | 'police' | 'centre'; side 3 selects campuses; legacy saves supply their existing side
 //                                       'library' | 'gallery' (2) and 'university' | 'amphitheater' (3): knowledge and culture (civics-knowledge.js)
+//                                       'market' (3): the meat market — its family is its STAGES, and the third argument is the stage (market.js)
 //   art.road(mask, busy)                4-bit mask N=1 E=2 S=4 W=8
 //   art.bridge(mask)
 //   art.wall(mask)                      the same mask; a standing sprite (walls.js)
@@ -170,7 +172,7 @@ export const art = Object.freeze({
 
 /** Every sprite the registry can hand out, named — the check.mjs audit walks this. */
 export function allSprites() {
-  const out = [...Object.values(MARKS).map(sprite => ({ name: sprite.name, sprite })), ...allBuildings(), ...allLargeCivics(), ...allKnowledgeCivics(), ...allInfrastructureCivics(), ...allCivicVariations(), ...allGovernor(), ...allBlocks(), ...allLandmarks(), ...allMansion(), ...allShops(), ...allRoads(), ...allWalls(), ...allRail(), ...allTerrain(), ...allCitizens(), ...BUBBLE_SAMPLES.map((sprite) => ({ name: sprite.name, sprite }))];
+  const out = [...Object.values(MARKS).map(sprite => ({ name: sprite.name, sprite })), ...allBuildings(), ...allLargeCivics(), ...allKnowledgeCivics(), ...allInfrastructureCivics(), ...allCivicVariations(), ...allGovernor(), ...allMarket(), ...allBlocks(), ...allLandmarks(), ...allMansion(), ...allShops(), ...allRoads(), ...allWalls(), ...allRail(), ...allTerrain(), ...allCitizens(), ...BUBBLE_SAMPLES.map((sprite) => ({ name: sprite.name, sprite }))];
   const seen = new Set();
   return out.filter(({ name }) => (seen.has(name) ? false : (seen.add(name), true)));
 }

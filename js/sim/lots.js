@@ -6,7 +6,8 @@
 
 import { buildingMark } from "./building-marks.js";
 import { KNOBS } from "./rules.js";
-import { ZONE, CIVIC, idx, inBounds, capacityOf, jobsOf, isPart, civicAnchorOf, civicSideOf, anchorOf, footprintOf, sideOf, carnAtOf } from "./world.js";
+import { ZONE, CIVIC, idx, inBounds, capacityOf, jobsOf, isPart, isMarket, civicAnchorOf, civicSideOf, anchorOf, footprintOf, sideOf, carnAtOf } from "./world.js";
+import { policy } from "./governance.js";
 import { served, siteRoadDist, doorsOf, nearestRoad } from "./fields.js";
 import { evictFromLot, fireFromLot } from "./citizens.js";
 import { mergeWindow, windowFill, mergeLots, splitLot } from "./blocks.js";
@@ -36,6 +37,10 @@ export const REASON = Object.freeze({
   PART: "part of the block",
   MANSION: "a mansion — one household of the affluent; it neither grows nor decays",
   MANSION_RISING: "a mansion is rising — the address is affluent",
+  MARKET_SITE: "a bare market site, waiting for trade",
+  LIGHT_MARKET: "a Light market — the H brush stopped it at the full square",
+  PROHIBITED: "shut — the meat trade is prohibited (Governance)",
+  MARKET_FULL: "the town would not keep another stage — it holds at this size",
 });
 
 /** Carnivores housed within Chebyshev r (a meat hall's customers); a block's are spread over its footprint. */
@@ -55,15 +60,9 @@ function carnivoresNear(world, i, r = 5) {
   return sum;
 }
 
-function stockAtHall(world, i) {
-  let n = 0;
-  for (const j of footprintOf(world, anchorOf(world, i))) n += world.meat[j] || 0;
-  return n;
-}
-
 export function maxTierByLV(world, i) {
   const z = world.zone[i];
-  if (z === ZONE.I || z === ZONE.M) return 3; // a hall floors its own LV; an LV ladder would cap it at a stall
+  if (z === ZONE.I) return 3;
   const lv = world.lv[i];
   const byLV = lv < KNOBS.LV_TIER[0] ? 1 : lv < KNOBS.LV_TIER[1] ? 2 : 3;
   return byLV;
@@ -77,6 +76,7 @@ export function lotScore(world, i) {
   const z = world.zone[i];
   const tier = world.tier[i];
   const out = { score: -1, reason: REASON.EMPTY, p: 0, parts: { valve: 0, local: 0 }, access: false, maxTier: 0, fill: 0 };
+  if (isMarket(world.civic[i])) return marketScore(world, i, out);
   if (z === ZONE.NONE) return out;
   // A block's part: the building is on the anchor; this tile grows, decays and burns with it (blocks.js).
   if (isPart(world, i)) { out.reason = REASON.PART; out.anchor = anchorOf(world, i); return out; }
@@ -95,7 +95,7 @@ export function lotScore(world, i) {
     out.reason = !access ? REASON.NO_ROAD : REASON.MANSION;
     return out;
   }
-  const valve = world.valves[z === ZONE.R ? "R" : z === ZONE.C ? "C" : z === ZONE.M ? "M" : "I"];
+  const valve = world.valves[z === ZONE.R ? "R" : z === ZONE.C ? "C" : "I"];
   const lv = world.lv[i];
   const pol = world.pol[i];
   let local;
@@ -107,10 +107,6 @@ export function lotScore(world, i) {
     out.customers = commercialCustomers(world, i);
     local = 0.6 * clamp(out.customers.total / 80 - 0.5, -KNOBS.LOCAL_CLAMP, KNOBS.LOCAL_CLAMP) + 0.4 * ((lv - 50) / KNOBS.LOCAL_SCALE);
     if (world.crime[i] > KNOBS.CRIME_HIGH) local -= KNOBS.CRIME_C_PENALTY; // shops need safe streets
-  } else if (z === ZONE.M) {
-    // A hall wants carnivores near and cheap ground; a grey market minds no crime.
-    local = 0.6 * clamp(carnivoresNear(world, i) / KNOBS.M_CUSTOMERS_DIV - 0.5, -KNOBS.LOCAL_CLAMP, KNOBS.LOCAL_CLAMP) + 0.4 * ((50 - lv) / KNOBS.LOCAL_SCALE)
-      + KNOBS.MEAT_LOCAL * Math.min(1, stockAtHall(world, i) / 8);
   } else {
     local = 0.4 * ((50 - lv) / KNOBS.LOCAL_SCALE);
   }
@@ -185,6 +181,90 @@ export function lotScore(world, i) {
   return out;
 }
 
+/**
+ * THE MEAT MARKET's rule (docs/PROPOSAL-MEAT-MARKET-2026-09-26.md A.3) — a zoned meat lot's own, the M valve plus
+ * local_M at the anchor, read over STAGES instead of storeys. It opens at its form's first stage (Light one stall,
+ * Heavy the full square) at SPROUT_P, grows a stage at GROW_P once FILL_TO_GROW of its places are filled, stops at
+ * its form's top, and loses a stage at DECAY_P (`marketStepDown`). No merging: a market is already the block.
+ */
+function marketScore(world, i, out) {
+  if (world.burning[i]) { out.reason = REASON.BURNING; return out; }
+  if (world.flooded[i]) { out.reason = REASON.FLOODED; return out; }
+  if (policy(world, "meatTrade") === "prohibited") { out.reason = REASON.PROHIBITED; return out; }
+  const access = served(world, i);
+  out.access = access;
+  const valve = world.valves.M;
+  // A market wants carnivores near and cheap ground, and stocked hooks help; a grey market minds no crime.
+  const local = 0.6 * clamp(carnivoresNear(world, i) / KNOBS.M_CUSTOMERS_DIV - 0.5, -KNOBS.LOCAL_CLAMP, KNOBS.LOCAL_CLAMP) + 0.4 * ((50 - world.lv[i]) / KNOBS.LOCAL_SCALE)
+    + KNOBS.MEAT_LOCAL * Math.min(1, (world.meat[i] || 0) / 8);
+  out.parts = { valve, local };
+  const score = access ? valve + local : -1;
+  out.score = score;
+  const stage = world.tier[i];
+  const form = world.maxTier[i] === 1 ? 1 : 3;
+  const top = KNOBS.MARKET_TOP[form];
+  out.maxTier = top;
+  const cap = capacityOf(world, i);
+  out.fill = cap ? world.staff[i] / cap : 0;
+  if (stage > 0 && score < KNOBS.DECAY_THRESH) {
+    out.reason = access ? REASON.DECAYING : REASON.NO_ROAD;
+    out.p = KNOBS.DECAY_P * -score;
+    out.decay = true;
+    return out;
+  }
+  if (!access) { out.reason = REASON.NO_ROAD; return out; }
+  if (stage < top && score > KNOBS.GROW_THRESH) {
+    if (stage > 0 && out.fill < KNOBS.FILL_TO_GROW) { out.reason = REASON.WAITING_FILL; return out; }
+    // A MARKET DOES NOT OUTGROW ITS TOWN: it takes its next stage only if the town would still keep it there — the
+    // score it would have one stage up stays at or above the decay line. Its steps are coarse (the square to the hall
+    // is +45 jobs, the hall to the exchange +108, a Heavy market opens at 27), and without this one grew past demand,
+    // decayed back and grew again: rocking on its steps (docs/PROPOSAL-MEAT-MARKET-2026-09-26.md C.3). A zoned lot's
+    // step is a few jobs among many lots and never needed it.
+    if (!marketWouldHold(world, i, stage === 0 ? KNOBS.MARKET_FLOOR[form] : stage + 1, local)) { out.reason = REASON.MARKET_FULL; return out; }
+    out.reason = REASON.GROWING;
+    out.p = (stage === 0 ? KNOBS.SPROUT_P : KNOBS.GROW_P) * score;
+    out.grow = true;
+    return out;
+  }
+  if (stage < top) { out.reason = stage === 0 ? REASON.MARKET_SITE : REASON.NO_DEMAND; return out; }
+  out.reason = form === 1 ? REASON.LIGHT_MARKET : REASON.STABLE;
+  return out;
+}
+
+/**
+ * Would the town keep this market one stage up? The score it would SETTLE at there: the meat valve's target
+ * (demand.js — the demand term, 0.06 a carnivore + 10 over the meat jobs Jm, plus the tax term and any boost) with the
+ * stage's extra jobs added to last month's Jm, plus the market's own local term — and it must not be below the decay
+ * line. The settled score, not today's: the valve lags its target, and a market judged on a lagging valve plus a jump
+ * was held back when rising and let through when falling. No census yet (the first month): nothing to judge by, so yes.
+ */
+function marketWouldHold(world, i, next, local) {
+  const cen = world.last?.census, dem = world.last?.demand;
+  if (!cen || !dem) return true;
+  const wanted = KNOBS.MEAT_PER_CARN * (cen.carnivores || 0) + KNOBS.MEAT_SEED;
+  const after = (cen.Jm || 0) + (KNOBS.MARKET_JOBS[next] || 0) - (KNOBS.MARKET_JOBS[world.tier[i]] || 0);
+  const term = clamp((wanted - after) / Math.max(after, 20), -1, 1);
+  const valve = clamp(term + (dem.T?.M || 0) + (dem.boost?.M || 0), -1, 1);
+  return valve + local >= KNOBS.DECAY_THRESH;
+}
+
+/** A market grows one stage — from the bare site straight to its form's first (KNOBS.MARKET_FLOOR). */
+function marketStepUp(world, i) {
+  world.tier[i] = world.tier[i] ? world.tier[i] + 1 : KNOBS.MARKET_FLOOR[world.maxTier[i] === 1 ? 1 : 3];
+}
+
+/**
+ * A market loses one stage — decay, a raid, a fire the engine reached — and lets go of the staff its new stage has
+ * no place for. A Heavy market below its full square closes to the bare site: Heavy is 27–180 jobs (the owner).
+ * Its stock and pens follow through the one hall predicate (meat.js normalizeStock, reconcilePens).
+ */
+export function marketStepDown(world, i) {
+  if (!world.tier[i]) return;
+  const floor = KNOBS.MARKET_FLOOR[world.maxTier[i] === 1 ? 1 : 3];
+  world.tier[i] = world.tier[i] - 1 < floor ? 0 : world.tier[i] - 1;
+  fireFromLot(world, i, capacityOf(world, i));
+}
+
 /** One tick of growth, decay and the blocks over every lot, raster order. */
 export function lotsTick(world) {
   const n = world.w * world.h;
@@ -195,6 +275,12 @@ export function lotsTick(world) {
   const mansions = []; // the lines: a mansion that rose this month (SPEC §9f)
   const rng = world.rng;
   for (let i = 0; i < n; i++) {
+    if (isMarket(world.civic[i])) {
+      const s = lotScore(world, i);
+      if (s.grow && rng.chance(s.p)) { marketStepUp(world, i); grew++; }
+      else if (s.decay && rng.chance(s.p)) { marketStepDown(world, i); decayed++; }
+      continue;
+    }
     if (world.zone[i] === ZONE.NONE) continue;
     const s = lotScore(world, i);
     if (s.grow) {

@@ -116,8 +116,12 @@ export function createInput(canvas, app) {
     }
   }
 
+  // A place op is a click at a corner; the MEAT MARKET's also carries the H brush, which picks its form — Light or
+  // Heavy (docs/PROPOSAL-MEAT-MARKET-2026-09-26.md A.1). No other place op reads density, so no other one carries it.
+  const placeOp = (kind, tx, ty) => (kind === "market" ? { kind, tx, ty, density: state.density } : { kind, tx, ty });
+
   function clickOp(tx, ty) {
-    if (PLACE_TOOLS.includes(state.tool)) return { kind: TOOL_BY_ID[state.tool].op.kind, tx, ty };
+    if (PLACE_TOOLS.includes(state.tool)) return placeOp(TOOL_BY_ID[state.tool].op.kind, tx, ty);
     return null;
   }
 
@@ -136,7 +140,7 @@ export function createInput(canvas, app) {
     const tool = TOOL_BY_ID[id];
     if (!tool || tool.op.kind === "inspect") return null;
     const kind = tool.op.kind;
-    if (PLACE_TOOLS.includes(id)) return { kind, tx, ty };
+    if (PLACE_TOOLS.includes(id)) return placeOp(kind, tx, ty);
     if (kind === "zone") return { kind, zone: tool.op.zone, x0: tx, y0: ty, x1: tx, y1: ty, density: state.density };
     if (kind === "road" || kind === "wall" || kind === "rail" || kind === "camera") return { kind, tiles: [idx(world(), tx, ty)] };
     return { kind, x0: tx, y0: ty, x1: tx, y1: ty };
@@ -320,10 +324,12 @@ export function createInput(canvas, app) {
     if (tool) { setTool(tool.id); return; }
     switch (k) {
       case "h": case "H":
-        if (chapterOf(app.world) < 2) { app.ui.flash("High density unlocks in Chapter 3: The City (Chapter 5 for meat halls)."); break; }
+        if (chapterOf(app.world) < 2) { app.ui.flash("High density unlocks in Chapter 3: The City (Chapter 5 for a Heavy meat market)."); break; }
         state.density = state.density === 3 ? 1 : 3;
         app.ui.setTool(state.tool, state.density);
-        app.ui.flash(`Density: ${state.density === 3 ? "High (tiers to 3)" : "Low (cottages only)"}`);
+        app.ui.flash(state.tool === "market"
+          ? `Meat market: ${state.density === 3 ? "Heavy — 27 to 180 jobs" : "Light — 3 to 27 jobs"}`
+          : `Density: ${state.density === 3 ? "High (tiers to 3)" : "Low (cottages only)"}`);
         refreshCost(); // an in-flight zone drag now has a different operation
         break;
       case " ": app.togglePause(); break;

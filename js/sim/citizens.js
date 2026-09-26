@@ -1467,8 +1467,9 @@ function searchJob(world, doors, sp, openByDoor, rng) {
       if (scored.has(lot)) continue;
       scored.add(lot);
       if (!admits(world.use[lot], sp.id)) continue; // the player's line: not open to this species
-      // A meat hall hires by diet (carnivores 0.9, omnivores 0.5, herbivores 0.1 — a weight: a rabbit takes the job when nothing else is open).
-      const pref = world.zone[lot] === ZONE.M ? KNOBS.JOB_M[DIET_OF[sp.id]] : jobZone(world, lot) === ZONE.C ? sp.jobC : sp.jobI;
+      // A meat market hires by diet (carnivores 0.9, omnivores 0.5, herbivores 0.1 — a weight: a rabbit takes the job when nothing else is open).
+      const jz = jobZone(world, lot);
+      const pref = jz === ZONE.M ? KNOBS.JOB_M[DIET_OF[sp.id]] : jz === ZONE.C ? sp.jobC : sp.jobI;
       const s = pref * (1 / (1 + d / sp.commute)) * (0.8 + 0.4 * rng.next());
       if (s > bestS) { bestS = s; best = { lot, door: i, d, cost: c }; }
     }

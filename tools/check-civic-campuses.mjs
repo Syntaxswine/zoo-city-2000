@@ -78,7 +78,8 @@ export function checkCivicCampuses(check) {
   for(const [kind,x] of [['zoo',10],['centre',15]]) {
     const r=apply(j,{kind,tx:x,ty:5}); if(!r.ok) throw Error(r.reason);
   }
-  j.zone[at(j,20,5)]=ZONE.M; j.tier[at(j,20,5)]=2;
+  // A meat market beside the prison and the centre, grown to the hall (stage 5): placed since 2026-09-26, not zoned.
+  { const r=apply(j,{kind:'market',tx:20,ty:5,density:3}); if(!r.ok) throw Error(r.reason); j.tier[at(j,20,5)]=5; }
   computeFields(j);
   const c=resident(j), zoo=at(j,10,5), centre=at(j,15,5);
   const first=convict(j,c,'burglary');

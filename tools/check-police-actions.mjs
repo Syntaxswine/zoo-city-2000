@@ -16,7 +16,7 @@ function fixture() {
   const home=at(5,8), police=at(3,10), centre=at(8,10), zoo=at(13,10), hall=at(18,8);
   w.zone[home]=ZONE.R; w.tier[home]=3;
   w.civic[police]=CIVIC.POLICE; w.civic[centre]=CIVIC.CENTRE; w.civic[zoo]=CIVIC.ZOO;
-  w.zone[hall]=ZONE.M; w.tier[hall]=1;
+  w.civic[hall]=CIVIC.MARKET; w.civicSize[hall]=1; w.maxTier[hall]=1; w.tier[hall]=1; // a one-tile market at one stall: meat is placed, not zoned, since 2026-09-26
   const hh=createHousehold(w,"rabbit",2); placeHousehold(w,hh,home);
   w.roadsDirty=true; w.wallsDirty=true; refreshLast(w);
   return {w,c:w.byId.get(hh.members[0]),home,police,centre,zoo,hall};

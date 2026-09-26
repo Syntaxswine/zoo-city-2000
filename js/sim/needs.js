@@ -5,7 +5,7 @@ import { homeTerms, moodContext, moodTerms } from "./citizens.js";
 import { lotScore, REASON } from "./lots.js";
 import { neutralRate } from "./demand.js";
 import { DIET_OF } from "./species.js";
-import { ZONE, anchorOf, footprintOf, absent } from "./world.js";
+import { ZONE, anchorOf, footprintOf, absent, isMarket } from "./world.js";
 import { hash01, seedFromString } from "./rng.js";
 import { chapterOf } from "./progression.js";
 import { ACT } from "./voice.js";
@@ -78,9 +78,9 @@ export function needOf(world, c, context = null) {
     if (demand.r.C > 0.05) add("SHOPS", NEED_VALVE_PTS, { value: demand.r.C });
     if (demand.r.R > 0.05) add("ROOMS", NEED_VALVE_PTS, { value: demand.r.R });
     if (demand.r.I > 0.05) add("WORKS", NEED_VALVE_PTS, { value: demand.r.I });
-    let jobStock = 0;
-    if (c.job >= 0 && world.zone[c.job] === ZONE.M) for (const j of footprintOf(world, anchorOf(world, c.job))) jobStock += world.meat?.[j] || 0;
-    const emptyHall = DIET_OF[c.species] === "carn" && c.job >= 0 && world.zone[c.job] === ZONE.M && jobStock === 0;
+    // A carnivore on a market's staff whose hooks are bare (the stock is held on the market's anchor, its job).
+    const atMarket = c.job >= 0 && isMarket(world.civic[c.job]);
+    const emptyHall = DIET_OF[c.species] === "carn" && atMarket && !(world.meat?.[c.job] || 0);
     if (DIET_OF[c.species] === "carn" && (demand.r.M > 0.05 || emptyHall)) add("HOOKS", NEED_VALVE_PTS, { value: demand.r.M, lot: emptyHall ? c.job : -1 });
   }
 

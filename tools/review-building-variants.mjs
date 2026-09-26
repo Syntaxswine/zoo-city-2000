@@ -1,4 +1,5 @@
 import { GOVERNOR_FAMILY } from '../js/art/governor.js';
+import { MARKET_FAMILY } from '../js/art/market.js';
 // Repeatable art evidence. Sheets use real selectors; city panels use js/render.js.
 import {mkdirSync,writeFileSync} from 'node:fs';
 import {resolve} from 'node:path';
@@ -27,6 +28,8 @@ export function families() {
   for(const [id,sprites] of Object.entries(LANDMARK_ART)){const zone=LANDMARKS[id].zone;out.push({group:'landmarks',key:`landmark-${id}`,zone,tier:3,side:3,theme:+id,sprites,select:v=>art.building(zone,3,v,3,+id)});}
   out.push({group:'mansion',key:'mansion',zone:1,tier:3,side:3,mansion:true,sprites:MANSION,select:v=>art.mansion(v)});
   for(const f of [...CIVIC_VARIANT_FAMILIES,GOVERNOR_FAMILY])out.push({group:'civics',key:`${f.kind}-${f.side}`,kind:f.kind,side:f.side,sprites:f.sprites,select:v=>art.civic(f.kind,f.side,v)});
+  // THE MEAT MARKET's family is its STAGES, not layouts: the third argument is the stage (render.js passes the anchor's tier).
+  out.push({group:'staged',key:`${MARKET_FAMILY.kind}-${MARKET_FAMILY.side}`,kind:MARKET_FAMILY.kind,side:MARKET_FAMILY.side,sprites:MARKET_FAMILY.sprites,select:v=>art.civic(MARKET_FAMILY.kind,MARKET_FAMILY.side,v)});
   for(const axis of ['ns','ew']){
     const table=railArt.STATION_VARIANTS || railArt.STATION_FAMILIES;
     const sprites=table?.[axis] || [railArt.STATIONS[axis]];

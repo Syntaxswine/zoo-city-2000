@@ -15,14 +15,46 @@ export const ROAD = Object.freeze({ NONE: 0, ROAD: 1, BRIDGE: 2 });
 export const ZONE = Object.freeze({ NONE: 0, R: 1, C: 2, I: 3, M: 4 });
 // 9–12 are the knowledge-and-culture buildings (SPEC §9e, 2026-09-05): appended after the Zoo, never renumbered,
 // and never inferred from a footprint's size — a 2×2 Library and a legacy 2×2 Large Park share a side and nothing else.
-export const CIVIC = Object.freeze({ NONE: 0, PARK: 1, LARGE_PARK: 2, LARGE_PARK_PART: 3, FIRE: 4, POLICE: 5, CENTRE: 6, PART: 7, ZOO: 8, LIBRARY: 9, UNIVERSITY: 10, GALLERY: 11, AMPHITHEATER: 12, FARM: 13, CEMETERY: 14, SANITATION: 15, GARBAGE: 16, DOCTOR: 17, HOSPITAL: 18, GOVERNOR: 19 });
+export const CIVIC = Object.freeze({ NONE: 0, PARK: 1, LARGE_PARK: 2, LARGE_PARK_PART: 3, FIRE: 4, POLICE: 5, CENTRE: 6, PART: 7, ZOO: 8, LIBRARY: 9, UNIVERSITY: 10, GALLERY: 11, AMPHITHEATER: 12, FARM: 13, CEMETERY: 14, SANITATION: 15, GARBAGE: 16, DOCTOR: 17, HOSPITAL: 18, GOVERNOR: 19, MARKET: 20 });
+/**
+ * THE MEAT MARKET (docs/PROPOSAL-MEAT-MARKET-2026-09-26.md): a placed 3×3 that grows. Its anchor carries the STAGE
+ * in `tier` and the FORM in `maxTier` (1 Light, 3 Heavy). It is deliberately NOT a civic employer: a civic's jobs
+ * count toward the shops' valve, and 48 meat jobs counted that way starved real shops (PROPOSAL-CRIME-AND-PUNISHMENT,
+ * "Why a zone") — a market's jobs are the meat valve's, Jm, and `jobZone` says so.
+ */
+export const isMarket = (c) => c === CIVIC.MARKET;
+/**
+ * The order a market's stalls go up in, as (dx, dy) inside its 3×3: the front row first (+ty is the public face, as
+ * for every civic), the middle of each row before its corners. The sim smells from these tiles and the art stands its
+ * stalls on them, so the two cannot disagree about where the market is.
+ */
+export const MARKET_STALL_ORDER = Object.freeze([[1, 2], [0, 2], [2, 2], [1, 1], [0, 1], [2, 1], [1, 0], [0, 0], [2, 0]]);
+/**
+ * Clear every tile of one zone to plain ground. A LOAD-TIME step, before a loaded world's first tick — the way worldgen
+ * writes the ground, which is why it lives here (check.mjs's forecourt tripwire names world.js for exactly that): the
+ * load's own rebuildDerived derives the paths over the new ground. meat.clearZonedMeat accounts for stock and pens first.
+ */
+export function clearZoneTiles(world, zone) {
+  for (let i = 0; i < world.w * world.h; i++) {
+    if (world.zone[i] !== zone) continue;
+    world.zone[i] = ZONE.NONE; world.tier[i] = 0; world.maxTier[i] = 3; world.big[i] = 0; world.theme[i] = 0; world.burning[i] = 0;
+  }
+}
+/** The footprint tiles a market smells from at its stage: KNOBS.MARKET_STALLS of them, in stall order. */
+export function marketStallTiles(world, anchor) {
+  const n = KNOBS.MARKET_STALLS[world.tier[anchor]] || 0;
+  if (!n) return [];
+  // A site smaller than 3×3 — a hand-built or test state; a placed market is always 3×3 — smells from its one tile.
+  if ((world.civicSize[anchor] || 3) < 3) return [anchor];
+  return MARKET_STALL_ORDER.slice(0, n).map(([dx, dy]) => anchor + dx + dy * world.w);
+}
 export const isStation = (c) => c === CIVIC.FIRE || c === CIVIC.POLICE; // coverage
 export const isKnowledgeCivic = (c) => c === CIVIC.LIBRARY || c === CIVIC.UNIVERSITY; // the knowledge field
 export const isCultureCivic = (c) => c === CIVIC.GALLERY || c === CIVIC.AMPHITHEATER; // the culture field
 export const isCivicEmployer = (c) => c === CIVIC.GOVERNOR || c === CIVIC.DOCTOR || c === CIVIC.HOSPITAL || c === CIVIC.FARM || c === CIVIC.SANITATION || c === CIVIC.GARBAGE || isStation(c) || c === CIVIC.CENTRE || c === CIVIC.ZOO || isKnowledgeCivic(c) || isCultureCivic(c); // jobs
 /** The footprint side a kind is BUILT at (ops.js): the small services 2×2, the campuses 3×3, the park 1×1. Legacy saves carry their own side in civicSize. */
-export const CIVIC_SIDE = Object.freeze({ governor: 3, doctor: 2, hospital: 3, farm: 2, cemetery: 6, sanitation: 3, garbage: 2, park: 1, fire: 3, police: 3, centre: 3, largePark: 3, zoo: 3, library: 2, university: 3, gallery: 2, amphitheater: 3 });
-export const CIVIC_OF_KIND = Object.freeze({ governor: CIVIC.GOVERNOR, doctor: CIVIC.DOCTOR, hospital: CIVIC.HOSPITAL, farm: CIVIC.FARM, cemetery: CIVIC.CEMETERY, sanitation: CIVIC.SANITATION, garbage: CIVIC.GARBAGE, park: CIVIC.PARK, fire: CIVIC.FIRE, police: CIVIC.POLICE, centre: CIVIC.CENTRE, largePark: CIVIC.LARGE_PARK, zoo: CIVIC.ZOO, library: CIVIC.LIBRARY, university: CIVIC.UNIVERSITY, gallery: CIVIC.GALLERY, amphitheater: CIVIC.AMPHITHEATER });
+export const CIVIC_SIDE = Object.freeze({ governor: 3, doctor: 2, hospital: 3, farm: 2, cemetery: 6, sanitation: 3, garbage: 2, park: 1, fire: 3, police: 3, centre: 3, largePark: 3, zoo: 3, library: 2, university: 3, gallery: 2, amphitheater: 3, market: 3 });
+export const CIVIC_OF_KIND = Object.freeze({ governor: CIVIC.GOVERNOR, doctor: CIVIC.DOCTOR, hospital: CIVIC.HOSPITAL, farm: CIVIC.FARM, cemetery: CIVIC.CEMETERY, sanitation: CIVIC.SANITATION, garbage: CIVIC.GARBAGE, park: CIVIC.PARK, fire: CIVIC.FIRE, police: CIVIC.POLICE, centre: CIVIC.CENTRE, largePark: CIVIC.LARGE_PARK, zoo: CIVIC.ZOO, library: CIVIC.LIBRARY, university: CIVIC.UNIVERSITY, gallery: CIVIC.GALLERY, amphitheater: CIVIC.AMPHITHEATER, market: CIVIC.MARKET });
 export const KIND_OF_CIVIC = Object.freeze(Object.fromEntries(Object.entries(CIVIC_OF_KIND).map(([k, v]) => [v, k])));
 /**
  * The jobs a civic anchor offers — EXPLICIT per kind. The knowledge-and-culture
@@ -419,8 +451,7 @@ export function capacityOf(world, i) {
   if (z === ZONE.R) return Math.round(KNOBS.R_CAP[t] * m);
   if (z === ZONE.C) return Math.round(KNOBS.C_JOBS[t] * m);
   if (z === ZONE.I) return Math.round(KNOBS.I_JOBS[t] * m);
-  if (z === ZONE.M && world.events.governance?.meatTrade === "prohibited") return 0;
-  if (z === ZONE.M) return Math.round(KNOBS.M_JOBS[t] * m);
+  if (isMarket(world.civic[i])) return marketJobs(world, i);
   return civicJobs(world.civic[i]); // a civic anchor's places; a PART is 0 by the table
 }
 
@@ -433,16 +464,21 @@ export function jobsOf(world, i) {
   const m = blockMultiplier(b);
   if (z === ZONE.C) return Math.round(KNOBS.C_JOBS[world.tier[i]] * m);
   if (z === ZONE.I) return Math.round(KNOBS.I_JOBS[world.tier[i]] * m);
-  if (z === ZONE.M && world.events.governance?.meatTrade === "prohibited") return 0;
-  if (z === ZONE.M) return Math.round(KNOBS.M_JOBS[world.tier[i]] * m);
+  if (isMarket(world.civic[i])) return marketJobs(world, i);
   return civicJobs(world.civic[i]);
 }
 
-/** Which demand a job site counts toward: C (zoo, stations and the centre count as C), I, or M (the meat halls — their own valve). */
+/** A market anchor's places at its stage — none while the trade is prohibited (governance), none at the bare site. */
+export function marketJobs(world, i) {
+  if (world.events.governance?.meatTrade === "prohibited") return 0;
+  return KNOBS.MARKET_JOBS[world.tier[i]] || 0;
+}
+
+/** Which demand a job site counts toward: C (zoo, stations and the centre count as C), I, or M (the meat market — its own valve). */
 export function jobZone(world, i) {
+  if (isMarket(world.civic[i])) return ZONE.M;
   if (world.zone[i] === ZONE.C || isCivicEmployer(world.civic[i])) return ZONE.C;
   if (world.zone[i] === ZONE.I) return ZONE.I;
-  if (world.zone[i] === ZONE.M) return ZONE.M;
   return ZONE.NONE;
 }
 

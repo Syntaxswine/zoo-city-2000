@@ -8,7 +8,7 @@ import { governanceCosts, policy } from './governance.js';
 // posts under "cheat", so the ledger always says how much came that way.
 
 import { KNOBS } from "./rules.js";
-import { ZONE, CIVIC, ROAD, TERRAIN, isStation, isPart } from "./world.js";
+import { ZONE, CIVIC, ROAD, TERRAIN, isStation, isPart, isMarket } from "./world.js";
 import { classOfCitizen } from "./wealth.js";
 
 export function post(world, kind, amount) {
@@ -41,7 +41,7 @@ export function yearlyFigures(world) {
     if (c.job < 0) continue;
     const z = world.zone[c.job];
     if (z === ZONE.I) fi++;
-    else if (z === ZONE.M) { if(policy(world,'meatTrade')!=='prohibited')fm++; }
+    else if (isMarket(world.civic[c.job])) { if(policy(world,'meatTrade')!=='prohibited')fm++; }
     else fc++;
   }
   // Bear winter: bears out of the workforce still counted as filled jobs? No —
@@ -77,7 +77,7 @@ export function yearlyFigures(world) {
     if (world.road[i] === ROAD.ROAD) roads++;
     else if (world.road[i] === ROAD.BRIDGE) bridges++;
     tiers += world.tier[i];
-    if (world.zone[i] === ZONE.M && world.tier[i] > 0 && !isPart(world, i)) markets++; // the licence inspects a hall, not its tiles
+    if (isMarket(world.civic[i]) && world.tier[i] > 0) markets++; // the licence inspects a market above its bare site
     if (world.civic[i] === CIVIC.DOCTOR) doctors++;
     if (world.civic[i] === CIVIC.HOSPITAL) hospitals++;
     if (world.civic[i] === CIVIC.FARM) farms++;

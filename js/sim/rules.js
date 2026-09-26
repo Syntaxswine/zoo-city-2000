@@ -199,7 +199,7 @@ export const KNOBS = {
   HOSPITAL_CARE: 0.03,
   HEALTH_BONUS_MAX: 0.03, // legacy saved careBonus validation
   NO_MEDICAL_PENALTY: 0.03, // citywide, while no medical facility operates
-  COST: { governor: 3000, doctor: 600, hospital: 4000, farm: 100, cemetery: 300, sanitation: 1200, garbage: 800, zoneR: 5, zoneC: 8, zoneI: 8, zoneM: 12, road: 10, bridge: 40, bulldoze: 2, bulldozeTree: 4, tree: 4, park: 150, largePark: 2500, zoo: 2500, pond: 40, fire: 500, police: 500, centre: 1500, wall: 8, use: 1, rail: 20, railBridge: 60, station: 300, camera: 100, library: 1000, university: 4000, gallery: 800, amphitheater: 3000 },
+  COST: { governor: 3000, doctor: 600, hospital: 4000, farm: 100, cemetery: 300, sanitation: 1200, garbage: 800, zoneR: 5, zoneC: 8, zoneI: 8, market: 12, road: 10, bridge: 40, bulldoze: 2, bulldozeTree: 4, tree: 4, park: 150, largePark: 2500, zoo: 2500, pond: 40, fire: 500, police: 500, centre: 1500, wall: 8, use: 1, rail: 20, railBridge: 60, station: 300, camera: 100, library: 1000, university: 4000, gallery: 800, amphitheater: 3000 },
   // ---- knowledge and culture (the owner, 2026-09-05; docs/PROPOSAL-KNOWLEDGE-CULTURE-2026-09-05.md, its review and the owner's ruling) ----
   // Four public buildings: Library 2×2 and University 3×3 give KNOWLEDGE, Gallery 2×2 and Amphitheater 3×3 give CULTURE.
   // C-type jobs, a road touching to build, served to operate. The owner ruled the reach: five tiles for the small
@@ -240,8 +240,17 @@ export const KNOBS = {
   ARREST_PRIORITY: [0, 0.05, 0.15], // added to the ARREST roll by the class at the victim's address — "priority policing" as probability, since files roll independently
   CASE_MONTHS_RICH: 12,          // … and a file from an affluent address is worked twice as long (CASE_MONTHS 6 for everyone else)
   // ---- crime and punishment (the owner, 2026-09-02; docs/PROPOSAL-CRIME-AND-PUNISHMENT.md) ----
-  // Zone M — the grey-market meat hall: stall / meat hall / cold store.
+  // Zone M — the grey-market meat hall: stall / meat hall / cold store. Since 2026-09-26 no lot is zoned M: the
+  // hall is the MEAT MARKET below, and these per-tier numbers are what one of its stages smells, fines and pens like.
   M_JOBS: [0, 3, 8, 16],
+  // THE MEAT MARKET (docs/PROPOSAL-MEAT-MARKET-2026-09-26.md; the owner, 2026-09-24/26): a placed 3×3 that GROWS
+  // a stage at a time — Light 3–27 jobs, Heavy 27–180, the owner's ranges. The stage lives on the anchor's `tier`
+  // and the form on its `maxTier` (1 Light, 3 Heavy: the H brush when it was placed). Stage 0 is the bare site.
+  MARKET_JOBS: [0, 3, 9, 18, 27, 72, 180], // one, three, six, nine stalls; the hall; the exchange (nine halls, then the grown block's 180)
+  MARKET_STALLS: [0, 1, 3, 6, 9, 9, 9],    // footprint tiles that smell: a stall's per stall, all nine from the square up
+  MARKET_TIER: [0, 1, 1, 1, 1, 2, 3],      // the zone tier a stage smells, fines and pens like: stall · hall · cold store
+  MARKET_FLOOR: [0, 1, 0, 4],              // by form (maxTier 1 | 3): Light opens at one stall, Heavy as the full square
+  MARKET_TOP: [0, 4, 0, 6],                // by form: Light stops at the square, Heavy at the exchange
   MEAT_PER_CARN: 0.06,      // rM = (0.06·carnivores + 10 − Jm)/max(Jm, 20): a 1,600 town wants two halls
   MEAT_SEED: 10,
   MEAT_CAP: 40,             // integer bodies/units held by one hall
@@ -559,18 +568,18 @@ export const RULES = Object.freeze([
     live: (w) => `${w.last.census.fireStations} fire station${w.last.census.fireStations === 1 ? "" : "s"} · ${w.last.census.burning} burning · fires roll at ×${f2(w.last.census.fireExposure)} of an uncovered town`,
   },
   {
-    id: "M1", title: "A meat hall is grey commerce",
-    formula: "zone M grows on its own valve rM = (0.06·carnivores + 10 − Jm)/max(Jm, 20) ; 3/8/16 jobs ; staffed by diet (carnivores 0.9, omnivores 0.5, herbivores 0.1) ; unlicensed it pays a cut of §25 per filled job, untaxed",
-    live: (w) => `${w.last.census.markets} halls · ${w.last.census.Jm} jobs · V_M ${f2(w.valves.M)} · cut §${w.last.budget.cutYr}/yr${w.events.licence ? " · LICENSED (taxed at the C rate, §400/yr each)" : ""}`,
+    id: "M1", title: "A meat market is grey commerce",
+    formula: "a placed 3×3 (§12, beside a road) grows from a bare site a stage at a time on its own valve rM = (0.06·carnivores + 10 − Jm)/max(Jm, 20), and only to a size the town would keep ; Light (H) 3/9/18/27 jobs, Heavy from Chapter 5 27/72/180 ; staffed by diet (carnivores 0.9, omnivores 0.5, herbivores 0.1) ; unlicensed it pays a cut of §25 per filled job, untaxed",
+    live: (w) => `${w.last.census.markets} markets · ${w.last.census.Jm} jobs · V_M ${f2(w.valves.M)} · cut §${w.last.budget.cutYr}/yr${w.events.licence ? " · LICENSED (taxed at the C rate, §400/yr each)" : ""}`,
   },
   {
     id: "M2", title: "Dread — herbivores smell it four tiles off",
-    formula: "a hall spreads 40/70/105 over 2/3/4 tiles × (0.5 + 0.5·min(stock/8,1)) ; LV −0.8·dread (twice a works) ; herbivores −0.25·dread mood (halved with a carnivore friend), −dread on the home score, and a household at dread ≥ 40 moves along the road at 3%/month ; carnivores +5 inside the smell and do not mind",
+    formula: "a market smells from its stall tiles — a stall's 40 over 2 from each, then the hall's 70 over 3 and the exchange's 105 over 4 from all nine — × (0.5 + 0.5·min(stock/8,1)) ; LV −0.8·dread (twice a works) ; herbivores −0.25·dread mood (halved with a carnivore friend), −dread on the home score, and a household at dread ≥ 40 moves along the road at 3%/month ; carnivores +5 inside the smell and do not mind",
     live: (w) => `max dread ${w.last.census.maxDread} · ${w.last.census.herbNear} herbivores within the smell`,
   },
   {
     id: "M3", title: "The licence, the raid",
-    formula: "Governance licenses meat halls at the player’s direction: §2,000 + §400/yr per hall, the jobs go on the books at the C rate, crime and the buyer's pull halve ; an unlicensed hall under police cover with crime > 50 can be raided: a storey shut, §200·tier in fines",
+    formula: "Governance licenses meat halls at the player’s direction: §2,000 + §400/yr per hall, the jobs go on the books at the C rate, crime and the buyer's pull halve ; an unlicensed market under police cover with crime > 50 can be raided: a stage shut, §200 per tier it stands for (stall 1, hall 2, exchange 3) in fines",
     live: (w) => (w.events.licence ? "licensed" : "unlicensed"),
   },
   {
@@ -585,7 +594,7 @@ export const RULES = Object.freeze([
   },
   {
     id: "M6", title: "Livestock grows in the pen",
-    formula: "a full pig or cow household may sell a cub to a reachable free pen (2/4/8 places by tier); it is absent until the exact sixteenth birthday, then yields 2 units; razing or losing the hall frees it alive",
+    formula: "a full pig or cow household may sell a cub to a reachable free pen (2 places on the stall stages, 4 at the hall, 8 at the exchange); it is absent until the exact sixteenth birthday, then yields 2 units; razing or losing the hall frees it alive",
     live: (w) => `${w.last.census.penned || 0} in pens · ${w.last.census.meatSlaughtered || 0} units from pens this year`,
   },
   {

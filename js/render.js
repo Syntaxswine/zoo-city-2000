@@ -652,6 +652,7 @@ export function createRenderer(canvas, initialWorld, art) {
             standing = world.mansion[i] ? art.mansion(world.variant[i], character) : art.building(world.zone[i], world.tier[i], world.variant[i], sideOf(world, i), world.theme[i], character);
           }
         } else if (world.civic[i] === CIVIC.GOVERNOR) standing = art.civic("governor", 3, world.variant[i]);
+        else if (world.civic[i] === CIVIC.MARKET) standing = art.civic("market", 3, world.tier[i]); // the family is its STAGES, not layouts: the sprite IS the growth (docs/PROPOSAL-MEAT-MARKET-2026-09-26.md)
         else if (world.civic[i] === CIVIC.PARK) standing = art.civic("park", civicSideOf(world, i), world.variant[i]);
         else if (world.civic[i] === CIVIC.LARGE_PARK) standing = art.civic("largePark", civicSideOf(world, i), world.variant[i]);
         else if (world.civic[i] === CIVIC.ZOO) standing = art.civic("zoo", 3, world.variant[i]);

@@ -255,9 +255,11 @@ const villagers = (w, n, home = at(w, 16, 30)) => { w.citizens = Array.from({ le
   assert.equal(scrubbers.gate(w), false, "fitted once, never offered again");
   w.events.choice = { id: "licence", cost: KNOBS.LICENCE_COST }; cash = w.cash;
   assert.match(resolveChoice(w, true), /licensed/); assert.equal(w.cash, cash - KNOBS.LICENCE_COST); assert.equal(policy(w, "meatTrade"), "inspected");
-  // The deterministic offer itself: a served tier-2 hall in a town with no Governor puts the card on the desk.
+  // The deterministic offer itself: a served market at the hall (stage 5 — a tier-2 hall until meat was placed, 2026-09-26)
+  // in a town with no Governor puts the card on the desk. A one-tile market: a legacy-sized civic, as a save may hold one.
+  const oneTileHall = (w, i) => { w.civic[i] = CIVIC.MARKET; w.civicSize[i] = 1; w.maxTier[i] = 3; w.tier[i] = 5; };
   const h = flat("hall");
-  const hall = at(h, 16, 30); h.zone[hall] = ZONE.M; h.tier[hall] = 2; h.roadsDirty = true; computeFields(h);
+  const hall = at(h, 16, 30); oneTileHall(h, hall); h.roadsDirty = true; computeFields(h);
   tick(h);
   assert.equal(h.events.choice?.id, "licence", "the month the first hall reaches tier 2, the licence is on the desk");
   refreshLast(h);
@@ -266,7 +268,7 @@ const villagers = (w, n, home = at(w, 16, 30)) => { w.citizens = Array.from({ le
   const g = flat("governed"); assert.equal(governor(g).ok, true);
   for (let x = 16; x <= 30; x++) { const i = at(g, x, 30); g.zone[i] = ZONE.I; g.tier[i] = 1; }
   assert.equal(scrubbers.gate(g), false);
-  const gh = at(g, 16, 40); g.zone[gh] = ZONE.M; g.tier[gh] = 2; g.roadsDirty = true; computeFields(g);
+  const gh = at(g, 16, 40); oneTileHall(g, gh); g.roadsDirty = true; computeFields(g);
   tick(g);
   assert.notEqual(g.events.choice?.id, "licence", "a governed town gets no licence card");
   g.events.choice = { id: "licence", cost: 1 }; cash = g.cash;
@@ -278,7 +280,8 @@ const villagers = (w, n, home = at(w, 16, 30)) => { w.citizens = Array.from({ le
   const w = flat("land", { campaign: true });
   for (const op of [{ kind: "tree", x0: 20, y0: 20, x1: 20, y1: 20 }, { kind: "wall", tiles: [at(w, 22, 22)] }, { kind: "use", x0: 16, y0: 16, x1: 16, y1: 16, value: 1 }]) assert.equal(lockedReason(w, op), "", `${op.kind} is open in Chapter 1`);
   assert.match(lockedReason(w, { kind: "station" }), /Chapter 5/, "rail stays with the Metropolis, as the guide says");
-  assert.match(lockedReason(w, { kind: "zone", zone: ZONE.M, density: 3 }), /Chapter 5/);
+  assert.match(lockedReason(w, { kind: "market", density: 3 }), /Chapter 5/, "a Heavy meat market waits for the Metropolis, as High meat did");
+  assert.equal(lockedReason(w, { kind: "market", density: 1 }), "", "a Light meat market is open from the start, as Low meat was");
 }
 
 // UX review: a LOCKED palette button said nothing when clicked (the keyboard path flashed the reason).

@@ -16,7 +16,7 @@
 // leaves the lot, was a ≥4-year hand standing there to take over (passed) or not
 // (lost)? Measured 2026-09-07: a keeper changes once per ~20 lot-years, and 81–87%
 // of lots hold an heir — succession is a rare, LOCAL shock.
-import { createWorld, ZONE, jobZone } from "../js/sim/world.js";
+import { createWorld, ZONE, CIVIC, jobZone } from "../js/sim/world.js";
 import { createMayor } from "./mayor.mjs";
 import { tick } from "../js/sim/tick.js";
 import { SPECIES_BY_ID } from "../js/sim/species.js";
@@ -157,7 +157,7 @@ for (const c of employed) {
   const i = c.job;
   if (world.zone[i] === ZONE.C) { inC++; if (world.tier[i] === 1) inNamedShop++; }
   else if (world.zone[i] === ZONE.I) inI++;
-  else if (world.zone[i] === ZONE.M) inM++;
+  else if (world.civic[i] === CIVIC.MARKET) inM++; // a meat market (placed since 2026-09-26)
   else inCivic++;
 }
 

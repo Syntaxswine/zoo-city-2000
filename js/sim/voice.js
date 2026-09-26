@@ -11,7 +11,7 @@ export const ACT = Object.freeze({
   SHOPS: "zone C near homes",
   ROOMS: "zone R near a road",
   WORKS: "zone I near a road",
-  HOOKS: "zone M on the road network",
+  HOOKS: "place a Meat market (4) on the road network",
   NO_JOB: "zone C or I, or add rail",
   SMOKE: "plant trees, a park, or a wall",
   NO_PARK: "build a Park or Large Park within 4 tiles of home",

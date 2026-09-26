@@ -9,7 +9,9 @@ import { policy, governanceUnlocked } from './governance.js';
 // citizens.js (birthMult, friendMult, moodBoost) and budget.js (bear winter).
 
 import { KNOBS } from "./rules.js";
-import { ZONE, CIVIC, TERRAIN, ROAD, idx, inBounds, capacityOf, anchorOf } from "./world.js";
+import { ZONE, CIVIC, TERRAIN, ROAD, idx, inBounds, capacityOf, anchorOf, isMarket } from "./world.js";
+import { marketStepDown } from "./lots.js";
+import { closeHall } from "./meat.js";
 import { post } from "./budget.js";
 import { removeHousehold, evictFromLot, fireFromLot } from "./citizens.js";
 import { neutralRate } from "./demand.js";
@@ -30,6 +32,7 @@ function anyWater(world) {
 
 function lowerTier(world, i) {
   if (world.tier[i] <= 0) return;
+  if (isMarket(world.civic[i])) { marketStepDown(world, i); return; } // a market loses a stage (lots.js)
   dissolve(world, i); // a block comes apart before one of its tiles loses a storey (blocks.js); a MANSION comes apart into cottages first
   if (world.tier[i] > 0) world.tier[i]--; // guarded: a Uint8 storey count must never wrap to 255
   const cap = capacityOf(world, i);
@@ -45,6 +48,12 @@ function lowerTier(world, i) {
  * (§2) is now impatience, not a toll.
  */
 function toRubble(world, i) {
+  // A MARKET burnt out falls to its bare site — a placed thing is not rubble. Its stock spoils and its pens go home
+  // alive through closeHall, inside the identity; its staff are let go (docs/PROPOSAL-MEAT-MARKET-2026-09-26.md A.6).
+  if (isMarket(world.civic[i])) {
+    if (world.tier[i]) { closeHall(world, i); world.tier[i] = 0; fireFromLot(world, i, 0); }
+    return;
+  }
   if (world.zone[i] === ZONE.NONE || world.tier[i] === 0) return;
   // A block is razed whole: its footprint comes apart without the split's
   // rehoming (everyone is about to be evicted by the storeys going anyway).
@@ -301,7 +310,7 @@ export const ROSTER = [
     gate: (w) => policy(w,'meatTrade')!=='prohibited' && !w.events.licence && w.tick - (w.events.lastRaid ?? -100000) >= 24 && raidable(w).length > 0,
     fire: (w) => {
       const lot = w.rng.pick(raidable(w));
-      const tier = w.tier[lot];
+      const tier = KNOBS.MARKET_TIER[w.tier[lot]]; // what the market's stage stands for: a stall 1, a hall 2, a cold store 3
       // The last hired is named and sent home; a file opens on them.
       let last = null;
       for (const c of w.citizens) if (c.job === lot && !c.dead && (!last || c.hired > last.hired || (c.hired === last.hired && c.id > last.id))) last = c;
@@ -309,7 +318,7 @@ export const ROSTER = [
       post(w, "fines", KNOBS.RAID_FINE * tier);
       w.events.lastRaid = w.tick;
       const who = last ? ` ${last.name} ${last.surname} (${last.species}) was seen leaving by the back.` : "";
-      const line = `RAID — the constables went through the meat hall at (${lot % w.w},${(lot / w.w) | 0}): a storey shut, §${KNOBS.RAID_FINE * tier} in fines.${who}`;
+      const line = `RAID — the constables went through the meat market at (${lot % w.w},${(lot / w.w) | 0}) and shut part of it: §${KNOBS.RAID_FINE * tier} in fines.${who}`;
       if (last && !last.dead) openFile(w, { tile: lot, culpritId: last.id, cause: "raid", line });
       return { line, links: last ? [last.id] : [] };
     },
@@ -350,11 +359,11 @@ function robbable(w) {
 }
 function raidable(w) {
   const out = [];
-  for (let i = 0; i < w.w * w.h; i++) if (w.zone[i] === ZONE.M && w.tier[i] > 0 && w.policeCov[i] > 0 && w.crime[i] > KNOBS.RAID_CRIME && w.staff[i] > 0) out.push(i);
+  for (let i = 0; i < w.w * w.h; i++) if (isMarket(w.civic[i]) && w.tier[i] > 0 && w.policeCov[i] > 0 && w.crime[i] > KNOBS.RAID_CRIME && w.staff[i] > 0) out.push(i);
   return out;
 }
 function firstHall(w) {
-  for (let i = 0; i < w.w * w.h; i++) if (w.zone[i] === ZONE.M && w.tier[i] > 0) return i;
+  for (let i = 0; i < w.w * w.h; i++) if (isMarket(w.civic[i]) && w.tier[i] > 0) return i;
   return 0;
 }
 function herbShare(c) {
@@ -522,13 +531,13 @@ export function eventsTick(world, cen, dem) {
     }
   }
 
-  // The Butchers' licence: offered DETERMINISTICALLY the month the first hall
-  // reaches tier 2 (a weight-2 roster card would arrive once per 15–40 years) —
+  // The Butchers' licence: offered DETERMINISTICALLY the month the first market
+  // reaches the hall (its stage 5; a weight-2 roster card would arrive once per 15–40 years) —
   // in a town with no Governor. A governed town sets meat regulation as a
   // standing policy instead, and no card is ever put on its desk.
   if (!governanceUnlocked(world) && !ev.licence && !ev.choice && world.tick - (ev.lastLicenceOffer ?? -100000) >= 120) {
     let hall2 = false;
-    for (let i = 0; i < n && !hall2; i++) if (world.zone[i] === ZONE.M && world.tier[i] >= 2 && served(world, i)) hall2 = true;
+    for (let i = 0; i < n && !hall2; i++) if (isMarket(world.civic[i]) && KNOBS.MARKET_TIER[world.tier[i]] >= 2 && served(world, i)) hall2 = true;
     if (hall2) {
       ev.lastLicenceOffer = world.tick;
       ev.choice = { id: "licence", title: "The Butchers' Licence", text: `The Butchers' Guild has a licence on your desk: an inspector in every meat hall, §${KNOBS.LICENCE_COST} and §${KNOBS.UPKEEP_LICENCE} a year each. The till pays tax at the C rate; crime around the halls halves; the halls buy half as eagerly.`, cost: KNOBS.LICENCE_COST, accept: `Pay §${KNOBS.LICENCE_COST}`, decline: "Decline" };

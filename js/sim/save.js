@@ -12,6 +12,7 @@ import { KNOBS } from "./rules.js";
 import { makeRng } from "./rng.js";
 import { computeFields, recountRosters, commutePath, doorsOf } from "./fields.js";
 import { citizenDefaults, rebuildMaps } from "./citizens.js";
+import { clearZonedMeat } from "./meat.js";
 import { locateCamps } from "./camps.js";
 import { refreshLast } from "./tick.js";
 import { migrateLegacyNames } from "./legacy.js";
@@ -171,6 +172,7 @@ export function load(json) {
 /** Rebuild everything derived, in the order the tick expects. */
 export function rebuildDerived(world) {
   rebuildMaps(world);
+  clearZonedMeat(world); // a save from when meat was zoned: its halls close, in the identity (meat.js) — before the orphaned hall jobs go
   releaseOrphanJobs(world);
   world.roadsDirty = true;
   world.wallsDirty = true;

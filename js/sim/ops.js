@@ -12,7 +12,7 @@ import { campAt } from "./camps.js";
 import { buildingSnapshot, syncBuildingAge } from "./building-age.js";
 import { lockedReason, floodplain, computeInfrastructure } from "./progression.js";
 import { KNOBS } from "./rules.js";
-import { TERRAIN, ROAD, ZONE, CIVIC, CIVIC_SIDE, CIVIC_OF_KIND, idx, inBounds, anchorOf, footprintOf, civicAnchorOf, civicTiles } from "./world.js";
+import { TERRAIN, ROAD, ZONE, CIVIC, CIVIC_SIDE, CIVIC_OF_KIND, idx, inBounds, anchorOf, footprintOf, civicAnchorOf, civicTiles, isMarket } from "./world.js";
 import { post, canSpend, exitReceivership } from "./budget.js";
 import { clearLot, invalidatePaths, releaseJob, replanStale, compact } from "./citizens.js";
 import { policeAction } from "./police-actions.js";
@@ -167,7 +167,7 @@ export function costOf(world, op) {
   const tiles = [];
   // Every footprint a tile op writes — the four knowledge-and-culture kinds included: until session 18 the list stopped at
   // the centre, so a Library could be dropped on an occupied tent (found while building the wealth arc; fixed as seen).
-  if (["zone", "road", "rail", "station", "wall", "bulldoze", "tree", "park", "largePark", "zoo", "fire", "police", "centre", "library", "university", "gallery", "amphitheater", "farm", "cemetery", "sanitation", "garbage", "doctor", "hospital", "governor"].includes(op.kind)) {
+  if (["zone", "road", "rail", "station", "wall", "bulldoze", "tree", "park", "largePark", "zoo", "fire", "police", "centre", "library", "university", "gallery", "amphitheater", "farm", "cemetery", "sanitation", "garbage", "doctor", "hospital", "governor", "market"].includes(op.kind)) {
     const side = CIVIC_SIDE[op.kind] || 1;
     const requested = op.tiles || (op.x0 != null ? rect(world, op) : Array.from({ length: side * side }, (_, k) => idx(world, op.tx + k % side, op.ty + Math.floor(k / side))));
     if (requested.some(i => campAt(world, i))) return { cost: 0, tiles, reason: "someone is camping here — provide housing before building" };
@@ -178,7 +178,9 @@ export function costOf(world, op) {
   const add = (i, c, what) => { tiles.push({ i, cost: c, what }); cost += c; };
   switch (op.kind) {
     case "zone": {
-      const zc = op.zone === ZONE.R ? C.zoneR : op.zone === ZONE.C ? C.zoneC : op.zone === ZONE.M ? C.zoneM : C.zoneI;
+      // Meat is placed, not zoned, since 2026-09-26 (docs/PROPOSAL-MEAT-MARKET-2026-09-26.md): the Meat market, key 4.
+      if (op.zone === ZONE.M) return { cost: 0, tiles: [], reason: "meat is no longer zoned — place a Meat market (4)" };
+      const zc = op.zone === ZONE.R ? C.zoneR : op.zone === ZONE.C ? C.zoneC : C.zoneI;
       for (const i of rect(world, op)) {
         if (world.terrain[i] === TERRAIN.WATER || world.road[i] || world.civic[i] || world.wall[i] || world.rail[i]) continue;
         if (isBuilt(world, i)) continue;
@@ -220,20 +222,21 @@ export function costOf(world, op) {
         if (world.civic[i]) {
           const a = civicAnchorOf(world, i);
           for (const j of civicTiles(world, i)) { taken.add(j); add(j, C.bulldoze, "civic"); }
-          // Jobs/custody change on demolition, so occupied sites cannot be undone.
-          if (world.citizens.some(c => !c.dead && (c.job === a || (c.heldAt === a && c.held > world.tick)))) evicts++;
+          // Jobs/custody change on demolition, so occupied sites cannot be undone — nor a market with meat on its hooks,
+          // which spoils (its penned animals are custody, and count above).
+          if (world.citizens.some(c => !c.dead && (c.job === a || (c.heldAt === a && c.held > world.tick))) || (isMarket(world.civic[a]) && hallStock(world, a))) evicts++;
           continue;
         }
         if (world.big[i]) {
           // A block goes as one building: every tile of its footprint, §2 each; its people are on the anchor.
           const a = anchorOf(world, i);
           for (const j of footprintOf(world, a)) { taken.add(j); add(j, C.bulldoze, "building"); }
-          if (world.occupants[a] || world.staff[a] || (world.zone[a] === ZONE.M && (hallStock(world, a) || world.citizens.some((c) => !c.dead && c.pen && anchorOf(world, c.heldAt) === a)))) evicts++;
+          if (world.occupants[a] || world.staff[a]) evicts++;
           continue;
         }
         if (isBuilt(world, i)) {
           add(i, C.bulldoze, "building");
-          if (world.occupants[i] || world.staff[i] || (world.zone[i] === ZONE.M && (hallStock(world, i) || world.citizens.some((c) => !c.dead && c.pen && anchorOf(world, c.heldAt) === i)))) evicts++;
+          if (world.occupants[i] || world.staff[i]) evicts++;
           continue;
         }
         if (world.zone[i]) { add(i, 0, "unzone"); continue; }
@@ -248,7 +251,7 @@ export function costOf(world, op) {
       }
       break;
     }
-    case "park": case "fire": case "police": case "centre": case "largePark": case "zoo": case "library": case "university": case "gallery": case "amphitheater": case "farm": case "cemetery": case "sanitation": case "garbage": case "doctor": case "hospital": case "governor": {
+    case "park": case "fire": case "police": case "centre": case "largePark": case "zoo": case "library": case "university": case "gallery": case "amphitheater": case "farm": case "cemetery": case "sanitation": case "garbage": case "doctor": case "hospital": case "governor": case "market": {
       if (op.kind === "governor" && world.civic.includes(CIVIC.GOVERNOR)) return { cost: 0, tiles: [], reason: "Only one Governor’s Mansion is allowed per city" };
       if (op.kind === "cemetery" && world.civic.includes(CIVIC.CEMETERY)) return { cost: 0, tiles: [], reason: "Only one cemetery is allowed per city" };
       const side = CIVIC_SIDE[op.kind]; // 1 the park · 2 the Library and the Gallery · 3 the campuses (world.js)
@@ -408,8 +411,8 @@ function applyOperation(world, op, { log = true } = {}) {
     if(op.key==='meatTrade'){
       world.events.licence=op.value==='inspected';
       if(op.value==='prohibited'){
-        for(let i=0;i<world.zone.length;i++)if(world.zone[i]===ZONE.M&&!(world.big[i]&128))closeHall(world,i);
-        for(const c of world.citizens)if(c.job>=0&&world.zone[c.job]===ZONE.M)releaseGovernanceJob(world,c);
+        for(let i=0;i<world.civic.length;i++)if(isMarket(world.civic[i]))closeHall(world,i);
+        for(const c of world.citizens)if(c.job>=0&&isMarket(world.civic[c.job]))releaseGovernanceJob(world,c);
       }
       resetMeatRoutes(world);
     }
@@ -501,7 +504,6 @@ function applyOperation(world, op, { log = true } = {}) {
           // footprint and its anchor's people; the rest are plain ground by then.
           const a = anchorOf(world, i);
           const tiles = world.big[i] ? footprintOf(world, a) : [i];
-          if (world.zone[a] === ZONE.M) closeHall(world, a); // stock spoils explicitly; penned cubs go home alive
           for (const j of tiles) { world.tier[j] = 0; world.zone[j] = ZONE.NONE; world.rubble[j] = 0; world.burning[j] = 0; world.maxTier[j] = 3; world.big[j] = 0; world.theme[j] = 0; world.mansion[j] = 0; }
           clearLot(world, a);
         }
@@ -511,11 +513,14 @@ function applyOperation(world, op, { log = true } = {}) {
       case "tree":
         world.terrain[i] = TERRAIN.TREE;
         break;
-      case "park": case "fire": case "police": case "centre": case "largePark": case "zoo": case "library": case "university": case "gallery": case "amphitheater": case "farm": case "cemetery": case "sanitation": case "garbage": case "doctor": case "hospital": case "governor": {
+      case "park": case "fire": case "police": case "centre": case "largePark": case "zoo": case "library": case "university": case "gallery": case "amphitheater": case "farm": case "cemetery": case "sanitation": case "garbage": case "doctor": case "hospital": case "governor": case "market": {
         world.terrain[i] = TERRAIN.GRASS;
         const a = idx(world, op.tx, op.ty), dx = i % world.w - op.tx, dy = ((i / world.w) | 0) - op.ty;
         world.civic[i] = i === a ? CIVIC_OF_KIND[op.kind] : CIVIC.PART;
         world.civicSize[i] = i === a ? CIVIC_SIDE[op.kind] : CIVIC_SIDE[op.kind] > 4 ? 192 | dx | dy << 3 : 128 | dx | dy << 2;
+        // A MARKET opens as the bare site, in the form the H brush chose (docs/PROPOSAL-MEAT-MARKET-2026-09-26.md A.1):
+        // the stage on the anchor's tier, the form on its maxTier — 1 Light, 3 Heavy, as a zone's density is written.
+        if (op.kind === "market" && i === a) { world.tier[i] = 0; world.maxTier[i] = op.density === 1 ? 1 : 3; }
         civics = true;
         break;
       }
@@ -593,6 +598,9 @@ function applyOperation(world, op, { log = true } = {}) {
 function removeCivic(world, i) {
   const a = civicAnchorOf(world, i);
   if (a < 0) return;
+  // A market's hall closes FIRST: stock spoils explicitly and penned animals go home alive, inside the identity
+  // meatBalance() audits — the release below frees jobs and custody, and knows nothing of pens or hooks.
+  if (isMarket(world.civic[a])) { closeHall(world, a); world.tier[a] = 0; world.maxTier[a] = 3; }
   for (const c of world.citizens) {
     if (c.job === a) releaseJob(world, c);
     if (c.heldAt === a) { c.held = 0; c.heldAt = -1; }

@@ -7,7 +7,7 @@ import { policy } from './governance.js';
 
 import { computeInfrastructure } from "./progression.js";
 import { KNOBS } from "./rules.js";
-import { TERRAIN, ROAD, ZONE, CIVIC, idx, inBounds, N4, isStation, isCivicEmployer, isKnowledgeCivic, isCultureCivic, absent, occAt, anchorOf, footprintOf, siteTiles, civicAnchorOf, civicTiles } from "./world.js";
+import { TERRAIN, ROAD, ZONE, CIVIC, idx, inBounds, N4, isStation, isCivicEmployer, isKnowledgeCivic, isCultureCivic, isMarket, marketStallTiles, absent, occAt, anchorOf, footprintOf, siteTiles, civicAnchorOf, civicTiles } from "./world.js";
 import { SPECIES_BY_ID, DIET_OF, admits } from "./species.js";
 import { forEachWithin, forEachWithinAll, floodBudget, computeOcclusion, isBarrier, crossable } from "./reach.js";
 
@@ -139,7 +139,7 @@ export function asksAccess(world, i) {
   if (world.rail[i] === 2) return true;
   const a = civicAnchorOf(world, i);
   const c = world.civic[a];
-  return isCivicEmployer(c);
+  return isCivicEmployer(c) || isMarket(c); // a market is not a civic employer (its jobs are Jm), but it asks for a road all the same
 }
 
 /**
@@ -237,15 +237,13 @@ export function computeDread(world) {
   const n = w * h;
   const e = world._dreadEmit || (world._dreadEmit = new Float32Array(n));
   e.fill(0);
-  for (let i = 0; i < n; i++) {
-    const t = world.tier[i];
-    if (world.zone[i] === ZONE.M && t > 0 && policy(world,'meatTrade')!=='prohibited') {
-      const hall = anchorOf(world, i);
-      let stock = 0;
-      for (const j of footprintOf(world, hall)) stock += world.meat[j] || 0;
-      const scale = 0.5 + 0.5 * Math.min(1, stock / 8);
-      spread(world, e, i, KNOBS.DREAD[t] * scale, KNOBS.DREAD_RADIUS[t]);
-    }
+  // A MARKET smells from its stall tiles, each at the zone tier its stage stands for (KNOBS.MARKET_TIER): one stall
+  // smells like one stall, a full exchange like the grown block it replaces (docs/PROPOSAL-MEAT-MARKET-2026-09-26.md A.2).
+  if (policy(world,'meatTrade')!=='prohibited') for (let i = 0; i < n; i++) {
+    if (!isMarket(world.civic[i]) || !world.tier[i]) continue;
+    const t = KNOBS.MARKET_TIER[world.tier[i]];
+    const scale = 0.5 + 0.5 * Math.min(1, (world.meat[i] || 0) / 8);
+    for (const j of marketStallTiles(world, i)) spread(world, e, j, KNOBS.DREAD[t] * scale, KNOBS.DREAD_RADIUS[t]);
   }
   for (let i = 0; i < n; i++) world.dread[i] = Math.max(0, Math.min(100, Math.round(e[i])));
 }
@@ -561,9 +559,10 @@ export function computeCrime(world) {
   const near = world._cnear || (world._cnear = new Float32Array(n));
   near.fill(0);
   const mult = world.events.licence ? KNOBS.LICENCE_CRIME_MULT : 1;
-  for (let i = 0; i < n; i++) {
-    const t = world.tier[i];
-    if (world.zone[i] === ZONE.M && t > 0 && policy(world,'meatTrade')!=='prohibited') spread(world, near, i, KNOBS.CRIME_M[t] * mult, KNOBS.CRIME_M_RADIUS[t]);
+  if (policy(world,'meatTrade')!=='prohibited') for (let i = 0; i < n; i++) {
+    if (!isMarket(world.civic[i]) || !world.tier[i]) continue;
+    const t = KNOBS.MARKET_TIER[world.tier[i]];
+    for (const j of marketStallTiles(world, i)) spread(world, near, j, KNOBS.CRIME_M[t] * mult, KNOBS.CRIME_M_RADIUS[t]);
   }
   // The files' stain is capped at FILE_CRIME_MAX — a street where three things
   // happened is a bad street, not three bad streets. Uncapped it stacked, and

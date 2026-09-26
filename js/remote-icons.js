@@ -4,7 +4,7 @@ const paths = Object.freeze({
   R: '<path d="m3 10 9-7 9 7M5 9v12h14V9M10 21v-7h4v7"/>',
   C: '<path d="M4 10v11h16V10M3 4h18v6H3zM8 4v6m8-6v6M9 21v-6h6v6"/>',
   I: '<path d="M3 21V11l6-4v5l6-4v13M15 21V3h4l2 18ZM6 16h1m4 0h1"/>',
-  M: '<path d="M14 4c4-2 8 2 6 6l-4 6c-2 3-6 2-8 0s-3-6 0-8Z M8 16l-3 3m0 0c-3-1-4 3-1 3 2 0 3-2 1-3"/><circle cx="15" cy="9" r="2"/>',
+  market: '<path d="M14 4c4-2 8 2 6 6l-4 6c-2 3-6 2-8 0s-3-6 0-8Z M8 16l-3 3m0 0c-3-1-4 3-1 3 2 0 3-2 1-3"/><circle cx="15" cy="9" r="2"/>',
   road: '<path d="M6 3 3 21M18 3l3 18M12 3v3m0 5v3m0 5v2"/>',
   wall: '<path d="M3 5h18v14H3ZM3 12h18M9 5v7m6 0v7"/>',
   rail: '<path d="M7 3 5 21M17 3l2 18M7 6h10M6 11h12M6 16h12M5 21h14"/>',

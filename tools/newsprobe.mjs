@@ -62,7 +62,9 @@ function build(seed) {
     for (let y = Y0; y <= Y0 + BLOCK; y++) { ring.push(idx(X0, y)); ring.push(idx(X0 + BLOCK, y)); }
     for (let k = 0; k <= BLOCK * 3; k++) ring.push(idx(Math.min(w.w - 2, Math.max(1, S.tx + inx * k)), S.ty));
     apply(w, { kind: "road", tiles: ring });
-    apply(w, { kind: "zone", zone: ZONES[b], x0: X0 + 1, y0: Y0 + 1, x1: X0 + BLOCK - 1, y1: Y0 + BLOCK - 1, density: 3 });
+    // Meat is placed, not zoned, since 2026-09-26: the meat block holds one Heavy market against its ring road.
+    if (ZONES[b] === ZONE.M) apply(w, { kind: "market", tx: X0 + 1, ty: Y0 + 1, density: 3 });
+    else apply(w, { kind: "zone", zone: ZONES[b], x0: X0 + 1, y0: Y0 + 1, x1: X0 + BLOCK - 1, y1: Y0 + BLOCK - 1, density: 3 });
     blocks++;
   }
   for (const kind of ["fire", "police"]) {

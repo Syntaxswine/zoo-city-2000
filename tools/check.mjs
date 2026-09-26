@@ -27,7 +27,7 @@ import { readFileSync, readdirSync, statSync, existsSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { lightLevel } from "../js/art/building-character.js";
-import { createWorld, ZONE, ROAD, capacityOf, jobsOf, isPart, sideOf, absent } from "../js/sim/world.js";
+import { createWorld, ZONE, ROAD, capacityOf, jobsOf, isPart, sideOf, absent, marketStallTiles } from "../js/sim/world.js";
 import { tick } from "../js/sim/tick.js";
 import { apply, replay, undo, costOf as costOfOp } from "../js/sim/ops.js";
 import { save, load, stateHash, stateHashNoNews, toPlain } from "../js/sim/save.js";
@@ -64,9 +64,12 @@ function buildCity(seed, years, { withSave = null } = {}) {
   apply(world, { kind: "zone", zone: ZONE.R, x0: sx - 3, y0: sy - 3, x1: sx, y1: sy + 3, density: 3 });
   apply(world, { kind: "zone", zone: ZONE.C, x0: sx + 1, y0: sy - 3, x1: sx + 3, y1: sy - 1, density: 3 });
   apply(world, { kind: "zone", zone: ZONE.I, x0: sx + 1, y0: sy, x1: sx + 3, y1: sy + 2, density: 3 });
-  // Zone M at t = 0 (a corner carved from the I block), and assert it, so the
-  // market invariants can never pass over an empty set (a later placement is seed-fragile: costOf skips built tiles).
-  const rM = apply(world, { kind: "zone", zone: ZONE.M, x0: sx + 1, y0: sy + 3, x1: sx + 3, y1: sy + 3, density: 3 });
+  // A MEAT MARKET at t = 0 — placed, not zoned, since 2026-09-26 (docs/PROPOSAL-MEAT-MARKET-2026-09-26.md) — off the
+  // ring road's north-east corner, and asserted, so the market invariants can never pass over an empty set (a later
+  // placement is seed-fragile: costOf refuses built tiles). Below the ring seed 7 has the river; the west side is the
+  // rail test's line; the east side under it is the police station and the zoo. LIGHT: a town of a few hundred wants
+  // some fourteen meat jobs, and a Heavy market opens at 27 — it would hold as a bare site.
+  const rM = apply(world, { kind: "market", tx: sx + 5, ty: sy - 5, density: 1 });
   const grewWithAccess = { ok: true, mZoned: rM.ok && rM.cost > 0 };
   let saved = null;
   for (let t = 0; t < years * 12; t++) {
@@ -75,7 +78,7 @@ function buildCity(seed, years, { withSave = null } = {}) {
     if (t === 60) apply(world, { kind: "rate", zone: "R", value: 10 });
     if (t === 84) apply(world, { kind: "rate", zone: "R", value: 7 });
     if (t === 100) apply(world, { kind: "tree", x0: sx + 5, y0: sy + 5, x1: sx + 7, y1: sy + 7 });
-    if (t === 120) apply(world, { kind: "bulldoze", x0: sx + 1, y0: sy + 3, x1: sx + 1, y1: sy + 3 });
+    if (t === 120) apply(world, { kind: "bulldoze", x0: sx + 1, y0: sy + 2, x1: sx + 1, y1: sy + 2 }); // an I building mid-run; the market stays, so its invariants have a hall to read
     const before = Uint8Array.from(world.tier);
     tick(world);
     for (let i = 0; i < world.w * world.h; i++) if (world.tier[i] > before[i] && !served(world, i)) grewWithAccess.ok = false;
@@ -297,31 +300,39 @@ function auditIds(w) {
   return bad;
 }
 {
-  check("M zoned in the scripted city", A.mZoned === true);
-  // Dread: on every built hall, nowhere beyond a hall's radius, gone when the halls go.
-  // Measured on a clone with the M row FORCED built (the scripted city's row
-  // burned in a year-7 fire on seed 7 — disasters are on — and rubble carries no dread).
+  check("a meat market placed in the scripted city", A.mZoned === true);
+  // Dread: on every stall tile of a standing market, nowhere beyond a stall tile's radius, gone when the market goes.
+  // Measured on a clone with every market FORCED to the hall (stage 5 — the M row was forced to tier 2 here, and the
+  // stage's smell is a tier-2 hall's, from all nine tiles; disasters are on, and a burnt market carries no dread).
   const D = load(save(world));
-  let builtM = 0, dreadOnM = 0, dreadFar = 0;
+  let stallTiles = 0, dreadOnStalls = 0, dreadFar = 0;
   const W = world.w;
   const halls = [];
-  for (let i = 0; i < W * world.h; i++) if (D.zone[i] === ZONE.M) { D.rubble[i] = 0; D.burning[i] = 0; D.tier[i] = 2; halls.push(i); }
+  for (let i = 0; i < W * world.h; i++) if (D.civic[i] === CIVIC.MARKET) { D.rubble[i] = 0; D.burning[i] = 0; D.tier[i] = 5; D.meat[i] = 0; halls.push(i); }
   computeFields(D);
-  for (const i of halls) { builtM++; if (D.dread[i] > 0) dreadOnM++; }
+  const sources = halls.flatMap((h) => marketStallTiles(D, h));
+  for (const i of sources) { stallTiles++; if (D.dread[i] > 0) dreadOnStalls++; }
+  const reach = KNOBS.DREAD_RADIUS[KNOBS.MARKET_TIER[5]];
   for (let i = 0; i < W * world.h; i++) {
     if (!D.dread[i]) continue;
-    let near = false;
-    for (const h of halls) if (Math.max(Math.abs((h % W) - (i % W)), Math.abs(((h / W) | 0) - ((i / W) | 0))) <= KNOBS.DREAD_RADIUS[D.tier[h]]) { near = true; break; }
-    if (!near) dreadFar++;
+    if (!sources.some((s) => Math.max(Math.abs((s % W) - (i % W)), Math.abs(((s / W) | 0) - ((i / W) | 0))) <= reach)) dreadFar++;
   }
-  check("dread: on every built hall, nowhere beyond a hall's radius", builtM > 0 && dreadOnM === builtM && dreadFar === 0, `halls ${builtM} · with dread ${dreadOnM} · stray ${dreadFar}`);
-  const dreadPeak = Math.max(...halls.map((i) => D.dread[i]));
-  check("dread: empty halls emit less than the old full-strength tier-2 value", dreadPeak > 0 && dreadPeak < 70, `${dreadPeak}`);
-  for (const i of halls) { D.zone[i] = ZONE.NONE; D.tier[i] = 0; }
+  check("dread: on every stall tile of a market, nowhere beyond a stall tile's radius", halls.length > 0 && stallTiles === 9 * halls.length && dreadOnStalls === stallTiles && dreadFar === 0, `markets ${halls.length} · stall tiles ${stallTiles} · with dread ${dreadOnStalls} · stray ${dreadFar}`);
+  // Stock scales the smell (×0.5 bare hooks → ×1 at 8 units), read on ONE stall so no neighbour adds to it: at the
+  // hall stage nine overlapping stall tiles reach the field's cap of 100 stocked or not, and a peak cannot tell.
+  for (const h of halls) D.tier[h] = 1;
+  computeFields(D);
+  const stall = marketStallTiles(D, halls[0])[0];
+  const emptyPeak = D.dread[stall];
+  for (const h of halls) D.meat[h] = 8;
+  computeFields(D);
+  const stockedPeak = D.dread[stall];
+  check("dread: one stall with bare hooks smells at exactly half a stall's strength, and eight units restore it", halls.length === 1 && emptyPeak === KNOBS.DREAD[1] / 2 && stockedPeak === KNOBS.DREAD[1], `${emptyPeak} → ${stockedPeak}`);
+  for (const h of halls) { D.meat[h] = 0; D.tier[h] = 0; }
   computeFields(D);
   let stray = 0;
   for (let i = 0; i < W * world.h; i++) if (D.dread[i]) stray++;
-  check("dread: zero with the halls unzoned", stray === 0, `${stray}`);
+  check("dread: zero with every market at its bare site", stray === 0, `${stray}`);
   // The two copies of the worker predicate agree.
   computeFields(world);
   const cen = census(world);
@@ -1123,8 +1134,8 @@ function cameraJusticeWorld(){
   {
     const W = cameraJusticeWorld();
     const pool = W.citizens.filter((c) => !c.dead && c.home >= 0 && !c.fixed && (!c.held || c.held <= W.tick));
-    let lot = -1;
-    for (let i = 0; i < W.w * W.h && lot < 0; i++) if (W.tier[i] > 0 && !W.rubble[i]) lot = i;
+    let lot = -1; // a zoned building: the line's wording is the claim, and a meat market off the ring's corner is out of the camera's sight
+    for (let i = 0; i < W.w * W.h && lot < 0; i++) if (W.zone[i] && W.tier[i] > 0 && !W.rubble[i]) lot = i;
     let road = -1;
     for (let i = 0; i < W.w * W.h && road < 0; i++) if (W.road[i] === ROAD.ROAD && !W.rail[i] && !W.wall[i]) road = i;
     W.cash = 100000;
@@ -2132,7 +2143,8 @@ function cameraJusticeWorld(){
   const FIRE = EV.ROSTER.find((e) => e.id === "fire");
   const N = A.world.w * A.world.h;
   const anyBurning = (w) => { for (let i = 0; i < N; i++) if (w.burning[i]) return true; return false; };
-  const firstBuilt = (w) => { for (let i = 0; i < N; i++) if (w.tier[i] > 0 && !w.burning[i] && !w.rubble[i]) return i; return -1; };
+  // The first standing ZONED building: fire to rubble and a street's crime are a lot's (a meat market is placed; its fire has its own check).
+  const firstBuilt = (w) => { for (let i = 0; i < N; i++) if (w.zone[i] && w.tier[i] > 0 && !w.burning[i] && !w.rubble[i]) return i; return -1; };
 
   // --- HOW OFTEN. The roster weight is exact arithmetic, so this needs no run:
   // a town covered end to end must roll fires at FIRE_START_COVERED of the rate
@@ -2198,8 +2210,9 @@ function cameraJusticeWorld(){
   const R = load(A.saved);
   R.events.noDisasters = true;
   computeFields(R);
+  // A ZONED lot: rubble is a lot's fate. (A meat market is placed, and burns back to its bare site — checked below.)
   let lot = -1;
-  for (let i = 0; i < N; i++) if (R.tier[i] > 0 && !R.rubble[i] && !R.burning[i] && !R.fireCov[i]) { lot = i; break; }
+  for (let i = 0; i < N; i++) if (R.zone[i] && R.tier[i] > 0 && !R.rubble[i] && !R.burning[i] && !R.fireCov[i]) { lot = i; break; }
   R.burning[lot] = 1;
   tick(R);
   check("rubble: a lot that burns down starts a RUBBLE_MONTHS clock, not a permanent flag",
@@ -2214,6 +2227,19 @@ function cameraJusticeWorld(){
   check("rubble: it clears ITSELF, one month at a time, and the plot is eligible with no bulldozer",
     R.rubble[lot] === 0 && ticks.every((v, k) => v === KNOBS.RUBBLE_MONTHS - 1 - k) && lotScore(R, lot).reason !== REASON.RUBBLE,
     `countdown ${ticks.join(",")}`);
+  // A MEAT MARKET that burns is not rubble (docs/PROPOSAL-MEAT-MARKET-2026-09-26.md A.6): burnt out it falls back —
+  // to its bare site, or a stage down if the engine reached it — and stays a market, its site standing.
+  const RM = load(A.saved);
+  RM.events.noDisasters = true;
+  computeFields(RM);
+  let mk = -1;
+  for (let i = 0; i < N; i++) if (RM.civic[i] === CIVIC.MARKET) { mk = i; break; }
+  if (mk >= 0 && !RM.tier[mk]) RM.tier[mk] = 1;
+  const mkStage = mk >= 0 ? RM.tier[mk] : 0;
+  if (mk >= 0) { RM.burning[mk] = 1; tick(RM); }
+  check("fire: a meat market that burns out is never rubble — it falls back a stage or to its bare site, and the site stands",
+    mk >= 0 && !RM.rubble[mk] && RM.civic[mk] === CIVIC.MARKET && RM.tier[mk] < mkStage && !RM.burning[mk],
+    mk >= 0 ? `stage ${mkStage} → ${RM.tier[mk]} · rubble ${RM.rubble[mk]}` : "no market");
   const B2 = load(A.saved);
   B2.events.noDisasters = true;
   computeFields(B2);
@@ -3781,14 +3807,14 @@ function cameraJusticeWorld(){
       apply(E, { kind: "centre", tx: 18, ty: 16 });
       apply(E, { kind: "police", tx: 22, ty: 16 });
       apply(E, { kind: "fire", tx: 25, ty: 16 });
+      apply(E, { kind: "market", tx: 28, ty: 16, density: 3 }); // placed like the civics (it too needs a road to be built) …
       // AND THEN TAKE THE ROAD AWAY AGAIN in the unreached run. A building the
       // player cannot reach can no longer be BUILT (the owner: "if a building
       // meets the requirements to exist it should be functional"), so the only
       // way to a stranded one is the way a player finds it - by bulldozing the
       // road that served it. That is the honest reproduction anyway.
       if (!reach) apply(E, { kind: "bulldoze", x0: 10, y0: 15, x1: 30, y1: 15, what: "road" });
-      apply(E, { kind: "zone", zone: ZONE.M, x0: 28, y0: 17, x1: 28, y1: 17, density: 3 });
-      E.tier[e(28, 17)] = 2;
+      E.tier[e(28, 16)] = 5; // … and grown to the hall (stage 5 smells, pens and licenses as a tier-2 hall did)
       computeFields(E);
       recountRosters(E);
       const cen = census(E);
@@ -3849,22 +3875,22 @@ function cameraJusticeWorld(){
     }
     H4.events.noDisasters = true;
     const hroad = [];
-    for (let x = 4; x <= 20; x++) if (x !== 12) hroad.push(h4(x, 10)); // one road, straight through, with the hall in it
+    for (let x = 4; x <= 20; x++) if (x < 11 || x > 13) hroad.push(h4(x, 10)); // one road, straight through, with the market in it
     apply(H4, { kind: "road", tiles: hroad });
-    apply(H4, { kind: "zone", zone: ZONE.M, x0: 12, y0: 10, x1: 12, y1: 10, density: 3 });
-    H4.tier[h4(12, 10)] = 2;
+    apply(H4, { kind: "market", tx: 11, ty: 9, density: 3 }); // a 3×3 standing in the road's three-tile gap
+    H4.tier[h4(11, 9)] = 5;
     apply(H4, { kind: "zone", zone: ZONE.R, x0: 6, y0: 11, x1: 6, y1: 11, density: 3 });
     apply(H4, { kind: "zone", zone: ZONE.R, x0: 18, y0: 11, x1: 18, y1: 11, density: 3 });
     H4.tier[h4(6, 11)] = 1;
     H4.tier[h4(18, 11)] = 1;
     computeFields(H4);
-    const hallDoors = doors(H4, h4(12, 10));
+    const hallDoors = doors(H4, h4(11, 9));
     const west = ME2.hallReach(H4, h4(6, 11));
     const east = ME2.hallReach(H4, h4(18, 11));
     check("access: and every side of a MEAT HALL is a loading bay — a cart coming from the west arrives at the west door and one from the east at the east door, for the same money; the freight index lists a hall under every door it has, not the lowest-numbered one",
-      hallDoors.length === 2 && hallDoors[0] === h4(11, 10) && hallDoors[1] === h4(13, 10)
-        && !!west && !!east && west.hall === h4(12, 10) && east.hall === h4(12, 10)
-        && west.door === h4(11, 10) && east.door === h4(13, 10)
+      hallDoors.length === 2 && hallDoors[0] === h4(10, 10) && hallDoors[1] === h4(14, 10)
+        && !!west && !!east && west.hall === h4(11, 9) && east.hall === h4(11, 9)
+        && west.door === h4(10, 10) && east.door === h4(14, 10)
         && west.walkSteps === east.walkSteps,
       `doors ${hallDoors.map(xy).join(" ")} · from the west ${west ? xy(west.door) : "NO ROUTE"} in ${west && west.walkSteps} · from the east ${east ? xy(east.door) : "NO ROUTE"} in ${east && east.walkSteps}`);
     // AND `routeToHall` KNOWS EVERY DOOR TOO. It is the route `justice.kill`
@@ -3872,18 +3898,18 @@ function cameraJusticeWorld(){
     // law had to be asserted of it separately, and was not: a mutant taking
     // only the hall's first door left the east lot with no route to the hall
     // at all, and the suite green.
-    const eastRoute = ME2.routeToHall(H4, h4(18, 11), h4(12, 10));
-    const westRoute = ME2.routeToHall(H4, h4(6, 11), h4(12, 10));
+    const eastRoute = ME2.routeToHall(H4, h4(18, 11), h4(11, 9));
+    const westRoute = ME2.routeToHall(H4, h4(6, 11), h4(11, 9));
     check("access: and the route that carries a BODY to the hall knows every door as well — `routeToHall` builds its own door set for the hall, so a cart from the east arrives at the east door and one from the west at the west, for the same money",
-      !!eastRoute && !!westRoute && eastRoute.door === h4(13, 10) && westRoute.door === h4(11, 10)
+      !!eastRoute && !!westRoute && eastRoute.door === h4(14, 10) && westRoute.door === h4(10, 10)
         && eastRoute.walkSteps === westRoute.walkSteps,
       `from the east ${eastRoute ? xy(eastRoute.door) : "NO ROUTE"} in ${eastRoute && eastRoute.walkSteps} · from the west ${westRoute ? xy(westRoute.door) : "NO ROUTE"} in ${westRoute && westRoute.walkSteps}`);
     // AND `doorOf` IS THE LOWEST-NUMBERED ONE, which is its whole contract and
     // was asserted nowhere once `need-stress` stopped using it.
     check("access: and `doorOf` is the LOWEST-numbered door, which is the only thing it promises — the single-tile reader the tools use has to agree with the list every rule reads",
-      FI.doorOf(H4, h4(12, 10)) === doors(H4, h4(12, 10))[0] && doors(H4, h4(12, 10)).length === 2
-        && FI.doorOf(H4, h4(12, 10)) < doors(H4, h4(12, 10))[1],
-      `doorOf ${xy(FI.doorOf(H4, h4(12, 10)))} · doorsOf ${doors(H4, h4(12, 10)).map(xy).join(" ")}`);
+      FI.doorOf(H4, h4(11, 9)) === doors(H4, h4(11, 9))[0] && doors(H4, h4(11, 9)).length === 2
+        && FI.doorOf(H4, h4(11, 9)) < doors(H4, h4(11, 9))[1],
+      `doorOf ${xy(FI.doorOf(H4, h4(11, 9)))} · doorsOf ${doors(H4, h4(11, 9)).map(xy).join(" ")}`);
 
     // AND THE FREIGHT CACHE IS RESET AT THE OP, not at the next month.
     // `hallReach` memoises per tick, so a cart asked after a player op would
@@ -3895,12 +3921,12 @@ function cameraJusticeWorld(){
     // wrong reset. Taking the road under the east door leaves the hall
     // standing and the east lot with nowhere to go, and only `ops.apply`'s own
     // `resetMeatRoutes` can notice inside the same month.
-    apply(H4, { kind: "bulldoze", x0: 13, y0: 10, x1: 13, y1: 10, what: "road" });
+    apply(H4, { kind: "bulldoze", x0: 14, y0: 10, x1: 14, y1: 10, what: "road" });
     const afterRaze = ME2.hallReach(H4, h4(18, 11));
     const westStill = ME2.hallReach(H4, h4(6, 11));
     check("access: a cart asked after a player op is answered from the city as it is NOW — take the road under a hall's east door and the very next request from the east says there is nowhere to take the meat, while the west still arrives; ops resets the freight cache at the op, not at the next month",
-      !!staleRoute && staleRoute.door === h4(13, 10) && H4.road[h4(13, 10)] === ROAD.NONE
-        && afterRaze === null && !!westStill && westStill.door === h4(11, 10),
+      !!staleRoute && staleRoute.door === h4(14, 10) && H4.road[h4(14, 10)] === ROAD.NONE
+        && afterRaze === null && !!westStill && westStill.door === h4(10, 10),
       `before, in by ${staleRoute ? xy(staleRoute.door) : "none"} · after the road went, from the east ${afterRaze ? xy(afterRaze.door) : "no route"} and from the west ${westStill ? xy(westStill.door) : "no route"}`);
   }
 
@@ -4208,10 +4234,11 @@ function cameraJusticeWorld(){
     apply(D, { kind: "zone", zone: ZONE.R, x0: 14, y0: 7, x1: 17, y1: 9, density: 3 });
     apply(D, { kind: "zone", zone: ZONE.C, x0: 20, y0: 7, x1: 23, y1: 9, density: 3 });
     apply(D, { kind: "zone", zone: ZONE.I, x0: 26, y0: 7, x1: 29, y1: 9, density: 3 });
-    apply(D, { kind: "zone", zone: ZONE.M, x0: 32, y0: 7, x1: 33, y1: 9, density: 3 });
+    // (No meat row since 2026-09-26: a meat market is placed, and must touch a road to be placed at all — it has no
+    // frontage to be two tiles deep in. Its growth reads access through `served` in lots.js marketScore.)
     computeFields(D);
     const rows = [];
-    for (const [name, x] of [["R", 14], ["C", 20], ["I", 26], ["M", 32]]) {
+    for (const [name, x] of [["R", 14], ["C", 20], ["I", 26]]) {
       const near = dat(x, 7);   // one tile from the road
       const farr = dat(x, 9);   // three tiles from it — both served
       for (const j of [near, farr]) { D.tier[j] = 2; D.lv[j] = 70; D.pol[j] = 4; D.crime[j] = 8; D.dread[j] = 0; D.maxTier[j] = 3; }
@@ -4772,6 +4799,12 @@ check("no Math.random under js/", mathRandom.length === 0, mathRandom.join(", ")
   const seen = new Set();
   for (let t = 0; t < 30 * 12; t++) {
     mayor.month(t);
+    // A CENTENARY is a tortoise turning one hundred, and whether a run of thirty years holds one was luck: the market
+    // (2026-09-26) moved this run's trajectory and the last one went. Forced like the rest — the call site is the claim.
+    if (t === 350) {
+      const tortoise = Y.citizens.find((c) => !c.dead && c.species === "tortoise" && c.home >= 0 && !c.centenary);
+      if (tortoise) { tortoise.born = Y.tick - 100 * 12; tortoise.deathAge = 99999; }
+    }
     if (t === 356) {
       const target = Y.households.find((h) => !h.gone && h.home >= 0 && h.members.length);
       const resident = target && Y.byId.get(target.members[0]);
@@ -5086,7 +5119,7 @@ check("no Math.random under js/", mathRandom.length === 0, mathRandom.join(", ")
     target: null, prevented: false, preventDefault() { this.prevented = true; }, ...extra,
   });
   const expectedToolKeys = [
-    ["1", "Digit1", "R"], ["2", "Digit2", "C"], ["3", "Digit3", "I"], ["4", "Digit4", "M"],
+    ["1", "Digit1", "R"], ["2", "Digit2", "C"], ["3", "Digit3", "I"], ["4", "Digit4", "market"],
     ["5", "Digit5", "road"], ["6", "Digit6", "wall"], ["7", "Digit7", "rail"], ["8", "Digit8", "station"],
     ["9", "Digit9", "tree"], ["0", "Digit0", "park"], ["z", "KeyZ", "zoo"], ["v", "KeyV", "centre"],
     ["p", "KeyP", "police"], ["f", "KeyF", "fire"], ["i", "KeyI", "inspect"], ["b", "KeyB", "bulldoze"],
@@ -5257,7 +5290,7 @@ check("no Math.random under js/", mathRandom.length === 0, mathRandom.join(", ")
   madeOps.length = 0;
   opWorld.zone[at] = ZONE.NONE;
   opWorld.maxTier[at] = 0;
-  const pointerTools = ["R", "C", "I", "M", "road", "wall", "rail", "station", "tree", "park", "zoo", "centre", "police", "fire", "bulldoze"];
+  const pointerTools = ["R", "C", "I", "market", "road", "wall", "rail", "station", "tree", "park", "zoo", "centre", "police", "fire", "bulldoze"];
   pointerTools.push("largePark");
   for (let dy=0;dy<3;dy++) for(let dx=0;dx<3;dx++) { const i=at+dx+dy*opWorld.w; for(const k of ["terrain","road","zone","civic","wall","rail","tier","big","rubble","burning"]) opWorld[k][i]=0; }
   opWorld.road[at-1]=ROAD.ROAD; opWorld.roadsDirty=true;
@@ -5269,8 +5302,9 @@ check("no Math.random under js/", mathRandom.length === 0, mathRandom.join(", ")
     canvasEvents.pointerup(pe(10, 10));
   }
   const pointerKinds = madeOps.map((op) => op.kind);
-  const pointerOpsExact = JSON.stringify(pointerKinds) === JSON.stringify(["zone", "zone", "zone", "zone", "road", "wall", "rail", "station", "tree", "park", "zoo", "centre", "police", "fire", "bulldoze", "largePark"])
-    && JSON.stringify(madeOps.slice(0, 4).map((op) => op.zone)) === JSON.stringify([ZONE.R, ZONE.C, ZONE.I, ZONE.M]);
+  const pointerOpsExact = JSON.stringify(pointerKinds) === JSON.stringify(["zone", "zone", "zone", "market", "road", "wall", "rail", "station", "tree", "park", "zoo", "centre", "police", "fire", "bulldoze", "largePark"])
+    && JSON.stringify(madeOps.slice(0, 3).map((op) => op.zone)) === JSON.stringify([ZONE.R, ZONE.C, ZONE.I])
+    && madeOps[3]?.density === input.density; // the market's place op carries the H brush, its form
   globalThis.window = oldWindow;
   check("needs: camera repicks Inspect; a citizen pin survives its walker; explicit unpin synchronizes bubbles",
     pinAttached && panelBubbleKept && escapeCleared && dragRepicked && keyRepicked && zoomRepicked && clampRepicked && costRepicked && roadCleared && citizenPinKept && epitaphKept && linkRepinned && explicitUnpinCleared,
@@ -5704,7 +5738,7 @@ check("no Math.random under js/", mathRandom.length === 0, mathRandom.join(", ")
   const HC = await import("./headless-canvas.mjs");
   HC.installCanvas();
 
-  const ids = ["R", "C", "I", "M", "road", "wall", "rail", "station", "tree", "park", "zoo", "centre", "police", "fire", "inspect", "bulldoze", "largePark", "camera", "library", "university", "gallery", "amphitheater", "farm", "cemetery", "sanitation", "garbage", "doctor", "hospital", "governor"];
+  const ids = ["R", "C", "I", "market", "road", "wall", "rail", "station", "tree", "park", "zoo", "centre", "police", "fire", "inspect", "bulldoze", "largePark", "camera", "library", "university", "gallery", "amphitheater", "farm", "cemetery", "sanitation", "garbage", "doctor", "hospital", "governor"];
   const keys = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "Z", "V", "P", "F", "I", "B", "G", "E", "K", "Y", "M", "T", "X", "C", "J", "Q", "[", "]", ";"];
   const orders = Array.from({ length: 29 }, (_, i) => i + 1);
   check("palette: the canonical registry has the owner's exact twenty-nine tools, order and unique keys",
@@ -5713,14 +5747,14 @@ check("no Math.random under js/", mathRandom.length === 0, mathRandom.join(", ")
       && JSON.stringify(TOOLS.map((t) => t.order)) === JSON.stringify(orders)
       && new Set(TOOLS.map((t) => t.key.toUpperCase())).size === 29
       && TOOLS.every((t) => TOOL_BY_ID[t.id] === t && TOOL_BY_KEY[t.key.toUpperCase()] === t));
-  const expectedKinds = ["zone", "zone", "zone", "zone", "road", "wall", "rail", "station", "tree", "park", "zoo", "centre", "police", "fire", "inspect", "bulldoze", "largePark", "camera", "library", "university", "gallery", "amphitheater", "farm", "cemetery", "sanitation", "garbage", "doctor", "hospital", "governor"];
-  check("palette: every ordered row carries its exact operation and the four zones keep R/C/I/M identity",
+  const expectedKinds = ["zone", "zone", "zone", "market", "road", "wall", "rail", "station", "tree", "park", "zoo", "centre", "police", "fire", "inspect", "bulldoze", "largePark", "camera", "library", "university", "gallery", "amphitheater", "farm", "cemetery", "sanitation", "garbage", "doctor", "hospital", "governor"];
+  check("palette: every ordered row carries its exact operation and the three zones keep R/C/I identity — meat is placed since 2026-09-26",
     JSON.stringify(TOOLS.map((t) => t.op.kind)) === JSON.stringify(expectedKinds)
-      && JSON.stringify(TOOLS.slice(0, 4).map((t) => t.op.zone)) === JSON.stringify([ZONE.R, ZONE.C, ZONE.I, ZONE.M])
+      && JSON.stringify(TOOLS.slice(0, 3).map((t) => t.op.zone)) === JSON.stringify([ZONE.R, ZONE.C, ZONE.I])
       && TOOLS.every((t) => labelForOp(t.op) === t.label));
   check("palette: no build binding is WASD and place-tool classification is derived from the registry",
     TOOLS.every((t) => !["W", "A", "S", "D"].includes(t.key.toUpperCase()))
-      && JSON.stringify(PLACE_TOOLS) === JSON.stringify(["station", "park", "zoo", "centre", "police", "fire", "largePark", "library", "university", "gallery", "amphitheater", "farm", "cemetery", "sanitation", "garbage", "doctor", "hospital", "governor"]));
+      && JSON.stringify(PLACE_TOOLS) === JSON.stringify(["market", "station", "park", "zoo", "centre", "police", "fire", "largePark", "library", "university", "gallery", "amphitheater", "farm", "cemetery", "sanitation", "garbage", "doctor", "hospital", "governor"]));
 
   const opsSrc = readFileSync(path.join(ROOT, "js", "sim", "ops.js"), "utf8");
   const costBody = opsSrc.slice(opsSrc.indexOf("export function costOf"), opsSrc.indexOf("function snapshot"));
@@ -5746,7 +5780,7 @@ check("no Math.random under js/", mathRandom.length === 0, mathRandom.join(", ")
       iconRows.push(`${tool.id}:${sprite.name}`);
     } catch (e) { spriteFailures++; iconRows.push(`${tool.id}:ERROR ${e.message}`); }
   }
-  const expectedSprites = ["R1-cottage-0", "C1-shop-0", "I1-shed-0", "M1-stall-0", "road-5", "wall-5", "rail-5", "station-ns", "tree-round", "park", "civic-zoo-3x3", "civic-centre-3x3", "civic-police-3x3", "civic-fire-3x3", "cursor", "rubble", "civic-largePark-3x3", "camera-0", "civic-library-2x2", "civic-university-3x3", "civic-gallery-2x2", "civic-amphitheater-3x3", "civic-farm-2x2", "civic-cemetery-6x6", "civic-sanitation-3x3", "civic-garbage-2x2", "civic-doctor-2x2", "civic-hospital-3x3", "governor-estate-0"];
+  const expectedSprites = ["R1-cottage-0", "C1-shop-0", "I1-shed-0", "market-4", "road-5", "wall-5", "rail-5", "station-ns", "tree-round", "park", "civic-zoo-3x3", "civic-centre-3x3", "civic-police-3x3", "civic-fire-3x3", "cursor", "rubble", "civic-largePark-3x3", "camera-0", "civic-library-2x2", "civic-university-3x3", "civic-gallery-2x2", "civic-amphitheater-3x3", "civic-farm-2x2", "civic-cemetery-6x6", "civic-sanitation-3x3", "civic-garbage-2x2", "civic-doctor-2x2", "civic-hospital-3x3", "governor-estate-0"];
   const scaled = HC.createCanvas(1, 1);
   const scaledSprite = spriteForTool(art, "R");
   paintSprite(scaled, scaledSprite, 2);
@@ -6073,8 +6107,8 @@ if (existsSync(artIndex)) {
   const noDiet = SPECIES.filter((sp) => !["herb", "omni", "carn"].includes(sp.diet)).map((sp) => sp.id);
   check("species: every roster row has a diet", noDiet.length === 0, noDiet.join(", "));
   let artM = true;
-  try { art.chalk(4, false); art.chalk(4, true); for (const t of [1, 2, 3]) for (const v of [0, 1]) art.building(4, t, v); art.civic("centre"); } catch (e) { artM = false; }
-  check("art: zone M (chalk, three tiers) and the centre exist — the renderer, not the sim, gates a fourth zone", artM);
+  try { for (let s = 0; s <= 6; s++) if (art.civic("market", 3, s).name !== `market-${s}`) artM = false; art.civic("centre"); } catch (e) { artM = false; }
+  check("art: the meat market's seven stages (the family is its growth, stage-indexed) and the centre exist", artM);
   // THE HI-RES SET (js/art/hires.js, SPEC §12.6): every box solid and every
   // ground diamond has a 2× twin made from its recipe — the same picture
   // twice the size: the anchor on the same world point, the ink within 12%
@@ -6500,7 +6534,7 @@ if (existsSync(artIndex)) {
   check("play: and it does follow once invalidate() is called",
     fresh !== stale, `${bare.length} ground tiles still not drawn`);
   // BUILDING: the per-frame pass, no invalidate needed.
-  const lot = nearestAim((i) => P.tier[i] > 0 && !P.rubble[i] && !P.burning[i]);
+  const lot = nearestAim((i) => P.zone[i] && P.tier[i] > 0 && !isPart(P, i) && !P.rubble[i] && !P.burning[i]); // a building's ANCHOR: a block's part draws nothing of its own
   const withLot = frame();
   P.tier[lot] = 0;
   check("play: a BUILDING is in the per-frame pass and needs no invalidate at all",
@@ -6588,8 +6622,8 @@ if (existsSync(artIndex)) {
   const { recountRosters } = await import("../js/sim/fields.js");
   const { TERRAIN } = W;
 
-  check("blocks: capacities are side² × 1.25 of a tier-3 lot — R 24/120/270 · C 20/100/225 · I 24/120/270 · M 16/80/180",
-    JSON.stringify(B.blockCapacities()) === JSON.stringify({ R: { 1: 24, 2: 120, 3: 270 }, C: { 1: 20, 2: 100, 3: 225 }, I: { 1: 24, 2: 120, 3: 270 }, M: { 1: 16, 2: 80, 3: 180 } }), JSON.stringify(B.blockCapacities()));
+  check("blocks: capacities are side² × 1.25 of a tier-3 lot — R 24/120/270 · C 20/100/225 · I 24/120/270 (no meat row: a market is placed and grows by stage)",
+    JSON.stringify(B.blockCapacities()) === JSON.stringify({ R: { 1: 24, 2: 120, 3: 270 }, C: { 1: 20, 2: 100, 3: 225 }, I: { 1: 24, 2: 120, 3: 270 } }), JSON.stringify(B.blockCapacities()));
 
   // A fixture: a dry 6×6, a road along its north edge, a 3×3 R patch zoned
   // High under it — tier 3 at its north corner, tier 2 on the other eight —
@@ -6898,6 +6932,13 @@ function costOfBulldoze(w, x, y) { return (0, costOfOp)(w, { kind: "bulldoze", x
   const { createWalkers } = await import("../js/walkers.js");
   const { art: hArt } = await import("../js/art/index.js");
   const { ink: hInk } = await import("../js/art/format.js");
+  // A HALL IS A MARKET since 2026-09-26 (docs/PROPOSAL-MEAT-MARKET-2026-09-26.md). These fixtures test the hall's
+  // MECHANICS — routes, stock, pens, the identity — which never read its footprint, so each keeps its hand-laid map
+  // with a ONE-TILE market (a legacy-sized civic, civicSize 1, as a save may hold one). The 3×3 geometry is asserted
+  // where it matters: the scripted city's smell and the hall-doors check. `tier` is the old zoned tier — 1 a stall,
+  // 2 a hall, 3 a cold store — and lands on the stage that stands for it (KNOBS.MARKET_TIER).
+  const HALL_STAGE = [0, 1, 5, 6];
+  const makeHall = (w, i, tier) => { w.civic[i] = CIVIC.MARKET; w.civicSize[i] = 1; w.zone[i] = ZONE.NONE; w.tier[i] = HALL_STAGE[tier]; w.maxTier[i] = 3; };
   const flatFreight = (seed = "h-freight", withRail = true) => {
     const w = createWorld({ seed, w: 64, h: 16 });
     w.terrain.fill(WO.TERRAIN.GRASS); w.road.fill(ROAD.NONE); w.rail.fill(0); w.zone.fill(ZONE.NONE); w.tier.fill(0);
@@ -6908,7 +6949,7 @@ function costOfBulldoze(w, x, y) { return (0, costOfOp)(w, { kind: "bulldoze", x
     for (let x = 2; x <= 58; x++) w.road[at(x, 7)] = ROAD.ROAD;
     const home = at(2, 8), hall = at(58, 8);
     w.zone[home] = ZONE.R; w.tier[home] = 1;
-    w.zone[hall] = ZONE.M; w.tier[hall] = 2;
+    makeHall(w, hall, 2);
     if (withRail) {
       for (let x = 5; x <= 55; x++) w.rail[at(x, 6)] = 1;
       w.rail[at(5, 6)] = 2; w.rail[at(55, 6)] = 2;
@@ -6940,7 +6981,7 @@ function costOfBulldoze(w, x, y) { return (0, costOfOp)(w, { kind: "bulldoze", x
   R.w.rail[R.at(30, 6)] = 1; R.w.rail[R.at(5, 6)] = 1; R.w.rail[R.at(55, 6)] = 1; ME.resetMeatRoutes(R.w);
   check("meat route: track without both stations gives no free ride", ME.hallReach(R.w, R.home, 8) === null);
   R.w.rail[R.at(5, 6)] = 2; R.w.rail[R.at(55, 6)] = 2;
-  R.w.zone[R.at(59, 8)] = ZONE.M; R.w.tier[R.at(59, 8)] = 1; R.w.roadsDirty = true; computeFields(R.w); ME.resetMeatRoutes(R.w);
+  makeHall(R.w, R.at(59, 8), 1); R.w.roadsDirty = true; computeFields(R.w); ME.resetMeatRoutes(R.w);
   check("meat route: equal-cost halls sharing a door tie by stable tile id", ME.hallReach(R.w, R.home, 8)?.hall === R.hall);
   R.w.meat[R.hall] = KNOBS.MEAT_CAP; ME.resetMeatRoutes(R.w);
   check("meat route: a full nearest hall redirects supply to the next reachable hall", ME.hallReach(R.w, R.home, 9, { space: true })?.hall === R.at(59, 8));
@@ -6957,7 +6998,7 @@ function costOfBulldoze(w, x, y) { return (0, costOfOp)(w, { kind: "bulldoze", x
   const WD = createWorld({ seed: "h-wall-door", w: 8, h: 8 });
   WD.terrain.fill(WO.TERRAIN.GRASS); WD.road.fill(ROAD.NONE); WD.zone.fill(ZONE.NONE); WD.tier.fill(0); WD.wall.fill(0); WD.citizens = []; WD.households = []; WD.byId = new Map(); WD.hhById = new Map();
   const wat = (x, y) => y * WD.w + x, wh = wat(3, 3), wk = wat(7, 4);
-  WD.zone[wh] = ZONE.M; WD.tier[wh] = 1; WD.zone[wk] = ZONE.R; WD.tier[wk] = 1;
+  makeHall(WD, wh, 1); WD.zone[wk] = ZONE.R; WD.tier[wk] = 1;
   WD.wall[wat(3, 2)] = 1; WD.road[wat(3, 1)] = ROAD.ROAD;
   for (let x = 5; x <= 7; x++) WD.road[wat(x, 3)] = ROAD.ROAD;
   const penHh = CI.createHousehold(WD, "pig", 1), killerHh = CI.createHousehold(WD, "wolf", 1);
@@ -7115,11 +7156,12 @@ function costOfBulldoze(w, x, y) { return (0, costOfOp)(w, { kind: "bulldoze", x
     const underfull = flatFreight("h-pen-underfull"), cowHh = CI.createHousehold(underfull.w, "cow", 3);
     CI.placeHousehold(underfull.w, cowHh, underfull.home); cowHh.members.forEach((id) => { underfull.w.byId.get(id).born = 0; });
     ME.meatTick(underfull.w);
-    check("market pen: only pig/cow cubs from a full household qualify, and tier capacities are exactly 2/4/8",
+    check("market pen: only pig/cow cubs from a full household qualify, and a market's pens are 2 on every stall stage, 4 at the hall, 8 at the exchange",
       !PN.w.citizens.some((c) => c.pen) && !underfull.w.citizens.some((c) => c.pen)
       && (PN.w.tier[PN.hall] = 1, ME.penCapacity(PN.w, PN.hall) === 2)
-      && (PN.w.tier[PN.hall] = 2, ME.penCapacity(PN.w, PN.hall) === 4)
-      && (PN.w.tier[PN.hall] = 3, ME.penCapacity(PN.w, PN.hall) === 8));
+      && (PN.w.tier[PN.hall] = 4, ME.penCapacity(PN.w, PN.hall) === 2)
+      && (PN.w.tier[PN.hall] = 5, ME.penCapacity(PN.w, PN.hall) === 4)
+      && (PN.w.tier[PN.hall] = 6, ME.penCapacity(PN.w, PN.hall) === 8));
     PN.w.tier[PN.hall] = 1;
     for (const id of rabbitHh.members.slice(0, 3)) {
       const c = PN.w.byId.get(id); c.pen = true; c.penSince = id; c.heldAt = PN.hall; c.held = PN.w.tick + 100;
@@ -7228,20 +7270,18 @@ function costOfBulldoze(w, x, y) { return (0, costOfOp)(w, { kind: "bulldoze", x
     check("meat save: a fractional demand remainder survives save/load and continues hash-identically",
       FD.w.meatStats.demand[String(FD.hall)] > 0 && stateHash(FD.w) === stateHash(FDL), `${stateHash(FD.w)} vs ${stateHash(FDL)}`);
 
-    // A block keeps one aggregate inventory through merge/split and gives it
-    // an explicit fate when the last hall disappears.
-    const B = flatFreight("h-block", false), tiles = [B.at(57, 8), B.at(58, 8), B.at(57, 9), B.at(58, 9)], ba = tiles[0];
-    B.w.zone[B.hall] = ZONE.NONE; B.w.tier[B.hall] = 0;
-    for (const i of tiles) { B.w.zone[i] = ZONE.M; B.w.tier[i] = 3; }
-    B.w.meat[tiles[0]] = 2; B.w.meat[tiles[1]] = 3; B.w.meat[tiles[2]] = 4; B.w.meat[tiles[3]] = 1;
-    ME.meatStats(B.w); CI.rebuildMaps(B.w);
-    const BL = await import("../js/sim/blocks.js");
-    BL.mergeLots(B.w, { side: 2, anchor: ba, tiles }); ME.meatTick(B.w);
-    const merged = ME.hallStock(B.w, ba);
-    BL.splitLot(B.w, ba); const split = ME.hallStock(B.w, ba);
+    // A market keeps its stock through its stages (it never merges: it is placed at 3×3 and grows by stage) and gives
+    // it an explicit fate when it is razed. (Until 2026-09-26 this was the zoned blocks' merge and split.)
+    const B = flatFreight("h-block", false), ba = B.hall;
+    B.w.tier[ba] = 6; ME.meatStats(B.w); CI.rebuildMaps(B.w);
+    ME.receiveMeat(B.w, ba, "bought", 10);
+    const LO = await import("../js/sim/lots.js");
+    LO.marketStepDown(B.w, ba); ME.meatTick(B.w); const atHall = ME.hallStock(B.w, ba);
+    LO.marketStepDown(B.w, ba); ME.meatTick(B.w); const atSquare = ME.hallStock(B.w, ba);
     const razed = apply(B.w, { kind: "bulldoze", x0: ba % B.w.w, y0: (ba / B.w.w) | 0, x1: ba % B.w.w, y1: (ba / B.w.w) | 0 });
-    check("meat blocks: merge and split conserve aggregate stock; razing names all ten units as spoilage with no ghost",
-      merged === 10 && split === 10 && razed.ok && ME.hallStock(B.w, ba) === 0 && B.w.meatStats.total.spoiled === 10 && ME.meatBalance(B.w).ok);
+    check("meat market: stock survives the stages it loses (exchange → hall → square); razing names all ten units as spoilage with no ghost",
+      B.w.tier[ba] === 0 && atHall === 10 && atSquare === 10 && razed.ok && ME.hallStock(B.w, ba) === 0 && B.w.meatStats.total.spoiled === 10 && ME.meatBalance(B.w).ok,
+      `hall ${atHall} · square ${atSquare} · razed ${razed.ok} · spoiled ${B.w.meatStats.total.spoiled}`);
 
     const BF = flatFreight("h-fire", false); ME.receiveMeat(BF.w, BF.hall, "bought", 7); BF.w.burning[BF.hall] = 1;
     ME.meatTick(BF.w);

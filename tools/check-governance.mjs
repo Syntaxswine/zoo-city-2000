@@ -36,7 +36,8 @@ assert.equal(op('violentSentence','zoo').ok,true);assert.equal(sentenceFor(w,{ca
 assert.equal(op('repeatSentence','zoo').ok,true);assert.equal(sentenceFor(w,{cause:'theft'},{...resident,thefts:1}).sentence,'zoo');
 hash=stateHash(w);assert.equal(op('wrong',true).ok,false);assert.equal(op('cleaners','true').ok,false);assert.equal(stateHash(w),hash);
 const cash=w.cash;assert.equal(op('scrubbers',true).ok,true);assert.equal(w.cash,cash-1500);assert.equal(w.events.scrubbers,true);assert.equal(op('scrubbers',false).ok,false);
-const hall=at(20,20);w.zone[hall]=ZONE.M;w.tier[hall]=1;receiveMeat(w,hall,'bought',3);
+// A one-tile meat market at one stall (a legacy-sized civic): meat is placed, not zoned, since 2026-09-26.
+const hall=at(20,20);w.civic[hall]=CIVIC.MARKET;w.civicSize[hall]=1;w.maxTier[hall]=1;w.tier[hall]=1;receiveMeat(w,hall,'bought',3);
 assert.equal(op('meatTrade','inspected').ok,true);assert.equal(w.events.licence,true);
 assert.equal(op('meatTrade','prohibited').ok,true);assert.equal(isHall(w,hall),false);assert.equal(jobsOf(w,hall),0);assert.equal(w.meat[hall],0);assert.equal(meatStats(w).total.spoiled,3);
 assert.equal(sentenceFor(w,{cause:'theft'},{...resident,thefts:2}).sentence,'zoo');assert.equal(sentenceFor(w,charge,resident,{sentence:'hall'}).sentence,'zoo');assert.equal(op('minorSentence','hall').ok,false);

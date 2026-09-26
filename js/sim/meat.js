@@ -9,7 +9,7 @@ import { policy } from './governance.js';
 // measured steps. Property value never imports this module or reads a route.
 
 import { KNOBS } from "./rules.js";
-import { ZONE, anchorOf, footprintOf, capacityOf, absent, isPart } from "./world.js";
+import { ZONE, anchorOf, footprintOf, capacityOf, absent, isMarket, clearZoneTiles } from "./world.js";
 import { WALK, TILE, dial, doorsOf, nodePath } from "./fields.js";
 import { DIET_OF } from "./species.js";
 import { removeCitizen } from "./citizens.js";
@@ -97,12 +97,14 @@ export function beginMeatMonth(world) {
   return active ? line : null;
 }
 
-/** A standing hall is one M building anchor. Road access is a route concern, not existence. */
+/**
+ * A standing hall is a MEAT MARKET's anchor above its bare site (docs/PROPOSAL-MEAT-MARKET-2026-09-26.md): the one
+ * predicate every meat rule reads. Until 2026-09-26 it was a lot zoned M. Road access is a route concern, not existence.
+ */
 export function isHall(world, i) {
   if(policy(world,'meatTrade')==='prohibited')return false;
   if (!(i >= 0 && i < world.w * world.h)) return false;
-  const a = anchorOf(world, i);
-  return a === i && world.zone[a] === ZONE.M && world.tier[a] > 0 && !world.rubble[a] && !world.burning[a];
+  return isMarket(world.civic[i]) && world.tier[i] > 0 && !world.rubble[i] && !world.burning[i];
 }
 
 /**
@@ -114,7 +116,7 @@ export function isHall(world, i) {
 export function hallSites(world) {
   const out = [];
   for (let i = 0; i < world.w * world.h; i++) {
-    if (world.zone[i] === ZONE.M && world.tier[i] > 0 && !isPart(world, i)) out.push(i);
+    if (isMarket(world.civic[i]) && world.tier[i] > 0) out.push(i);
   }
   return out;
 }
@@ -162,8 +164,9 @@ function reconcilePens(world) {
   }
 }
 
+/** Pens by what the market's stage stands for: a stall's 2, a hall's 4, a cold store's 8 (KNOBS.MARKET_TIER). */
 export function penCapacity(world, hall) {
-  return KNOBS.PEN_CAP[world.tier[anchorOf(world, hall)]] || 0;
+  return KNOBS.PEN_CAP[KNOBS.MARKET_TIER[world.tier[anchorOf(world, hall)]] || 0] || 0;
 }
 
 /** Derived route caches are never saved or hashed. */
@@ -340,6 +343,32 @@ export function closeHall(world, hall) {
   }
   resetMeatRoutes(world);
   return { spoiled, released };
+}
+
+/**
+ * A save made while meat was ZONED (before 2026-09-26): its halls close on load through the path a bulldozer takes —
+ * stock spoiled, penned animals home alive, both inside the identity meatBalance() audits — and their lots become
+ * plain ground. The owner accepted that such saves break ("it will break the saves, but thats ok"); this keeps the
+ * rest of the town (docs/PROPOSAL-MEAT-MARKET-2026-09-26.md A.7). A no-op on any city saved since. Returns the halls closed.
+ */
+export function clearZonedMeat(world) {
+  const n = world.w * world.h;
+  let halls = 0;
+  let zoned = false;
+  for (let i = 0; i < n; i++) {
+    if (world.zone[i] !== ZONE.M) continue;
+    zoned = true;
+    if (anchorOf(world, i) === i && world.tier[i] > 0) { closeHall(world, i); halls++; }
+  }
+  if (!zoned) return 0;
+  for (let i = 0; i < n; i++) if (world.zone[i] === ZONE.M && world.meat[i]) spoilStock(world, i, world.meat[i]); // a stray unit on a part or a bare lot, accounted all the same
+  clearZoneTiles(world, ZONE.M); // the ground itself is world.js's to write, at load as at worldgen
+  if (halls) {
+    const line = `THE MEAT MARKETS — this city was saved when meat was zoned: its ${halls} hall${halls === 1 ? "" : "s"} closed, the stock spoiled and the penned animals went home. Meat is placed now — a Meat market, key 4.`;
+    world.events.log.push({ t: world.tick, id: "market", line });
+  }
+  resetMeatRoutes(world);
+  return halls;
 }
 
 /**

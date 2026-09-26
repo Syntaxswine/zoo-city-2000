@@ -17,9 +17,10 @@
 // The extraction is proved by the hash: `playtest --years 30 --quiet` printed
 // 292e7fa1 before it and prints 292e7fa1 after it.
 
-import { ZONE, TERRAIN, idx, inBounds } from "../js/sim/world.js";
+import { ZONE, CIVIC, TERRAIN, idx, inBounds } from "../js/sim/world.js";
 import { apply, undo } from "../js/sim/ops.js";
 import { served } from "../js/sim/fields.js";
+import { KNOBS } from "../js/sim/rules.js";
 
 const NORMAL_BLOCK = 7;
 const ESTATE_BLOCK = 8;
@@ -160,19 +161,23 @@ export function createMayor(world, opts = {}) {
     for (let y = y0; y <= y1; y++) { ring.push(idx(world, x0, y)); ring.push(idx(world, x1, y)); }
     // Connect the ring to the start road if this is the first block.
     const r1 = apply(world, { kind: "road", tiles: ring });
-    let zoneRect = { x0: x0 + 1, y0: y0 + 1, x1: x1 - 1, y1: y1 - 1 };
-    if (layout === "estate" && zone === ZONE.M) {
-      // One unambiguous hall in each reserved market interior: the H probe is
-      // a two-HALL town, not two chalk blocks that happen to merge into an
-      // unpredictable number of buildings. Pick the dry tile nearest centre.
-      const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
-      const lots = [];
-      for (let y = y0 + 1; y < y1; y++) for (let x = x0 + 1; x < x1; x++) {
-        if (world.terrain[idx(world, x, y)] !== TERRAIN.WATER) lots.push([x, y]);
+    if (zone === ZONE.M) {
+      // MEAT IS PLACED, NOT ZONED (docs/PROPOSAL-MEAT-MARKET-2026-09-26.md): one Heavy market in the block, against the
+      // ring road at the first interior corner that takes it. The estate's old rule — "one unambiguous hall in each
+      // market interior" — is now the only kind there is: a block holds one market, and it grows or it does not.
+      // The FORM a sensible mayor would pick (the H brush): Heavy opens at 27 jobs and a town that wants fewer would
+      // only watch it close again, so Heavy once the town wants 40 meat jobs (demand.js's 0.06 a carnivore + 10), Light below.
+      const cen = world.last?.census;
+      const wanted = cen ? KNOBS.MEAT_PER_CARN * (cen.carnivores || 0) + KNOBS.MEAT_SEED : 0;
+      const density = wanted >= 40 ? 3 : 1;
+      let placed = false;
+      for (const [tx, ty] of [[x0 + 1, y0 + 1], [x1 - 3, y0 + 1], [x0 + 1, y1 - 3], [x1 - 3, y1 - 3]]) {
+        if (apply(world, { kind: "market", tx, ty, density }).ok) { placed = true; break; }
       }
-      lots.sort((a, b) => (Math.abs(a[0] - cx) + Math.abs(a[1] - cy)) - (Math.abs(b[0] - cx) + Math.abs(b[1] - cy)) || a[1] - b[1] || a[0] - b[0]);
-      if (lots.length) zoneRect = { x0: lots[0][0], y0: lots[0][1], x1: lots[0][0], y1: lots[0][1] };
+      opened.add(`${bx},${by}`);
+      return (r1.ok || r1.reason === "nothing to do") && placed;
     }
+    const zoneRect = { x0: x0 + 1, y0: y0 + 1, x1: x1 - 1, y1: y1 - 1 };
     const r2 = apply(world, { kind: "zone", zone, ...zoneRect, density: 3 });
     opened.add(`${bx},${by}`);
     return (r1.ok || r1.reason === "nothing to do") && r2.ok;
@@ -334,6 +339,8 @@ export function createMayor(world, opts = {}) {
       const wants = wantTypes[layout](v).sort((a, b) => b[2] - a[2]);
       const empty = { [ZONE.R]: 0, [ZONE.C]: 0, [ZONE.I]: 0, [ZONE.M]: 0 };
       for (let i = 0; i < world.w * world.h; i++) if (world.zone[i] && world.tier[i] === 0 && !world.rubble[i]) empty[world.zone[i]]++;
+      // A market still at its bare site is room enough: open no other until it trades (it stands for a block's worth).
+      for (let i = 0; i < world.w * world.h; i++) if (world.civic[i] === CIVIC.MARKET && world.tier[i] === 0) empty[ZONE.M] += 12;
       for (const [name, zone, val] of wants) {
         if (val < 0.05) break;
         if (empty[zone] >= 12) continue;

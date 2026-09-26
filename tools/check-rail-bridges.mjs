@@ -1,4 +1,4 @@
-import {createWorld,TERRAIN,ZONE,ROAD} from '../js/sim/world.js';
+import {createWorld,TERRAIN,ZONE,ROAD,CIVIC} from '../js/sim/world.js';
 import {apply,undo} from '../js/sim/ops.js';
 import {computeFields,commutePath,doorOf,RIDE} from '../js/sim/fields.js';
 import {hallReach} from '../js/sim/meat.js';
@@ -24,7 +24,7 @@ export function checkRailBridges(check){
   check('rail bridge '+axis+': stations and road crossings are refused on water',!apply(w,{kind:'station',...xy(wet)}).ok&&!apply(w,{kind:'road',tiles:[wet]}).ok&&!w.road[wet]&&w.rail[wet]===1);
   for(let x=2;x<=17;x++)if(x<8||x>11)w.road[at(x,7)]=ROAD.ROAD;
   apply(w,{kind:'station',...xy(at(2,6))});apply(w,{kind:'station',...xy(at(17,6))});
-  const home=at(2,8),hall=at(17,8);w.zone[home]=ZONE.R;w.tier[home]=1;w.zone[hall]=ZONE.M;w.tier[hall]=2;
+  const home=at(2,8),hall=at(17,8);w.zone[home]=ZONE.R;w.tier[home]=1;w.civic[hall]=CIVIC.MARKET;w.civicSize[hall]=1;w.maxTier[hall]=3;w.tier[hall]=5; // a one-tile market at the hall: meat is placed since 2026-09-26
   w.roadsDirty=true;w.wallsDirty=true;computeFields(w);
   const commute=commutePath(w,'rabbit',doorOf(w,home),doorOf(w,hall),100),freight=hallReach(w,home,Infinity);
   check('rail bridge '+axis+': commuters and freight ride across the river',commute?.path.some(i=>(i&RIDE)&&(i&~RIDE)===wet)&&freight?.path.some(i=>(i&RIDE)&&(i&~RIDE)===wet));

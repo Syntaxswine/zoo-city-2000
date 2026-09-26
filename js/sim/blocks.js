@@ -219,7 +219,8 @@ export function ignite(world, i, months) {
 /** The capacity table the card and the Rules tab print: blocks by zone and side. */
 export function blockCapacities() {
   const out = {};
-  for (const [z, caps] of [["R", KNOBS.R_CAP], ["C", KNOBS.C_JOBS], ["I", KNOBS.I_JOBS], ["M", KNOBS.M_JOBS]]) {
+  // No meat row since 2026-09-26: a meat market is placed at 3×3 and grows by stage (KNOBS.MARKET_JOBS), never by merging.
+  for (const [z, caps] of [["R", KNOBS.R_CAP], ["C", KNOBS.C_JOBS], ["I", KNOBS.I_JOBS]]) {
     out[z] = { 1: caps[3], 2: Math.round(caps[3] * 4 * KNOBS.BIG_BONUS), 3: Math.round(caps[3] * 9 * KNOBS.BIG_BONUS) };
   }
   return out;

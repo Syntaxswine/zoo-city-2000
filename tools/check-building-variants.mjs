@@ -4,9 +4,11 @@ import {roster,cityPanel} from './review-building-variants.mjs';
 import {art} from '../js/art/index.js';
 import {RECIPES} from '../js/art/solid.js';
 import {rasterize} from '../js/art/format.js';
+import {KNOBS} from '../js/sim/rules.js';
 const all=roster();let count=0;
 for(const f of all){
-  const expected=f.group==='zoned'?6:f.group==='civics'?3:f.group==='stations'?2:4;
+  // A STAGED family (the meat market) has one sprite per stage of its growth — KNOBS.MARKET_JOBS names the stages.
+  const expected=f.group==='zoned'?6:f.group==='civics'?3:f.group==='stations'?2:f.group==='staged'?KNOBS.MARKET_JOBS.length:4;
   assert.equal(f.entries.length,expected,`${f.key} family count`);
   const rows=new Set();
   for(const e of f.entries){

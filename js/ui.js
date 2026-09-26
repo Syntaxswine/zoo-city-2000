@@ -397,6 +397,8 @@ export function createUI(app) {
   const hTitle = (c) => `cross-species share of ${plural(c.friendships, "friendship")}${hSmall(c) ? ` — fading in until ${KNOBS.H_FLOOR}; the raw share is ${pct(hRaw(c))}` : ""}`;
 
   // ---- hover card --------------------------------------------------------------------------------------
+  // THE MEAT MARKET's stages (docs/PROPOSAL-MEAT-MARKET-2026-09-26.md A.2): Light is 1–4, Heavy opens at 4 and grows to 6.
+  const MARKET_STAGE_NAME = ["the bare site", "one stall", "three stalls", "six stalls", "the full square", "the hall", "the exchange"];
   const TIER_NAME = { 1: ["cottage", "shop", "shed", "stall"], 2: ["two-storey", "store", "factory", "meat hall"], 3: ["apartment", "tower", "works", "cold store"] };
   // The blocks (SPEC §3b): one building on 2×2 or 3×3 tiles, named by zone and side.
   const BLOCK_NAME = { 2: ["terrace court", "arcade", "mill", "abattoir"], 3: ["the towers", "emporium", "foundry", "meat exchange"] };
@@ -464,8 +466,8 @@ export function createUI(app) {
     else if (rep.civic === CIVIC.SANITATION) what = "Sanitation works · 750 villagers within 7 tiles · household mess −50%";
     else if (rep.civic === CIVIC.GARBAGE) what = "Garbage depot · 750 villagers within 10 tiles";
     else if (rep.civic === CIVIC.AMPHITHEATER) what = "Amphitheater";
+    else if (rep.civic === CIVIC.MARKET) what = `Meat market · ${rep.maxTier === 1 ? "Light" : "Heavy"} · ${MARKET_STAGE_NAME[rep.tier] || "the site"}${policy(w,"meatTrade")==="prohibited"?" · closed by Governance":""}`;
     else if (rep.mansion) what = "Mansion"; // wealth and class (SPEC §9f)
-    else if (rep.zone === ZONE.M) what = `Meat market ${rep.maxTier === 1 ? "Low" : "High"}${policy(w,"meatTrade")==="prohibited"?" · closed by Governance":""}`;
     else if (rep.zone !== ZONE.NONE) what = `${ZONE_NAME[rep.zone]} ${rep.maxTier === 1 ? "Low" : "High"}`;
     else if (w.terrain[i] === TERRAIN.WATER) what = "Water";
     else if (w.terrain[i] === TERRAIN.TREE) what = "Trees";
@@ -567,8 +569,9 @@ export function createUI(app) {
       for (const c of held) lines.push(el("div", "", `held: ${c.name} ${c.surname} (${c.species}), home in ${c.held - w.tick} month${c.held - w.tick === 1 ? "" : "s"}${c.wrongful ? " — the wrong animal" : ""}`));
       lines.push(el("div", "dim", rep.civic === CIVIC.ZOO ? "Prison for lighter crimes. Release leaves fertility unchanged." : "Pacification for murder or a second theft. They come home calm and childless."));
     }
-    if (rep.zone === ZONE.M && rep.tier > 0) {
-      const hall = anchorOf(w, i);
+    if (rep.civic === CIVIC.MARKET) head.append(el("span", "", `  jobs ${rep.staff}/${rep.jobs}`));
+    if (rep.civic === CIVIC.MARKET && rep.tier > 0) {
+      const hall = rep.ty * w.w + rep.tx; // the market's anchor holds its stock and its pens
       const flow = hallYear(w, hall);
       lines.push(el("div", "", `meat on hand ${hallStock(w, hall)}/${KNOBS.MEAT_CAP} · sold this year ${flow.eaten || 0}`));
       lines.push(el("div", "dim", `bought this year: ${flow.bought || 0} dead · ${flow.killed || 0} killings · ${flow.convicted || 0} convicted · ${flow.slaughtered || 0} from the pen`));
@@ -578,7 +581,7 @@ export function createUI(app) {
     if (pinned) head.append(el("span", "pin", " pinned (Esc)"));
     lines.push(head);
 
-    if (rep.zone !== ZONE.NONE) {
+    if (rep.zone !== ZONE.NONE || rep.civic === CIVIC.MARKET) {
       const s = rep.score;
       const arrow = s.grow ? "▲" : s.decay ? "▼" : "•";
       const p = s.p ? ` p ${(s.p * 100).toFixed(1)}%/mo` : "";
@@ -587,7 +590,7 @@ export function createUI(app) {
       const tot = Math.round(s.score * 100) / 100;
       const vs = Math.round(s.parts.valve * 100) / 100;
       const ls = Math.round((tot - vs) * 100) / 100;
-      const parts = s.access ? `V_${ZONE_NAME[rep.zone]} ${f2(vs)} + local ${f2(ls)} = ${f2(tot)}` : "no road access → score −1";
+      const parts = s.access ? `V_${rep.civic === CIVIC.MARKET ? "M" : ZONE_NAME[rep.zone]} ${f2(vs)} + local ${f2(ls)} = ${f2(tot)}` : "no road access → score −1";
       lines.push(el("div", "", `${arrow} ${s.reason} (${parts}${p})`));
       if (s.customers) lines.push(el("div", "dim", `customer support: ${s.customers.local.toFixed(1)} nearby + ${s.customers.rail.toFixed(1)} by rail (weighted for journey time)`));
       // The block it could join (SPEC §3b): what it is waiting for, from the same window the rule reads.
@@ -675,7 +678,7 @@ export function createUI(app) {
       const names = rep.workers.slice(0, 5).map((c) => `${c.name} ${c.surname} (${c.species}${c.fixed ? ", fixed" : ""})`).join(", ");
       lines.push(el("div", "", `workers: ${names}${rep.workers.length > 5 ? ` +${rep.workers.length - 5}` : ""}`));
     }
-    if (rep.zone !== ZONE.NONE) {
+    if (rep.zone !== ZONE.NONE || rep.civic === CIVIC.MARKET) {
       const s = rep.score;
       const why = whyNot(w, rep);
       const wn = el("div", "why");
@@ -696,19 +699,22 @@ export function createUI(app) {
   function whyNot(w, rep) {
     const s = rep.score;
     const n = neutralOf(w);
-    const z = ZONE_NAME[rep.zone];
+    const z = rep.civic === CIVIC.MARKET ? "M" : ZONE_NAME[rep.zone];
     switch (s.reason) {
       case REASON.GROWING: case REASON.STABLE: case REASON.MERGING: return "—";
       case REASON.PART: return `part of the block at (${rep.tx},${rep.ty})`;
       case REASON.NO_ROAD: return `no road within ${KNOBS.ROAD_REACH} tiles`; // the knob, not a 3: SPEC 6c says everything moves with it
       case REASON.SMOG: return `smog ${rep.pol} > ${KNOBS.SMOG_REFUSE}`;
-      case REASON.NO_DEMAND: case REASON.EMPTY: {
+      case REASON.NO_DEMAND: case REASON.EMPTY: case REASON.MARKET_SITE: {
         const v = s.parts.valve;
         const rate = w.rates[z] ?? w.rates.C; // a meat hall rides the C rate
         return `demand ${f2(v)}${rate > n ? ` (${z} ${rate}% vs neutral ${n.toFixed(1)}%)` : s.parts.local < 0 ? ` (local ${f2(s.parts.local)})` : ""}`;
       }
       case REASON.LV_CAP: return `LV ${rep.lv} < ${rep.tier === 1 ? KNOBS.LV_TIER[0] : KNOBS.LV_TIER[1]} — parks and trees raise it`;
       case REASON.DENSITY_CAP: return "density brush: Low";
+      case REASON.LIGHT_MARKET: return "a Light market stops at the full square — a Heavy one (H, from Chapter 5) grows on to the hall and the exchange";
+      case REASON.PROHIBITED: return "the meat trade is prohibited — Governance";
+      case REASON.MARKET_FULL: return `the town would not keep another stage: ${rep.jobs} meat jobs here, and the meat valve is ${f2(s.parts.valve)}`;
       case REASON.WAITING_FILL: return `waiting to fill up (${Math.round(s.fill * 100)}% of ${rep.capacity})`;
       case REASON.CAPPED: return "capacity reached — build a park or a Large Park, or mix the species";
       case REASON.DECAYING: return `score ${f2(s.score)} < −0.15 — decaying`;
@@ -1020,7 +1026,7 @@ export function createUI(app) {
     if (c.railTiles || c.stations) tr("rail · stations · riders", `${c.railTiles} · ${c.stations} · ${c.riders}`);
     if (c.commuteN) tr(`mean commute (walk-steps; a ride is ${railShare()})`, c.meanCommute.toFixed(1));
     if (c.markets) {
-      tr("meat halls", `${c.markets} (${c.Jm} jobs) · ${c.herbNear} herbivores within the smell`);
+      tr("meat markets", `${c.markets} (${c.Jm} jobs) · ${c.herbNear} herbivores within the smell`);
       tr("meat on hand · sold this year", `${c.meatOnHand || 0} · ${c.meatSold || 0}`);
       tr("sources this year", `${c.meatBought || 0} dead · ${c.meatKilled || 0} killings · ${c.meatConvicted || 0} convicted · ${c.meatSlaughtered || 0} pen`);
       if (c.penned) tr("in market pens", `${c.penned}`);

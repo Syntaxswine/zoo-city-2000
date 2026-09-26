@@ -14,7 +14,7 @@ export const CHAPTERS = Object.freeze([
 ]);
 // Anything absent here waits for the Metropolis (chapter 5). Trees, walls and Use are land tools, not civic
 // progression, so they open with the road (hostile review 2026-09-13: the U key read "Unlocks in Chapter 5").
-const UNLOCK = { road: 0, R: 0, M: 0, farm: 0, fire: 0, inspect: 0, bulldoze: 0, tree: 0, wall: 0, use: 0,
+const UNLOCK = { road: 0, R: 0, market: 0, farm: 0, fire: 0, inspect: 0, bulldoze: 0, tree: 0, wall: 0, use: 0,
   governor: 1, governance: 1, C: 1, I: 1, police: 1, interview: 1, collect: 1, cemetery: 1, doctor: 2, hospital: 3, library: 2, gallery: 2, park: 2, largePark: 2,
   zoo: 2, centre: 2, sanitation: 3, garbage: 3 };
 export const chapterOf = w => w.flags?.campaign?.chapter ?? 4;
@@ -23,9 +23,11 @@ export function lockedReason(w, op) {
   if (!w.flags?.campaign) return "";
   if (["rate", "toggle", "cheat", "choice", "undo"].includes(op.kind)) return "";
   if (op.kind === "zone" && (op.density ?? 3) > 1) {
-    const required = op.zone === ZONE.M ? 4 : 2;
+    const required = 2;
     if (chapterOf(w) < required) return `High density unlocks in Chapter ${required + 1}: ${CHAPTERS[required].name}. Use Low density.`;
   }
+  // A HEAVY meat market waits for the Metropolis, as High meat did when it was a zone; a Light one is open from the start.
+  if (op.kind === "market" && (op.density ?? 3) > 1 && chapterOf(w) < 4) return `A Heavy meat market unlocks in Chapter 5: ${CHAPTERS[4].name}. Use Light (H).`;
   const id = op.kind === "zone" ? ["", "R", "C", "I", "M"][op.zone] : op.kind;
   const required = UNLOCK[id] ?? 4;
   return chapterOf(w) < required ? `Unlocks in Chapter ${required + 1}: ${CHAPTERS[required].name}.` : "";

@@ -1,5 +1,5 @@
 // Saved laws live in events.governance; reading defaults never changes a save.
-import { CIVIC, civicTiles, isPart } from './world.js';
+import { CIVIC, civicTiles, isPart, isMarket } from './world.js';
 import { served } from './fields.js';
 import { KNOBS } from './rules.js';
 
@@ -36,7 +36,7 @@ export const oversightFactor=w=>policy(w,'oversight')?.5:1;
 export const communityFactor=(w,a,b)=>policy(w,'community')&&a.species!==b.species?1.5:1;
 export function governanceCosts(w){
   let buildings=0,governors=0;
-  for(let i=0;i<w.civic.length;i++){if(w.civic[i]===CIVIC.GOVERNOR)governors++;if(w.zone[i]&&w.tier[i]&&!isPart(w,i))buildings++;}
+  for(let i=0;i<w.civic.length;i++){if(w.civic[i]===CIVIC.GOVERNOR)governors++;if((w.zone[i]||isMarket(w.civic[i]))&&w.tier[i]&&!isPart(w,i))buildings++;}
   const residents=w.citizens.filter(c=>!c.dead).length;
   return {estate:governors*360,oversight:policy(w,'oversight')?300:0,cleaners:policy(w,'cleaners')?buildings*6:0,foodAid:foodSupport(w)*12,community:policy(w,'community')?240+residents*2:0};
 }

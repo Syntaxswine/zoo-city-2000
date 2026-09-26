@@ -35,17 +35,29 @@ function lot(world, tile, zone, tier) {
   world.tier[tile] = tier;
 }
 
+/**
+ * A one-tile meat market at `stage` — a legacy-sized civic (civicSize 1), as a save may hold one — so a job plan can
+ * carry meat jobs on one tile of the lattice, where zoned meat lots stood until the market was placed at 3×3
+ * (docs/PROPOSAL-MEAT-MARKET-2026-09-26.md). Its jobs are the stage's (KNOBS.MARKET_JOBS) and count as Jm.
+ */
+function market(world, tile, stage) {
+  world.civic[tile] = CIVIC.MARKET;
+  world.civicSize[tile] = 1;
+  world.maxTier[tile] = 1;
+  world.tier[tile] = stage;
+}
+
 function repeated(zone, tier, count) {
   return Array.from({ length: count }, () => ({ zone, tier }));
 }
 
 function jobPlan(code) {
   if (code === "VAN") {
-    // C 306 (including the centre's four), I 942, M 11: J=1,259.
+    // C 306 (including the centre's four), I 942, M 12 (a market of three stalls and one of one): J=1,260.
     return [
       ...repeated(ZONE.C, 3, 14), ...repeated(ZONE.C, 2, 2), ...repeated(ZONE.C, 1, 2),
       ...repeated(ZONE.I, 3, 38), ...repeated(ZONE.I, 2, 3),
-      ...repeated(ZONE.M, 2, 1), ...repeated(ZONE.M, 1, 1),
+      { market: 2 }, { market: 1 },
     ];
   }
   // C 306, I 952: J=1,258.  One C3 is the real pollution source in
@@ -124,7 +136,8 @@ function buildGrid(world, code) {
     if (jobs.length < plan.length) {
       const tile = candidates[cursor++];
       const spec = plan[jobs.length];
-      lot(world, tile, spec.zone, spec.tier);
+      if (spec.market) market(world, tile, spec.market);
+      else lot(world, tile, spec.zone, spec.tier);
       jobs.push(tile);
     }
   }

@@ -239,15 +239,13 @@ function advisor(world, cen, dem, fig) {
   let lotsR = 0;
   let lotsC = 0;
   let lotsI = 0;
-  let lotsM = 0;
   const n = world.w * world.h;
   for (let i = 0; i < n; i++) {
     if (world.zone[i] === ZONE.R) lotsR++;
     else if (world.zone[i] === ZONE.C) lotsC++;
     else if (world.zone[i] === ZONE.I) lotsI++;
-    else if (world.zone[i] === ZONE.M) lotsM++;
   }
-  const lots = lotsR + lotsC + lotsI + lotsM;
+  const lots = lotsR + lotsC + lotsI; // a meat market is placed, not a zoned lot (docs/PROPOSAL-MEAT-MARKET-2026-09-26.md)
   const net = fig.incomeYr + (fig.cutYr || 0) - fig.upkeepYr;
   const j = world.events.justice;
   const justice = j && (j.pacified || j.sold) ? ` · pacified ${j.pacified} (${j.wrongful} wrongful) · sold ${j.sold}` : "";

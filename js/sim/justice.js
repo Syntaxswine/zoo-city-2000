@@ -27,7 +27,7 @@ import { policy, foodRecipient, oversightFactor } from './governance.js';
 // Every line names the animals and uses no pronoun — the sim has no sex.
 
 import { KNOBS } from "./rules.js";
-import { ZONE, CIVIC, inBounds, absent, anchorOf } from "./world.js";
+import { ZONE, CIVIC, inBounds, absent, anchorOf, isMarket } from "./world.js";
 import { useName } from "./use.js";
 import { DIET_OF, isPredatorOf } from "./species.js";
 import { post } from "./budget.js";
@@ -118,7 +118,7 @@ export function killWeight(world, c) {
   // on this H route is free; a cut line or a hall beyond 60 walked steps is
   // no market at all. Full hooks cannot buy another body.
   if (hallReach(world, c.home, KNOBS.MEAT_ROAD, { space: true })) w *= world.events.licence ? KNOBS.KILL_MARKET_LICENSED : KNOBS.KILL_MARKET;
-  if (c.job >= 0 && world.zone[c.job] === ZONE.M) w *= KNOBS.KILL_STAFF;
+  if (c.job >= 0 && isMarket(world.civic[c.job])) w *= KNOBS.KILL_STAFF;
   w *= 0.5 + world.crime[c.home] / 100;
   return w;
 }
@@ -227,14 +227,15 @@ export function burglaryTick(world, cen, notices) {
   const lot = world.rng.pick(hot);
   const thief = thiefPool(world, lot);
   if (!thief) return;
-  const tier = world.tier[lot];
+  const market = isMarket(world.civic[lot]);
+  const tier = market ? KNOBS.MARKET_TIER[world.tier[lot]] : world.tier[lot]; // a market is robbed like the storeys it stands for
   const loss = KNOBS.BURGLARY_LOSS * tier;
   post(world, "theft", -Math.min(loss, Math.max(0, world.cash)));
   const z = world.zone[lot];
   // The victim's CLASS (SPEC §9f): the class of a burgled HOME's address this month — a shop, a works or a hall has no class (the
   // owner's scope is the home; shops have no owners yet). An affluent address's file is worked longer and harder, and the line says so.
   const victimClass = z === ZONE.R ? classAt(world, lot) : 0;
-  const where = z === ZONE.R ? `broke into the house at ${addressOf(world, lot)}` : z === ZONE.C ? `walked out of the shop at ${at(world, lot)} with §${loss} of stock` : z === ZONE.M ? `left the meat hall at ${at(world, lot)} with §${loss} of stock` : `took §${loss} of copper off the works at ${at(world, lot)}`;
+  const where = z === ZONE.R ? `broke into the house at ${addressOf(world, lot)}` : z === ZONE.C ? `walked out of the shop at ${at(world, lot)} with §${loss} of stock` : market ? `left the meat market at ${at(world, lot)} with §${loss} of stock` : `took §${loss} of copper off the works at ${at(world, lot)}`;
   // The file opens either way: it is the STREET's memory of the burglary, not
   // the paperwork's, and a street does not forget faster for want of a desk
   // sergeant. Whether anyone WORKS it is filesTick's question.

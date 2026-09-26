@@ -26,7 +26,7 @@
 //                blocks and the town grows less (measured: balanced P 977 against 2,138 at 30 years,
 //                estate 674 against 1,234). READ THE COMMUTE TABLE, NOT THE POPULATION LINE, from
 //                such a run; the commute law is the same whatever the town's fortunes.
-import { createWorld, ZONE, CIVIC, KIND_OF_CIVIC, isCivicEmployer, anchorOf, jobsOf } from "../js/sim/world.js";
+import { createWorld, ZONE, CIVIC, KIND_OF_CIVIC, isCivicEmployer, isMarket, anchorOf, jobsOf } from "../js/sim/world.js";
 import { createMayor } from "./mayor.mjs";
 import { tick } from "../js/sim/tick.js";
 import { dial, doorsOf, commuteTime, rides, WALK } from "../js/sim/fields.js";
@@ -75,7 +75,7 @@ function place(kind) {
   return false;
 }
 
-const label = (i) => { const cv = world.civic[i]; if (isCivicEmployer(cv)) return KIND_OF_CIVIC[cv]; const z = world.zone[i]; return z === ZONE.C ? "C" : z === ZONE.I ? "I" : z === ZONE.M ? "M" : "?"; };
+const label = (i) => { const cv = world.civic[i]; if (isMarket(cv)) return "M"; if (isCivicEmployer(cv)) return KIND_OF_CIVIC[cv]; const z = world.zone[i]; return z === ZONE.C ? "C" : z === ZONE.I ? "I" : z === ZONE.M ? "M" : "?"; };
 const ORDER = ["police", "fire", "library", "gallery", "university", "amphitheater", "zoo", "centre", "C", "I", "M"];
 const BENEFIT = { police: KNOBS.POLICE_RADIUS, fire: KNOBS.FIRE_RADIUS, library: KNOBS.KNOW_RADIUS, gallery: KNOBS.KNOW_RADIUS, C: 5 };
 const cheb = (i, j) => Math.max(Math.abs((i % w) - (j % w)), Math.abs(((i / w) | 0) - ((j / w) | 0)));

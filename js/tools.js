@@ -13,7 +13,9 @@ export const TOOLS = Object.freeze([
   row(1, "R", "1", "Residential", { kind: "zone", zone: ZONE.R }, { kind: "building", args: [ZONE.R, 1, 0] }, "zone residential (drag)"),
   row(2, "C", "2", "Commercial", { kind: "zone", zone: ZONE.C }, { kind: "building", args: [ZONE.C, 1, 0] }, "zone commercial (drag)"),
   row(3, "I", "3", "Industrial", { kind: "zone", zone: ZONE.I }, { kind: "building", args: [ZONE.I, 1, 0] }, "zone industrial (drag)"),
-  row(4, "M", "4", "Meat", { kind: "zone", zone: ZONE.M }, { kind: "building", args: [ZONE.M, 1, 0] }, "zone meat market (drag) — grey, off the books"),
+  // THE MEAT MARKET (docs/PROPOSAL-MEAT-MARKET-2026-09-26.md): placed, not zoned, since 2026-09-26 — a 3×3 that grows
+  // from a bare site a stage at a time; H picks Light (3–27 jobs) or Heavy (27–180, from Chapter 5). Its id is its op kind.
+  row(4, "market", "4", "Meat market", { kind: "market" }, { kind: "civic", args: ["market", 3, 4] }, "place a 3×3 meat market beside a road; H: Light or Heavy — grey, off the books"),
   row(5, "road", "5", "Road", { kind: "road" }, { kind: "road", args: [5, false] }, "L-drag; Shift = straight; water makes a bridge; a square rail makes a crossing"),
   row(6, "wall", "6", "Wall", { kind: "wall" }, { kind: "wall", args: [5] }, "L-drag; Shift = straight; a road or rail through it is a tunnel"),
   row(7, "rail", "7", "Rail", { kind: "rail" }, { kind: "rail", args: [5] }, "L-drag; Shift = straight; water makes a rail bridge; a square road makes a crossing"),
@@ -46,7 +48,7 @@ export const TOOLS = Object.freeze([
 
 export const TOOL_BY_ID = Object.freeze(Object.fromEntries(TOOLS.map((tool) => [tool.id, tool])));
 export const TOOL_BY_KEY = Object.freeze(Object.fromEntries(TOOLS.map((tool) => [tool.key.toUpperCase(), tool])));
-export const PLACE_TOOLS = Object.freeze(TOOLS.filter((tool) => ["governor", "doctor", "hospital", "farm", "cemetery", "sanitation", "garbage", "station", "park", "largePark", "zoo", "centre", "police", "fire", "library", "university", "gallery", "amphitheater"].includes(tool.op.kind)).map((tool) => tool.id));
+export const PLACE_TOOLS = Object.freeze(TOOLS.filter((tool) => ["market", "governor", "doctor", "hospital", "farm", "cemetery", "sanitation", "garbage", "station", "park", "largePark", "zoo", "centre", "police", "fire", "library", "university", "gallery", "amphitheater"].includes(tool.op.kind)).map((tool) => tool.id));
 /**
  * Tools that get a GHOST under the cursor — the ground diamond
  * (`art.overlay("ghost")`), green where the tile will take the thing and red

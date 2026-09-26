@@ -7,7 +7,7 @@ import { hasPolice } from "./sim/police-actions.js";
 
 import { remoteIcon } from "./remote-icons.js";
 const PURPOSE = {
-  R: "Homes for villagers.", C: "Shops and commercial jobs.", I: "Industrial jobs; produces pollution.", M: "Meat supply and jobs; spreads dread and attracts crime.",
+  R: "Homes for villagers.", C: "Shops and commercial jobs.", I: "Industrial jobs; produces pollution.", market: "Meat supply and jobs; grows from a bare site as trade allows; spreads dread and attracts crime.",
   road: "Connects homes, jobs and public services.", wall: "Blocks passage and service coverage except through road or rail tunnels.", rail: "Carries commuters and freight between stations.",
   tree: "Reduces nearby pollution.", park: "Improves nearby land value and raises city capacity; no road required.", largePark: "Raises city capacity and nearby land value; no workers.",
   zoo: "Holds sentenced citizens in prison.", centre: "Treats sentenced citizens, permanently preventing their reproduction and killings.",

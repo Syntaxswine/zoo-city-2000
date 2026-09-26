@@ -3,7 +3,7 @@
 
 import { KNOBS } from "./rules.js";
 import { SPECIES, SPECIES_BY_ID, isPredPrey, isPredatorOf, DIET_OF } from "./species.js";
-import { ZONE, CIVIC, ROAD, jobsOf, jobZone, absent, capacityOf, isPart, isKnowledgeCivic, isCultureCivic } from "./world.js";
+import { ZONE, CIVIC, ROAD, jobsOf, jobZone, absent, capacityOf, isPart, isKnowledgeCivic, isCultureCivic, isMarket } from "./world.js";
 import { served, edgeRoads , commuteTime, rides, fireExposure } from "./fields.js";
 import { landmarkOf } from "./landmarks.js";
 import { needOf, needsContext } from "./needs.js";
@@ -212,7 +212,7 @@ export function census(world) {
       else if (jz === ZONE.M) Jm += jobs;
       else Ji += jobs;
     }
-    if (world.zone[i] === ZONE.M && world.tier[i] > 0 && !isPart(world, i)) markets++; // a block is one hall
+    if (isMarket(world.civic[i]) && world.tier[i] > 0) markets++; // a market above its bare site is one hall
     if (world.mansion[i]) mansions++;
     if (world.zone[i] === ZONE.R && !isPart(world, i) && world.klass[i] === CLASS.AFFLUENT) affluentLots++;
     if (world.big[i] === 2) blocks2++;
