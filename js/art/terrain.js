@@ -277,12 +277,11 @@ export function meadowSprite(corners, seed = 0) {
  * a 0.5-unit 'p' border with an 'm' inner edge. Same geometry as C and I,
  * whose accents '6' (≈101) and '7' (≈138) stand alone.
  *
- * Zone 4 M (the meat markets) draws in its own accent 'A' (dried liver,
- * ≈79 — 42 BELOW grass mid, on the far side of the hue wheel from both '6'
- * and '7'), the C/I geometry, no shade key.
+ * Zone 4 (meat) has no chalk: since 2026-09-26 meat is not zoned but placed
+ * as a market (js/art/market.js), and its chalk went with the zone.
  */
-const CHALK_KEY = { 1: G[3], 2: "6", 3: "7", 4: "A" };
-const CHALK_SHADE = { 1: G[0], 2: null, 3: null, 4: null };
+const CHALK_KEY = { 1: G[3], 2: "6", 3: "7" };
+const CHALK_SHADE = { 1: G[0], 2: null, 3: null };
 const CHALK_PERIOD = 4;
 export function chalkKey(zone, high, a, b, px, py) {
   const k = CHALK_KEY[zone];
@@ -305,12 +304,12 @@ export function chalkKey(zone, high, a, b, px, py) {
   return grassKey(px, py, 0);
 }
 /** The keys a zone's chalk is drawn in, for the census in tools/shots.mjs. */
-export const CHALK_KEYS = { 1: [G[3], G[0]], 2: ["6"], 3: ["7"], 4: ["A"] };
+export const CHALK_KEYS = { 1: [G[3], G[0]], 2: ["6"], 3: ["7"] };
 const chalkFn = (zone, high) => (a, b, px, py, s = 1) => chalkKey(zone, high, a, b, px, py, s);
 export const CHALK = {};
-for (const zone of [1, 2, 3, 4]) {
+for (const zone of [1, 2, 3]) {
   CHALK[zone] = [false, true].map((high) =>
-    groundSprite({ name: `chalk-${["", "R", "C", "I", "M"][zone]}-${high ? "high" : "low"}`, anchor: TILE_ANCHOR, tags: ["ground", "chalk"] }, chalkFn(zone, high))
+    groundSprite({ name: `chalk-${["", "R", "C", "I"][zone]}-${high ? "high" : "low"}`, anchor: TILE_ANCHOR, tags: ["ground", "chalk"] }, chalkFn(zone, high))
   );
 }
 
@@ -635,7 +634,7 @@ export function allTerrain() {
   GRASS.forEach((s) => out.push({ name: s.name, sprite: s }));
   MEADOW.forEach((s) => out.push({ name: s.name, sprite: s }));
   FOOTPATH_LIST.forEach((s) => out.push({ name: s.name, sprite: s }));
-  for (const zone of [1, 2, 3, 4]) CHALK[zone].forEach((s) => out.push({ name: s.name, sprite: s }));
+  for (const zone of [1, 2, 3]) CHALK[zone].forEach((s) => out.push({ name: s.name, sprite: s }));
   out.push({ name: RUBBLE.name, sprite: RUBBLE });
   out.push({ name: WATER_TILE.name, sprite: WATER_TILE });
   KERB.forEach((s) => out.push({ name: s.name, sprite: s }));

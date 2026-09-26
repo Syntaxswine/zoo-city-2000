@@ -64,13 +64,14 @@ export const ACCENT = {
   "5": "#B8C860", // zone chalk R — pale green-yellow, ~60 luminance above grass mid (the first value was a hair off grass and vanished at 1x)
   "6": "#3C6E8A", // zone chalk C
   "7": "#A88A2E", // zone chalk I
-  // Zone chalk M (the meat markets): dried liver. Luminance ≈79, 42 below
-  // grass mid 'o' (≈120) — the R accent's lesson was a hair off grass and
-  // vanished at 1× — and a hue (≈349°) on the far side of the wheel from
-  // C's blue '6' (≈202°) and I's ochre '7' (≈45°). The other candidate,
-  // #8A4E48, sat 25 off grass. It is NOT the zot red '0': that key stays
-  // reserved for the zots, and no building carries it.
-  "A": "#7A3A46", // zone chalk M
+  // Dried liver. Picked for zone chalk M (luminance ≈79, 42 below grass mid
+  // 'o'; a hue, ≈349°, on the far side of the wheel from C's blue '6' and
+  // I's ochre '7'). The meat chalk is retired — since 2026-09-26 meat is a
+  // placed market, never zoned — and the key stays for its other wearer,
+  // the suits' burgundy tie (suits.js), still a fixed point at dusk
+  // (dusk.js FIXED). It is NOT the zot red '0': that key stays reserved for
+  // the zots, and no building carries it.
+  "A": "#7A3A46", // the tie's burgundy (was zone chalk M)
   "8": "#E8742A", // fire
   "9": "#F2C14E", // flame tip
   "0": "#C8414A", // zot red

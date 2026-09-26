@@ -32,7 +32,7 @@ import { solidSprite, registerBlocks, KIT } from "./buildings.js";
 import { dress as dressRoof } from "./roof-furniture.js";
 import { TREE_ROUND, TREE_TALL, TREE_WILLOW } from "./terrain.js";
 
-const { walled, doorAt, flipPlan, extentBox, BRICK, CONC, RUST, SLATE, EARTH, GRASS, SLATE_SKIN, C_ROOF, R_ROOF, I_ROOF, M_ROOF, ROOF_OF, TIMBER, PLINTH, CONC_WALL, END_GLASS, AWNING, AWNING_M, SAWDUST, BRACKET, HOOK, LAMP, STEP, POST, brickGrain, ribGrain, ringGrain, TREE_REACH } = KIT;
+const { walled, doorAt, flipPlan, extentBox, BRICK, CONC, RUST, SLATE, EARTH, GRASS, SLATE_SKIN, C_ROOF, R_ROOF, I_ROOF, ROOF_OF, TIMBER, PLINTH, CONC_WALL, END_GLASS, AWNING, SAWDUST, BRACKET, LAMP, STEP, POST, brickGrain, ribGrain, ringGrain, TREE_REACH } = KIT;
 
 // ---------------------------------------------------------------- shared
 
@@ -367,101 +367,12 @@ function foundry() {
   return boxes;
 }
 
-// ------------------------------------------------------------ meat market
-
-/**
- * The abattoir (M 2×2, 80): the meat hall's brick-and-slate hall with its
- * clerestory, a windowless cold-store annex off its end, a stall along the
- * front under the striped awning with the hooks on its rail, a fenced pen
- * on sawdust beside it, and a rust chimney at the back corner. Brown
- * throughout; the one '$' dot on the sign is the brightest thing on it.
- */
-function abattoir() {
-  const H = 14, BRICK_TO = 8;
-  const brick = litSkin(BRICK, { grain: brickGrain, height: BRICK_TO });
-  const slate = litSkin(SLATE, { height: H - BRICK_TO });
-  const hall = {
-    glazing: true,
-    top: slate.top,
-    side: (a, k, x, y) => { const g = H - k; if (a >= 9 && a < 12 && g < 6) return "+"; if (g >= 10 && g < 12 && Math.floor(a) % 3 === 1) return "="; return g < BRICK_TO ? brick.side(a, k - (H - BRICK_TO), x, y) : slate.side(a, k, x, y); },
-    end: (b, k, x, y) => { const g = H - k; if (g >= 10 && g < 12 && Math.floor(b) % 3 === 1) return END_GLASS; return g < BRICK_TO ? brick.end(b, k - (H - BRICK_TO), x, y) : slate.end(b, k, x, y); },
-  };
-  const annexBase = litSkin(SLATE, { height: 10 });
-  const annex = { top: annexBase.top, side: (a, k, x, y) => (a >= 1.5 && a < 2.5 && 10 - k >= 6 && 10 - k < 8 ? "+" : annexBase.side(a, k, x, y)), end: annexBase.end };
-  const sign = { top: () => SLATE[2], side: (a, k) => (a >= 1.5 && a < 2 && k >= 1 && k < 2 ? BRICK[3] : SLATE[1]), end: (b, k) => (b >= 1.5 && b < 2 && k >= 1 && k < 2 ? BRICK[3] : SLATE[0]) };
-  const counter = litSkin(BRICK, { grain: brickGrain, height: 3 });
-  const boxes = [
-    box(1, 22, 1, 20, 0, H, hall),
-    box(0.5, 22.5, 0.5, 20.5, H, H + 1, M_ROOF),
-    box(22, 31, 4, 16, 0, 10, annex),
-    box(21.5, 31.5, 3.5, 16.5, 10, 11, M_ROOF),
-    chimney(1, 1, H + 12, 2.5),
-    // The sign over the door.
-    box(10, 10.5, 20, 21, 10, 10.5, BRACKET),
-    box(8.5, 12.5, 21, 21.5, 7.5, 10, sign),
-    // The stall along the front: a counter under the striped awning, hooks on the rail.
-    box(2, 14, 21.5, 24, 0, 3, counter),
-    box(1.5, 14.5, 20.5, 25, 6, 8, AWNING_M),
-    ...[4.5, 7.5, 10.5].map((a) => box(a - 0.25, a + 0.25, 24.5, 25, 4, 6, HOOK)),
-    box(2, 14, 24, 27, 0, 0.8, SAWDUST),
-    // The pen.
-    ...pen(17, 31, 19, 31, 21),
-  ];
-  return boxes;
-}
-
-/**
- * The meat exchange (M 3×3, 180): a great hall — brick to the first storey,
- * slate above — under a lantern roof, a cold-store wing off each end, a
- * loading yard with the van at the dock and a striped awning with its
- * hooks along the hall's front, two pens on sawdust, the sign with its one
- * dot, and a rust chimney over the boilers.
- */
-function meatExchange() {
-  const H = 18, BRICK_TO = 10;
-  const brick = litSkin(BRICK, { grain: brickGrain, height: BRICK_TO });
-  const slate = litSkin(SLATE, { height: H - BRICK_TO });
-  const hall = {
-    glazing: true,
-    top: slate.top,
-    side: (a, k, x, y) => { const g = H - k; if (a >= 17 && a < 21 && g < 7) return "+"; if (g >= 13 && g < 15.5 && Math.floor(a) % 3 === 1) return "="; if (g >= 3 && g < 6 && Math.floor(a) % 6 === 2) return "="; return g < BRICK_TO ? brick.side(a, k - (H - BRICK_TO), x, y) : slate.side(a, k, x, y); },
-    end: (b, k, x, y) => { const g = H - k; if (g >= 13 && g < 15.5 && Math.floor(b) % 3 === 1) return END_GLASS; if (g >= 3 && g < 6 && Math.floor(b) % 6 === 2) return END_GLASS; return g < BRICK_TO ? brick.end(b, k - (H - BRICK_TO), x, y) : slate.end(b, k, x, y); },
-  };
-  const lantern = { glazing: true, top: () => SLATE[2], side: (a, k) => (k >= 1 && k < 3.5 ? "=" : SLATE[1]), end: (b, k) => (k >= 1 && k < 3.5 ? END_GLASS : SLATE[0]) };
-  const coldBase = litSkin(SLATE, { height: 12 });
-  const cold = { top: coldBase.top, side: (a, k, x, y) => (a >= 1.5 && a < 2.5 && ((12 - k >= 4 && 12 - k < 6) || (12 - k >= 9 && 12 - k < 11)) ? "+" : coldBase.side(a, k, x, y)), end: coldBase.end };
-  const sign = { top: () => SLATE[2], side: (a, k) => (a >= 2 && a < 2.5 && k >= 1 && k < 2 ? BRICK[3] : SLATE[1]), end: (b, k) => (b >= 2 && b < 2.5 && k >= 1 && k < 2 ? BRICK[3] : SLATE[0]) };
-  const boxes = [
-    box(1, 40, 1, 24, 0, H, hall),
-    box(0.5, 40.5, 0.5, 24.5, H, H + 1, M_ROOF),
-    box(10, 31, 7, 17, H + 1, H + 6, lantern),
-    box(9.5, 31.5, 6.5, 17.5, H + 6, H + 7, M_ROOF),
-    box(40, 47, 1, 24, 0, 12, cold), // the east cold store
-    box(39.5, 47.5, 0.5, 24.5, 12, 13, M_ROOF),
-    box(1, 12, 24, 34, 0, 12, cold), // the south cold store
-    box(0.5, 12.5, 23.5, 34.5, 12, 13, M_ROOF),
-    chimney(42, 26, 30, 3),
-    // The sign, the awning and the hooks along the hall's front.
-    box(19, 19.5, 24, 25, 11.5, 12, BRACKET),
-    box(16.5, 21.5, 25, 25.5, 9, 11.5, sign),
-    box(22, 38, 23.5, 28, 7, 9, AWNING_M),
-    ...[24.5, 27.5, 30.5, 33.5, 36.5].map((a) => box(a - 0.25, a + 0.25, 27.5, 28, 5, 7, HOOK)),
-    // The yard: paving at the dock, the van, two pens.
-    box(12, 47, 24, 47, 0, 0.5, SAWDUST),
-    box(22, 38, 28, 32, 0, 1.2, STEP),
-    ...van(26, 33),
-    ...pen(14, 28, 36, 47, 18),
-    ...pen(30, 46, 36, 47, 34),
-  ];
-  return boxes;
-}
-
 // Additional plans are individually composed: paired villas, staggered slabs,
 // a shopping court, a department-store tower, and working industrial yards.
 function newBlock(zone, side) {
   const n = side * 16, out = [box(1, n-1, 1, n-1, 0, 0.6, zone < 3 ? PLINTH : SAWDUST)];
   const hall = (a,b,w,d,h,roof = "hip") => {
-    const ramp = zone === 1 ? BRICK : zone === 2 ? CONC_WALL : zone === 3 ? RUST : SLATE;
+    const ramp = zone === 1 ? BRICK : zone === 2 ? CONC_WALL : RUST;
     out.push(box(a,a+w,b,b+d,0.6,h+0.6,walled(litSkin(ramp,{height:h,grain:zone===1?brickGrain:zone===3?ribGrain:undefined}),h,{storey:8,sill:3,winH:3,period:4,winW:2,from:1,endWindows:true,door:doorAt(w/2,6,1.3)})));
     if(roof === "hip") out.push(...hipRoof(a,a+w,b,b+d,h+0.6,3,1.5,ROOF_OF[zone]));
     else {
@@ -492,16 +403,7 @@ function newBlock(zone, side) {
     hall(2,2,13,20,26,"flat"); hall(20,2,25,20,12,"saw");
     out.push(stack(3,3,43,4),stack(10,3,35,3),...tank(3,30,10,7),...tank(14,30,7,6),...van(33,30));
     out.push(box(22,43,24,28,0,2,STEP),box(26,34,36,43,0,4,TIMBER));
-  } else if(side===2) { // Slim slaughter hall alongside a large stock pen.
-    hall(2,2,12,25,16,"hip");
-    out.push(chimney(3,3,29),...pen(18,31,3,26,22),box(2,14,26,30,7,8.5,AWNING_M));
-    for(const a of [4,7,10]) out.push(box(a,a+.5,29,29.5,5,7,HOOK));
-  } else { // Two market ranges flanking the livestock court.
-    hall(2,2,43,12,18,"hip"); hall(2,18,12,23,12,"flat");
-    out.push(chimney(3,3,32),...pen(20,33,19,34,24),...pen(35,47,19,34,39),...van(24,40));
-    out.push(box(17,45,13,17,8,9.5,AWNING_M));
-    for(const a of [20,25,30,35,40]) out.push(box(a,a+.5,16.5,17,6,8,HOOK));
-  }
+  } else throw new Error(`newBlock: no plan for zone ${zone}`); // zone 4 retired: a market is placed, not zoned (js/art/market.js)
   return out;
 }
 const CONC_WALL_SKIN = litSkin(CONC,{height:8});
@@ -513,10 +415,9 @@ export const BLOCKS = {
   1: { 2: family("terrace-court", "R", 2, terraceCourt, { stamps: [[TREE_ROUND, 22, 20, 1]] }), 3: family("towers", "R", 3, towers, { stamps: [[TREE_ROUND, 16, 20, 1], [TREE_TALL, 31, 20, 1]] }) },
   2: { 2: family("arcade", "C", 2, arcade), 3: family("emporium", "C", 3, emporium, { stamps: [[TREE_ROUND, 6, 43, 1], [TREE_WILLOW, 42, 43, 1]] }) },
   3: { 2: family("mill", "I", 2, mill), 3: family("foundry", "I", 3, foundry) },
-  4: { 2: family("abattoir", "M", 2, abattoir), 3: family("meat-exchange", "M", 3, meatExchange) },
 };
-for (const zone of [1,2,3,4]) for(const side of [2,3]) {
-  BLOCKS[zone][side].push(...family([null,"garden-villas","market-pavilions","machine-yards","stock-court"][zone], [null,"R","C","I","M"][zone], side, () => newBlock(zone,side)));
+for (const zone of [1,2,3]) for(const side of [2,3]) {
+  BLOCKS[zone][side].push(...family([null,"garden-villas","market-pavilions","machine-yards"][zone], [null,"R","C","I"][zone], side, () => newBlock(zone,side)));
 }
 registerBlocks(BLOCKS);
 
@@ -530,6 +431,6 @@ export const BLOCK_KIT = Object.freeze({ hipRoof, chimney, gardenWall, FENCE, pe
 /** Every block sprite, named, for the audit and the sheet. */
 export function allBlocks() {
   const out = [];
-  for (const zone of [1, 2, 3, 4]) for (const side of [2, 3]) for (const s of BLOCKS[zone][side]) out.push({ name: s.name, sprite: s });
+  for (const zone of [1, 2, 3]) for (const side of [2, 3]) for (const s of BLOCKS[zone][side]) out.push({ name: s.name, sprite: s });
   return out;
 }

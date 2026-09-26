@@ -22,9 +22,9 @@ import {placeAt} from '../js/iso/painter.js';
 
 export function families() {
   const out=[];
-  for(let zone=1;zone<=4;zone++)for(let tier=1;tier<=3;tier++)out.push({group:'zoned',key:`zone-${zone}-${tier}`,zone,tier,side:1,sprites:BUILDINGS[zone][tier],select:v=>art.building(zone,tier,v)});
+  for(let zone=1;zone<=3;zone++)for(let tier=1;tier<=3;tier++)out.push({group:'zoned',key:`zone-${zone}-${tier}`,zone,tier,side:1,sprites:BUILDINGS[zone][tier],select:v=>art.building(zone,tier,v)});
   SHOP_ART.forEach((sprites,kind)=>{if(kind)out.push({group:'shops',key:`shop-${kind}`,zone:2,tier:1,side:1,sprites,select:v=>art.building(2,1,v)});});
-  for(let zone=1;zone<=4;zone++)for(const side of [2,3])out.push({group:'blocks',key:`block-${zone}-${side}`,zone,tier:3,side,sprites:BLOCKS[zone][side],select:v=>art.building(zone,3,v,side)});
+  for(let zone=1;zone<=3;zone++)for(const side of [2,3])out.push({group:'blocks',key:`block-${zone}-${side}`,zone,tier:3,side,sprites:BLOCKS[zone][side],select:v=>art.building(zone,3,v,side)});
   for(const [id,sprites] of Object.entries(LANDMARK_ART)){const zone=LANDMARKS[id].zone;out.push({group:'landmarks',key:`landmark-${id}`,zone,tier:3,side:3,theme:+id,sprites,select:v=>art.building(zone,3,v,3,+id)});}
   out.push({group:'mansion',key:'mansion',zone:1,tier:3,side:3,mansion:true,sprites:MANSION,select:v=>art.mansion(v)});
   for(const f of [...CIVIC_VARIANT_FAMILIES,GOVERNOR_FAMILY])out.push({group:'civics',key:`${f.kind}-${f.side}`,kind:f.kind,side:f.side,sprites:f.sprites,select:v=>art.civic(f.kind,f.side,v)});

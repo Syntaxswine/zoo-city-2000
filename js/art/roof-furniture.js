@@ -164,11 +164,6 @@ export function furnish(boxes, { zone, variant = 0, skins }) {
     if (duct >= 4 && freeSpot(d, boxes, d.a1 - duct - 1.5, d.b1 - 4, duct, 1.6)) {
       out.push(box(d.a1 - duct - 1.5, d.a1 - 1.5, d.b1 - 4, d.b1 - 2.4, d.c, d.c + 1.4, rust));
     }
-  } else if (zone === 4) {
-    // M: extractors. Two stacks on the hall, because that is what a hall has.
-    for (const [a, b, h] of [[d.a0 + 2.5, d.b0 + 2.5, 5], [d.a0 + 6, d.b0 + 3.5, 3.5]]) {
-      if (a + 1.6 < d.a1 - 1 && b + 1.6 < d.b1 - 1 && freeSpot(d, boxes, a, b, 1.6, 1.6)) out.push(...stack(d, a, b, dark, 1.6, h));
-    }
   } else {
     // CIVIC (zone 0). The campuses are the worst roofs in the game — the
     // cemetery is 90% top face and 77% of that is ONE quad — but they must
@@ -199,14 +194,12 @@ const RAIL = {
   1: flatSkin(TILE[3], TILE[2], TILE[1]),
   2: flatSkin(CONC[4], CONC[2], SLATE[1]),
   3: flatSkin(RUST[3], RUST[2], RUST[1]),
-  4: flatSkin(SLATE[2], SLATE[1], SLATE[0]),
 };
 const ROOF = {
   0: flatSkin(SLATE[2], SLATE[1], SLATE[0]),
   1: flatSkin(TILE[2], TILE[1], TILE[0]),
   2: flatSkin(CONC[3], SLATE[1], SLATE[0]),
   3: flatSkin(RUST[2], RUST[1], RUST[0]),
-  4: flatSkin(SLATE[1], SLATE[0], SLATE[0]),
 };
 const COMMON = {
   pale: flatSkin(CONC[3], CONC[2], CONC[1]),
@@ -216,7 +209,7 @@ const COMMON = {
   cloth: flatSkin(FABRIC[3], FABRIC[2], FABRIC[1]),
 };
 const BAGS = {};
-for (const z of [0, 1, 2, 3, 4]) BAGS[z] = Object.freeze({ roof: ROOF[z], rail: RAIL[z], ...COMMON });
+for (const z of [0, 1, 2, 3]) BAGS[z] = Object.freeze({ roof: ROOF[z], rail: RAIL[z], ...COMMON });
 
 /** The furniture skins for a zone (0 = civic). */
 export const skinsFor = (zone) => BAGS[zone] || BAGS[0];

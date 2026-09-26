@@ -401,7 +401,7 @@ export function createUI(app) {
   const MARKET_STAGE_NAME = ["the bare site", "one stall", "three stalls", "six stalls", "the full square", "the hall", "the exchange"];
   const TIER_NAME = { 1: ["cottage", "shop", "shed", "stall"], 2: ["two-storey", "store", "factory", "meat hall"], 3: ["apartment", "tower", "works", "cold store"] };
   // The blocks (SPEC §3b): one building on 2×2 or 3×3 tiles, named by zone and side.
-  const BLOCK_NAME = { 2: ["terrace court", "arcade", "mill", "abattoir"], 3: ["the towers", "emporium", "foundry", "meat exchange"] };
+  const BLOCK_NAME = { 2: ["terrace court", "arcade", "mill"], 3: ["the towers", "emporium", "foundry"] };
   function personLink(c, label = `${c.name} ${c.surname}`) {
     const b = el("button", "personlink", label);
     b.type = "button";

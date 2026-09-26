@@ -6,14 +6,21 @@ regenerated set contains 262 sprites across 66 families.
 The additions cover every zoned tier, specialist shop, larger block,
 species landmark, mansion, civic kind/size, and both station axes.
 
+2026-09-26: meat stopped being a zone. The meat market is a placed 3×3
+civic that grows, and its family is its seven STAGES (group `staged`,
+selected by the anchor's tier, not the variant byte); zone 4's zoned
+families are retired — three one-tile families (18 sprites) and two block
+families (8). The regenerated set is 243 sprites across 62 families.
+
 | Family group | Families | Sprites |
 | --- | ---: | ---: |
-| One-tile zoning | 12 | 72 |
+| One-tile zoning | 9 | 54 |
 | Specialist shops | 10 | 40 |
-| Larger blocks | 8 | 32 |
+| Larger blocks | 6 | 24 |
 | Species landmarks | 11 | 44 |
 | Mansion | 1 | 4 |
 | Civic kind/size combinations (including Governor’s Mansion) | 22 | 66 |
+| Meat market stages | 1 | 7 |
 | Station axes | 2 | 4 |
 
 The corner shop is counted in one-tile zoning. Original plans remain in the
@@ -21,7 +28,7 @@ family arrays. Existing saved variant bytes select the expanded families
 deterministically; an existing lot's appearance may change, but its business
 kind, simulation state, footprint, and save format remain unchanged.
 
-Run `node tools/review-building-variants.mjs` to regenerate the 38 sheets,
+Run `node tools/review-building-variants.mjs` to regenerate the 40 sheets,
 11 city panels, and `coverage.json`. Sheet captions identify family and
 zero-based variant. The JSON maps every sprite to all reachable saved bytes
 and identifies each city-panel slot. City panels use the actual game renderer,

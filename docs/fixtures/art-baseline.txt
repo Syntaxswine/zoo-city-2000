@@ -189,32 +189,6 @@ I3x3-truffle-works-0	195x134	97,84	10119	f3de64af
 I3x3-truffle-works-1	195x134	97,84	10118	12b42196
 I3x3-truffle-works-annex-0	195x134	97,84	10752	fde18777
 I3x3-truffle-works-annex-1	195x134	97,84	10751	3f25c67f
-M1-stall-0	47x35	23,23	933	61fafc79
-M1-stall-1	47x35	23,23	933	f1c072d8
-M1-stall-2	62x40	30,27	1292	39d2d02a
-M1-stall-3	57x43	31,27	1421	5f2f41bc
-M1-stall-4	55x44	29,28	1132	c26c841a
-M1-stall-5	61x42	29,26	1375	f25d15b6
-M2-meat-hall-0	58x44	30,32	1507	d5386dbb
-M2-meat-hall-1	58x44	27,32	1507	69a975bb
-M2-meat-hall-2	62x47	30,34	1605	20014af2
-M2-meat-hall-3	57x49	31,33	1739	7bcad28d
-M2-meat-hall-4	61x52	29,38	1720	a7520ec9
-M2-meat-hall-5	63x55	31,39	1853	16e590fd
-M2x2-abattoir-0	109x88	51,57	4865	8c3b3336
-M2x2-abattoir-1	109x88	57,57	4865	9d0fffa3
-M2x2-stock-court-0	123x88	61,56	5030	c08d7c9d
-M2x2-stock-court-1	123x88	61,56	5030	2c0023cd
-M3-cold-store-0	61x52	31,39	2092	e045a809
-M3-cold-store-1	61x52	29,39	2092	d6e2de13
-M3-cold-store-2	62x55	30,42	2013	57e11085
-M3-cold-store-3	57x57	31,41	2163	78ecf40b
-M3-cold-store-4	61x59	29,43	2236	53ada764
-M3-cold-store-5	57x65	31,49	2523	f054854d
-M3x3-meat-exchange-0	167x115	71,67	11053	a0ab7248
-M3x3-meat-exchange-1	167x115	95,67	11053	29264c0e
-M3x3-stock-court-0	187x123	93,75	11418	3a754bf4
-M3x3-stock-court-1	187x123	93,75	11418	02f8bff1
 R1-cottage-0	53x36	26,23	963	2612dc9b
 R1-cottage-1	53x36	26,23	963	ffcb830b
 R1-cottage-2	56x38	26,24	1182	f628796f
@@ -302,8 +276,6 @@ chalk-C-high	64x32	32,16	1024	ced75f3e
 chalk-C-low	64x32	32,16	1024	988691e4
 chalk-I-high	64x32	32,16	1024	37f5df28
 chalk-I-low	64x32	32,16	1024	42c0b2cb
-chalk-M-high	64x32	32,16	1024	4689b22d
-chalk-M-low	64x32	32,16	1024	6d980497
 chalk-R-high	64x32	32,16	1024	f5f50645
 chalk-R-low	64x32	32,16	1024	8346f04b
 citizen-bear|ne|0|adult|s0m0g0|	12x20	6,19	156	55aa1ad2
@@ -3944,4 +3916,4 @@ zot-nodemand	13x14	6,12	143	f5788835
 zot-nojob	13x14	6,12	143	439ab5fc
 zot-noroad	13x14	6,12	143	75554088
 zot-smog	13x14	6,12	143	42795e03
-TOTAL	3871	f652eaf6
+TOTAL	3843	c8e545af

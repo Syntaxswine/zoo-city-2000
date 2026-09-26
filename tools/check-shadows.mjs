@@ -44,7 +44,10 @@ const check = (name, ok, detail = "") => {
 // ---- the masks -------------------------------------------------------------------
 const list = allSprites();
 const solids = list.filter(({ sprite }) => RECIPES.get(sprite)?.boxes);
-check("there are solids to cast", solids.length >= 300, `${solids.length}`);
+// A floor against an EMPTY cast (a broken registry would pass every mask check vacuously), not a count to hold:
+// it follows the registry down. 322 box recipes until zone 4's twenty-six zoned meat buildings were retired
+// (2026-09-26 — meat is a placed market now), 296 after; the floor was 300 and is now 290.
+check("there are solids to cast", solids.length >= 290, `${solids.length}`);
 
 let cast = 0, badKey = 0, emptyMask = 0, anchorOut = 0, notMonotone = [];
 for (const { name, sprite } of solids) {

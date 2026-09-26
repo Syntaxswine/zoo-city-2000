@@ -113,9 +113,9 @@ function sheet(name, cells, { cols, cellW, cellH, groundY, z }) {
 
 function sheets(z) {
   const out = [];
-  // Buildings: 4 zones × 3 tiers × 4 variants (a row per family), then civics and overlays.
+  // Buildings: 3 zones × 3 tiers × 4 variants (a row per family), then civics and overlays.
   const b = [];
-  for (const zone of [1, 2, 3, 4]) for (const tier of [1, 2, 3]) for (const v of [0, 1, 2, 3]) b.push({ sprite: BUILDINGS[zone][tier][v], label: BUILDINGS[zone][tier][v].name, onTile: true });
+  for (const zone of [1, 2, 3]) for (const tier of [1, 2, 3]) for (const v of [0, 1, 2, 3]) b.push({ sprite: BUILDINGS[zone][tier][v], label: BUILDINGS[zone][tier][v].name, onTile: true });
   out.push(sheet("sheet-buildings.png", b, { cols: 4, cellW: 80, cellH: 100, groundY: 84, z }));
 
   out.push(sheet("sheet-marks.png", Object.entries(MARKS).flatMap(([species, sprite], n) => [
@@ -123,7 +123,7 @@ function sheets(z) {
     { sprite: characterSprite(BUILDINGS[1][2][n % 4], { majority: n + 1, lit: 2 }), label: `${species}-home`, onTile: true },
     { sprite: characterSprite(BUILDINGS[2][2][n % 4], { majority: n + 1, lit: 2 }), label: `${species}-work`, onTile: true },
   ]), { cols: 6, cellW: 80, cellH: 100, groundY: 84, z }));
-  out.push(sheet("sheet-building-lights.png", [1, 2, 3, 4].flatMap(zone => [0, 1, 2, 3].map(lit => ({ sprite: characterSprite(BUILDINGS[zone][3][2], { lit }), label: `${zone}-lit-${lit}`, onTile: true }))), { cols: 4, cellW: 80, cellH: 110, groundY: 94, z }));
+  out.push(sheet("sheet-building-lights.png", [1, 2, 3].flatMap(zone => [0, 1, 2, 3].map(lit => ({ sprite: characterSprite(BUILDINGS[zone][3][2], { lit }), label: `${zone}-lit-${lit}`, onTile: true }))), { cols: 4, cellW: 80, cellH: 110, groundY: 94, z }));
 
   out.push(sheet("sheet-civics-large.png", Object.entries(LARGE_CIVICS).map(([kind, sprite]) => ({ sprite, label: `${kind} 3x3` })), { cols: 2, cellW: 224, cellH: 198, groundY: 139, z }));
   out.push(sheet("sheet-civics-large-hires.png", Object.entries(LARGE_CIVICS).map(([kind, sprite]) => ({ sprite: art.hires(sprite), label: `${kind} 3x3 hires` })), { cols: 2, cellW: 448, cellH: 396, groundY: 278, z: 1 }));
@@ -137,8 +137,8 @@ function sheets(z) {
   // The hi-res set (js/art/hires.js): a 1× sprite scaled ×2 beside its 2× twin, at zoom 1 so the sheet IS the comparison.
   {
     const pairs = [
-      BUILDINGS[1][3][0], BUILDINGS[2][3][0], BUILDINGS[3][2][0], BUILDINGS[4][2][0], PARK, FIRE_STATION,
-      BLOCKS[1][2][0], BLOCKS[2][2][0], BLOCKS[3][2][0], BLOCKS[4][2][0],
+      BUILDINGS[1][3][0], BUILDINGS[2][3][0], BUILDINGS[3][2][0], PARK, FIRE_STATION,
+      BLOCKS[1][2][0], BLOCKS[2][2][0], BLOCKS[3][2][0],
       GRASS[0], ROADS[0][N | S], ROADS[1][N | E | S | W], RAILS[N | S], WATER_TILE, CHALK[2][1], BRIDGES[N | S], RUBBLE,
     ];
     const cellW = 600, cellH = 240, cols = 2; // wide enough for a 2×2 block's 260-px twin beside its scaled 1×
@@ -162,11 +162,11 @@ function sheets(z) {
     out.push(save("sheet-hires.png", canvas, 1));
   }
 
-  // The blocks: 4 zones × 2 sides × 2 variants, each on its own grass footprint (a row per zone).
+  // The blocks: 3 zones × 2 sides × 2 variants, each on its own grass footprint (a row per zone).
   {
     const cols = 4, cellW = 280, cellH = 250, groundY = 205;
     const cells = [];
-    for (const zone of [1, 2, 3, 4]) for (const side of [2, 3]) for (const v of [0, 1]) cells.push({ sprite: BLOCKS[zone][side][v], side });
+    for (const zone of [1, 2, 3]) for (const side of [2, 3]) for (const v of [0, 1]) cells.push({ sprite: BLOCKS[zone][side][v], side });
     const canvas = createCanvas(cols * cellW, Math.ceil(cells.length / cols) * cellH);
     const ctx = background(canvas);
     cells.forEach((cell, i) => {
@@ -337,18 +337,18 @@ function sheets(z) {
     out.push(save("sheet-roadnet.png", canvas, z));
   }
 
-  // Terrain: grass ×3, chalk 4×2, rubble, water ×6 cycle frames, kerbs ×4 on grass, trees, zots, glyphs.
+  // Terrain: grass ×3, chalk 3×2, rubble, water ×6 cycle frames, kerbs ×4 on grass, trees, zots, glyphs.
   const t = [];
   GRASS.forEach((s, i) => t.push({ sprite: s, label: `grass ${i}` }));
-  for (const zone of [1, 2, 3, 4]) CHALK[zone].forEach((s) => t.push({ sprite: s, label: s.name }));
+  for (const zone of [1, 2, 3]) CHALK[zone].forEach((s) => t.push({ sprite: s, label: s.name }));
   t.push({ sprite: RUBBLE, label: "rubble" });
   for (let f = 0; f < WATER_FRAMES; f++) t.push({ sprite: WATER_TILE, label: `water frame ${f}`, tint: waterTint(f) });
   // Chalk coverage: how much of each tile is accent vs grass. "Translucent"
   // is a number here — the first round's High tiles measured 65% accent.
   // The R chalk is drawn in grass keys 'p' (line) and 'm' (shade), not in
   // ACCENT '5' (see terrain.js); grass-0 itself is ≈5% 'p', so the R line
-  // number carries that floor. The M chalk is ACCENT 'A'.
-  for (const zone of [1, 2, 3, 4])
+  // number carries that floor. (The M chalk is retired with the zoned meat.)
+  for (const zone of [1, 2, 3])
     for (const s of CHALK[zone]) {
       const total = ink(s.rows);
       const [lineKey, shadeKey] = CHALK_KEYS[zone];

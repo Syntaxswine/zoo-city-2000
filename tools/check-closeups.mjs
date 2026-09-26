@@ -171,7 +171,7 @@ function sheet(name, sprites, cellW, cellH, columns, zoom = 4) {
 }
 sheet("citizens", SPECIES_IDS.map(s => art.citizen(s, "se", 0, "adult")), 160, 128, 7);
 sheet("citizen-poses", FACINGS.flatMap(f => AGES.map(a => art.citizen("fox", f, 1, a, { hat: true, carry: "sack" }))), 192, 164, 4);
-sheet("buildings", [1, 2, 3, 4].flatMap(z => [1, 2, 3].map(t => art.building(z, t, 0))), 540, 330, 2);
+sheet("buildings", [1, 2, 3].flatMap(z => [1, 2, 3].map(t => art.building(z, t, 0))), 540, 330, 2);
 sheet("civics", ["fire", "police", "centre", "zoo", "largePark", "park"].map(k => art.civic(k, k === "park" ? 1 : 3)), 840, 340, 2, 2);
 sheet("knowledge-and-mansions", ["library", "gallery", "university", "amphitheater"].map(k => art.civic(k)).concat([art.mansion(0), art.mansion(1)]), 840, 380, 2, 2);
 sheet("infrastructure", [["farm", 2], ["cemetery", 6], ["sanitation", 3], ["garbage", 2], ["doctor", 2], ["hospital", 3]].map(([k, side]) => art.civic(k, side)), 900, 480, 2, 2);

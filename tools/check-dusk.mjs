@@ -47,7 +47,9 @@ const SURFACE = KEYS.filter((k) => rampOf(k));
 // pixel is SHADOW_KEY" compared the constant with itself). Dropping '-' from
 // the module's list made the lit windows dim with the city and the whole
 // gate stayed green. This is the list, written here: the shadow, the lit
-// window, fire, its tip, the zot, and the four zone chalks.
+// window, fire, its tip, the zot, the three zone chalks, and 'A' — the meat
+// chalk's dried liver until meat was placed rather than zoned (2026-09-26),
+// kept fixed for its other wearer, the suits' burgundy tie.
 const LIGHTS_AND_MARKS = ["+", "-", "8", "9", "0", "5", "6", "7", "A"];
 const AMOUNTS = [0.25, 0.55, 0.8, 1];
 const both = (a) => [duskTable(a), duskTable(a, true)];
@@ -113,16 +115,16 @@ for (const a of AMOUNTS) {
 //
 // What it is now: the distance to the NEAREST grass rung, against the floor
 // the daylight palette already ships and the owner has already looked at
-// (R 51 · C 97 · I 48 · M 63 — the bar is 48). Derived, not typed, so
-// re-picking an accent moves the bar with it. At the shipped amount the
-// margins are 136 / 89 / 80 / 52: every one of them better than daylight's
-// tightest. Across the whole knob the worst is 47 at amount 0.25, which is
+// (R 51 · C 97 · I 48 — the bar is 48; M's 63 went with the meat chalk,
+// 2026-09-26). Derived, not typed, so re-picking an accent moves the bar
+// with it. At the shipped amount the margins are 136 / 89 / 80: every one of
+// them better than daylight's tightest. Across the whole knob the worst is 47 at amount 0.25, which is
 // why the sweep is held to a COLLAPSE guard instead — a mark that has to stay
 // legible at an amount the product cannot be in is a different claim, and
 // pretending otherwise is how a gate gets tuned until it passes.
 {
   const dist = (p, q) => Math.hypot(p[0] - q[0], p[1] - q[1], p[2] - q[2]);
-  const CHALK = ["5", "6", "7", "A"];
+  const CHALK = ["5", "6", "7"]; // the zone chalks that exist — M's 'A' is no chalk now (the tie still wears it)
   const GRASS = RAMPS.grass.keys.split("");
   const margin = (t, k) => Math.min(...GRASS.map((g) => dist(colourOf(t ? t[k] : k), colourOf(t ? t[g] : g))));
   const floor = Math.min(...CHALK.map((k) => margin(null, k)));
