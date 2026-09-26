@@ -20,9 +20,12 @@ The items are not equal, and the difference matters to whoever picks one up:
 
 - **M — the meat market — is the OWNER'S.** It is a sim change, an art
   redesign and a save question, and it reverses a ruling the owner made when
-  the meat zone was designed (M.2). The owner answered five of **M.4**'s six
-  questions the same day; two remain open, and nothing is built until they are
-  answered. It is the first item since the sprite arc began
+  the meat zone was designed (M.2). By 2026-09-26 the owner had answered
+  every question in **M.4** and added a street trade for towns without a
+  market. The design is
+  [PROPOSAL-MEAT-MARKET-2026-09-26.md](PROPOSAL-MEAT-MARKET-2026-09-26.md), and
+  nothing is built until the owner OKs it. It is the first item since the
+  sprite arc began
   that must touch `js/sim/` — that arc's law 7 (*"if an art change needs a sim
   field, it is not an art change"*) puts it outside the arc, with a sim
   change's discipline.
@@ -36,7 +39,7 @@ The items are not equal, and the difference matters to whoever picks one up:
 
 | | what | whose | code | art | `js/sim/` | first step | waits on |
 |---|---|---|---|---|---|---|---|
-| **M** | the meat market becomes a placeable 3×3 that grows, Light or High by the brush, redesigned, one sprite per stage of growth | the owner's | yes | yes | **yes** | a proposal with M.4's answers and numbers | M.4's questions 4 and 7 |
+| **M** | the meat market becomes a placeable 3×3 that grows — Light 3–27 jobs, Heavy 27–180 — one sprite per stage; with no market, the trade walks the streets | the owner's | yes | yes | **yes** | [the proposal](PROPOSAL-MEAT-MARKET-2026-09-26.md) is written | the owner's OK to its Part D |
 | **L1** | the one-box factories get a roofline — sawtooth, stacks, tanks | mine | a part moves | yes | no | move the parts into the kit, byte-identical | taste |
 | **L2** | street lamps that come on at dusk | mine | render | yes | no | a sheet of where they would stand | whether a lamp throws a pool |
 | **L3** | shirts that say where an animal works | mine | a draw-time read | yes | no (reads only) | measure each shirt against every coat, before drawing one | **the owner** |
@@ -165,7 +168,7 @@ Read from the Governor's Mansion, the last 3×3 added — `65ccac9`, 2026-09-13,
   `npm run check` — and, since `abf08bd`, `art-baseline.txt` via
   `node tools/art-dump.mjs --write` in the same commit.
 
-### M.4 The owner's answers, and the two still open
+### M.4 The owner's answers
 
 Six questions went to the owner; each carried my lean. They answered five
 on 2026-09-25, in these words:
@@ -188,30 +191,32 @@ on 2026-09-25, in these words:
 | 5 | Who pays? | *"same cost as zoning a lone tile of the previous one"* | **§12** (`COST.zoneM`) for the whole 3×3, not the §108 I suggested. Nothing was said against the rest of my lean, so it stays privately run with no upkeep. The cut, the licence and the raid are unchanged. |
 | 6 | What happens to saves that have meat halls? | *"it will break the saves, but thats ok, the player base is basically me"* | No migration and no legacy code path are owed. What a meat save should do when loaded is in M.8. |
 
-**Still open — these two go back to the owner, with my recommendations:**
+**The last two, answered 2026-09-26.** Question 4 asked how much market a
+3×3 is; question 7, new where answers 2 and 3 met, asked whether a Light
+market grows. I had recommended that Light stop at its first stage:
 
-- **4. How much market is a 3×3?** (Not answered.) I recommend that at every
-  stage it be exactly what today's zone puts on nine tiles:
-  - jobs of 27 / 72 / 180 — nine stalls, then nine halls, then the grown
-    exchange with its ×1.25;
-  - stock of 40 and pens of 2 / 4 / 8, as one hall, which is what a grown
-    block has today;
-  - dread and crime from all nine tiles at the market's stage, as a grown
-    block gives off today.
+> *"for light it should be 3-27 jobs*
+>
+> *for heavy 27-180*
+>
+> *2 yes, 3-27 in stepped increments with different sprites."*
 
-  That is the same land, jobs and smell the zone had, so the valve SPEC §9c
-  measured still holds, and M.7 step 5 measures it. On that valve a town of
-  1,600 wants about 72 meat jobs: one market at the hall stage.
-- **7. Does a Light market grow?** New: this is where answers 2 and 3 meet.
-  Low meat today never grows past a stall.
-  - (a) Light is the first stage and stops there, while High carries on
-    through the hall and the cold store. That is three stage sprites in all,
-    and the brush means what it means for every zone — *"Low (cottages
-    only)"*, as the H key says (input.js:326).
-  - (b) Each form has its own ladder: an open-air market that fills out, and
-    a hall that grows. That is six sprites.
+So a **Light** market grows from 3 to 27 jobs in steps, each with its own
+sprite, and a **Heavy** one spans 27 to 180. Light growing overrules my
+recommendation.
 
-  **I recommend (a).**
+In the same message the owner added the **street trade**:
+
+> *"what if you didn't have the meat market and people were just trying to
+> sell it on the street, this would turn the negative effects of the meat
+> market into a walking hazard."*
+
+It is Part B of the proposal.
+
+**The design is written up in
+[PROPOSAL-MEAT-MARKET-2026-09-26.md](PROPOSAL-MEAT-MARKET-2026-09-26.md)**:
+seven stages, the numbers, the street trade, the commits and the checks. It
+waits on the owner's OK to its Part D.
 
 ### M.5 What reads the meat zone — the blast radius
 
@@ -245,8 +250,9 @@ Where I would start reading, in order: `meat.js`, `world.js`, `ops.js`,
 ### M.6 The art brief
 
 - **One sprite per stage of growth.** The owner: *"the reason for multiple
-  sprites is to show the growth of the market."* That is three stages under
-  question 7(a), six under 7(b). Each is a 3×3 with a hi-res twin from the
+  sprites is to show the growth of the market."* The proposal has seven: a
+  bare site, four Light stages and two more for Heavy (its A.2 and A.9).
+  Each is a 3×3 with a hi-res twin from the
   same recipe, every box inside the 48×48-unit footprint
   ([ART-CIVICS-3X3.md](ART-CIVICS-3X3.md)).
 - **A stage must read as the same market, grown** — not a different
@@ -274,9 +280,11 @@ Where I would start reading, in order: `meat.js`, `world.js`, `ops.js`,
 
 ### M.7 The order of work, and what holds it
 
-1. **A proposal**, once questions 4 and 7 are answered: M.4's answers, the
-   numbers, and M.2's table answered row by row — as
-   `PROPOSAL-CRIME-AND-PUNISHMENT.md` did for the zone.
+1. **A proposal** — written:
+   [PROPOSAL-MEAT-MARKET-2026-09-26.md](PROPOSAL-MEAT-MARKET-2026-09-26.md),
+   with M.4's answers, the numbers, the street trade and M.2's table answered
+   row by row, as `PROPOSAL-CRIME-AND-PUNISHMENT.md` did for the zone. Its
+   own Part C orders the rest of this list in detail.
 2. **Instruments first, and byte-identical.** A probe that reads markets on
    the estate layout (`meatprobe.mjs` reads it today). No migration fixture is
    owed (M.4, answer 6).
