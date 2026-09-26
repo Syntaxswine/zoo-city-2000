@@ -60,6 +60,7 @@ export function cityPanel(selection,zoom=2) {
   selection.forEach(({family:f,entry:e},j)=>{
     const tx=5+(j%3)*pitch,ty=5+Math.floor(j/3)*pitch,i=ty*w.w+tx,side=f.side;
     w.variant[i]=e.byte;
+    if(f.group==='staged')w.tier[i]=e.byte; // a market draws the sprite of its STAGE, the anchor's tier (render.js) — the byte alone drew stage 0 every time
     if(f.kind){w.civic[i]=CIVIC_OF_KIND[f.kind];w.civicSize[i]=side;for(let dy=0;dy<side;dy++)for(let dx=0;dx<side;dx++)if(dx||dy){const p=i+dx+dy*w.w;w.civic[p]=CIVIC.PART;w.civicSize[p]=side>4?192|dx|(dy<<3):128|dx|(dy<<2);}}
     else if(f.axis){w.rail[i]=2;const step=f.axis==='ns'?w.w:1;w.rail[i-step]=1;w.rail[i+step]=1;}
     else {w.zone[i]=f.zone;w.tier[i]=f.tier;w.theme[i]=f.theme||0;w.mansion[i]=f.mansion?1:0; if(side>1){w.big[i]=side;for(let dy=0;dy<side;dy++)for(let dx=0;dx<side;dx++)if(dx||dy){const p=i+dx+dy*w.w;w.big[p]=128|dx|(dy<<2);w.zone[p]=f.zone;w.tier[p]=f.tier;}}}
