@@ -24,6 +24,12 @@ export const CIVIC = Object.freeze({ NONE: 0, PARK: 1, LARGE_PARK: 2, LARGE_PARK
  */
 export const isMarket = (c) => c === CIVIC.MARKET;
 /**
+ * The smell an animal lives in: the markets' dread and the street trade's, to the field's cap. Every herbivore and
+ * carnivore reader asks this (mood, home, leaving, the census); LAND VALUE reads world.dread alone, because a seller on
+ * the kerb for a month frightens the herbivores who pass and does not reprice the street (the proposal's B.5, the owner's yes).
+ */
+export const smellAt = (world, i) => Math.min(100, world.dread[i] + (world.streetDread?.[i] || 0));
+/**
  * The order a market's stalls go up in, as (dx, dy) inside its 3×3: the front row first (+ty is the public face, as
  * for every civic), the middle of each row before its corners. The sim smells from these tiles and the art stands its
  * stalls on them, so the two cannot disagree about where the market is.
@@ -136,6 +142,7 @@ export function createWorld({ seed = "zoo", w = 64, h = 64, campaign = false } =
     civicReach: new Uint8Array(n), // WEALTH (SPEC §9f, fields.computeKnowledgeCulture): WHICH of the four public buildings reach the tile, fields.REACH bits — the checklist asks for each by name where the knowledge and culture fields keep only the stronger; derived, never saved
     _camGen: 0, // the camera walk’s visited-set generation (fields.computeCamCover)
     dread: new Uint8Array(n),
+    streetDread: new Uint8Array(n), // THE STREET TRADE's smell (street.js): herbivores fear it, land value never reads it — derived
     carnAt: new Uint16Array(n), // Uint16 since the blocks: a 3×3 R block keeps 270 animals on its anchor
     occupants: new Uint16Array(n),
     staff: new Uint16Array(n),

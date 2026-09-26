@@ -19,6 +19,7 @@ import { post } from "./budget.js";
 const FLOW_KEYS = Object.freeze([
   "bought", "killed", "convicted", "slaughtered", "eaten", "spoiled",
   "penBought", "penReleased", "cartTrips", "cartPhysical", "cartWalk",
+  "street", // units sold off the kerb (street.js) — already counted as killed and eaten; this says where
 ]);
 
 const emptyFlow = () => Object.fromEntries(FLOW_KEYS.map((key) => [key, 0]));
@@ -324,6 +325,17 @@ function queueTrip(world, kind, route, extra = {}) {
   note(world, route.hall, "cartTrips", 1);
   note(world, route.hall, "cartPhysical", route.physicalSteps);
   note(world, route.hall, "cartWalk", route.walkSteps);
+}
+
+/**
+ * A killing sold OFF THE KERB (street.js): killed and eaten the same month, so it holds no stock and the identity
+ * stands as written — inflow +1, eaten +1. Nobody pays the mayor; the "street" counter says where it went.
+ */
+export function streetSale(world) {
+  meatStats(world); // capture opening inventory before the first flow
+  note(world, -1, "killed", 1);
+  note(world, -1, "eaten", 1);
+  note(world, -1, "street", 1);
 }
 
 /** Put a killing or convicted sale into stock exactly once. */

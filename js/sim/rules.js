@@ -251,6 +251,12 @@ export const KNOBS = {
   MARKET_TIER: [0, 1, 1, 1, 1, 2, 3],      // the zone tier a stage smells, fines and pens like: stall · hall · cold store
   MARKET_FLOOR: [0, 1, 0, 4],              // by form (maxTier 1 | 3): Light opens at one stall, Heavy as the full square
   MARKET_TOP: [0, 4, 0, 6],                // by form: Light stops at the square, Heavy at the exchange
+  // THE STREET TRADE (street.js; the proposal's Part B): meat sold off the kerb where no market reaches.
+  STREET_PER_SELLER: 50,     // unserved carnivores per seller: the valve's 0.06 jobs a carnivore, at a stall's 3 jobs
+  STREET_REACH: 6,           // a pitch is a road tile within this of the seller's home (Chebyshev)
+  STREET_BEST: 3,            // … and it moves each month among the best this many (most unserved carnivores within 5)
+  STREET_EXPOSURE_MAX: 3,    // walking tiles near a pitch that count toward a victim's weight (×1 + this)
+  STREET_STOP_E: 6,          // a seller's month on a covered kerb, as trespass exposure: p = TRESPASS_P · this · cover/POLICE_EFFECT
   MEAT_PER_CARN: 0.06,      // rM = (0.06·carnivores + 10 − Jm)/max(Jm, 20): a 1,600 town wants two halls
   MEAT_SEED: 10,
   MEAT_CAP: 40,             // integer bodies/units held by one hall
@@ -596,6 +602,11 @@ export const RULES = Object.freeze([
     id: "M6", title: "Livestock grows in the pen",
     formula: "a full pig or cow household may sell a cub to a reachable free pen (2 places on the stall stages, 4 at the hall, 8 at the exchange); it is absent until the exact sixteenth birthday, then yields 2 units; razing or losing the hall frees it alive",
     live: (w) => `${w.last.census.penned || 0} in pens · ${w.last.census.meatSlaughtered || 0} units from pens this year`,
+  },
+  {
+    id: "M7", title: "The street trade — where no market reaches",
+    formula: "carnivores with no market within 60 walked steps (every one of them under prohibition) are unserved ; one seller per 50 of them — carnivore adults of those homes, the unemployed first — works a pitch: the road tile within 6 of home with the most unserved carnivores within 5, moving each month among the best 3 ; a pitch carries a stall's dread (40 over 2 — herbivores' mood, home and leaving, never land value), a stall's crime (10 over 1), the killing's ×3 pull, and ×(1 + tiles walked near it, up to 3) on a passing prey's weight as a victim ; a killing near a pitch is sold off the kerb, killed and eaten at once ; the mayor gets nothing ; police may stop a seller at a covered pitch like a trespasser",
+    live: (w) => `${w.last.census.streetSellers || 0} sellers · ${w.last.census.streetUnserved || 0} carnivores no market reaches · ${w.meatStats?.total?.street || 0} sold off the kerb · ${w.events.justice?.street || 0} stopped`,
   },
   {
     id: "K1", title: "The killing — no jobs means hungry wolves",

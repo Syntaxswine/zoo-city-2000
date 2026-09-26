@@ -200,10 +200,16 @@ check("tick cost is not catastrophic (the printed number is the instrument; this
 // fixture with no medical facilities. Earlier deaths change the deterministic
 // simulation trajectory: the 15-year population changes from 366 to 271.
 // Focused health checks independently verify the exact lifespan factors.
-// 257-285 is +/-5%: a change that moves the town further than
+// THE STREET TRADE (2026-09-26, docs/PROPOSAL-MEAT-MARKET-2026-09-26.md Part B) moved it again. This town's meat
+// market is placed Light at t = 0 and opens as a bare site; until its first stall (months 9–13 on seed 7) the town's
+// carnivores buy off the kerb — a new rule, and four months of it reshuffle the draws that follow (rehoming rolls in
+// the smell). 271 → 320. The same town with the street trade switched off (STREET_PER_SELLER ∞) ends at 282, inside
+// the old band; seeds 3 and 5 move +84 and −38 — the rig's own spread with the trade off is 251–390. Measured, not
+// a push; the number is in the commit message.
+// 304-336 is +/-5%: a change that moves the town further than
 // that is a FINDING, and re-baselining this line is a deliberate act with a
 // number in the commit message, not a nuisance to be widened away.
-check("the scripted city is still a town", world.citizens.length > 257 && world.citizens.length < 285, `${world.citizens.length} citizens after ${YEARS} years (the band is 257-285, \u00b15% of 271; moving it is a finding, and re-baselining is a decision)`);
+check("the scripted city is still a town", world.citizens.length > 304 && world.citizens.length < 336, `${world.citizens.length} citizens after ${YEARS} years (the band is 304-336, \u00b15% of 320; moving it is a finding, and re-baselining is a decision)`);
 
 // ledger
 let sum = 0;
@@ -6944,6 +6950,90 @@ function costOfBulldoze(w, x, y) { return (0, costOfOp)(w, { kind: "bulldoze", x
   }
   check("meat market: reloaded at EVERY month of six years while its markets grow, the city's next month is hash-identical to the straight run's",
     moves > 0 && apart.length === 0, `${moves} months a stage moved · ${apart.length ? "apart at " + apart.slice(0, 6).join(",") : "never apart"}`);
+}
+
+// ---- THE STREET TRADE (js/sim/street.js; docs/PROPOSAL-MEAT-MARKET-2026-09-26.md Part B) ---------------------------
+// Where no market reaches, carnivores sell meat off the kerb, and the hazard walks. A hand-built street: a road, six
+// wolves' homes west, rabbits' east — no market, then one in reach, then the trade prohibited.
+{
+  const ST = await import("../js/sim/street.js");
+  const MEs = await import("../js/sim/meat.js");
+  const CIs = await import("../js/sim/citizens.js");
+  const FIs = await import("../js/sim/fields.js");
+  const JUs = await import("../js/sim/justice.js");
+  const { smellAt } = await import("../js/sim/world.js");
+  const w = createWorld({ seed: "street", w: 40, h: 24 });
+  w.terrain.fill(0); w.road.fill(ROAD.NONE); w.rail.fill(0); w.zone.fill(ZONE.NONE); w.tier.fill(0); w.civic.fill(CIVIC.NONE);
+  w.wall.fill(0); w.big.fill(0); w.rubble.fill(0); w.burning.fill(0); w.meat.fill(0);
+  w.citizens = []; w.households = []; w.byId = new Map(); w.hhById = new Map(); w.nextId = 1; w.nextHouseholdId = 1;
+  w.events.noDisasters = true;
+  const at = (x, y) => y * w.w + x;
+  const xy = (t) => `(${t % w.w},${(t / w.w) | 0})`;
+  for (let x = 2; x <= 37; x++) w.road[at(x, 10)] = ROAD.ROAD;
+  const lot = (x, y) => { const i = at(x, y); w.zone[i] = ZONE.R; w.tier[i] = 1; w.maxTier[i] = 3; return i; };
+  const wolfHomes = [4, 5, 6, 7, 8, 9].map((x) => lot(x, 11));
+  const rabbitHome = lot(14, 11);
+  for (const h of wolfHomes) { const hh = CIs.createHousehold(w, "wolf", 1); CIs.placeHousehold(w, hh, h); }
+  { const hh = CIs.createHousehold(w, "rabbit", 1); CIs.placeHousehold(w, hh, rabbitHome); }
+  for (const c of w.citizens) { c.born = w.tick - 30 * 12; c.deathAge = 99999; }
+  w.roadsDirty = true; w.wallsDirty = true; computeFields(w); FIs.recountRosters(w);
+  const s1 = ST.computeStreet(w);
+  const seller = s1.sellers[0], sc = seller && w.byId.get(seller.id);
+  const inReach = seller && Math.max(Math.abs((seller.pitch % w.w) - (sc.home % w.w)), Math.abs(((seller.pitch / w.w) | 0) - ((sc.home / w.w) | 0))) <= KNOBS.STREET_REACH;
+  check("street: with no market in reach, one seller per fifty unserved carnivores — a wolf of those homes, standing on a road near home",
+    s1.unserved === 6 && s1.sellers.length === 1 && sc?.species === "wolf" && w.road[seller.pitch] !== ROAD.NONE && inReach,
+    `unserved ${s1.unserved} · sellers ${s1.sellers.length} · pitch ${seller ? xy(seller.pitch) : "none"}`);
+  const again = ST.computeStreet(w);
+  const pitches = new Set();
+  const t0 = w.tick;
+  for (let k = 0; k < 6; k++) { w.tick = t0 + k; pitches.add(ST.computeStreet(w).sellers[0]?.pitch); }
+  w.tick = t0; ST.computeStreet(w);
+  check("street: the pitch is the same for the same month (derived, draw-free) and moves among the best few from month to month",
+    again.sellers[0]?.pitch === seller?.pitch && pitches.size >= 2 && pitches.size <= KNOBS.STREET_BEST, `${pitches.size} pitches in six months`);
+  computeFields(w);
+  const lvWith = Array.from(w.lv), crimeWith = Array.from(w.crime);
+  const saved = w.street; w.street = null; computeFields(w); const lvWithout = Array.from(w.lv), crimeWithout = Array.from(w.crime); w.street = saved; computeFields(w);
+  // Land value never reads the street's SMELL. A pitch also carries a stall's crime, and a high-crime tile loses
+  // CRIME_LV_PENALTY like any other (fields.js computeCrime) — so a tile's value may differ only there, and only by that.
+  const lvOnlyByCrime = lvWith.every((v, i) => v === lvWithout[i]
+    || (crimeWith[i] > KNOBS.CRIME_HIGH && crimeWithout[i] <= KNOBS.CRIME_HIGH && v === Math.max(0, lvWithout[i] - KNOBS.CRIME_LV_PENALTY)));
+  const pitch = seller.pitch;
+  const herbTerm = CIs.homeTerms(w, "rabbit", pitch).find((t) => t.code === "DREAD_HOME")?.value ?? 0;
+  check("street: a pitch smells as a stall — frightening a herbivore's home — and land value never reads the smell (only the street's crime can move it, as any crime does)",
+    w.streetDread[pitch] === KNOBS.DREAD[1] && w.dread[pitch] === 0 && smellAt(w, pitch) === KNOBS.DREAD[1] && herbTerm < 0 && lvOnlyByCrime,
+    `street smell ${w.streetDread[pitch]} · market dread ${w.dread[pitch]} · a rabbit's home term ${herbTerm.toFixed(1)}`);
+  const before = MEs.meatBalance(w);
+  MEs.streetSale(w);
+  const after = MEs.meatBalance(w);
+  check("street: a sale off the kerb is killed and eaten at once — no stock, the identity exact, the mayor paid nothing",
+    after.ok && after.stock === before.stock && w.meatStats.total.street === 1 && w.meatStats.total.killed === 1 && w.meatStats.total.eaten === 1 && !(w.ledger?.cut));
+  // Cover, and only cover, puts a seller in the files.
+  const saveP = KNOBS.TRESPASS_P;
+  w.policeCov.fill(0);
+  const filesBefore = w.events.files.length;
+  JUs.streetStopTick(w, null, []);
+  const noCover = w.events.files.length === filesBefore;
+  const saveMax = KNOBS.TRESPASS_MAX;
+  KNOBS.TRESPASS_P = 1; KNOBS.TRESPASS_MAX = 1; w.policeCov[pitch] = KNOBS.POLICE_EFFECT;
+  JUs.streetStopTick(w, null, []);
+  KNOBS.TRESPASS_P = saveP; KNOBS.TRESPASS_MAX = saveMax;
+  check("street: the police stop a seller only at a covered pitch — a street-trade file on the spot",
+    noCover && w.events.files.some((f) => f.cause === "street trade" && f.tile === pitch && f.culpritId === seller.id));
+  w.policeCov.fill(0);
+  // A market in reach ends it; a prohibition brings it back.
+  const m = at(10, 11); w.civic[m] = CIVIC.MARKET; w.civicSize[m] = 1; w.maxTier[m] = 1; w.tier[m] = 1; MEs.resetMeatRoutes(w);
+  const served = ST.computeStreet(w);
+  w.events.governance = { ...(w.events.governance || {}), meatTrade: "prohibited" }; MEs.resetMeatRoutes(w);
+  const banned = ST.computeStreet(w);
+  delete w.events.governance.meatTrade; MEs.resetMeatRoutes(w);
+  check("street: a market in reach ends the street trade, and a prohibition sends every carnivore back to the kerb",
+    served.unserved === 0 && served.sellers.length === 0 && banned.prohibited && banned.unserved === 6 && banned.sellers.length === 1,
+    `served ${served.unserved}/${served.sellers.length} · prohibited ${banned.unserved}/${banned.sellers.length}`);
+  // Derived from the saved state alone: a reloaded city computes the very same street.
+  w.civic[m] = CIVIC.NONE; w.civicSize[m] = 0; w.tier[m] = 0; MEs.resetMeatRoutes(w);
+  const here = JSON.stringify(ST.computeStreet(w).sellers);
+  const there = JSON.stringify(load(save(w)).street?.sellers);
+  check("street: a reload computes the same sellers on the same pitches — it is never saved", here === there && here !== "[]", `${here} vs ${there}`);
 }
 
 // ---- Part H: meat on hand, free-rail freight, pens (SPEC §9c) ---------------------

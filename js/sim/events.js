@@ -411,7 +411,7 @@ const NEWS_EXTRA = Object.freeze([
   ["cold", "COLD", "bad", true], ["saved", "SAVED", "good", true], ["landmark", "LANDMARK", "good", true],
   ["identified", "IDENTIFIED", "good", true],
   ["mansion", "MANSION", "good", true], ["estate", "THE ESTATE", "good", true], // wealth and class (SPEC §9f)
-  ["emptyHooks", "EMPTY HOOKS", "bad", true], ["market", "THE MARKET", "good", false],
+  ["emptyHooks", "EMPTY HOOKS", "bad", true], ["market", "THE MARKET", "good", false], ["street", "THE STREET", "bad", true],
   ["bought", "BOUGHT", "bad", false], ["pen", "THE PEN", "bad", false], ["trespass", "TRESPASS", "bad", false],
   ["cold-file", "The file", "bad", false],
   ["story-obituary", "OBITUARY", "bad", false], ["story-litter", "LITTER", "good", false], ["story-centenary", "CENTENARY", "good", false],

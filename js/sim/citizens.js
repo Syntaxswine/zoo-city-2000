@@ -12,7 +12,7 @@ import { KNOBS } from "./rules.js";
 import { SPECIES, SPECIES_BY_ID, NAME_PARTS, affinity, ARRIVING, PREY_OF, DIET_OF, isPredatorOf, isPredPrey, admits } from "./species.js";
 import { temperOf, compat } from "./temper.js";
 import { computeInfrastructure, medicalLifespanModifier } from "./progression.js";
-import { ZONE, CIVIC, TERRAIN, ROAD, idx, inBounds, capacityOf, jobsOf, jobZone, absent, civicAnchorOf, anchorOf } from "./world.js";
+import { ZONE, CIVIC, TERRAIN, ROAD, idx, inBounds, capacityOf, jobsOf, jobZone, absent, civicAnchorOf, anchorOf, smellAt } from "./world.js";
 import { useName } from "./use.js";
 import { doorsOf, edgeRoads, commutePath, dial, WALK, nodePath, commuteTime } from "./fields.js";
 import { ageYears, ageMonths, isWorker } from "./census.js";
@@ -276,9 +276,10 @@ export function homeTerms(world, species, i, strict = false) {
     { code: "LV_BASE", value: lv },
     { code: "POLLUTION", value: -pol * (1 - sp.polTol / 100) },
   ];
-  // The meat hall's dread: herbivores steer away from it; carnivores do not mind (the LV term already took 0.8·dread off).
+  // The meat hall's dread: herbivores steer away from it — and from the street trade's (smellAt); carnivores do not
+  // mind a market (the LV term already took 0.8·dread off, and this gives it back) and the street took nothing off LV.
   const diet = DIET_OF[species];
-  if (diet === "herb") terms.push({ code: "DREAD_HOME", value: -KNOBS.DREAD_HOME_HERB * world.dread[i] });
+  if (diet === "herb") terms.push({ code: "DREAD_HOME", value: -KNOBS.DREAD_HOME_HERB * smellAt(world, i) });
   else if (diet === "carn") terms.push({ code: "DREAD_HOME", value: KNOBS.DREAD_HOME_CARN * world.dread[i] });
   switch (sp.homePref) {
     case "high": {
@@ -750,7 +751,7 @@ export function leaveScore(world, hh, cen = world.last?.census) {
     lowMood: mood / present.length < KNOBS.LEAVE_MOOD_LOW,
     crime: home >= 0 && world.crime[home] > KNOBS.CRIME_HIGH,
     smoke: home >= 0 && world.pol[home] > SPECIES_BY_ID[hh.species].polTol,
-    dread: home >= 0 && DIET_OF[hh.species] === "herb" && world.dread[home] >= KNOBS.REHOME_DREAD,
+    dread: home >= 0 && DIET_OF[hh.species] === "herb" && smellAt(world, home) >= KNOBS.REHOME_DREAD,
     crowded: home >= 0 && world.occupants[home] > capacityOf(world, home),
     taxed: world.rates.R > neutralRate(cen ? cen.P : 0) + KNOBS.LEAVE_TAX_OVER,
     burned: hh.burnedAt != null && world.tick - hh.burnedAt <= KNOBS.LEAVE_BURNED_MONTHS,
@@ -948,7 +949,7 @@ export function citizensTick(world, cen, dem) {
   //     markets" would be a mood number only). Draws only where dread ≥ 40.
   for (const hh of world.households) {
     if (hh.gone || hh.home < 0 || DIET_OF[hh.species] !== "herb") continue;
-    if (world.dread[hh.home] < KNOBS.REHOME_DREAD) continue;
+    if (smellAt(world, hh.home) < KNOBS.REHOME_DREAD) continue;
     if (!rng.chance(KNOBS.REHOME_DREAD_P)) continue;
     const from = hh.home;
     const moving = detachPresent(world, hh);
@@ -958,7 +959,7 @@ export function citizensTick(world, cen, dem) {
     for (const id of moving.members) { const c = world.byId.get(id); c.home = -1; world.occupants[from]--; }
     moving.home = -1;
     const to = bestHome(world, householdSpecies(world, moving), moving.members.length, false, allowed);
-    if (to >= 0 && world.dread[to] < world.dread[from]) { placeHousehold(world, moving, to); for (const id of moving.members) remember(world, world.byId.get(id), KIND.MOVED, to); out.rehomed++; }
+    if (to >= 0 && smellAt(world, to) < smellAt(world, from)) { placeHousehold(world, moving, to); for (const id of moving.members) remember(world, world.byId.get(id), KIND.MOVED, to); out.rehomed++; }
     else placeHousehold(world, moving, from, false); // nowhere better: the same door, the same roots
   }
 
@@ -1284,8 +1285,8 @@ export function moodTerms(world, c, context = moodContext(world)) {
     // hides it whenever it would matter.
     const culture = world.culture[c.home];
     if (culture) terms.push({ code: "CULTURE", value: KNOBS.CULTURE_MOOD[culture] });
-    // The meat hall's dread: herbivores mind it (halved with a carnivore friend); carnivores like the smell.
-    const dread = world.dread[c.home];
+    // The meat hall's dread and the street trade's: herbivores mind them (halved with a carnivore friend); carnivores like the smell.
+    const dread = smellAt(world, c.home);
     if (dread > 0) {
       if (diet === "herb") {
         let carnFriend = false;

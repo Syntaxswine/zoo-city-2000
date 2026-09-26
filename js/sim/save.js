@@ -13,6 +13,7 @@ import { makeRng } from "./rng.js";
 import { computeFields, recountRosters, commutePath, doorsOf } from "./fields.js";
 import { citizenDefaults, rebuildMaps } from "./citizens.js";
 import { clearZonedMeat } from "./meat.js";
+import { computeStreet } from "./street.js";
 import { locateCamps } from "./camps.js";
 import { refreshLast } from "./tick.js";
 import { migrateLegacyNames } from "./legacy.js";
@@ -189,6 +190,9 @@ export function rebuildDerived(world) {
     const b = doorsOf(world, c.job);
     c.path = a.length && b.length ? (commutePath(world, c.species, a, b) || { path: null }).path : null; // the weighted commute (use-zoning), never the unit BFS: a loaded city must take the roads the live one took
   }
+  // The street trade (street.js) needs the routes computeFields just built; refreshLast's fields then carry its smell
+  // and crime for the card. The first tick recomputes it from this same state, so nothing here can steer a month.
+  computeStreet(world);
   // A loaded city reads complete at once (the play-tester saw placeholders
   // in the header until the first tick). `refreshLast` recomputes the fields
   // itself, so the paths rebuilt above are in the traffic it counts - there is

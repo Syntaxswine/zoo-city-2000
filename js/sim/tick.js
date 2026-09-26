@@ -14,6 +14,7 @@ import { justiceTick } from "./justice.js";
 import { storyTick } from "./story.js";
 import { computeClass } from "./wealth.js";
 import { beginMeatMonth, penMaturityTick, meatTick, meatCensus, resetMeatRoutes } from "./meat.js";
+import { computeStreet, streetNews } from "./street.js";
 import { SPECIES } from "./species.js";
 import { ZONE } from "./world.js";
 import { buildingSnapshot, syncBuildingAge } from "./building-age.js";
@@ -47,6 +48,12 @@ export function tick(world) {
   meatNotices.push(...penMaturityTick(world));
   notices.push(...meatNotices);
   sanitationTick(world);
+  // 0b. THE STREET TRADE (street.js): who sells meat off the kerb this month, and where — from the month before's
+  // settled state, before the fields, which carry its smell and crime. Derived and draw-free, so a reloaded city's
+  // first month computes the very same street here; only its opening and closing news is saved.
+  computeStreet(world);
+  const streetLine = streetNews(world);
+  if (streetLine) { meatNotices.push(streetLine); notices.push(streetLine); } // logged by streetNews itself: meatNotices keeps the log from taking it twice
   // 1. fields
   computeFields(world);
   recountRosters(world);

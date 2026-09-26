@@ -691,6 +691,11 @@ export function createUI(app) {
     if (w.burning[i]) lines.push(el("div", "warn", "ON FIRE — bulldoze a firebreak."));
     if (w.rubble[i]) lines.push(el("div", "warn", `rubble — the site clears itself in ${w.rubble[i]} month${w.rubble[i] === 1 ? "" : "s"} and rebuilds on its own; the zoning is kept. Bulldoze (§2) if you cannot wait.`));
     if (w.flooded[i]) lines.push(el("div", "warn", `flooded, ${w.flooded[i]} more month${w.flooded[i] === 1 ? "" : "s"}.`));
+    // THE STREET TRADE (sim/street.js): a seller's pitch this month, and the smell it leaves — which frightens herbivores
+    // and which land value never reads.
+    { const seller = w.street?.sellers.find((s) => s.pitch === i); const sc = seller && w.byId?.get(seller.id);
+      if (sc) lines.push(el("div", "warn", `a street seller: ${sc.name} ${sc.surname} (${sc.species}) — meat off the kerb; no market reaches these streets`)); }
+    if (w.streetDread?.[i]) lines.push(el("div", "dim", `the street trade's smell ${w.streetDread[i]} — herbivores fear it; land value does not see it`));
     if (w.terrain[i] === TERRAIN.TREE && !w.zone[i]) lines.push(el("div", "dim", "a tree: −4 pollution, +3 LV next door; zoning over it fells it at §4."));
     return lines;
   }
@@ -726,7 +731,7 @@ export function createUI(app) {
     if (!wk) return "between walks";
     return wk.riding ? "on the train"
       : wk.kind === "predation" ? (wk.carry ? `${wk.leg < wk.legs.length - 1 ? "taking" : "walking home from the hall with"} a heavy sack — ${wk.preyName} did not come home` : `calling on ${wk.preyName}`)
-        : { commuter: "commuting", stroller: "out for a stroll", cub: "off to the park", arrival: "just arrived — walking home", meeting: "meeting a new friend", cart: wk.leg ? "bringing the hall cart home" : "taking the hall cart to a door", penned: "standing in the market pen", departure: "leaving town for the edge road" }[wk.kind] || wk.kind;
+        : { commuter: "commuting", stroller: "out for a stroll", cub: "off to the park", arrival: "just arrived — walking home", meeting: "meeting a new friend", cart: wk.leg ? "bringing the hall cart home" : "taking the hall cart to a door", penned: "standing in the market pen", seller: "selling meat off the kerb — no market reaches these streets", departure: "leaving town for the edge road" }[wk.kind] || wk.kind;
   }
 
   function portraitFor(id, species, years, mood = 50) {
@@ -1025,6 +1030,7 @@ export function createUI(app) {
     if (c.walls) tr("walls · tunnels", `${c.walls} · ${c.tunnels}`);
     if (c.railTiles || c.stations) tr("rail · stations · riders", `${c.railTiles} · ${c.stations} · ${c.riders}`);
     if (c.commuteN) tr(`mean commute (walk-steps; a ride is ${railShare()})`, c.meanCommute.toFixed(1));
+    if (c.streetSellers) tr("the street trade", `${c.streetSellers} seller${c.streetSellers === 1 ? "" : "s"} off the kerb · ${c.streetUnserved} carnivores no market reaches`);
     if (c.markets) {
       tr("meat markets", `${c.markets} (${c.Jm} jobs) · ${c.herbNear} herbivores within the smell`);
       tr("meat on hand · sold this year", `${c.meatOnHand || 0} · ${c.meatSold || 0}`);

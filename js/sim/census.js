@@ -3,7 +3,7 @@
 
 import { KNOBS } from "./rules.js";
 import { SPECIES, SPECIES_BY_ID, isPredPrey, isPredatorOf, DIET_OF } from "./species.js";
-import { ZONE, CIVIC, ROAD, jobsOf, jobZone, absent, capacityOf, isPart, isKnowledgeCivic, isCultureCivic, isMarket } from "./world.js";
+import { ZONE, CIVIC, ROAD, jobsOf, jobZone, absent, capacityOf, isPart, isKnowledgeCivic, isCultureCivic, isMarket, smellAt } from "./world.js";
 import { served, edgeRoads , commuteTime, rides, fireExposure } from "./fields.js";
 import { landmarkOf } from "./landmarks.js";
 import { needOf, needsContext } from "./needs.js";
@@ -132,7 +132,7 @@ export function census(world) {
     if (c.exonerated) exonerated++;
     if (!c.pen && (c.held || 0) > world.tick) held++;
     if (c.pen) penned++;
-    if (c.home >= 0 && world.dread[c.home] > 0 && DIET_OF[c.species] === "herb") herbNear++;
+    if (c.home >= 0 && smellAt(world, c.home) > 0 && DIET_OF[c.species] === "herb") herbNear++; // a market's smell or the street's
     if (c.path) { commuteN++; commuteSum += commuteTime(c.path); if (rides(c.path)) riders++; }
     for (const f of c.friends) {
       if (f > c.id) {
@@ -221,7 +221,7 @@ export function census(world) {
     // The watched share is over OCCUPIED HOMES, not over tiles: a camera
     // pointed at a field costs the town nothing, and should not.
     if (world.occupants[i] > 0) { occupiedHomes++; if (world.camCov[i] >= KNOBS.CAM_EFFECT / 2) watchedHomes++; }
-    if (world.dread[i] > maxDread) maxDread = world.dread[i];
+    if (smellAt(world, i) > maxDread) maxDread = smellAt(world, i);
     // THE WHOLE LOOP ASKS, not just the zoo. A civic nobody can walk to
     // employs nobody, covers nothing and takes nobody in - and these counts
     // are what the rest of the game reads for its EFFECT: `justice` sizes the
@@ -297,6 +297,7 @@ export function census(world) {
     counts, shares, speciesPresent, diet, carnivores: diet.carn,
     friendships, cross, predPrey, predPreyFixed, H, hKnife,
     fixed, wrongful, exonerated, held, penned, herbNear, maxDread, markets, centres,
+    streetSellers: world.street?.sellers.length || 0, streetUnserved: world.street?.unserved || 0, // the street trade this month (street.js)
     meatOnHand,
     meatSold: world.meatStats?.yearly?.eaten || 0,
     meatBought: world.meatStats?.yearly?.bought || 0,

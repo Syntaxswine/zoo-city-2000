@@ -246,6 +246,13 @@ export function computeDread(world) {
     for (const j of marketStallTiles(world, i)) spread(world, e, j, KNOBS.DREAD[t] * scale, KNOBS.DREAD_RADIUS[t]);
   }
   for (let i = 0; i < n; i++) world.dread[i] = Math.max(0, Math.min(100, Math.round(e[i])));
+  // THE STREET TRADE (street.js): a stall's dread at every pitch this month, in its own field — herbivores read the two
+  // together (world.smellAt), land value reads world.dread alone. A prohibition does not stop it: it is where it goes.
+  const se = world._streetEmit || (world._streetEmit = new Float32Array(n));
+  se.fill(0);
+  for (const p of world.street?.pitches || []) spread(world, se, p, KNOBS.DREAD[1], KNOBS.DREAD_RADIUS[1]);
+  const sd = world.streetDread || (world.streetDread = new Uint8Array(n));
+  for (let i = 0; i < n; i++) sd[i] = Math.max(0, Math.min(100, Math.round(se[i])));
 }
 
 /** Centroid of built lots (tier > 0); falls back to zoned lots, then the start tile. */
@@ -564,6 +571,8 @@ export function computeCrime(world) {
     const t = KNOBS.MARKET_TIER[world.tier[i]];
     for (const j of marketStallTiles(world, i)) spread(world, near, j, KNOBS.CRIME_M[t] * mult, KNOBS.CRIME_M_RADIUS[t]);
   }
+  // … and every street pitch a stall's, never halved: nobody licenses the kerb (street.js).
+  for (const p of world.street?.pitches || []) spread(world, near, p, KNOBS.CRIME_M[1], KNOBS.CRIME_M_RADIUS[1]);
   // The files' stain is capped at FILE_CRIME_MAX — a street where three things
   // happened is a bad street, not three bad streets. Uncapped it stacked, and
   // because burglaryTick draws its rate from the COUNT of hot lots, the stain

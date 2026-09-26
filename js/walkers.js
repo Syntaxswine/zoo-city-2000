@@ -344,6 +344,17 @@ export function createWalkers(initialWorld) {
     return add(w);
   }
 
+  /**
+   * A STREET SELLER (sim/street.js) stands at its pitch with the meat cart — a standing, clickable mirror of this
+   * month's world.street, like a penned cub. The pitch moves every month; the figure follows it.
+   */
+  function spawnSeller(c, pitch) {
+    const w = make("seller", c, [], { tile: pitch, facing: (c.id & 1) ? "sw" : "se" });
+    w.carry = "cart";
+    w.pitch0 = pitch;
+    return add(w);
+  }
+
   /** A penned cub is a standing, clickable mirror of sim state. */
   function spawnPenned(c) {
     const tile = door(c.heldAt);
@@ -486,6 +497,7 @@ export function createWalkers(initialWorld) {
     const byId = world.byId || new Map();
     const winter = world.events.active.some((e) => e.id === "bearWinter");
     const camperIds = new Set(world.campers.map((c) => c.id));
+    const sellers = new Map((world.street?.sellers || []).map((s) => [s.id, s.pitch])); // this month's street trade (sim/street.js)
 
     // Release anyone whose citizen is gone or changed; campers/scouts that left.
     for (let k = active.length - 1; k >= 0; k--) {
@@ -498,6 +510,11 @@ export function createWalkers(initialWorld) {
       if (w.citizen == null) continue;
       const c = byId.get(w.citizen);
       if (c?.pen && w.kind !== "penned") { remove(k); continue; }
+      // A seller stands at its pitch: any other walk of that animal gives way, and a seller whose pitch moved or who
+      // no longer sells is released (the sim's world.street is rebuilt every month).
+      const pitch = sellers.get(w.citizen);
+      if (pitch != null && w.kind !== "seller") { remove(k); continue; }
+      if (w.kind === "seller" && pitch !== w.pitch0) { remove(k); continue; }
       const changed = !c || c.home !== w.home0 || (w.kind === "penned" && (!c.pen || c.heldAt !== w.heldAt0)) || (w.kind === "commuter" && c.job !== w.job0) || (w.kind === "commuter" && !c.path);
       if (changed) {
         w.release = true;
@@ -513,6 +530,11 @@ export function createWalkers(initialWorld) {
       for (const c of world.citizens) {
         if (active.length >= MAX_WALKERS) break;
         if (c.pen && !activeIds.has(c.id)) spawnPenned(c);
+      }
+      for (const s of world.street?.sellers || []) {
+        if (active.length >= MAX_WALKERS) break;
+        const c = byId.get(s.id);
+        if (c && !c.dead && !activeIds.has(s.id)) spawnSeller(c, s.pitch);
       }
       for (const trip of world.meatTrips || []) {
         if (active.length >= MAX_WALKERS) break;
@@ -703,7 +725,7 @@ export function createWalkers(initialWorld) {
     if (!(dt > 0)) dt = 0;
     const vp = viewport || { x0: 0, y0: 0, x1: world.w, y1: world.h };
     for (const w of active) {
-      if (w.kind === "camper" || w.kind === "penned") { w.idle += dt; w.frame = w.idle > 1 ? 3 : 0; continue; }
+      if (w.kind === "camper" || w.kind === "penned" || w.kind === "seller") { w.idle += dt; w.frame = w.idle > 1 ? 3 : 0; continue; }
       step(w, dt);
     }
     for (let k = active.length - 1; k >= 0; k--) if (active[k].done) remove(k);

@@ -36,7 +36,8 @@ import { ageYears, isWorker } from "./census.js";
 import { served, exposure } from "./fields.js";
 import { reachFrom } from "./reach.js";
 import { KIND, remember } from "./life.js";
-import { hallReach, routeToHall, receiveMeat } from "./meat.js";
+import { hallReach, routeToHall, receiveMeat, streetSale } from "./meat.js";
+import { sellerOf, streetExposure } from "./street.js";
 import { CLASS, classAt, classOfCitizen, estateName } from "./wealth.js";
 
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
@@ -118,6 +119,9 @@ export function killWeight(world, c) {
   // on this H route is free; a cut line or a hall beyond 60 walked steps is
   // no market at all. Full hooks cannot buy another body.
   if (hallReach(world, c.home, KNOBS.MEAT_ROAD, { space: true })) w *= world.events.licence ? KNOBS.KILL_MARKET_LICENSED : KNOBS.KILL_MARKET;
+  // … and a seller is a buyer: where the street trade's smell reaches a home, the pull is a market's (street.js). Never
+  // halved — nobody licenses the kerb.
+  else if (world.streetDread?.[c.home] > 0) w *= KNOBS.KILL_MARKET;
   if (c.job >= 0 && isMarket(world.civic[c.job])) w *= KNOBS.KILL_STAFF;
   w *= 0.5 + world.crime[c.home] / 100;
   return w;
@@ -141,6 +145,9 @@ function kill(world, killer, victim, notices) {
   // reach. KILL_MARKET still describes the killer's market influence, but
   // stock, cash and the transient trip all use the same victim-to-hall route.
   const hall = sackRoute ? selectedHall : -1;
+  // No hall will take it — but a seller will, where the street trade reaches the killer (street.js): sold off the kerb
+  // the same month, killed and eaten, no stock and no cut.
+  const kerb = hall < 0 && (!!sellerOf(world, killer.id) || world.streetDread?.[killer.home] > 0);
   const homeRoute = hall >= 0 ? market : null;
   (world.predations || (world.predations = [])).push({
     killer: killer.id, killerHome: killer.home, victimHome, hall,
@@ -155,11 +162,12 @@ function kill(world, killer, victim, notices) {
   for (const id of family) { const o = world.byId.get(id); if (o) o.grief = tick + 12; }
   ev.active.push({ id: "fear", until: tick + KNOBS.FEAR_MONTHS, moodBySpecies: { [victim.species]: -KNOBS.FEAR_MOOD } });
   if (hall >= 0 && receiveMeat(world, hall, "killed", 1)) post(world, "cut", KNOBS.MEAT_PRICE);
+  else if (kerb) streetSale(world);
   post(world, "inquest", -Math.min(KNOBS.INQUEST, Math.max(0, world.cash)));
   ev.killings++;
   const jobless = killer.job < 0 && isWorker(world, killer);
   const since = jobless ? `, out of work since ${monthName(tick - Math.min(tick, killer.jobless || 0))}` : "";
-  const bought = hall >= 0 ? `; the meat hall at ${at(world, hall)} had ${victim.species} on Tuesday` : "";
+  const bought = hall >= 0 ? `; the meat hall at ${at(world, hall)} had ${victim.species} on Tuesday` : kerb ? `; there was ${victim.species} off the kerb by Tuesday` : "";
   const wake = mourners.length >= 3 ? ` ${mourners.length} friends held a wake.` : "";
   const line = `KILLING — ${nameOf(victim)} did not come home to ${addressOf(world, victimHome)}. ${nameOf(killer)} of ${at(world, killer.home)}${since} was seen on the street${bought}.${wake}`;
   openFile(world, { tile: victimHome, culpritId: killer.id, victimId: victim.id, cause: "killing", line, victimClass });
@@ -190,11 +198,23 @@ export function killingTick(world, cen, notices) {
     const cands = [];
     const vw = [];
     const reach = reachFrom(world, killer.home, KNOBS.KILL_RADIUS); // a wall between them is out of reach
+    // THE HAZARD WALKS (street.js): a seller works its pitch, so prey whose walk passes within a tile of it are within
+    // its reach wherever they live.
+    const pitch = sellerOf(world, killer.id)?.pitch ?? -1;
+    let pitchNear = null;
+    if (pitch >= 0) {
+      pitchNear = new Uint8Array(world.w * world.h);
+      const px = pitch % world.w, py = (pitch / world.w) | 0;
+      for (let y = Math.max(0, py - 1); y <= Math.min(world.h - 1, py + 1); y++) for (let x = Math.max(0, px - 1); x <= Math.min(world.w - 1, px + 1); x++) pitchNear[y * world.w + x] = 1;
+    }
     for (const v of cs) {
       if (v.dead || v.home < 0 || v === killer || v.household === killer.household || absent(world, v)) continue;
       if (ageYears(world, v) < KNOBS.ADULT_AGE) continue;
-      if (reach(v.home) < 0) continue;
+      if (reach(v.home) < 0 && !(pitchNear && streetExposure(world, v, pitchNear))) continue;
       let wt = isPredatorOf(killer.species, v.species) ? 1 : KNOBS.KILL_OTHER;
+      // Exposure on the way: a walk past a pitch this month raises the weight, ×(1 + tiles near it, capped).
+      const exposed = streetExposure(world, v);
+      if (exposed) wt *= 1 + exposed;
       let bridged = v.friends.includes(killer.id);
       if (!bridged) for (const f of v.friends) { const o = world.byId.get(f); if (o && o.species === killer.species) { bridged = true; break; } }
       if (bridged) wt *= KNOBS.KILL_BRIDGE;
@@ -412,7 +432,7 @@ export function arrest(world, f, c, wrongful, notices, opts = {}) {
   c.record = (c.record || 0) + 1;
   if (theft) c.thefts = thefts;
   remember(world, c, KIND.ARRESTED, f.cause);
-  const minor = f.cause === "trespass";
+  const minor = f.cause === "trespass" || f.cause === "street trade"; // a seller stopped at the kerb is sentenced as a trespasser (street.js)
   if (wrongful) { c.wrongful = true; c.wrongedBy = f.culpritId; ev.justice.wrongful++; }
   ev.arrests.push({ tick, tile: f.tile, citizenId: c.id, name: nameOf(c), culpritId: f.culpritId, culpritName: culprit ? nameOf(culprit) : "", wrongful, cause: f.cause, exonerated: false, hard: !!opts.minor && !minor });
   if (ev.arrests.length > 200) ev.arrests.splice(0, ev.arrests.length - 200);
@@ -442,7 +462,8 @@ export function arrest(world, f, c, wrongful, notices, opts = {}) {
       line = `TAKEN IN — ${nameOf(c)} went from ${at(world, home)} to the Pacification Centre at ${at(world, destination)} ${why}. ${months} months.${harsher && theft && thefts === 1 ? " A first theft from the affluent: one step harsher." : ""}${tail}`;
     } else {
       ev.justice.cells++;
-      if (minor) ev.justice.trespass++;
+      if (f.cause === "trespass") ev.justice.trespass++;
+      else if (f.cause === "street trade") ev.justice.street = (ev.justice.street || 0) + 1;
       line = `CELLS — ${nameOf(c)} is in the Zoo prison at ${at(world, destination)} until ${monthName(tick + months)} ${why}.${tail}`;
     }
   }
@@ -595,12 +616,31 @@ export function trespassTick(world, cen, notices) {
   }
 }
 
+/**
+ * THE STREET TRADE's stop (street.js): a seller at a pitch the police cover, taken like a trespasser — the file opened
+ * and closed on the spot, a month in the Zoo prison, the record up. A month on the kerb is STREET_STOP_E tiles of
+ * trespass exposure. No cover, no stop: as for trespass, nobody is looking.
+ */
+export function streetStopTick(world, cen, notices) {
+  for (const s of world.street?.sellers || []) {
+    const c = world.byId.get(s.id);
+    if (!c || c.dead || c.home < 0 || absent(world, c)) continue;
+    const cov = world.policeCov[s.pitch];
+    if (!cov) continue;
+    const p = Math.min(KNOBS.TRESPASS_MAX, KNOBS.TRESPASS_P * KNOBS.STREET_STOP_E * cov / KNOBS.POLICE_EFFECT);
+    if (!world.rng.chance(p)) continue;
+    const f = openFile(world, { tile: s.pitch, culpritId: c.id, cause: "street trade", crime: KNOBS.TRESPASS_CRIME, radius: 1 });
+    arrest(world, f, c, false, notices, { minor: true });
+  }
+}
+
 export function justiceTick(world, cen) {
   const notices = [];
   custodyTick(world, notices);
   killingTick(world, cen, notices);
   burglaryTick(world, cen, notices);
   trespassTick(world, cen, notices);
+  streetStopTick(world, cen, notices);
   filesTick(world, cen, notices);
   return notices;
 }
