@@ -5535,6 +5535,81 @@ check("no Math.random under js/", mathRandom.length === 0, mathRandom.join(", ")
     saveKeys.filter((k) => /^(news|read)/i.test(k)).join(", "));
 }
 
+// ---- CRIME IS ITS OWN SECTION (2026-09-26; the owner: "crime should be its own news section, that way it doesnt
+// flood the other news"; SPEC §11b). A row is in the news or the crime section by one column of the news roster
+// (events.js TICKER_CRIME); the reader's chips split the feed along it, the badge counts the news, and a month's crime
+// pops up once at most (news.js monthFlashes). The blotter's leads and the producers' log ids are SPELT OUT here —
+// a check that read the module's own list would be the code agreeing with itself.
+{
+  const { newsRows, FILTERS, monthFlashes, createNews } = await import("../js/news.js");
+  const CEV = await import("../js/sim/events.js");
+  const CRIME_LEADS = ["HEIST", "RAID", "KILLING", "BURGLARY", "SOLD", "CELLS", "TAKEN IN", "HOME", "RELEASED", "EXONERATED", "COLD", "IDENTIFIED", "THE STREET", "TRESPASS", "The file", "CASE WAITING", "INTERVIEW", "COLLECT"];
+  check("news crime: the blotter's leads, spelt out here, are the roster's, in its order (the summary ranks by it)",
+    JSON.stringify(CEV.CRIME_LEADS) === JSON.stringify(CRIME_LEADS), CEV.CRIME_LEADS.join(","));
+  // The section IS the line's lead, so a grep over the producers' line templates is the right tool: every lead the
+  // police, the courts and the street write must read as crime, and no other producer's may (the roster's RAID and
+  // HEIST excepted — events.js writes the police's raids and a heist among its weather).
+  const leadsOf = (f) => [...new Set([...readFileSync(path.join(ROOT, f), "utf8").matchAll(/[`"']([A-Z][A-Z0-9'’ ]*[A-Z0-9]) —/g)].map((m) => m[1]))];
+  const police = ["js/sim/justice.js", "js/sim/police-actions.js", "js/sim/street.js"].flatMap(leadsOf);
+  const others = ["js/sim/story.js", "js/sim/tick.js", "js/sim/citizens.js", "js/sim/meat.js", "js/sim/events.js", "js/sim/ops.js", "js/sim/wealth.js", "js/sim/landmarks.js"]
+    .flatMap(leadsOf).filter((l) => l !== "RAID" && l !== "HEIST");
+  const isCrime = (l) => CEV.TICKER_CRIME.test(`${l} — x`);
+  check("news crime: every lead the police, the courts and the street write is crime, and no other producer's is",
+    police.length >= 12 && others.length >= 30 && police.every(isCrime) && !others.some(isCrime)
+      && CEV.TICKER_CRIME.test("The file on the burglary at (4,4) closed after 6 months. Ranpa Howell (wolf) was never charged."),
+    `${police.length} police leads, not crime: ${police.filter((l) => !isCrime(l)).join(",") || "none"} · ${others.length} others, crime: ${others.filter(isCrime).join(",") || "none"}`);
+  // On a real feed — the suite city's own — a row is crime exactly when its producer is the police's.
+  const CRIME_IDS = new Set(["arrest", "released", "home", "killing", "burglary", "cold", "street", "raid", "heist", "interview", "police-collection", "identified", "exonerated"]);
+  const feed = newsRows(A.world);
+  const idOf = (r) => r.id.replace(/:.*$/, "");
+  const crimeRows = feed.filter((r) => r.crime), kinds = new Set(crimeRows.map(idOf));
+  const misfiled = feed.filter((r) => r.crime !== CRIME_IDS.has(idOf(r)));
+  check("news crime: on the suite city's own feed a row is crime exactly when its producer is the police's",
+    kinds.size >= 3 && feed.length - crimeRows.length >= 50 && misfiled.length === 0,
+    `${crimeRows.length} crime rows (${[...kinds].join("/")}) of ${feed.length} · misfiled ${misfiled.slice(0, 3).map((r) => `${r.id}: ${r.text.slice(0, 32)}`).join(" | ") || "none"}`);
+  const inNews = FILTERS.find((f) => f[0] === "news")?.[2], inCrime = FILTERS.find((f) => f[0] === "crime")?.[2];
+  check("news crime: the news and the crime sections split the feed — disjoint, together all of it — and the other chips are all inside the news",
+    FILTERS.length === 6 && FILTERS[0][0] === "news" && FILTERS[5][0] === "crime" && inNews && inCrime
+      && feed.every((r) => inNews(r) !== inCrime(r))
+      && FILTERS.slice(1, 5).every(([, , fn]) => feed.filter(fn).every((r) => !r.crime))
+      && feed.some((r) => r.crime && r.flash) && feed.some((r) => r.crime && r.bad), // the premise: crime that WOULD have been headlines and trouble
+    FILTERS.map((f) => f[0]).join(","));
+  // A month's pop-ups: the news first, in its order; the crime as ONE, the killing named before the routine.
+  const month = [
+    "CELLS — Ada Mousewell (mouse) is in the Zoo prison at (1,1) until May for the trespass at (2,2).",
+    "MILESTONE — 500 animals: Zoo City is a TOWN.",
+    "RELEASED — Ada Mousewell (mouse) is home at (3,3) with a record.",
+    "WEDDING — Bo Lupin (wolf) and Ada Mousewell (mouse) are married.",
+    "KILLING — Wilker Chipperly (beaver) did not come home to (4,4).",
+    "CELLS — Bo Lupin (wolf) is in the Zoo prison at (1,1) until June for the street trade at (5,5).",
+    "FIRE at (6,6) — bulldoze a firebreak.",
+  ];
+  const run = monthFlashes(month);
+  check("news crime: a month's crime pops up ONCE, after the news — the killing named before the routine — and one crime line pops up as itself",
+    run.length === 3 && run[0] === month[1] && run[1] === month[6]
+      && run[2] === "CRIME — 4 dispatches this month: KILLING, CELLS ×2, RELEASED. The crime section of the news has them."
+      && JSON.stringify(monthFlashes([month[4], month[1]])) === JSON.stringify([month[1], month[4]])
+      && JSON.stringify(monthFlashes([month[1], month[6], month[3]])) === JSON.stringify([month[1], month[6]]),
+    run.join(" | "));
+  // The badge counts the news; the crime section keeps its own count, and opening the reader reads the NEWS.
+  const { installDom, stubApp } = await import("./dom-shim.mjs");
+  installDom();
+  const Wc = createWorld({ seed: "crime-section", w: 12, h: 12 });
+  Wc.events.log = [
+    { t: 0, id: "burglary", line: "BURGLARY — Ranpa Howell (wolf) broke into the house at (4,4). A file is open for six months." },
+    { t: 0, id: "arrest", line: "CELLS — Ranpa Howell (wolf) is in the Zoo prison at (1,1) until May for the burglary at (4,4)." },
+    { t: 0, id: "notice", line: "MILESTONE — 51 animals: Zoo City is a HAMLET." },
+  ];
+  let cpref = { news: { "check-city": [] } };
+  const reader = createNews(stubApp(Wc, { ui: { refresh() {} }, prefs: { get: () => cpref, set: (p) => { cpref = { ...cpref, ...p }; } } }));
+  const before = [reader.unread(), reader.unread("crime")];
+  reader.open();
+  const after = [reader.unread(), reader.unread("crime")];
+  reader.close();
+  check("news crime: the badge counts the news, the crime section keeps its own count, and opening the reader reads the news, not the blotter",
+    before.join() === "1,2" && after.join() === "0,2", `before ${before} · after opening ${after}`);
+}
+
 // ---- Part F: selected people stories, named reports and linked reader ------------------------
 {
   const { storyTick, STORY_PREFIXES } = await import("../js/sim/story.js");
@@ -5684,8 +5759,10 @@ check("no Math.random under js/", mathRandom.length === 0, mathRandom.join(", ")
       && feed.every((r) => r.who.every((id) => F.byId.has(id) || legacyOf(F, id)))
       && feed.every((r) => r.links.every((id) => F.byId.has(id) || legacyOf(F, id)))
       && JSON.stringify(feed.map((r) => [r.who, r.links])) === JSON.stringify(restoredFeed.map((r) => [r.who, r.links])));
-  check("story: the fifth news chip is the exact who.length people filter",
-    FILTERS.length === 5 && FILTERS[4][0] === "people" && feed.filter(FILTERS[4][2]).every((r) => r.who.length)
+  // (Five chips until crime took its own section, 2026-09-26: the people chip is still the exact who filter, inside the news.)
+  const peopleFilter = FILTERS.find((f) => f[0] === "people");
+  check("story: the people news chip is the exact who.length filter",
+    peopleFilter && feed.filter(peopleFilter[2]).every((r) => r.who.length) && feed.filter((r) => r.people && !r.crime).every(peopleFilter[2])
       && feed.some((r) => r.id === "named-operation" && !r.people && r.links[0] === parents[0].id));
 
   const target = { target: { tx: 2, ty: 3, citizen: { home } }, citizen: dead.id };

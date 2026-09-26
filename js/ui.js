@@ -25,7 +25,7 @@ import { campaignText, CHAPTERS, chapterOf, farmYield, activeInfrastructure, med
 const GOALS = CHAPTERS.filter((c) => c.target).map((c) => c.target.toLocaleString("en-US")).join(" → ");
 import { ZONE, CIVIC, TERRAIN, ROAD, ZONE_NAME, anchorOf } from "./sim/world.js";
 import { dateOf, characterLine } from "./sim/tick.js";
-import { eventTitle, TICKER_FLASH } from "./sim/events.js";
+import { eventTitle } from "./sim/events.js";
 import { lotReport, REASON } from "./sim/lots.js";
 import { exposure, asksAccess, nearReach, campusReach } from "./sim/fields.js";
 import { RULES, KNOBS } from "./sim/rules.js";
@@ -37,7 +37,7 @@ import { colourOf } from "./art/palette.js";
 import { pluralSpecies } from "./sim/landmarks.js";
 import { ageYears, isWorker } from "./sim/census.js";
 import { toolHelp } from "./tools.js";
-import { newsRows } from "./news.js";
+import { newsRows, monthFlashes } from "./news.js";
 import { hallStock, hallYear } from "./sim/meat.js";
 import { needOf } from "./sim/needs.js";
 import { ACT, line as needLine } from "./sim/voice.js";
@@ -311,10 +311,13 @@ export function createUI(app) {
   function refreshNews() {
     const b = $("#btnNews");
     if (!b || !app.news) return;
-    const n = app.news.unread();
+    // The badge counts the NEWS; the crime section keeps its own count (news.js), so a policed town's blotter cannot
+    // hold the button lit.
+    const n = app.news.unread(), c = app.news.unread("crime");
     b.lastElementChild.textContent = n ? `news ${n}` : "news";
     b.classList.toggle("on", n > 0);
-    b.title = n ? `R: ${n} unread — every dispatch this city ever made, oldest first; ← → step one at a time` : "R: the news — every dispatch this city ever made, oldest first; ← → step one at a time";
+    const crime = c ? ` · crime ${c} unread, in its own section` : "";
+    b.title = n ? `R: ${n} unread${crime} — every dispatch this city ever made, oldest first; ← → step one at a time` : `R: the news${crime} — every dispatch this city ever made, oldest first; ← → step one at a time`;
   }
 
   // ---- demand bars ------------------------------------------------------------------------------
@@ -1110,8 +1113,10 @@ export function createUI(app) {
   // The tab is the glance; `R` opens the reader. Both read the same feed, and
   // both run OLDEST FIRST — the order the owner asked to read them in.
   function renderNews(body, w) {
-    const rows = newsRows(w);
-    if (!rows.length) { body.append(el("p", "note", "Events and advisor lines land here as the months pass. R opens the reader.")); return; }
+    const all = newsRows(w);
+    if (!all.length) { body.append(el("p", "note", "Events and advisor lines land here as the months pass. R opens the reader.")); return; }
+    // The glance is the NEWS; crime is its own section, counted here and read in the reader.
+    const rows = all.filter((r) => !r.crime), crime = all.length - rows.length;
     const ul = el("ul", "log");
     for (const l of rows.slice(-120)) {
       const li = el("li");
@@ -1122,6 +1127,7 @@ export function createUI(app) {
     }
     body.append(ul);
     body.append(el("p", "note", rows.length > 120 ? `the last 120 of ${rows.length} — R opens the reader, from the founding` : "R opens the reader: ← → step one dispatch at a time"));
+    if (crime) body.append(el("p", "note", `${crime} crime dispatch${crime === 1 ? "" : "es"} — killings, burglaries, arrests, the street trade — in their own section: R opens the reader, then crime`));
   }
 
   function onTick(notices) {
@@ -1129,7 +1135,8 @@ export function createUI(app) {
     // order. Nothing is dropped either way — every line is already in the
     // city's own event log, which is what the News tab and the reader read.
     const personal=starredNotices(world(),app.starIds?.()||[]);
-    flashRun([...personal, ...notices.filter((n) => TICKER_FLASH.test(n))],personal.length?"Inspect starred lives; R opens city news":"R opens the news");
+    // The month's crime pops up once at most, after the news, so the blotter cannot push the rest off the map (news.js).
+    flashRun([...personal, ...monthFlashes(notices)],personal.length?"Inspect starred lives; R opens city news":"R opens the news");
     refresh();
   }
 

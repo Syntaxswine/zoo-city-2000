@@ -1776,9 +1776,10 @@ that pop up on the screen in a sequential order."*
   open with a badge of 300 things you lived through.
 - **The reader** (`R`, or the strip's `news`): the feed oldest first, a
   cursor stepped with ← → and ↑ ↓, PgUp/PgDn by ten, Home/End,
-  `mark all read`, and five chips: all · headlines (only what popped up over
-  the map, `TICKER_FLASH`) · trouble (`TICKER_BAD`) · good (`TICKER_GOOD`) ·
-  people (rows carrying a nonempty `who`). WASD belongs only to map movement
+  `mark all read`, and six chips: news (every dispatch but crime) · headlines
+  (only what popped up over the map, `TICKER_FLASH`) · trouble (`TICKER_BAD`) ·
+  good (`TICKER_GOOD`) · people (rows carrying a nonempty `who`) · crime (the
+  police blotter, its own section — below). It opens on news. WASD belongs only to map movement
   and is swallowed while the modal reader stands (Part P).
   It opens on the FIRST UNREAD — and opening MARKS that row read, so the badge
   drops by one the moment you look. A row is read when the cursor LANDS on it,
@@ -1786,15 +1787,36 @@ that pop up on the screen in a sequential order."*
   high-water line. `Esc`, `R` again, the `×`, or a click on the scrim closes
   it; the clock is stopped while it stands (`modalOpen()` counts it, like the
   title and the choice card).
-- **The strip button** carries the unread count and goes ink-filled while any
-  stands — the same "this is on" that pause / overlay / zoom use.
-- **The News tab** (was Log) is the glance at the same feed: the last 120,
-  chronological. It opens scrolled to the newest and follows it, unless you
+- **The strip button** carries the NEWS section's unread count (the crime
+  section keeps its own, in the reader's head and on its chip) and goes
+  ink-filled while any stands — the same "this is on" that pause / overlay / zoom use.
+- **The News tab** (was Log) is the glance at the same feed: the last 120 of
+  the news section, chronological, and a line counting the crime section. It opens scrolled to the newest and follows it, unless you
   have scrolled up to read — then it stays where you put it.
 - **A month's run of flashes queues** (`flashRun`): 2.6 s for one, 1.5 s each
   for a run, labelled `(2/6)`, five at most and then `+N more this month — R
   opens the news`. A flash the player caused (a refused op, a save, an undo) preempts
   the run: feedback on what you just did wins.
+- **Crime is its own section** (the owner, 2026-09-26: *"crime should be its
+  own news section, that way it doesnt flood the other news"*). Measured on a
+  policed 30-year town — stations, a centre, a Zoo prison, the meat trade
+  prohibited from year 10 — crime was 32–35% of the feed and 18–21 of its
+  22–23 pop-ups a year: every arrest writes a CELLS line and a RELEASED line,
+  and both were headlines. A row is in the NEWS or the CRIME section by one
+  column of the news roster (`events.js` `TICKER_CRIME`, `CRIME_LEADS`):
+  every crime and every step the police and the courts take about one —
+  HEIST, RAID, KILLING, BURGLARY, SOLD, CELLS, TAKEN IN, HOME, RELEASED,
+  EXONERATED, COLD and the burglary's closing file, IDENTIFIED, CASE WAITING,
+  INTERVIEW, COLLECT — and THE STREET, the trade the police stop. The meat
+  trade's own lines (EMPTY HOOKS, THE MARKET, BOUGHT, THE PEN) are commerce
+  and stay in the news. The first five chips hold no crime, the last all of
+  it; the badge counts the news. A month's crime pops up ONCE at most, after
+  the news (`news.js` `monthFlashes`): the line itself when there is one,
+  else `CRIME — N dispatches this month: KILLING, CELLS ×2, …` in the
+  roster's order — presentation only, never logged. The policed towns'
+  pop-ups went from 21.5–23.2 a year to 10.6–11.0 (crime 18.1–20.5 →
+  7.6–8.0); a quiet town's did not move. The sim only publishes the column:
+  it never names the reader (the check that says so caught a comment).
 - **People stories (Part F).** `storyTick`, after justice, is the sole bridge
   from this month's `lifeEvents` to named news rows. Three distinct
   `LOST_FRIEND` witnesses produce one obituary for a natural death or
@@ -1821,7 +1843,11 @@ that pop up on the screen in a sequential order."*
   71/1,104 (6.4%), 53/345 (15.4%) and 62/1,111 (5.6%); every id resolved and
   survived the saved tail. Seed 7's 30-year normal hash moved
   `e2352679 → 771239e1`; `stateHashNoNews` stayed exactly `7efe937b`, proving
-  that the newspaper is the only simulation-identity difference.
+  that the newspaper is the only simulation-identity difference. Since the
+  crime section the budget reads people against the NEWS section: 52.4 /
+  42.3 / 56.4 / 33.3% over the same seeds (2026-09-26) — over 40% on three.
+  The cause is the WEDDING story (`1e9d983`, 2026-09-07; 274 of seed 7's 808
+  rows), not the section, which only stopped the blotter diluting it.
 
 ---
 

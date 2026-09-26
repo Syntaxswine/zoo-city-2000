@@ -6,6 +6,11 @@
 // fire and police station. We retain EVERY row as it is emitted, even after
 // the live 400-row cap rolls, so the people percentage is a true 30-year
 // editorial budget rather than a flattering measurement of the final page.
+//
+// Since 2026-09-26 crime is its own section of the reader (news.js FILTERS): the budget is people stories against
+// the NEWS section — the page they are printed on — and the crime section is reported beside it, not counted in it.
+// (Against the whole feed, a crime-heavy town's blotter diluted the people share and hid how much of the news
+// people stories were.)
 
 import { probeSave } from "./probe-save.mjs";
 import { createWorld, ZONE, TERRAIN, CIVIC } from "../js/sim/world.js";
@@ -87,7 +92,8 @@ function build(seed) {
 function measure(seed) {
   const { w, blocks, emitted } = build(seed);
   const all = newsRows({ ...w, events: { ...w.events, log: emitted } });
-  const people = all.filter((r) => r.people);
+  const news = all.filter((r) => !r.crime);
+  const people = news.filter((r) => r.people);
   const unresolved = emitted.flatMap((r) => [...(Array.isArray(r.who) ? r.who : []), ...(Array.isArray(r.links) ? r.links : [])])
     .filter((id) => !w.byId.has(id) && !legacyOf(w, id));
   const flashed = all.filter((r) => r.flash);
@@ -98,8 +104,8 @@ function measure(seed) {
   const currentByKey = new Map(current.map((r) => [keyOf(r), JSON.stringify([r.who, r.links])]));
   const whoLost = loaded.filter((r) => currentByKey.get(keyOf(r)) !== JSON.stringify([r.who, r.links]));
   return {
-    seed, blocks, pop: w.citizens.length, rows: all.length, people: people.length,
-    pct: all.length ? (100 * people.length) / all.length : 0,
+    seed, blocks, pop: w.citizens.length, rows: all.length, news: news.length, crime: all.length - news.length, people: people.length,
+    pct: news.length ? (100 * people.length) / news.length : 0,
     obituary: all.filter((r) => r.id.startsWith("story-obituary:")).length,
     litter: all.filter((r) => r.id.startsWith("story-litter:")).length,
     centenary: all.filter((r) => r.id.startsWith("story-centenary:")).length,
@@ -114,13 +120,13 @@ function measure(seed) {
 
 const rows = SEEDS.map(measure);
 if (CSV) {
-  console.log("seed,pop,dispatches,people,peoplePct,obituary,litter,centenary,reports,flashed,multiFlashMonths,unresolved,whoLost,noNewsHash");
-  for (const r of rows) console.log([r.seed, r.pop, r.rows, r.people, r.pct.toFixed(1), r.obituary, r.litter, r.centenary, r.reports, r.flashed, r.multi, r.unresolved, r.whoLost, r.noNews].join(","));
+  console.log("seed,pop,dispatches,news,crime,people,peoplePctOfNews,obituary,litter,centenary,reports,flashed,multiFlashMonths,unresolved,whoLost,noNewsHash");
+  for (const r of rows) console.log([r.seed, r.pop, r.rows, r.news, r.crime, r.people, r.pct.toFixed(1), r.obituary, r.litter, r.centenary, r.reports, r.flashed, r.multi, r.unresolved, r.whoLost, r.noNews].join(","));
 } else {
   console.log(`newsprobe: ${YEARS} years · ${SAVED ? "export (no scripted construction)" : "eight-block news town + fire + police"}`);
-  console.log("| seed | rows | people | share | obit / litter / 100 | reports | flashed | unresolved / lost | no-news hash |");
-  console.log("|---|---:|---:|---:|---:|---:|---:|---:|---|");
-  for (const r of rows) console.log(`| ${r.seed} | ${r.rows} | ${r.people} | ${r.pct.toFixed(1)}% | ${r.obituary} / ${r.litter} / ${r.centenary} | ${r.reports} | ${r.flashed} | ${r.unresolved} / ${r.whoLost} | ${r.noNews} |`);
+  console.log("| seed | rows | news / crime | people | of the news | obit / litter / 100 | reports | flashed | unresolved / lost | no-news hash |");
+  console.log("|---|---:|---:|---:|---:|---:|---:|---:|---:|---|");
+  for (const r of rows) console.log(`| ${r.seed} | ${r.rows} | ${r.news} / ${r.crime} | ${r.people} | ${r.pct.toFixed(1)}% | ${r.obituary} / ${r.litter} / ${r.centenary} | ${r.reports} | ${r.flashed} | ${r.unresolved} / ${r.whoLost} | ${r.noNews} |`);
 }
 
 // A tiny export may emit only one story: report its share, without treating
@@ -128,7 +134,7 @@ if (CSV) {
 const budgetSample = r => r.rows >= 30;
 const bad = rows.filter((r) => (budgetSample(r) && r.pct > 40) || r.unresolved || r.whoLost || (!SAVED && r.blocks < 1));
 if (bad.length) {
-  console.error(`newsprobe: FAIL ${bad.map((r) => r.seed).join(", ")} (people must be <=40%; every who must resolve and survive save/load)`);
+  console.error(`newsprobe: FAIL ${bad.map((r) => r.seed).join(", ")} (people must be <=40% of the news section; every who must resolve and survive save/load)`);
   process.exitCode = 1;
 } else if (!CSV) {
   console.log(`PASS: every named id resolves and survives the saved tail; ${rows.filter(budgetSample).length} city samples meet the 40% people budget. ${rows.filter(r=>!budgetSample(r)).length} samples have fewer than 30 dispatches: budget reported, not gated.`);

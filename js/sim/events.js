@@ -264,7 +264,7 @@ export const ROSTER = [
     fire: () => `WOLF MOON — the Greybacks howl all month. The rabbits lie awake; half the town goes out to listen, and friendships form twice as fast.`,
   },
   {
-    id: "heist", kind: DISASTER, news: ["HEIST", "bad", true], weight: () => 3,
+    id: "heist", kind: DISASTER, news: ["HEIST", "bad", true, "crime"], weight: () => 3,
     gate: (w, c) => robbable(w).length > 0,
     fire: (w) => {
       const lot = w.rng.pick(robbable(w));
@@ -306,7 +306,7 @@ export const ROSTER = [
   },
   {
     // The raid: the police working, so a BOON kind — the No-disasters toggle must not mask it.
-    id: "raid", kind: BOON, news: ["RAID", "bad", true], weight: () => 3,
+    id: "raid", kind: BOON, news: ["RAID", "bad", true, "crime"], weight: () => 3,
     gate: (w) => policy(w,'meatTrade')!=='prohibited' && !w.events.licence && w.tick - (w.events.lastRaid ?? -100000) >= 24 && raidable(w).length > 0,
     fire: (w) => {
       const lot = w.rng.pick(raidable(w));
@@ -403,17 +403,25 @@ export const eventTitle = (id) => EVENT_TITLES[id] || id;
  */
 export const NEWS_ROSTER = Object.freeze(ROSTER.map((event) => Object.freeze([event.id, ...event.news])));
 
+// A row is [id, the line's lead, tone ("bad" | "good" | null), pops up over the map, SECTION]. The section is
+// "crime" for the police blotter — every crime, and every step the police and the courts take about one — and the
+// news for everything else. The sim only publishes the column; the reader keeps the two sections apart and lets a
+// month's crime pop up once at most, so the blotter cannot flood the rest (SPEC §11b) — the owner, 2026-09-26: "crime
+// should be its own news section, that way it doesnt flood the other news". The meat trade's own lines (EMPTY HOOKS, THE MARKET, BOUGHT, THE
+// PEN) are commerce and stay in the news; THE STREET is the trade the police stop, and is crime.
 const NEWS_EXTRA = Object.freeze([
   ["milestone", "MILESTONE", "good", true], ["bearWinter", "BEAR", "bad", true], ["receivership", "RECEIVERSHIP", "bad", true],
-  ["licence", "The Butchers", "good", true], ["killing", "KILLING", "bad", true], ["burglary", "BURGLARY", "bad", true],
-  ["sold", "SOLD", "bad", true], ["cells", "CELLS", "bad", true], ["takenIn", "TAKEN IN", "bad", true],
-  ["home", "HOME", "good", true], ["released", "RELEASED", "good", true], ["exonerated", "EXONERATED", "good", true],
-  ["cold", "COLD", "bad", true], ["saved", "SAVED", "good", true], ["landmark", "LANDMARK", "good", true],
-  ["identified", "IDENTIFIED", "good", true],
+  ["licence", "The Butchers", "good", true], ["killing", "KILLING", "bad", true, "crime"], ["burglary", "BURGLARY", "bad", true, "crime"],
+  ["sold", "SOLD", "bad", true, "crime"], ["cells", "CELLS", "bad", true, "crime"], ["takenIn", "TAKEN IN", "bad", true, "crime"],
+  ["home", "HOME", "good", true, "crime"], ["released", "RELEASED", "good", true, "crime"], ["exonerated", "EXONERATED", "good", true, "crime"],
+  ["cold", "COLD", "bad", true, "crime"], ["saved", "SAVED", "good", true], ["landmark", "LANDMARK", "good", true],
+  ["identified", "IDENTIFIED", "good", true, "crime"],
   ["mansion", "MANSION", "good", true], ["estate", "THE ESTATE", "good", true], // wealth and class (SPEC §9f)
-  ["emptyHooks", "EMPTY HOOKS", "bad", true], ["market", "THE MARKET", "good", false], ["street", "THE STREET", "bad", true],
-  ["bought", "BOUGHT", "bad", false], ["pen", "THE PEN", "bad", false], ["trespass", "TRESPASS", "bad", false],
-  ["cold-file", "The file", "bad", false],
+  ["emptyHooks", "EMPTY HOOKS", "bad", true], ["market", "THE MARKET", "good", false], ["street", "THE STREET", "bad", true, "crime"],
+  ["bought", "BOUGHT", "bad", false], ["pen", "THE PEN", "bad", false], ["trespass", "TRESPASS", "bad", false, "crime"],
+  ["cold-file", "The file", "bad", false, "crime"],
+  // The police's own paperwork, which had no row: into the blotter, no tone, never over the map.
+  ["caseWaiting", "CASE WAITING", null, false, "crime"], ["interview", "INTERVIEW", null, false, "crime"], ["collect", "COLLECT", null, false, "crime"],
   ["story-obituary", "OBITUARY", "bad", false], ["story-litter", "LITTER", "good", false], ["story-centenary", "CENTENARY", "good", false],
 ]);
 const NEWS_ALL = [...NEWS_ROSTER, ...NEWS_EXTRA];
@@ -423,6 +431,9 @@ export const TICKER_BAD = prefixRx(NEWS_ALL.filter((r) => r[2] === "bad"));
 export const TICKER_GOOD = prefixRx(NEWS_ALL.filter((r) => r[2] === "good"));
 const FLASH_PREFIX = prefixRx(NEWS_ALL.filter((r) => r[3]));
 export const TICKER_FLASH = new RegExp(`${FLASH_PREFIX.source}|^OBITUARY 100 —|^CHAPTER [1-5] —`);
+/** The police blotter: the lines the reader keeps in their own section (SPEC §11b), and their leads in roster order. */
+export const TICKER_CRIME = prefixRx(NEWS_ALL.filter((r) => r[4] === "crime"));
+export const CRIME_LEADS = Object.freeze(NEWS_ALL.filter((r) => r[4] === "crime").map((r) => r[1]));
 
 /** Resolve the choice card. */
 export function resolveChoice(world, accept) {
