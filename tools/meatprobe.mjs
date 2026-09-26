@@ -17,7 +17,7 @@ import path from "node:path";
 import { createWorld, ZONE, isPart } from "../js/sim/world.js";
 import { tick } from "../js/sim/tick.js";
 import { load, save } from "../js/sim/save.js";
-import { hallStock, hallReach, meatBalance, meatTick, resetMeatRoutes } from "../js/sim/meat.js";
+import { hallSites, hallStock, hallReach, meatBalance, meatTick, resetMeatRoutes } from "../js/sim/meat.js";
 import { KNOBS } from "../js/sim/rules.js";
 import { createMayor } from "./mayor.mjs";
 
@@ -70,25 +70,34 @@ const number = (value) => Number.isFinite(Number(value)) ? Number(value) : 0;
 const count = (o, key) => number(o?.[key]);
 const copyTotals = (world) => ({ ...(world.meatStats?.total || {}) });
 const delta = (after, before, key) => count(after, key) - count(before, key);
-const stockSum = (world) => {
-  let stock = 0;
-  for (let i = 0; i < world.meat.length; i++) {
-    if (world.zone[i] === ZONE.M && world.tier[i] > 0 && !isPart(world, i)) stock += hallStock(world, i);
-  }
-  return stock;
-};
+// Halls are read through `hallSites`, the sim's own list, never by testing a
+// zone here: the probe must read the same thing whether the market is a zone
+// or a placed site (docs/PROPOSAL-MEAT-MARKET-2026-09-26.md, Part C).
+const stockSum = (world) => hallSites(world).reduce((stock, hall) => stock + hallStock(world, hall), 0);
+const stagesOf = (world) => new Map(hallSites(world).map((hall) => [hall, world.tier[hall]]));
 
 function runCity(world, label, years, mayor = null) {
   const before = copyTotals(world);
   const cutBefore = count(world.ledger, "cut");
   const stocks = [stockSum(world)];
   let hallMonths = 0;
+  // A STAGE MOVE is a hall whose storey (a zoned hall's tier, a market's
+  // stage) differs from last month's, or that opened or closed. A hall that
+  // moves many times a decade is rocking on its steps.
+  let stages = stagesOf(world);
+  let stageMoves = 0;
   for (let t = 0; t < years * 12; t++) {
     if (mayor) mayor.month(t);
     tick(world);
     hallMonths += count(world.last?.census, "markets");
     stocks.push(stockSum(world));
+    const now = stagesOf(world);
+    for (const [hall, stage] of now) if (stages.get(hall) !== stage) stageMoves++;
+    for (const hall of stages.keys()) if (!now.has(hall)) stageMoves++;
+    stages = now;
   }
+  const atEnd = {};
+  for (const stage of stages.values()) atEnd[stage] = (atEnd[stage] || 0) + 1;
   const after = copyTotals(world);
   const flow = {};
   for (const key of ["bought", "killed", "convicted", "slaughtered", "eaten", "spoiled", "penBought", "penReleased", "cartTrips", "cartPhysical", "cartWalk"]) {
@@ -108,6 +117,8 @@ function runCity(world, label, years, mayor = null) {
   const sourceUnits = flow.bought + flow.killed + flow.convicted + flow.slaughtered * KNOBS.PEN_YIELD;
   return {
     label, years, halls: count(world.last?.census, "markets"), hallYears,
+    stagesAtEnd: Object.keys(atEnd).sort((a, b) => a - b).map((stage) => `${stage}:${atEnd[stage]}`).join(" ") || "none",
+    movesPerHallDecade: hallYears ? stageMoves / (hallYears / 10) : 0,
     ...flow, sourceUnits,
     stockMin: Math.min(...stocks), stockMax: Math.max(...stocks), stock: measuredStock,
     soldPerHallYear: hallYears ? flow.eaten / hallYears : 0,
@@ -144,10 +155,10 @@ function report(rows, options) {
   console.log(options.saveFile
     ? `meatprobe: ${options.saveFile} + ${options.years} years`
     : `meatprobe: ${options.seeds.length} seeds × ${options.layouts.length} layouts × ${options.years} years`);
-  console.log("| city | halls | bought | killed | convicted | pen bought | released | slaughtered adults | stock min→max→end | sold / hall-year | carts | physical / cart | free-rail walk / cart | cut | conservation |");
-  console.log("|---|---:|---:|---:|---:|---:|---:|---:|---|---:|---:|---:|---:|---:|---|");
+  console.log("| city | halls | stages at end | stage moves / hall-decade | bought | killed | convicted | pen bought | released | slaughtered adults | stock min→max→end | sold / hall-year | carts | physical / cart | free-rail walk / cart | cut | conservation |");
+  console.log("|---|---:|---|---:|---:|---:|---:|---:|---:|---:|---|---:|---:|---:|---:|---:|---|");
   for (const r of rows) {
-    console.log(`| ${r.label} | ${r.halls} | ${r.bought} | ${r.killed} | ${r.convicted} | ${r.penBought} | ${r.penReleased} | ${r.slaughtered} | ${r.stockMin}→${r.stockMax}→${r.stock} | ${f(r.soldPerHallYear)} | ${r.cartTrips} | ${f(r.meanPhysical)} | ${f(r.meanWalk)} | §${Math.round(r.cut)} | ${r.balance.ok && r.balance.penOk ? "stock + pens exact" : "BROKEN"} |`);
+    console.log(`| ${r.label} | ${r.halls} | ${r.stagesAtEnd} | ${f(r.movesPerHallDecade)} | ${r.bought} | ${r.killed} | ${r.convicted} | ${r.penBought} | ${r.penReleased} | ${r.slaughtered} | ${r.stockMin}→${r.stockMax}→${r.stock} | ${f(r.soldPerHallYear)} | ${r.cartTrips} | ${f(r.meanPhysical)} | ${f(r.meanWalk)} | §${Math.round(r.cut)} | ${r.balance.ok && r.balance.penOk ? "stock + pens exact" : "BROKEN"} |`);
   }
   const inflow = rows.reduce((sum, r) => sum + r.sourceUnits, 0);
   const eaten = rows.reduce((sum, r) => sum + r.eaten, 0);
@@ -226,7 +237,7 @@ function curveReport(options) {
     KNOBS.MEAT_BUY_P = 0;
     const eatRows = eatValues.map((value) => {
       const world = cleanMarket(estate);
-      for (let i = 0; i < world.zone.length; i++) if (world.zone[i] === ZONE.M && world.tier[i] > 0 && !isPart(world, i)) world.meat[i] = KNOBS.MEAT_CAP;
+      for (const hall of hallSites(world)) world.meat[hall] = KNOBS.MEAT_CAP;
       KNOBS.MEAT_EAT = value;
       meatTick(world);
       return { sold: world.meatStats?.total?.eaten || 0, stock: stockSum(world) };

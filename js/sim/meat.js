@@ -9,7 +9,7 @@ import { policy } from './governance.js';
 // measured steps. Property value never imports this module or reads a route.
 
 import { KNOBS } from "./rules.js";
-import { ZONE, anchorOf, footprintOf, capacityOf, absent } from "./world.js";
+import { ZONE, anchorOf, footprintOf, capacityOf, absent, isPart } from "./world.js";
 import { WALK, TILE, dial, doorsOf, nodePath } from "./fields.js";
 import { DIET_OF } from "./species.js";
 import { removeCitizen } from "./citizens.js";
@@ -103,6 +103,20 @@ export function isHall(world, i) {
   if (!(i >= 0 && i < world.w * world.h)) return false;
   const a = anchorOf(world, i);
   return a === i && world.zone[a] === ZONE.M && world.tier[a] > 0 && !world.rubble[a] && !world.burning[a];
+}
+
+/**
+ * Every hall's anchor, standing or burning — the instruments' one view of the
+ * market (`tools/meatprobe.mjs`, `tools/playtest.mjs`), so that a probe reads
+ * the same thing before and after the meat market moves from a zone to a
+ * placed site. Read-only; nothing in the sim calls it.
+ */
+export function hallSites(world) {
+  const out = [];
+  for (let i = 0; i < world.w * world.h; i++) {
+    if (world.zone[i] === ZONE.M && world.tier[i] > 0 && !isPart(world, i)) out.push(i);
+  }
+  return out;
 }
 
 /** Aggregate defensively over a block footprint; normal state keeps the units on its anchor. */

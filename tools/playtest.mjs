@@ -17,6 +17,7 @@ import { apply } from "../js/sim/ops.js";
 import { lotScore } from "../js/sim/lots.js";
 import { KNOBS } from "../js/sim/rules.js";
 import { stateHash } from "../js/sim/save.js";
+import { hallSites } from "../js/sim/meat.js";
 import { served } from "../js/sim/fields.js";
 import { createMayor } from "./mayor.mjs";
 
@@ -96,7 +97,11 @@ if (csv) {
     console.log(`${String(r.year).padStart(3)} ${String(r.P).padStart(5)} ${String(r.W).padStart(5)} ${String(r.J).padStart(5)} ${String(r.U).padStart(5)} ${f(r.VR).padStart(6)} ${f(r.VC).padStart(5)} ${f(r.VI).padStart(5)} ${String(r.cash).padStart(8)} ${String(r.inc).padStart(8)} ${String(r.up).padStart(6)} ${String(r.appr).padStart(4)} ${f(r.H).padStart(4)} ${String(r.fr).padStart(4)} ${f(r.pol, 0).padStart(4)} ${f(r.lv, 0).padStart(4)} ${f(r.crime, 0).padStart(3)}/${String(r.maxCrime).padEnd(3)} ${f(r.n, 1).padStart(3)} ${String(Math.round(r.cap)).padStart(5)} ${String(r.lots).padStart(4)}  ${top}`);
   }
   const last = rows[rows.length - 1];
-  console.log(`crime and punishment: halls ${last.markets} (${last.Jm} jobs, V_M ${f(last.VM)}) · herbivores within the smell ${last.herbNear} · killings ${last.killings} · arrests ${last.arrests} (wrongful ${last.wrongful}) · fixed ${last.fixed} · sold ${last.sold} · held ${last.held} · H by pacification ${f(last.hKnife, 3)}`);
+  // Halls by storey (a zoned hall's tier, a market's stage), read through the sim's own list — meatprobe's reading.
+  const stageCount = {};
+  for (const hall of hallSites(world)) stageCount[world.tier[hall]] = (stageCount[world.tier[hall]] || 0) + 1;
+  const stages = Object.keys(stageCount).sort((a, b) => a - b).map((s) => `${s}:${stageCount[s]}`).join(" ") || "none";
+  console.log(`crime and punishment: halls ${last.markets} [stages ${stages}] (${last.Jm} jobs, V_M ${f(last.VM)}) · herbivores within the smell ${last.herbNear} · killings ${last.killings} · arrests ${last.arrests} (wrongful ${last.wrongful}) · fixed ${last.fixed} · sold ${last.sold} · held ${last.held} · H by pacification ${f(last.hKnife, 3)}`);
   console.log(`ledger: ${Object.entries(world.ledger).map(([k, v]) => `${k} ${v}`).join(" · ")}`);
   const lastMs = tickMs.slice(-12);
   console.log(`hash ${stateHash(world)} · ${world.citizens.length} citizens · ${world.households.length} households · ${world.events.log.length} events · last-year tick ${(lastMs.reduce((a, b) => a + b, 0) / lastMs.length).toFixed(2)} ms (max ${Math.max(...lastMs).toFixed(1)})`);
