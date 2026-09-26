@@ -20,8 +20,9 @@ The items are not equal, and the difference matters to whoever picks one up:
 
 - **M — the meat market — is the OWNER'S.** It is a sim change, an art
   redesign and a save question, and it reverses a ruling the owner made when
-  the meat zone was designed (M.2). It needs the owner's answers to **M.4**
-  before anything is built. It is the first item since the sprite arc began
+  the meat zone was designed (M.2). The owner answered five of **M.4**'s six
+  questions the same day; two remain open, and nothing is built until they are
+  answered. It is the first item since the sprite arc began
   that must touch `js/sim/` — that arc's law 7 (*"if an art change needs a sim
   field, it is not an art change"*) puts it outside the arc, with a sim
   change's discipline.
@@ -35,7 +36,7 @@ The items are not equal, and the difference matters to whoever picks one up:
 
 | | what | whose | code | art | `js/sim/` | first step | waits on |
 |---|---|---|---|---|---|---|---|
-| **M** | the meat market becomes a placeable 3×3, a light and a high form, redesigned, a few variations each | the owner's | yes | yes | **yes** | the answers to M.4, written as a proposal | the owner |
+| **M** | the meat market becomes a placeable 3×3 that grows, Light or High by the brush, redesigned, one sprite per stage of growth | the owner's | yes | yes | **yes** | a proposal with M.4's answers and numbers | M.4's questions 4 and 7 |
 | **L1** | the one-box factories get a roofline — sawtooth, stacks, tanks | mine | a part moves | yes | no | move the parts into the kit, byte-identical | taste |
 | **L2** | street lamps that come on at dusk | mine | render | yes | no | a sheet of where they would stand | whether a lamp throws a pool |
 | **L3** | shirts that say where an animal works | mine | a draw-time read | yes | no (reads only) | measure each shirt against every coat, before drawing one | **the owner** |
@@ -117,9 +118,9 @@ and said so.
 |---|---|---|
 | drag | a click ([input.js:119–122](../js/input.js)) | fine |
 | undo | civics have the same-month undo ([ops.js:366–373](../js/sim/ops.js)) | fine |
-| density | a place op carries none (input.js:120, :139) | the H brush must reach the place op |
-| the tier ladder | a civic has no tier | M.4, question 3 |
-| decay, fire, the raid's shut storey | civics never decay, burn or lose a storey (fire starts on built lots only, events.js:62–65; the raid is `lowerTier`, :31–38) | rebuilt, or dropped |
+| density | a place op carries none (input.js:120, :139) | the H brush reaches the place op (M.4, answer 2) |
+| the tier ladder | a civic has no tier | **kept** — the market grows (M.4, answer 3) |
+| decay, fire, the raid's shut storey | civics never decay, burn or lose a storey (fire starts on built lots only, events.js:62–65; the raid is `lowerTier`, :31–38) | rebuilt on the market's own tier, since it has one |
 | the WHY NOT line | `lotReport` is for lots (lots.js:241–297) | a card line for the market |
 | the art audit | the civic one — three layouts a family (`check-building-variants`) | fine |
 | its own valve | **civic jobs count as shop jobs** (`jobZone`, [world.js:441–447](../js/sim/world.js)) | keep hall jobs in Jm, or the failure measured above comes back |
@@ -147,7 +148,8 @@ Read from the Governor's Mansion, the last 3×3 added — `65ccac9`, 2026-09-13,
   from the tile and the seed when the world is made
   ([world.js:139](../js/sim/world.js)), saved, and never written again. **Every
   civic family has exactly three layouts** — `check-building-variants.mjs:9`
-  asserts it. The owner's *"a few variations"* is that: three layouts a form.
+  asserts it. The market's sprites are its stages of growth instead (M.4,
+  answer 3), so that check has to learn a family that grows.
 - **Density is a zones-only idea.** The civic branch never reads it
   (ops.js:251–267). No placeable has a light and a heavy form — the pairs that
   exist are separate kinds, tools and ids (park / large park, library /
@@ -163,48 +165,53 @@ Read from the Governor's Mansion, the last 3×3 added — `65ccac9`, 2026-09-13,
   `npm run check` — and, since `abf08bd`, `art-baseline.txt` via
   `node tools/art-dump.mjs --write` in the same commit.
 
-### M.4 What the owner must answer first
+### M.4 The owner's answers, and the two still open
 
-Each with my reading, which is a reading and not an answer:
+Six questions went to the owner; each carried my lean. They answered five
+on 2026-09-25, in these words:
 
-1. **Does the zone go?** *"change the meat market into"* reads as yes: row 4
-   becomes the placeable and keeps key `4` — no letter or digit is free for a
-   second tool (only `'` `\` and `` ` `` are). Old input logs still hold
-   `zone: 4` ops, and log replay is a suite law (check.mjs:614–624), so the
-   zone op must go on replaying even with its tool gone.
-2. **Light and high — one tool or two?** One, the H brush choosing the form as
-   it does for every zone, High still at Chapter 5 (the lock must then read a
-   place op). The form, saved in the anchor's `maxTier`, needs no new save
-   field.
-3. **Does a placed market grow?** (a) It opens as stalls and grows to a hall
-   and a cold store as trade allows, capped by its form: the tier ladder
-   stays, and with it decay, the raid's shut storey, the why-not line and the
-   valve's say — and the art is needed per tier. (b) It is what was placed,
-   like every civic: less art, but a High market is full size the day it
-   opens whatever the town wants, and every tier-keyed number needs a
-   per-form value. **I lean (a)** — it rebuilds the most of M.2's table and
-   moves the least balance.
-4. **How much market is a 3×3?** Today a Low lot is one stall (3 jobs) and the
-   biggest thing High grows is the 3×3 exchange (180). A Light market could be
-   nine stalls' worth (27) and a High one the exchange — or less. The same for
-   the stock (40 a hall, whatever its size), the pens, and the smell: dread
-   and crime are emitted per tile today, so a grown block smells nine times
-   over. A market could emit once.
-5. **Who pays?** Today it is §12 a tile and privately run — the cut, the
-   licence, the raid. A civic has a price and an upkeep. My reading: keep it
-   grey — the nine tiles' zoning price (§108), no upkeep, jobs in Jm.
-6. **The saves that have halls — the owner's own town among them.** There is
-   no migration framework (`version` is always 1; the ad-hoc markers are
-   `justiceVersion` and `citizenHomes`, save.js:66), and stock, pens, staff
-   and `meatStats` are all keyed by the old anchors. (a) Keep: zoned meat goes
-   on working as legacy and no new meat is zoned — the campuses' precedent
-   (*"Existing 2×2 gardens and 1×1 services retain their footprint"*,
-   [HANDOFF-CIVIC-CAMPUSES](HANDOFF-CIVIC-CAMPUSES-2026-09-05.md)). (b) Convert
-   every grown 3×3 into a placed market, stock, pens and staff carried, and
-   keep the rest as legacy. (c) Clear: stock `spoiled`, pens `penReleased`
-   alive, both inside the conservation identity. My reading: (a), and ask
-   about (b). **No fixture in the tree has a meat lot** (`save-v1-plain.json`,
-   `mansion-quarter.json`) — ask for the owner's save either way.
+> *"1 yes*
+>
+> *2 yes, one tool.*
+>
+> *3 the reason for multiple sprites is to show the growth of the market.*
+>
+> *5 same cost as zoning a lone tile of the previous one*
+>
+> *6 it will break the saves, but thats ok, the player base is basically me."*
+
+| # | the question | the answer | what it settles |
+|---|---|---|---|
+| 1 | Does meat zoning go away entirely? | *"yes"* | Row 4 becomes the placeable and keeps key `4` (no other letter or digit is free). Nothing writes `zone = ZONE.M` any more. |
+| 2 | One tool, with H choosing Light or High? | *"yes, one tool"* | The brush chooses the form when the market is placed. High still waits for Chapter 5, so the lock must read a place op. The form lives in the anchor's `maxTier`, so no new save field. |
+| 3 | Does a placed market grow, or open at full size? | *"the reason for multiple sprites is to show the growth of the market"* | **It grows**, as trade allows, capped by its form. The tier ladder stays, and with it decay, the raid's shut storey, the why-not line and the valve's say. **The several sprites are the stages of growth.** That is how the first ask's *"a few variations"* now reads; alternate looks for a single stage were not asked for. |
+| 5 | Who pays? | *"same cost as zoning a lone tile of the previous one"* | **§12** (`COST.zoneM`) for the whole 3×3, not the §108 I suggested. Nothing was said against the rest of my lean, so it stays privately run with no upkeep. The cut, the licence and the raid are unchanged. |
+| 6 | What happens to saves that have meat halls? | *"it will break the saves, but thats ok, the player base is basically me"* | No migration and no legacy code path are owed. What a meat save should do when loaded is in M.8. |
+
+**Still open — these two go back to the owner, with my recommendations:**
+
+- **4. How much market is a 3×3?** (Not answered.) I recommend that at every
+  stage it be exactly what today's zone puts on nine tiles:
+  - jobs of 27 / 72 / 180 — nine stalls, then nine halls, then the grown
+    exchange with its ×1.25;
+  - stock of 40 and pens of 2 / 4 / 8, as one hall, which is what a grown
+    block has today;
+  - dread and crime from all nine tiles at the market's stage, as a grown
+    block gives off today.
+
+  That is the same land, jobs and smell the zone had, so the valve SPEC §9c
+  measured still holds, and M.7 step 5 measures it. On that valve a town of
+  1,600 wants about 72 meat jobs: one market at the hall stage.
+- **7. Does a Light market grow?** New: this is where answers 2 and 3 meet.
+  Low meat today never grows past a stall.
+  - (a) Light is the first stage and stops there, while High carries on
+    through the hall and the cold store. That is three stage sprites in all,
+    and the brush means what it means for every zone — *"Low (cottages
+    only)"*, as the H key says (input.js:326).
+  - (b) Each form has its own ladder: an open-air market that fills out, and
+    a hall that grows. That is six sprites.
+
+  **I recommend (a).**
 
 ### M.5 What reads the meat zone — the blast radius
 
@@ -217,13 +224,13 @@ js tools` is the list to walk:
 | `sim/world.js` | `capacityOf` / `jobsOf` — `M_JOBS` × the block multiplier :422–423, :436–437; `jobZone` :441–447; the civic tables :16–50 | a civic id, jobs by form, **jobs kept in Jm** |
 | `sim/fields.js` | `computeDread` :229–251 and the crime hill :559–567, from every meat tile by tier; `doorsOf` :775–777 (via `siteTiles` — works for civics as it is) | a source for a civic |
 | `sim/ops.js` | zoning :180–190, :473–478; bulldoze counts stock and pens :227–237 and calls `closeHall` :502–506; prohibition closes halls :408–415; civic placement :251–267, :514–520; `removeCivic` :593–602 | density in the place op; **`removeCivic` must close the hall** (M.8) |
-| `sim/lots.js`, `sim/blocks.js` | the M valve and `local_M` :98–113; the merge :171–183 and `joinable` blocks.js:51–54; decay :224–233; `lotReport` :241–297 | whatever question 3 decides |
+| `sim/lots.js`, `sim/blocks.js` | the M valve and `local_M` :98–113; the merge :171–183 and `joinable` blocks.js:51–54; decay :224–233; `lotReport` :241–297 | the market's growth, on its own tier (M.4, answer 3) |
 | `sim/events.js` | the raid :299–316 via `lowerTier` :31–38; the licence offer, a tier-2 served meat lot :525–537; `raidable` and `firstHall` :351–359; fire on built lots :62–65, :80–88 | a raid, a licence and a fire for a civic — or none |
 | `sim/justice.js` | `KILL_MARKET` :120; `KILL_STAFF` when `zone[c.job] === ZONE.M` :121; the killing's hall and sack :134–162; the sale :373–388, :425–434 | re-keyed to the hall test |
 | `sim/census.js`, `budget.js`, `demand.js`, `needs.js`, `voice.js`, `governance.js`, `police-actions.js`, `tick.js` | each its own zone test: `markets` and Jm (census :155, :207–215), the cut and the licence (budget :44–113), `r.M` (demand :62–105), the HOOKS need (needs :81–84), the advisor (tick :242–285) | every one re-keyed |
 | `sim/citizens.js` | `JOB_M`, hiring by diet on `zone[lot] === ZONE.M` :1470–1471; dread in home score, mood, leaving and rehome :279–282, :753, :945–962, :1287–1295; the market's push and pull on arrivals :648–653 | the hiring test re-keyed |
 | `sim/progression.js` | `UNLOCK.M: 0` :17; High meat at Chapter 5, for zone ops only :25–27 | the lock for a place op |
-| `sim/save.js` | the tile arrays :20; `meatStats` keyed by anchor :83, :162; citizens' `pen`, `penSince`, `heldAt` :31–38; `releaseOrphanJobs` on every load :174, :246–256 | question 6 |
+| `sim/save.js` | the tile arrays :20; `meatStats` keyed by anchor :83, :162; citizens' `pen`, `penSince`, `heldAt` :31–38; `releaseOrphanJobs` on every load :174, :246–256 | nothing owed to old saves (M.4, answer 6); see M.8 for loading one |
 | `tools.js`, `input.js`, `palette.js`, `remote-icons.js` | row 4; density :26, :98–99, :139–140; the H flash that names meat halls :322–327; the icon | a place row, its id equal to its kind |
 | `ui.js`, `render.js` | `TIER_NAME` :400, `BLOCK_NAME` :402, the card :468, :570–577, the Budget :967, the Census :1022–1038; render: the meat chalk :378–380, the dread overlay :492, the civic chain :654–670 | the card, the names, a draw branch |
 | `walkers.js` | carts from a hall's staff :316–345; penned animals :347–352; sacks into the hall :378–380; `meatTrips` :500–520 | anchors found through the hall test |
@@ -237,14 +244,18 @@ Where I would start reading, in order: `meat.js`, `world.js`, `ops.js`,
 
 ### M.6 The art brief
 
-- **Two forms, three layouts each** — the civic rule, and what *"a few
-  variations"* maps to — and, under 3(a), each tier the form can reach. A
-  hi-res twin from the same recipe; every box inside the 48×48-unit
-  footprint ([ART-CIVICS-3X3.md](ART-CIVICS-3X3.md)). The map's hash picks
-  the layout, not the player (M.3).
-- **Light** reads as an open-air market: stalls under striped awnings, a yard,
-  hooks, a cart. **High** reads as a hall: brick under the slate roof, a cold
-  store with stacks and tanks, a loading dock for the carts and sacks the
+- **One sprite per stage of growth.** The owner: *"the reason for multiple
+  sprites is to show the growth of the market."* That is three stages under
+  question 7(a), six under 7(b). Each is a 3×3 with a hi-res twin from the
+  same recipe, every box inside the 48×48-unit footprint
+  ([ART-CIVICS-3X3.md](ART-CIVICS-3X3.md)).
+- **A stage must read as the same market, grown** — not a different
+  building on the same lot. Keep the plan across stages (the yard, the road
+  side, the pen) and add to it.
+- **The stages.** The first stage reads as an open-air market: stalls under
+  striped awnings, a yard, hooks, a cart. The hall stage roofs part of the
+  yard over in brick under the slate roof. The cold-store stage adds the cold
+  store with stacks and tanks, and a loading dock for the carts and sacks the
   walkers already carry ([`sheet-meat.png`](shots/sheet-meat.png)).
 - **Start from the kit.** `STRIPE`, `AWNING_M`, `SAWDUST`, `BRACKET`
   (buildings.js:476–516); `HOOK` (:553); `stall()` (:554–579); `meatHall()`
@@ -257,17 +268,18 @@ Where I would start reading, in order: `meat.js`, `world.js`, `ops.js`,
   from a zoned one"*. The slate roof is how a player reads *meat*. The market
   becomes a private business placed like a civic, so its roof has to choose
   which of those two a player should see.
-- **What it retires**: the twenty-six sprites of M.1 and the zone chalk
-  `chalk-M-low` / `chalk-M-high` (terrain.js:280–315) — unless question 6(a)
-  keeps them drawing legacy halls, which it would.
+- **What it retires**: all twenty-six sprites of M.1 and the zone chalk
+  `chalk-M-low` / `chalk-M-high` (terrain.js:280–315). Old saves may break
+  (M.4, answer 6), so nothing is kept to draw legacy halls.
 
 ### M.7 The order of work, and what holds it
 
-1. **The answers, written as a proposal**, with M.2's table answered row by
-   row — as `PROPOSAL-CRIME-AND-PUNISHMENT.md` did for the zone.
+1. **A proposal**, once questions 4 and 7 are answered: M.4's answers, the
+   numbers, and M.2's table answered row by row — as
+   `PROPOSAL-CRIME-AND-PUNISHMENT.md` did for the zone.
 2. **Instruments first, and byte-identical.** A probe that reads markets on
-   the estate layout and on the owner's save — `meatprobe.mjs` reads both
-   today. The migration fixture, from that save.
+   the estate layout (`meatprobe.mjs` reads it today). No migration fixture is
+   owed (M.4, answer 6).
 3. **The sim commit.** Every rig hash moves: print the before and after in the
    commit and say why. Never re-bless a hash silently.
 4. **The art**, with `node tools/art-dump.mjs --write` in the same commit (an
@@ -291,6 +303,13 @@ Where I would start reading, in order: `meat.js`, `world.js`, `ops.js`,
   clears the tiles ([ops.js:593–602](../js/sim/ops.js)), but it never frees a
   pen or spoils the stock. A bulldozed market would strand both and break the
   conservation identity `meatBalance()` audits. Route it through `closeHall`.
+- **A save that still has meat must fail loudly, never load half-working.**
+  Breaking old saves is accepted (M.4, answer 6), but a save that still holds
+  `zone === 4` tiles must not load into a town whose meat code no longer reads
+  them. Either refuse it with a message, or clear its meat on load through
+  the bulldoze path — stock `spoiled`, pens `penReleased`, jobs released. The
+  identity stays whole, and the owner keeps the rest of their town. Clearing
+  is cheap and kinder; either way it needs a check.
 - **Civic jobs count as shop jobs** — M.2's last row.
 - **The tool's id must equal its op kind.** The ghost looks up its size and
   sprite by tool id (input.js:443, :450), the sim by kind (ops.js:171, :254);
