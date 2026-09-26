@@ -399,7 +399,7 @@ export function createUI(app) {
   // ---- hover card --------------------------------------------------------------------------------------
   // THE MEAT MARKET's stages (docs/PROPOSAL-MEAT-MARKET-2026-09-26.md A.2): Light is 1–4, Heavy opens at 4 and grows to 6.
   const MARKET_STAGE_NAME = ["the bare site", "one stall", "three stalls", "six stalls", "the full square", "the hall", "the exchange"];
-  const TIER_NAME = { 1: ["cottage", "shop", "shed", "stall"], 2: ["two-storey", "store", "factory", "meat hall"], 3: ["apartment", "tower", "works", "cold store"] };
+  const TIER_NAME = { 1: ["cottage", "shop", "shed"], 2: ["two-storey", "store", "factory"], 3: ["apartment", "tower", "works"] }; // zone 4's names went with the zone: a market names its stage (MARKET_STAGE_NAME)
   // The blocks (SPEC §3b): one building on 2×2 or 3×3 tiles, named by zone and side.
   const BLOCK_NAME = { 2: ["terrace court", "arcade", "mill"], 3: ["the towers", "emporium", "foundry"] };
   function personLink(c, label = `${c.name} ${c.surname}`) {

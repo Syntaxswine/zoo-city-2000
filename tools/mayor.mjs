@@ -308,7 +308,7 @@ export function createMayor(world, opts = {}) {
       // Nowhere in reach: build it anyway, so the run still has a zoo to report on.
       if (!placed) outerAny: for (let dy = -12; dy <= 12; dy++) for (let dx = -12; dx <= 12; dx++) if (apply(world, { kind: "zoo", tx: sx + dx, ty: sy + dy }).ok) break outerAny;
     }
-    // --markets N: the mayor opens N meat-hall blocks from year 2, one a year.
+    // --markets N: the mayor opens N blocks from year 2, one a year, and places a meat market in each (openBlock).
     if (marketsWanted && mo === 0 && year >= 2 && year < 2 + marketsWanted) { const b = nextBlock(); if (b) openBlock(b[0], b[1], ZONE.M); }
     // --pacify: a pacification centre beside the start at year 3.
     if (pacify && t === 36) {

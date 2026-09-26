@@ -555,7 +555,7 @@ export const RULES = Object.freeze([
   },
   {
     id: "S1", title: "Crime",
-    formula: "crime = 40 − 0.5·LV + 0.4·animals in the 3×3 + 3·unemployed adults in the 3×3 (carnivores ×2) + 40·unemployed share + a meat hall's 10/18/25 over 1/2/3 + up to 25 within 2 of open files (their stains cap there) − police ; above 60: LV −10, shops −0.2, a shop above 70 can be robbed ; mood −0.3 per point above 40 at home",
+    formula: "crime = 40 − 0.5·LV + 0.4·animals in the 3×3 + 3·unemployed adults in the 3×3 (carnivores ×2) + 40·unemployed share + a meat market's 10/18/25 over 1/2/3 from its stall tiles (a street pitch's 10 over 1) + up to 25 within 2 of open files (their stains cap there) − police ; above 60: LV −10, shops −0.2, a shop above 70 can be robbed ; mood −0.3 per point above 40 at home",
     live: (w) => `mean crime on built lots ${f1(w.last.census.meanCrime)} · max ${w.last.census.maxCrime} · unemployed share ${f2(w.last.census.W ? w.last.census.U / w.last.census.W : 0)}`,
   },
   {
@@ -585,32 +585,32 @@ export const RULES = Object.freeze([
   },
   {
     id: "M3", title: "The licence, the raid",
-    formula: "Governance licenses meat halls at the player’s direction: §2,000 + §400/yr per hall, the jobs go on the books at the C rate, crime and the buyer's pull halve ; an unlicensed market under police cover with crime > 50 can be raided: a stage shut, §200 per tier it stands for (stall 1, hall 2, exchange 3) in fines",
+    formula: "Governance licenses meat markets at the player’s direction: §2,000 + §400/yr per market, the jobs go on the books at the C rate, crime and the buyer's pull halve ; an unlicensed market under police cover with crime > 50 can be raided: a stage shut, §200 per tier it stands for (stall 1, hall 2, exchange 3) in fines",
     live: (w) => (w.events.licence ? "licensed" : "unlicensed"),
   },
   {
     id: "M4", title: "Meat on hand is conserved",
-    formula: "stock ≤ 40 per hall ; stock = opening + bought dead + killings + convicted + 2·pen animals − meals sold − named spoilage ; a stocked hall gains up to +0.20 local M score",
+    formula: "stock ≤ 40 per market, at every stage ; stock = opening + bought dead + killings + convicted + 2·pen animals − meals sold − named spoilage ; a stocked market gains up to +0.20 local M score",
     live: (w) => `${w.last.census.meatOnHand || 0} on hand · ${w.last.census.meatSold || 0} meals sold this year`,
   },
   {
-    id: "M5", title: "The hall buys by a real service route",
-    formula: `nearest hall within 60 WALKED road steps; board, alight and every rail edge cost ZERO for meat carts and sacks, and their visible path carries those rail tiles. Citizen commutes price rail at ${f2(KNOBS.RAIL_COST / KNOBS.WALK)} of a walk. Property value, parks, Large Parks, plaques and smell use geographic distance — rail never shortens them`,
+    id: "M5", title: "The market buys by a real service route",
+    formula: `nearest market within 60 WALKED road steps; board, alight and every rail edge cost ZERO for meat carts and sacks, and their visible path carries those rail tiles. Citizen commutes price rail at ${f2(KNOBS.RAIL_COST / KNOBS.WALK)} of a walk. Property value, parks, Large Parks, plaques and smell use geographic distance — rail never shortens them`,
     live: (w) => `${w.last.census.railTiles || 0} rail tiles · freight rail distance 0 · property distance unchanged`,
   },
   {
     id: "M6", title: "Livestock grows in the pen",
-    formula: "a full pig or cow household may sell a cub to a reachable free pen (2 places on the stall stages, 4 at the hall, 8 at the exchange); it is absent until the exact sixteenth birthday, then yields 2 units; razing or losing the hall frees it alive",
+    formula: "a full pig or cow household may sell a cub to a reachable free pen (2 places on the stall stages, 4 at the hall, 8 at the exchange); it is absent until the exact sixteenth birthday, then yields 2 units; razing or losing the market frees it alive",
     live: (w) => `${w.last.census.penned || 0} in pens · ${w.last.census.meatSlaughtered || 0} units from pens this year`,
   },
   {
     id: "M7", title: "The street trade — where no market reaches",
     formula: "carnivores with no market within 60 walked steps (every one of them under prohibition) are unserved ; one seller per 50 of them — carnivore adults of those homes, the unemployed first — works a pitch: the road tile within 6 of home with the most unserved carnivores within 5, moving each month among the best 3 ; a pitch carries a stall's dread (40 over 2 — herbivores' mood, home and leaving, never land value), a stall's crime (10 over 1), the killing's ×3 pull, and ×(1 + tiles walked near it, up to 3) on a passing prey's weight as a victim ; a killing near a pitch is sold off the kerb, killed and eaten at once ; the mayor gets nothing ; police may stop a seller at a covered pitch like a trespasser",
-    live: (w) => `${w.last.census.streetSellers || 0} sellers · ${w.last.census.streetUnserved || 0} carnivores no market reaches · ${w.meatStats?.total?.street || 0} sold off the kerb · ${w.events.justice?.street || 0} stopped`,
+    live: (w) => `${w.last.census.streetSellers || 0} sellers · ${w.last.census.streetUnserved || 0} carnivores no market reaches · ${w.meatStats?.total?.street || 0} sold off the kerb · ${w.events.justice?.street || 0} taken to the cells`,
   },
   {
     id: "K1", title: "The killing — no jobs means hungry wolves",
-    formula: "killings/month = 0.00005 × Σ over adults of: carnivore 1, omnivore 0.1, herbivore 0.03 ; ×20 unemployed ; ×3 with a non-full hall in the 60-step service network (×1.5 licensed) ; ×2 hall staff ; ×(0.5 + crime at home/100) ; fixed 0 ; victims live within 3: prey ×1, anyone else ×0.1, a friendship ×0.1 ; adults only ; the wake befriends the mourners",
+    formula: "killings/month = 0.00005 × Σ over adults of: carnivore 1, omnivore 0.1, herbivore 0.03 ; ×20 unemployed ; ×3 with a market with space in the 60-step service network (×1.5 licensed), or where the street trade's smell reaches home ; ×2 market staff ; ×(0.5 + crime at home/100) ; fixed 0 ; victims live within 3 (a seller's also walk past its pitch): prey ×1, anyone else ×0.1, a friendship ×0.1, ×(1 + tiles walked past a pitch) ; adults only ; the wake befriends the mourners",
     live: (w) => `${w.events.killings} killings since founding · ${w.last.census.U} unemployed · ${w.events.files.filter((f) => !f.closed).length} open files`,
   },
   {
@@ -620,7 +620,7 @@ export const RULES = Object.freeze([
   },
   {
     id: "P2", title: "The sentence",
-    formula: "Default laws, editable in Governance: lighter crimes: Zoo prison (24 beds, release unchanged); murder or second theft: Pacification Centre (6 beds, six months, home FIXED); third theft, or theft after pacification: meat hall (§100 cut). A missing or full destination leaves the case open. Species does not determine sentencing. Unless Equal treatment is enacted, theft from the affluent is one step harsher: a first theft goes to the centre and a second to the hall; murder of the affluent goes to the hall.",
+    formula: "Default laws, editable in Governance: lighter crimes: Zoo prison (24 beds, release unchanged); murder or second theft: Pacification Centre (6 beds, six months, home FIXED); third theft, or theft after pacification: a meat market (§100 cut). A missing or full destination leaves the case open. Species does not determine sentencing. Unless Equal treatment is enacted, theft from the affluent is one step harsher: a first theft goes to the centre and a second to the market; murder of the affluent goes to the hall.",
     live: (w) => `${w.last.census.centres} centre${w.last.census.centres === 1 ? "" : "s"} · ${w.last.census.held} held · pacified ${w.events.justice.pacified} · sold ${w.events.justice.sold}`,
   },
   {

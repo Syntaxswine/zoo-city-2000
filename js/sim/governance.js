@@ -3,9 +3,9 @@ import { CIVIC, civicTiles, isPart, isMarket } from './world.js';
 import { served } from './fields.js';
 import { KNOBS } from './rules.js';
 
-const sentenceOptions = [['zoo','Imprisonment'],['centre','Pacification'],['hall','Sale to a meat hall']];
+const sentenceOptions = [['zoo','Imprisonment'],['centre','Pacification'],['hall','Sale to a meat market']];
 export const POLICIES = [
-  {key:'meatTrade',name:'Meat-hall regulation',options:[['unregulated','Unregulated'],['inspected','Licensed inspectors'],['prohibited','Prohibited']],description:'Inspectors halve local hall crime and buying pressure, put hall jobs on the tax books, and cost §'+KNOBS.UPKEEP_LICENCE+' per hall/year. Prohibition closes trade, discards stock, releases penned animals alive, and blocks sale sentences. Carnivores lose market access and the treasury loses hall revenue.'},
+  {key:'meatTrade',name:'Meat-market regulation',options:[['unregulated','Unregulated'],['inspected','Licensed inspectors'],['prohibited','Prohibited']],description:'Inspectors halve local market crime and buying pressure, put market jobs on the tax books, and cost §'+KNOBS.UPKEEP_LICENCE+' per market/year. Prohibition closes every market, discards stock, releases penned animals alive, and blocks sale sentences — and the trade goes to the street: carnivores sell off the kerb, and the smell and the killing walk with the sellers. The treasury loses market revenue.'},
   {key:'minorSentence',name:'First theft and minor offences',options:sentenceOptions,description:'Choose the sentence for a first theft or minor offence. Imprisonment releases residents unchanged; pacification permanently prevents offspring and predation; sale kills the resident.'},
   {key:'repeatSentence',name:'Second theft',options:sentenceOptions,description:'Choose the sentence for a second theft. A full or missing permitted facility leaves the case open.'},
   {key:'violentSentence',name:'Murder',options:sentenceOptions,description:'Choose the sentence for murder. The same law applies to every species.'},

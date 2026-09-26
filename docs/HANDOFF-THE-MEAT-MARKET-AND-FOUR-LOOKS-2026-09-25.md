@@ -1,5 +1,10 @@
 # HANDOFF — the meat market as a placeable 3×3, and four looks (2026-09-25)
 
+> **2026-09-26: item M is BUILT** — seven commits, `8cb6f35` … `05ce7eb` and the
+> words; [the proposal's status](PROPOSAL-MEAT-MARKET-2026-09-26.md) lists them and what
+> the build changed. L1–L4, Qz and Q1′ are untouched: the rest of this file
+> stands as written.
+
 *For whoever takes any of these, in whatever order the owner chooses.
 **Nothing in this file is built.** Every number and line reference below is
 true of the commit that added this file (its parent is `4e59dca`, 2026-09-25)
@@ -39,7 +44,7 @@ The items are not equal, and the difference matters to whoever picks one up:
 
 | | what | whose | code | art | `js/sim/` | first step | waits on |
 |---|---|---|---|---|---|---|---|
-| **M** | the meat market becomes a placeable 3×3 that grows — Light 3–27 jobs, Heavy 27–180 — one sprite per stage; with no market, the trade walks the streets | the owner's | yes | yes | **yes** | [the proposal](PROPOSAL-MEAT-MARKET-2026-09-26.md) is written | the owner's OK to its Part D |
+| **M** | the meat market becomes a placeable 3×3 that grows — Light 3–27 jobs, Heavy 27–180 — one sprite per stage; with no market, the trade walks the streets | the owner's | yes | yes | **yes** | [the proposal](PROPOSAL-MEAT-MARKET-2026-09-26.md) is written | **BUILT 2026-09-26** (`8cb6f35` · `01aa0bb` · `e052aa9` · `5f1aab4` · `991991e` · `05ce7eb` · the words) |
 | **L1** | the one-box factories get a roofline — sawtooth, stacks, tanks | mine | a part moves | yes | no | move the parts into the kit, byte-identical | taste |
 | **L2** | street lamps that come on at dusk | mine | render | yes | no | a sheet of where they would stand | whether a lamp throws a pool |
 | **L3** | shirts that say where an animal works | mine | a draw-time read | yes | no (reads only) | measure each shirt against every coat, before drawing one | **the owner** |

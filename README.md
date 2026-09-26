@@ -64,7 +64,7 @@ toggles disasters for the current city.
 ## Controls
 
 The build remote on the left is the key: `1` Residential, `2` Commercial,
-`3` Industrial, `4` Meat, `5` Road, `6` Wall, `7` Rail, `8` Station, `9`
+`3` Industrial, `4` Meat market, `5` Road, `6` Wall, `7` Rail, `8` Station, `9`
 Tree, `E` Camera, `0` Park, `G` Large Park, `Z` Zoo (prison), `V` Pacification, `P` Police, `F` Fire, `I` Inspect,
 `B` Bulldoze, the four public buildings — `K` Library, `Y` University, `M` Gallery, `T` Amphitheater (knowledge
 raises the town's capacity; culture lifts mood and land value; a University reaches half the map's tiles, an Amphitheater an eighth).
@@ -127,8 +127,8 @@ them on the real map):
 | the cap | `Cap = (1200 + 150·parks + 500·large parks + festival) · (1 + 0.5·H)` |
 | a lot grows | road within 3 tiles, `score = V + (LV − Pol − 40)/200 > 0.05`, 70% full, land value permits the storey |
 | pollution | every source spreads linearly over its radius; a lone works stinks next door, pigs and skunks dirty their lot, parks are sinks; no wind |
-| crime | `40 − 0.5·LV + 0.4·density + 3·jobless in the 3×3 + 40·unemployed share + a hall's hill + open files − police`; above 60 it costs land value and shops; it is also the killing's hazard |
-| dread | a meat hall spreads 40/70/105 over 2/3/4 tiles; LV −0.8·dread (twice a works); herbivores mind it, carnivores do not |
+| crime | `40 − 0.5·LV + 0.4·density + 3·jobless in the 3×3 + 40·unemployed share + a market's hill + a street pitch's + open files − police`; above 60 it costs land value and shops; it is also the killing's hazard |
+| dread | a meat market smells from its stalls — a stall's 40 over 2 from each, then the hall's 70 over 3 and the exchange's 105 over 4 from all nine tiles; LV −0.8·dread (twice a works); herbivores mind it, carnivores do not; a street seller's pitch smells like a stall and never lowers land value |
 | use-zoning | `U` opens predator, prey and all 14 species checkboxes, then paints lots and roads; no checks is mixed, otherwise matching any check is allowed; a gate on homes and jobs; a forbidden road step costs ×6; a repainted household has 3 months to rehome or leaves |
 | trespass | `E` forbidden walking tiles on the commute (+4 for a forbidding home or job); `p = min(0.3, 0.02·E·cover/60)` a month — no police, no stop; Zoo prison for a month and a record; trespass does not count as theft |
 | rail | a commute is the cheapest walk-and-ride: a step 1, a ride 2/9 (0.22) between stations served by a road within 3 tiles (the forecourt is walked); riders move at ×4.5, 50% faster than before; traffic and trespass count walking steps only — neutral travel until you step off; a road and a line cross square-on on one tile |
@@ -151,7 +151,7 @@ require a road touching any edge; small and large parks can stand without roads.
 The garden artwork belongs to Large Park and retains its recreation benefits.
 Zoo is a separate walled prison with 24 beds. First thefts and lighter crimes
 use prison; murder and second thefts use pacification; third thefts or theft
-after pacification go to a meat hall. A missing or full destination leaves
+after pacification go to a meat market. A missing or full destination leaves
 the case open. Existing saves retain the physical sizes of old buildings.
 
 ## The animals
@@ -241,9 +241,14 @@ the line first and leaves the road.
 
 **Crime and punishment.** Any adult may kill a neighbour — carnivores
 likely, the unemployed twenty times likelier ("no jobs means hungry
-wolves"), prey rarely — and a grey-market **meat hall** (zone `M`) is the
-buyer: it pays the mayor an untaxed cut, casts a dread over four tiles that
-takes twice the land value a works does, and herbivores move away from it.
+wolves"), prey rarely — and a grey-market **meat market** is the buyer: placed
+with `4` as a 3×3 that grows a stall at a time from a bare site to a hall and
+an exchange (`H` picks Light, 3–27 jobs, or Heavy, 27–180), it pays the mayor
+an untaxed cut, casts a dread from its stalls that takes twice the land value
+a works does, and herbivores move away from it. Where no market reaches — or
+the trade is prohibited — carnivores sell meat off the kerb instead, and the
+pitch moves from street to street every month: the smell and the killing
+walk with it.
 Every incident opens a six-month file; police cover is the monthly chance of
 an arrest, and one arrest in twenty takes the wrong animal, chosen by
 proximity. The street sees it: the killer walks to the neighbour's door, a

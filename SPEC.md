@@ -116,6 +116,7 @@ One lot = one tile = one building. Tiers 0..3 (0 = zoned, empty).
 | I jobs | 4 | 10 | 24 |
 | Large Park (3×3 civic; legacy 2×2) | no jobs — parks have no workers (the owner, 2026-09-07); the twelve it once listed were a leftover from when the garden was the zoo | | |
 | Zoo prison (3×3 civic) | 8 C-type jobs; 24 beds | | |
+| Meat market (3×3 civic, placed; §9c) | by STAGE, not tier — Light 3 · 9 · 18 · 27 (one, three, six, nine stalls); Heavy 27 · 72 · 180 (the square, the hall, the exchange); Jm | | |
 
 `maxTier` is the density brush: Low = 1, High = 3 (one byte per lot; the
 species-selection lever — mice want towers, bears want cottages).
@@ -147,10 +148,10 @@ splits first, then the one tile loses its storey); rubble or the bulldozer
 (every tile of the footprint at once — the bulldozer on any tile of a block
 takes the footprint, §2 a tile, one evict, not undoable when occupied). Fire
 takes the whole footprint at once too (`ignite`), so a block never
-half-burns. A `use` repaint covers the footprint. The census counts halls,
-not tiles (`markets`), and `blocks2` / `blocks3`. The hover card names the
-block (terrace court · arcade · mill · abattoir; the towers · emporium ·
-foundry · meat exchange), a part says whose it is, and a tier-3 lot says what
+half-burns. A `use` repaint covers the footprint. The census counts
+`blocks2` / `blocks3` (a meat market is placed, never merged: §9c). The hover
+card names the block (terrace court · arcade · mill; the towers · emporium ·
+foundry), a part says whose it is, and a tier-3 lot says what
 its block is waiting for.
 
 ### 3c. Landmarks — a 3×3 takes the name of the species that made it (`js/sim/landmarks.js`; session 12, 2026-09-03)
@@ -339,8 +340,10 @@ wall first and keeps the road.
 What honours the wall: pollution (every source, parks as sinks), dread, the
 hall's crime hill and every file's stain, the park / zoo / van land-value
 masks and a plaque's bonus, fire and police cover, and every radius query in
-justice — the killing's victims, the wrongful pool, the thief pool,
-`hallNear` — so a walled prey compound is out of a killer's reach. Road
+justice — the killing's victims, the wrongful pool, the thief pool — so a
+walled prey compound is out of a killer's reach. (`hallNear`, once on this
+list, is gone: a market's buying reach is `hallReach`, a walked road path,
+§9c.) Road
 reach (`roadDist`, `doorOf`) stops at a bare wall too: a lot walled off on
 every side has no road and the card says so. Not affected, on purpose: the
 centroid term of LV (not a source) and `nature8` (the eight neighbours).
@@ -438,7 +441,7 @@ became:
 | **industry above tier 2** | `served`. SC2000's frontage rule (`roadDist <= 1`) is DELETED — the inside of an industrial block may now stand as tall as its edge; the millbelt gains 11 tier-3 works |
 | a **rail station** | `served`. It was "a road tile ORTHOGONALLY beside the platform", which is the d = 1 case of the same rule |
 | the **zoo** (2×2) | `served` on all four tiles, gating jobs, the LV halo and the census the cap reads — one predicate, three effects. The census reports `zoos` (served) and `zoosNoRoad` |
-| a **meat hall**, the pacification centre, fire and police cover | `served` |
+| a **meat market** (its growth and its buying), the pacification centre, fire and police cover | `served` |
 | a **park** | nothing. A park is a place, not a service; the owner did not list it |
 | **doors** (job search, walkers, carts, the station) | `doorsOf` — every side |
 
@@ -990,7 +993,7 @@ new charge. Collect skips that interview roll.
 
 Both paths use the existing sentence (including prior thefts and affluent-victim
 escalation) as the starting point: 60% normal, 20% one step harsher, 10% one step
-lighter, 10% meat hall. The ladder is Zoo prison → Pacification Centre → meat hall;
+lighter, 10% meat market. The ladder is Zoo prison → Pacification Centre → meat market;
 steps clamp at the ends. An innocent citizen starts at jail. All existing custody,
 pacification, death, family, ledger, and wrongful-conviction effects still apply.
 If the chosen destination is unavailable/full, the citizen remains free and the
@@ -1037,7 +1040,7 @@ census so a loaded city and the straight run agree (the save/load hash law).
 The crime overlay (`O`) shows crime in red and police cover in blue; the
 hover card prints crime and both covers; the Rules tab has S1–S3.
 
-## 9c. Crime and punishment — zone M, the killing, the file, the centre (`js/sim/justice.js`, `fields.js`, `events.js`)
+## 9c. Crime and punishment — the meat market, the street, the killing, the file, the centre (`js/sim/justice.js`, `fields.js`, `events.js`, `lots.js`, `street.js`)
 
 The owner (2026-09-02): *"lets think about how we can add predation to the
 game as part of crime. perhaps with a custom zoned commercial space for grey
@@ -1052,41 +1055,72 @@ weighted by unemployment, no jobs means hungry wolves. 2. no, random based
 on proximity. i think it should be possible for prey to murder too, but just
 much less likely. 3. yes."* Designed by two panels
 (`docs/PROPOSAL-CRIME-AND-PUNISHMENT.md`), built as stated there with the
-rulings applied. Every constant is in KNOBS; the rules tab has M1–M6, K1,
-P1–P3.
+rulings applied. Then (2026-09-25/26): *"i want to change the meat market
+into a placeable 3x3 for light and high density … the reason for multiple
+sprites is to show the growth of the market"* — *"for light it should be
+3-27 jobs / for heavy 27-180 … in stepped increments with different
+sprites"* — *"what if you didn't have the meat market and people were just
+trying to sell it on the street, this would turn the negative effects of the
+meat market into a walking hazard."* Meat stopped being a zone: the market
+is placed and grows, and where none reaches, the trade goes to the kerb
+(`docs/PROPOSAL-MEAT-MARKET-2026-09-26.md`). Every constant is in KNOBS;
+the rules tab has M1–M7, K1, P1–P3.
 
 ```
 DIET     herb = rabbit, mouse, beaver, tortoise, pig, cow · omni = bear, raccoon, skunk · carn = fox, owl, wolf, cat, hawk
          (fox and owl hunt without the `predator` flag, which stays the skunk-incident gate)
 
-ZONE M   key 4, "Meat", §12 a tile, drag-zoned; tiers stall / meat hall / cold store, M_JOBS [0, 3, 8, 16];
-         its own valve rM = clamp((0.06·carnivores + 10 − Jm)/max(Jm, 20), −1, 1), T_M = T_C — a 1,600 town wants ~72 hall jobs;
-         Jm ∈ J and Lab, ∉ Jc (no crowd-out of shops); local_M = 0.6·clamp(carnivores within 5 / 40 − 0.5, ±0.3) + 0.4·(50 − LV)/200
-         + 0.20·min(1, stock/8);
-         maxTier 3 like I; staffed by diet JOB_M {carn 0.9, omni 0.5, herb 0.1} (a weight — pigs and beavers, jobC 0.2, will walk to one)
-DREAD    world.dread (derived): a hall spreads [0, 40, 70, 105] × (0.5 + 0.5·min(1, stock/8)) over radius [0, 2, 3, 4]
-         (the pollution shape); LV −= 0.8·dread
-         → a tier-3 hall −84/−67/−50/−34/−17 LV at d 0..4, exactly twice a works (−42/−34/−25/−17/−8)
-         herbivores: mood −min(25, 0.25·dread) (halved with a carnivore friend); home score −dread; arrivals ×(1 − 0.3·min(1, halls/3));
-                     REHOME: a herbivore household at dread ≥ 40 moves along the road (≤ 12 tiles) at 3%/month, to a lot with less dread
-         carnivores: +5 mood inside the smell; home score +0.8·dread (net 0 — they do not mind); arrivals +0.3·min(1, Jm/40)
+MARKET   key 4, "Meat market" — PLACED, not zoned, since 2026-09-26: a 3×3 civic (CIVIC.MARKET) beside a road, §12 (a lone
+         M tile's old price); the H brush picks the FORM, Light (maxTier 1) or Heavy (maxTier 3, from Chapter 5)
+         the anchor's tier is the STAGE, jobs MARKET_JOBS [0, 3, 9, 18, 27, 72, 180]: 0 the bare site (also the ghost);
+         Light 1–4, one, three, six, nine stalls; Heavy opens at 4, the full square, then 5 the hall, 6 the exchange;
+         a Heavy market that falls below 4 closes to its site — it never turns Light
+         a stage stands for the zone tier it replaced (MARKET_TIER [0, 1, 1, 1, 1, 2, 3]: stall · hall · cold store) wherever a
+         rule read a tier — the smell and crime, the pens, a raid's fine, the licence
+         its own valve rM = clamp((0.06·carnivores + 10 − Jm)/max(Jm, 20), −1, 1), T_M = T_C — a 1,600 town wants ~72 meat jobs;
+         Jm ∈ J and Lab, ∉ Jc (NOT a civic employer: no crowd-out of shops); local_M = 0.6·clamp(carnivores within 5 / 40 − 0.5,
+         ±0.3) + 0.4·(50 − LV)/200 + 0.20·min(1, stock/8); a stage at a time, as a lot takes a storey (sprout, GROW_P, 70% full,
+         decay below the line) — and only to a size the town would KEEP: the score it would settle at one stage up,
+         clamp(term(Jm + the step's jobs) + T.M + boost.M) + local, may not be below the decay line (lots.js marketWouldHold,
+         read from THIS month's census and demand, `world.now` — a reloaded city rebuilds `world.last` differently);
+         without it a market grew past demand, decayed and grew again (stage moves a hall-decade 3–6 → 1.3–1.7)
+         staffed by diet JOB_M {carn 0.9, omni 0.5, herb 0.1} (a weight — pigs and beavers, jobC 0.2, will walk to one)
+         closing: the bulldozer, a fire (a burnt market falls to its site, never rubble) and a prohibition close the hall first
+         (meat.closeHall: stock spoiled, pens released, staff sent home, inside meatBalance)
+DREAD    world.dread (derived): a market smells from its STALL TILES (world.js MARKET_STALL_ORDER — the tiles the art stands
+         its stalls on, so the picture and the smell cannot disagree): a stall's 40 over 2 from each of its 1/3/6/9 stall tiles,
+         then the hall's 70 over 3 and the exchange's 105 over 4 from all nine, × (0.5 + 0.5·min(1, stock/8)); sources add, to
+         100 (the pollution shape); LV −= 0.8·dread — land value reads world.dread ALONE
+         → one tier-3 source −84/−67/−50/−34/−17 LV at d 0..4, exactly twice a works (−42/−34/−25/−17/−8)
+         the street trade's pitches smell as stalls in their OWN field, world.streetDread (THE STREET, below)
+         herbivores read the two together, smellAt = min(100, dread + streetDread): mood −min(25, 0.25·smell) (halved with a
+                     carnivore friend); home score −smell; arrivals ×(1 − 0.3·min(1, markets/3));
+                     REHOME: a herbivore household at smell ≥ 40 moves along the road (≤ 12 tiles) at 3%/month, to a lot with less
+         carnivores: +5 mood inside either smell; home score +0.8·dread (net 0 — they do not mind); arrivals +0.3·min(1, Jm/40)
          omnivores: nothing. NOT pollution (pollution pulls raccoons and pigs and refuses R growth — the rule is herbivore-specific)
-CRIME    crime += a hall's [0, 10, 18, 25] over [0, 1, 2, 3] (×0.5 licensed) + 15 within 2 of every open FILE
+CRIME    crime += a market's [0, 10, 18, 25] over [0, 1, 2, 3] by the tier its stage stands for, from its stall tiles as the
+         dread (×0.5 licensed), and a stall's at every street pitch, + 15 within 2 of every open FILE
          + 3 per unemployed adult in the 3×3 (a carnivore ×2)   ← "no jobs means hungry wolves", counted from live state
 MONEY    unlicensed: the CUT, §25 per filled M job per year, ledger "cut", untaxed; a killing bought by a hall +§50; a convict sold +§100;
          meals are §20/unit to "cut" unlicensed, or the C-rate share to "tax" licensed — every cash change uses budget.post
-         LICENCE (offered deterministically the month the first hall reaches tier 2; §2,000 + §400/yr per hall): M jobs taxed at the C rate,
+         LICENCE (offered deterministically, to a town with no Governor, the month the first market reaches the hall — stage 5,
+                 so a town of Light markets is never offered it; a governed town sets it in Governance; §2,000 + §400/yr
+                 per market): M jobs taxed at the C rate,
                  the crime hill ×0.5, the buyer's pull ×0.5 (3 → 1.5); the smell is unchanged
-         RAID (a BOON kind so the No-disasters toggle never masks it; w3; cooldown 24): an unlicensed hall with police cover, crime > 50
-                 and staff → a storey shut, +§200·tier fines, the last hired named and a file opened on them
+         RAID (a BOON kind so the No-disasters toggle never masks it; w3; cooldown 24): an unlicensed market with police cover,
+                 crime > 50 and staff → a stage shut (a Heavy market below the square closes), +§200 × the tier its stage
+                 stood for (stall 1, hall 2, exchange 3) in fines, the last hired named and a file opened on them
          THE GREENS' LEAGUE (w2, 6 months): herbivores ≥ 40% and a killing's file standing → V_C −0.3, herbivore mood +5
 
 THE KILLING (justice.js killingTick, every month, before the files):
-         Σ = Σ over adults of KILL_DIET {carn 1, omni 0.1, herb 0.03} × 20 if unemployed × 3 with a non-full hall in H service reach (1.5 licensed)
+         Σ = Σ over adults of KILL_DIET {carn 1, omni 0.1, herb 0.03} × 20 if unemployed × 3 with a market with space in H service reach
+             (1.5 licensed) — or, with none, × 3 where the street trade's smell reaches the home (a seller is a buyer)
              × 2 if on a hall's staff × (0.5 + crime at home/100); fixed, held and cubs 0
          killings this month k = floor(0.00005·Σ + rng) — drawn once wherever an adult lives (the baseline hash moves; see §4)
-         killer = weighted pick; victim = weighted pick of adults within Chebyshev 3 of the killer's home (not the household):
-                  the killer's prey ×1, anyone else ×0.1, a friendship (the killer's, or of the killer's kind) ×0.1; none → nothing
+         killer = weighted pick; victim = weighted pick of adults within Chebyshev 3 of the killer's home (not the household) —
+                  and, for a seller, any prey whose walk passes within a tile of its pitch: the killer's prey ×1, anyone else
+                  ×0.1, a friendship (the killer's, or of the killer's kind) ×0.1, and × (1 + tiles walked past a pitch, at most
+                  3); none → nothing. A killing no market takes is sold off the kerb when the street reaches the killer
          → removeCitizen "killed"; the funeral rule (mourners ≥ 3 befriend at the wake; grief a year for mourners and household);
            the victim's species −15 mood city-wide for 6 months; −§200 inquest; a FILE at the victim's home; the line names both
 THE FILE events.files [{tile, radius 2, crime 15, opened, until +24, culpritId, victimId, cause, line, closed}] — saved under events;
@@ -1105,7 +1139,7 @@ THE WRONG ANIMAL 5% of arrests: any adult within 4 of the file, weighted 1/(1 + 
          EXONERATED, −§500 compensation, the town −5 mood for 6 months, "there is no way to unfix / unsell"
 THE SENTENCE lighter crimes → Zoo prison (24 beds), 3 months; trespass 1 month.
          Murder or second theft → pacification (6 beds), 6 months, then fixed.
-         Third theft or theft after pacification → reachable non-full meat hall.
+         Third theft or theft after pacification → a reachable meat market with space (none under a prohibition: the Zoo prison).
          Missing/full destination leaves the case open without a conviction.
          Every conviction increments record; only theft/burglary increments thefts.
 CUSTODY  c.held = untilTick (saved), c.heldAt = the prison or centre (−1 only for legacy cells); `c.pen` is the separate market-pen state; the job is released (releaseJob — ONE function for retirement,
@@ -1118,22 +1152,38 @@ FIXED    permanent, saved; no litter (a pair needs two unfixed fertile adults �
 THE CENTRE CIVIC.CENTRE, 3×3, key V, §1,500, §900/yr, 4 C-type jobs (isCivicEmployer — NOT isStation, which is coverage),
          6 beds counted from heldAt; LV −6 within 2; carnivores −5 mood within 4 (the van); bulldozing it releases the inmates
          unfixed and is not undoable
+THE STREET (street.js) — the hazard the market kept in one place, walking
+         UNSERVED carnivores at home with no market within MEAT_ROAD 60 walked steps (hallReach) — every carnivore under a
+                  prohibition; SELLERS ceil(unserved / 50) carnivore adults of those homes, the unemployed first, then by id —
+                  no job slot and no valve: the trade is informal
+         PITCH    the road tile (never rail) within 6 of the seller's home with the most unserved carnivores within 5; it moves
+                  every month among the best 3 — the walking; no road near home, no pitch
+         HAZARD   a pitch carries a stall: its smell (40 over 2) in world.streetDread, its crime (10 over 1), the buyer's pull
+                  on the killing; a prey animal whose walk passes within a tile of a pitch is exposed (the victim weight above)
+         SUPPLY   a killing sold off the kerb is killed and eaten the same month — no stock, no cut (meat.streetSale, FLOW
+                  "street"); the mayor gets nothing: no cut, no licence, no raid
+         POLICE   a seller on a covered pitch is stopped as a trespasser (§9d) at six tiles' exposure: p = min(0.3,
+                  0.02·6·cover/60); a month in the Zoo prison, the record up — without a free bed the case waits
+         DERIVED  rebuilt at the start of every month from the month before (tick.js step 0b) and at load before the fields;
+                  draw-free, never saved or hashed; only the news of it opening and closing is saved (events.streetOpen)
+         measured (30 y, balanced, seeds 7/3/5): with markets, 2–8 seller-months; with none, 74–141 herbivores a month live in
+                  a smell (0 before) and killings 8/9/5 → 9/11/24; prohibited from year 10, 52–85 and 8/13/10 → 21/13/18
 ```
 
 ### Meat on hand (Part H, `js/sim/meat.js`)
 
-One unit is one body. A standing M anchor holds at most `MEAT_CAP` 40;
-parts of a 2×2/3×3 aggregate into that anchor. The saved identity is:
+One unit is one body. A market's anchor holds at most `MEAT_CAP` 40 at every
+stage; its other eight tiles hold none. The saved identity is:
 
 ```
 stock = opening + bought + killed + convicted + PEN_YIELD·slaughtered − eaten − spoiled
 ```
 
 `spoiled` is explicit: stock on a hall that burns, decays or is bulldozed,
-block overflow imported from a hand-edited/old state, and the unavoidable
+zoned meat in an old save (cleared on load through the same path), and the unavoidable
 excess when a grown pen animal reaches a full hall. A full hall refuses a
 dead body, killing or convict before it becomes supply; no counter or cash
-moves. Bulldozing a stocked hall is non-undoable. `meatBalance()` audits the
+moves. Bulldozing a stocked market is non-undoable. `meatBalance()` audits the
 identity, and stock is consolidated in Number space before entering the
 `Uint16Array`, so a block merge cannot wrap.
 
@@ -1164,7 +1214,7 @@ effects).
 Inflows are a reachable killing (+1), a convicted sale (+1), each reachable
 natural death bought with `MEAT_BUY_P` (+1), and livestock from the pen.
 A full pig/cow household may sell its oldest cub into a reachable pen with
-capacity 2/4/8 by hall tier. The named animal remains in its household but is
+capacity 2 on the stall stages, 4 at the hall, 8 at the exchange. The named animal remains in its household but is
 absent from work, friendship, mood, births, investigation and predation. On
 the exact sixteenth birthday it is removed as `slaughtered`, yields two
 units, and every remaining household member records `LOST_CHILD` without
@@ -1179,7 +1229,10 @@ pen animal/market date. Census keeps meat units sold separate from
 `events.justice.sold` convicts. `EMPTY HOOKS` flashes once per dry spell and
 resets on any restock; `THE MARKET` reports once each January.
 
-Measured (`tools/playtest.mjs`, 30 years, rates 8, seeds 7/3/5, disasters off): killings 3–7 per 30 years in a fed town
+Measured with the MARKET (`tools/playtest.mjs`, 30 years, rates 8, two markets, stations, a centre; 01aa0bb): meat jobs
+87–100 → 54–72 in the balanced towns (the zoned halls overshot the valve, V_M −0.36 to −0.40; the markets sit where it wants
+them), herbivores within the smell 8–45 → 6–14, killings 133 → 125 over six towns. Measured with ZONED halls, before
+2026-09-26 (`tools/playtest.mjs`, 30 years, rates 8, seeds 7/3/5, disasters off): killings 3–7 per 30 years in a fed town
 with no hall; 5–16 with two hall blocks (11–19 halls, ~70 jobs, the cut ≈ §1.4k/yr); arrests 4–9 per 30 years with a station
 and a centre (fixed 1–7, sold 2–4, wrongful 0–1 — the 5% is rare at that volume); herbivores within a hall's smell 0–19 of ~750
 (the push and the rehome empty the street); a jobless dormitory of 80 sees one killing every ~7 years. Population is cap-pinned
@@ -1199,7 +1252,9 @@ file opened (cause `trespass`, stain 5 within 1) and closed in the same
 `arrest()` call, never wrongful. The sentence is one month in a Zoo prison with a free bed and record++.
 Trespass never increments the separate theft counter or escalates through it.
 Without a prison bed the case remains open. The pinned citizen card prints
-the exposure and the monthly chance.
+the exposure and the monthly chance. A street seller on a covered pitch is
+stopped the same way, a month on the kerb counting as six tiles (§9c THE
+STREET).
 
 ## 9d. The camera network (`js/sim/fields.js`, `justice.js`, `demand.js`, `ops.js`)
 
@@ -1562,7 +1617,7 @@ stands whenever such a file exists.
 The build remote stands left of the map, two columns by eight rows (four by
 four below 720 px high). Its sixteen buttons, thumbnails, order, operations,
 keys and generated footer help all read the one DOM-free `TOOLS` registry:
-`1 R · 2 C · 3 I · 4 Meat · 5 Road · 6 Wall · 7 Rail · 8 Station · 9 Tree ·
+`1 R · 2 C · 3 I · 4 Meat market · 5 Road · 6 Wall · 7 Rail · 8 Station · 9 Tree ·
 0 Park · G Large Park · Z Zoo (prison) · V Pacify · P Police · F Fire station · I Inspect · B Bulldoze`.
 The top strip keeps only modifiers and commands: `H` density, `U` Use,
 `Space` pause, `, .` speed, `Backspace` or `Ctrl+Z` undo, `Ctrl+S` save-as,
@@ -1588,10 +1643,12 @@ painted on the GROUND, so a building hides its own tile's band.
 - **Road:** L-drag, horizontal leg then vertical; Shift = straight; over
   water = bridge §40. Auto-join by the 4-bit N/E/S/W mask into 16 tiles;
   busy variant when traffic > 40.
-- **Park 1×1 §150, Large Park 3×3 §2,500, Zoo prison 3×3 §2,500:** click-place with a ghost; red ghost when
-  blocked.
-- **Density `H`:** toggles the brush; painting R/C/I/M with Low sets
-  `maxTier = 1`; the chalk shows an inner diamond for High.
+- **Park 1×1 §150, Large Park 3×3 §2,500, Zoo prison 3×3 §2,500, Meat market 3×3 §12:** click-place with a ghost; red ghost when
+  blocked. A zone-M drag is refused: "meat is no longer zoned — place a Meat market (4)".
+- **Density `H`:** toggles the brush; painting R/C/I with Low sets
+  `maxTier = 1`; the chalk shows an inner diamond for High. For the Meat
+  market it picks the FORM — Light (3 to 27 jobs) or Heavy (27 to 180, from
+  Chapter 5) — and the strip says which.
 - **Hover card** (always live; click pins):
   ```
   (23,41) R High  tier 2  occ 8/10  ▲ growing (V_R +0.31 + local +0.12 = +0.43, p 4.3%/mo)
@@ -1812,13 +1869,14 @@ its zone ramp.
 | R | **terrace court** — two three-storey brick wings in an L round a courtyard: a round tree, a bench, path stones, a brick garden wall with gate gaps, a dormer, a chimney each wing | **the towers** — a U of five-storey blocks round a garden with a fountain and two trees; a stair tower a storey taller with a lamp; balcony strips; the garden wall with a wide gate |
 | C | **arcade** — a two-storey glass-fronted hall, a glazed pavilion on its roof carrying a clock tower with a white face and a lamp, a colonnade along its front (five posts, a slab, canvas awnings between) | **emporium** — a department store in three setbacks: glass ground floor with awnings on both faces, window bands, a roof sign with lit letters on a bracket, a corner entrance under a canopy, a paved forecourt with two trees and a bench |
 | I | **mill** — a long rust shed under a sawtooth roof, a tall brick stack, a water tank on legs, a two-step loading dock, a stack of crates | **foundry** — two sheds (sawtooth · lantern roof), a conveyor bridge between them, three stacks of three heights, a gantry across the yard, a coal heap, a loading apron |
-| M | **abattoir** — the meat hall with its clerestory, a windowless cold store, a stall under the striped awning with three hooks on its rail, a fenced pen on sawdust, the sign with its one '$' dot, a chimney | **meat exchange** — a great hall under a lantern roof, a cold-store wing off each end, the striped awning with five hooks, a loading dock with the van, two pens on sawdust, the sign, a chimney |
 
 Built from buildings.js's `KIT` (the same ramps, skins, grains, `walled`,
 `flipPlan`) so a block reads as its zone; hub at the footprint's centre;
 variant 1 the plan and its stamps mirrored across a = b. The footprint
 gate holds (every box in [0, 16·side]²) and the ray audit (§13) runs over
-all sixteen. `art.building(zone, tier, variant, side, theme)` — side 2 | 3
+all of them — twelve original plans now: zone 4's four (the abattoir and the
+meat exchange) and its stock courts were retired on 2026-09-26, when meat
+became a placed market (§12.2g). `art.building(zone, tier, variant, side, theme)` — side 2 | 3
 returns the block, tier ignored; theme > 0 with side 3 returns that
 landmark (§12.2c); until blocks.js registers, a block draws its zone's
 tier-3 lot (a wrong picture, never a throw), and an unregistered theme
@@ -1942,6 +2000,30 @@ Inspect, demolition, undo, road access and drawing resolve any part to it.
 Save metadata preserves old 1×1 stations and 2×2 gardens without expansion.
 Old garden civic IDs remain Large Park IDs. See docs/ART-CIVICS-3X3.md and
 docs/HANDOFF-CIVIC-CAMPUSES-2026-09-05.md for migration and verification.
+
+### 12.2g The meat market — seven stages (`js/art/market.js`; 2026-09-26)
+
+A market's sprites are its GROWTH, one per stage (`art.civic("market", 3, stage)`; the renderer passes the anchor's
+tier), and every stage is the one before with something added. The plan under all seven: flags inside a low brick
+wall, the gate in the middle of the front (+ty) between two stone-capped piers, the sign on its post beside it, and nine
+sawdust pitches on MARKET_STALL_ORDER's tiles — the tiles the sim smells from.
+
+| stage | jobs | what stands |
+|---|---:|---|
+| 0 | 0 | the site: the yard, the wall, the gate and the nine empty pitches — also the placement ghost |
+| 1 · 2 · 3 | 3 · 9 · 18 | one stall facing the gate; the front row; six and a barrow |
+| 4 | 27 | the full square: nine stalls, a second barrow, crates by the gate |
+| 5 | 72 | the hall over the back two rows — brick, tall windows, hipped slate, a glazed lantern — the front row kept |
+| 6 | 180 | a windowless cold store out of the hall's back corner, its chimney, and the loading yard on the front-right pitch: the dock, the van, two pens |
+
+- **A stall is read from above.** At zoom 1 a market is mostly roof, so a stall is its canopy — five red and white
+  panels running front to back, keyed on world units so a panel is the same panel in the twin — over a brick booth
+  and a timber block, with four EMPTY hooks on the rail under the front edge. The meat is implied, never drawn:
+  "what breaks the field guide: carcasses, drips, text, saturated red" (`docs/PROPOSAL-CRIME-AND-PUNISHMENT.md`).
+- **The gate is low** (4.5): every front gate stands before a front-row stall, and an arch hid stage 1's.
+- **The cold store stands a quarter-unit proud of the hall's eave.** Two faces in one plane go to whichever box was
+  drawn first; sharing the hall's, it read as a box on the roof.
+- **The roofs are meat's slate**, not a civic's grey: a private business placed like a civic.
 
 ### 12.3 Citizens — hand-authored kit, the organic exception
 12×20 px adults, 8×12 cubs; facings SE and NE authored, SW/NW mirrored and
@@ -2116,6 +2198,12 @@ game's largest text surface — was never executed by the suite until session
 15, and a card that threw froze the game (§23 of the handoff). It is a shim,
 not a browser: no layout, no CSS, nothing about how the card LOOKS. That is
 still the browser round.
+
+`tools/market-sheet.mjs` stands the meat market's seven stages in a row on
+grass, each on its road, and photographs them through the real renderer —
+zoom 1, zoom 2 (the twin) and dusk — into `docs/shots/market-stages.png`;
+`--before <tree>` puts another checkout's on the same rig in the same process
+(`market-before-after.png`), the only way a before survives a recipe change.
 
 `tools/shots.mjs --sheet` renders every family to a contact sheet PNG;
 `--scene` renders a 12×12 block with all 9 building families and 20 walkers
@@ -2325,6 +2413,12 @@ scaled ×2 beside their twins.
   no mansion and no class saves and hashes exactly as it did before the arc.
   Class itself is DERIVED (`world.klass`, never saved), so no household field
   joins the save.
+- **The meat market** (§9c, 2026-09-26) adds no field: its form is the
+  anchor's `maxTier`, its stage its `tier`. A save holding zone-4 tiles loads
+  with its meat cleared through the bulldoze path (`meat.clearZonedMeat` —
+  stock spoiled, pens released, one log line) and the rest of the town kept.
+  The street trade saves only `events.streetOpen` (its news); `world.street`,
+  `world.streetDread` and `world.now` are derived and never saved.
 - `zoo.pref` — this browser's preferences (the cheat switch, §8): not a
   city, not saved with one, never read by the sim (the suite greps for it).
 

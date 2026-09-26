@@ -39,8 +39,9 @@ import { SPECIES_BY_ID } from "./species.js";
  * The roster: index = the theme id kept in `world.theme[anchor]`; 0 is the
  * plain block. `key` names the art family (js/art/landmarks.js registers
  * `LANDMARK_ART[id]`); `species` are the kin it is for; `blurb` is the card's
- * one line. R by residents, C and I by staff. M has none (the proposal's
- * ruling: the abattoir with a carnivore staff is a later theme on this rule).
+ * one line. R by residents, C and I by staff. Meat has none: it is a placed
+ * market since 2026-09-26, never a zoned block (the crime proposal had left
+ * "the abattoir with a carnivore staff" as a later theme on this rule).
  */
 export const LANDMARKS = Object.freeze([
   null,

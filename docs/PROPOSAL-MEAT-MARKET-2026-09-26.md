@@ -1,7 +1,43 @@
 # PROPOSAL — the meat market, placed and growing; and the street trade where there is none (2026-09-26)
 
-**Status: PROPOSED. Nothing is built.** The owner's answers below are
-rulings. Every number that is mine waits on the owner's OK — the checklist in
+**Status: BUILT, 2026-09-26.** The owner said *"yes"* to all eight items of
+Part D, and it went in as Part C planned, a commit a step:
+
+| step | commit | what |
+|---|---|---|
+| 1 | `8cb6f35` | the instruments, byte-identical |
+| 2 | `01aa0bb` | the market in the sim, drawn with functional stage sprites |
+| 2′ | `e052aa9` | the growth guard reads THIS month's census (`world.now`); a reload check at every month of six years |
+| 3 | `5f1aab4` | the street trade |
+| 4 | `991991e` | the art: the seven stages redrawn; `tools/market-sheet.mjs` |
+| 4′ | `05ce7eb` | the retirement: the twenty-six zoned meat sprites and the meat chalk |
+| 5 | the commit that wrote this status | the words: SPEC §9c and the sections that read the zone, CAMPAIGN, GOVERNANCE, the README, the Rules tab, Governance's labels |
+
+What building it changed from the text below — each found by measuring or by
+looking, and each argued in its commit message:
+
+- **A growth guard (A.3).** A market takes its next stage only if the town
+  would keep it there — the score it would settle at one stage up, not below
+  the decay line. Without it markets rocked on their coarse steps (3–6 stage
+  moves a hall-decade; 1.3–1.7 with it). It reads this month's census,
+  because a reloaded city rebuilds last month's differently.
+- **The scripted mayor picks the form** a sensible player would: Heavy once
+  the town wants 40 meat jobs, Light below.
+- **The pens arrive with the exchange (A.9).** Nine stalls leave no room for
+  a pen that reads at zoom 1; the exchange's loading yard holds two.
+- **The meat is implied, never drawn (A.9).** A first round hung sides of meat
+  on the rail; the crime proposal's art rule — *"what breaks the field guide:
+  carcasses, drips, text, saturated red"* — took them off. The hooks hang
+  empty, as the zoned stall's did.
+- **The gate is low.** An arch over it hid stage 1's only stall.
+- **A stopped seller waits for a bed**, as any trespasser does: the test towns
+  without a market never built a Zoo prison, so none was sentenced there.
+- **Not renamed:** the event log's lines still say "meat hall" (SOLD, CASE
+  WAITING, the Greens' march, the advisor, the licence card). The log is
+  hashed; renaming them moves every rig's hash — a two-commit change of its
+  own, if the owner wants it.
+
+The owner's answers below are rulings. Every number that is mine waits on the owner's OK — the checklist in
 **Part D**. The background — what the meat zone is today, why it was a zone,
 and what reads it — is item M of
 [HANDOFF-THE-MEAT-MARKET-AND-FOUR-LOOKS-2026-09-25.md](HANDOFF-THE-MEAT-MARKET-AND-FOUR-LOOKS-2026-09-25.md).

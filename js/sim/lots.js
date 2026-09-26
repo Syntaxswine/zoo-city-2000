@@ -234,7 +234,7 @@ function marketScore(world, i, out) {
 /**
  * Would the town keep this market one stage up? The score it would SETTLE at there: the meat valve's target
  * (demand.js — the demand term, 0.06 a carnivore + 10 over the meat jobs Jm, plus the tax term and any boost) with the
- * stage's extra jobs added to last month's Jm, plus the market's own local term — and it must not be below the decay
+ * stage's extra jobs added to this month's Jm (world.now), plus the market's own local term — and it must not be below the decay
  * line. The settled score, not today's: the valve lags its target, and a market judged on a lagging valve plus a jump
  * was held back when rising and let through when falling. No census yet (the first month): nothing to judge by, so yes.
  */

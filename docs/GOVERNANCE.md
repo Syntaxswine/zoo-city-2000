@@ -23,7 +23,7 @@ holds the books, as for every other op.
 
 | Decision | Effect | Cost |
 | --- | --- | --- |
-| Meat-hall regulation | Unregulated trade, inspected/taxed trade, or prohibition | Licensing §2,000 each enactment, then §400/hall/year |
+| Meat-market regulation | Unregulated trade, inspected/taxed trade, or prohibition | Licensing §2,000 each enactment, then §400 a market a year |
 | Sentencing | Separate rules for first/minor offences, second theft, murder, persistent theft | No enactment fee; facilities retain their upkeep |
 | Equal treatment | Remove the affluent victim’s extra sentencing step | Free |
 | Police accountability | Halve wrongful arrests and innocent interview collection probability | §300/year |
@@ -42,16 +42,27 @@ reproduction and predation. Sale kills the resident. Missing/full facilities
 leave cases open. Laws apply to future decisions and do not reverse previous
 convictions or permanent pacification.
 
-Prohibiting trade closes hall jobs and transactions, ends the halls’ local
-crime/dread effects, discards stock through the spoilage ledger, and releases
-penned animals alive. Sale sentences are replaced by imprisonment while the
-ban holds. Repealing it restores trading availability without replacing stock
-or automatically rehiring workers.
+Prohibiting trade closes every market's jobs and transactions, ends the
+markets' local crime/dread effects, discards stock through the spoilage
+ledger, and releases penned animals alive. Sale sentences are replaced by
+imprisonment while the ban holds. Repealing it restores trading availability
+without replacing stock or automatically rehiring workers.
+
+**The trade does not stop: it goes to the street** (2026-09-26; SPEC §9c,
+THE STREET). Under a prohibition every carnivore is unserved, and sellers —
+carnivore adults, the unemployed first, one for every fifty — work pitches on
+the roads near their homes that move every month. A pitch carries a stall's
+smell and crime and the buyer's pull on the killing; the smell frightens
+herbivores but never lowers land value; the mayor gets nothing; and the
+police stop a seller only where they cover the pitch. Measured over twenty
+years of prohibition in three towns: 52–85 herbivores a month living in a
+smell, against none before it.
 
 In a town with **no Governor** the two old offers still come to the desk, as
 they did before governance existed: the Scrubbers card (a roster event once 15
 industrial lots stand) and the Butchers' licence (offered deterministically the
-month the first hall reaches tier 2; SPEC §9c). Accepting them sets the same
+month the first market reaches the hall, its stage 5 — a town of Light markets
+is never offered it; SPEC §9c). Accepting them sets the same
 flags Governance reads. A governed town gets no card; a card left on the desk
 when the estate rose is referred to Governance without a charge. Striking the
 cards outright (2026-09-12) had silently re-rolled every free-play city's event

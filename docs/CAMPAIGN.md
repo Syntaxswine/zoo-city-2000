@@ -25,11 +25,11 @@ reset the streak — 22 and 38 months on two seeds against 10 with a fifth farm.
 
 | Chapter | Population goal | Newly available tools | Villagers per farm |
 | --- | ---: | --- | ---: |
-| The River Settlement | 100 | Roads, trees, walls, Use zoning, Low residential, Low meat, farms, fire stations | 25 |
+| The River Settlement | 100 | Roads, trees, walls, Use zoning, Low residential, Light meat markets, farms, fire stations | 25 |
 | The Town | 400 | Police (with Interview and Collect), cemeteries, the Governor’s Mansion and Governance, Low commercial and industrial | 50 |
 | The City | 800 | Doctors’ offices, libraries, galleries, small and large parks, zoos, pacification centres, High R/C/I | 100 |
 | The Sanitation Crisis | 1,200 plus sanitation goals | Hospitals, sanitation works and garbage depots | 200 |
-| The Metropolis | Open-ended | Rail and stations, cameras, the University, the Amphitheater, High meat | 400 |
+| The Metropolis | Open-ended | Rail and stations, cameras, the University, the Amphitheater, Heavy meat markets | 400 |
 
 Inspection, demolition, saving, undo, taxes and game controls remain available.
 Locked tools explain their chapter on hover, on click and on keyboard
