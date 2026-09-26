@@ -55,6 +55,12 @@ export function tick(world) {
   const cen = census(world);
   // 3. valves
   const dem = updateDemand(world, cen);
+  // THIS MONTH's census and demand, for the rules inside the tick that must ask them — a meat market's growth
+  // (lots.js marketWouldHold). NOT `world.last`: that is rebuilt on load from the END of the saved month by
+  // refreshLast, where a running city's holds the census taken at step 2, so a rule inside the tick that read it
+  // would decide one way in a straight run and another after a reload. Derived, never saved; a loaded city has
+  // none until its first tick, and readers outside the tick (the card) fall back to world.last.
+  world.now = { census: cen, demand: dem };
   // 4. lots
   const lots = lotsTick(world);
   notices.push(...lots.landmarks); // a landmark rose (SPEC §3c); lotsTick logged it under its own id

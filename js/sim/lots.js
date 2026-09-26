@@ -239,7 +239,8 @@ function marketScore(world, i, out) {
  * was held back when rising and let through when falling. No census yet (the first month): nothing to judge by, so yes.
  */
 function marketWouldHold(world, i, next, local) {
-  const cen = world.last?.census, dem = world.last?.demand;
+  const src = world.now || world.last; // this month's, inside the tick (tick.js says why not world.last)
+  const cen = src?.census, dem = src?.demand;
   if (!cen || !dem) return true;
   const wanted = KNOBS.MEAT_PER_CARN * (cen.carnivores || 0) + KNOBS.MEAT_SEED;
   const after = (cen.Jm || 0) + (KNOBS.MARKET_JOBS[next] || 0) - (KNOBS.MARKET_JOBS[world.tier[i]] || 0);

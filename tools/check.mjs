@@ -6919,6 +6919,33 @@ function costOfBulldoze(w, x, y) { return (0, costOfOp)(w, { kind: "bulldoze", x
   check("shops: a tier-2 store and an R lot report no shop", (F.tier[shopLot] = 2, lotReport(F, shopLot).shop === null) && lotReport(F, homeLot).shop === null && shopOf(F, homeLot) === null);
   F.tier[shopLot] = 1;
 }
+// ---- THE MEAT MARKET across a reload (docs/PROPOSAL-MEAT-MARKET-2026-09-26.md) ----------------------------
+// A market decides whether to grow on THIS month's census (world.now, tick.js). `world.last` would not do: a loaded
+// city rebuilds it from the end of the saved month (refreshLast), a running one holds the step-2 census, and a growth
+// rule that read it decided one way straight and another after a reload — but only in the FIRST month after the load,
+// so one save point proves nothing. A reload at EVERY month of six years: fork, tick both once, compare. Measured on
+// 2026-09-26 with the guard reading world.last: apart at months 36 and 42; reading world.now: never.
+{
+  const { createMayor } = await import("./mayor.mjs");
+  const MK = createWorld({ seed: "market-reload" });
+  const mm = createMayor(MK, { layout: "balanced", rates: [8, 8, 8], schedule: [], parks: 1, markets: 2, pacify: false, stations: true, disasters: false, recessionYear: null, zooYear: null });
+  for (let t = 0; t < 3 * 12; t++) { mm.month(t); tick(MK); }
+  const apart = [];
+  let moves = 0;
+  for (let t = 36; t < 108; t++) {
+    mm.month(t);
+    const ML = load(save(MK));
+    const markets = [];
+    for (let i = 0; i < MK.w * MK.h; i++) if (MK.civic[i] === CIVIC.MARKET) markets.push(i);
+    const before = markets.map((i) => MK.tier[i]).join();
+    tick(MK); tick(ML);
+    if (markets.map((i) => MK.tier[i]).join() !== before) moves++;
+    if (stateHash(MK) !== stateHash(ML)) apart.push(t);
+  }
+  check("meat market: reloaded at EVERY month of six years while its markets grow, the city's next month is hash-identical to the straight run's",
+    moves > 0 && apart.length === 0, `${moves} months a stage moved · ${apart.length ? "apart at " + apart.slice(0, 6).join(",") : "never apart"}`);
+}
+
 // ---- Part H: meat on hand, free-rail freight, pens (SPEC §9c) ---------------------
 {
   const ME = await import("../js/sim/meat.js");
