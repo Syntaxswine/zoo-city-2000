@@ -404,11 +404,12 @@ export const eventTitle = (id) => EVENT_TITLES[id] || id;
 export const NEWS_ROSTER = Object.freeze(ROSTER.map((event) => Object.freeze([event.id, ...event.news])));
 
 // A row is [id, the line's lead, tone ("bad" | "good" | null), pops up over the map, SECTION]. The section is
-// "crime" for the police blotter — every crime, and every step the police and the courts take about one — and the
-// news for everything else. The sim only publishes the column; the reader keeps the two sections apart and lets a
-// month's crime pop up once at most, so the blotter cannot flood the rest (SPEC §11b) — the owner, 2026-09-26: "crime
-// should be its own news section, that way it doesnt flood the other news". The meat trade's own lines (EMPTY HOOKS, THE MARKET, BOUGHT, THE
-// PEN) are commerce and stay in the news; THE STREET is the trade the police stop, and is crime.
+// "crime" for the police blotter — every crime, and every step the police and the courts take about one — "weddings"
+// for the WEDDING line, and the news for everything else. The sim only publishes the column; the reader keeps the
+// sections apart and lets a month's crime pop up once at most, so neither can flood the rest (SPEC §11b). The owner,
+// 2026-09-26: "crime should be its own news section, that way it doesnt flood the other news"; 2026-09-27: "lets give
+// weddings their own tab". The meat trade's own lines (EMPTY HOOKS, THE MARKET, BOUGHT, THE PEN) are commerce and
+// stay in the news; THE STREET is the trade the police stop, and is crime.
 const NEWS_EXTRA = Object.freeze([
   ["milestone", "MILESTONE", "good", true], ["bearWinter", "BEAR", "bad", true], ["receivership", "RECEIVERSHIP", "bad", true],
   ["licence", "The Butchers", "good", true], ["killing", "KILLING", "bad", true, "crime"], ["burglary", "BURGLARY", "bad", true, "crime"],
@@ -423,10 +424,16 @@ const NEWS_EXTRA = Object.freeze([
   // The police's own paperwork, which had no row: into the blotter, no tone, never over the map.
   ["caseWaiting", "CASE WAITING", null, false, "crime"], ["interview", "INTERVIEW", null, false, "crime"], ["collect", "COLLECT", null, false, "crime"],
   ["story-obituary", "OBITUARY", "bad", false], ["story-litter", "LITTER", "good", false], ["story-centenary", "CENTENARY", "good", false],
+  // The WEDDING had no row until it took its own section (2026-09-27), so it never popped up — story.js offers it to
+  // the month's notices, and this column decides. It still does not, and has no tone: whether a wedding should pop up
+  // is the owner's call (BACKLOG).
+  ["story-wedding", "WEDDING", null, false, "weddings"],
 ]);
 const NEWS_ALL = [...NEWS_ROSTER, ...NEWS_EXTRA];
 const esc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-const prefixRx = (rows) => new RegExp(`^(?:${rows.map((r) => esc(r[1])).join("|")})`);
+// No rows is a regex that matches NOTHING: `^(?:)` would match every line, and a one-row section mistyped would
+// swallow the whole feed.
+const prefixRx = (rows) => (rows.length ? new RegExp(`^(?:${rows.map((r) => esc(r[1])).join("|")})`) : /(?!)/);
 export const TICKER_BAD = prefixRx(NEWS_ALL.filter((r) => r[2] === "bad"));
 export const TICKER_GOOD = prefixRx(NEWS_ALL.filter((r) => r[2] === "good"));
 const FLASH_PREFIX = prefixRx(NEWS_ALL.filter((r) => r[3]));
@@ -434,6 +441,8 @@ export const TICKER_FLASH = new RegExp(`${FLASH_PREFIX.source}|^OBITUARY 100 —
 /** The police blotter: the lines the reader keeps in their own section (SPEC §11b), and their leads in roster order. */
 export const TICKER_CRIME = prefixRx(NEWS_ALL.filter((r) => r[4] === "crime"));
 export const CRIME_LEADS = Object.freeze(NEWS_ALL.filter((r) => r[4] === "crime").map((r) => r[1]));
+/** The weddings: a section of their own as well (SPEC §11b). */
+export const TICKER_WEDDING = prefixRx(NEWS_ALL.filter((r) => r[4] === "weddings"));
 
 /** Resolve the choice card. */
 export function resolveChoice(world, accept) {

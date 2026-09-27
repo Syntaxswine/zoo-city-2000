@@ -5567,12 +5567,16 @@ check("no Math.random under js/", mathRandom.length === 0, mathRandom.join(", ")
   check("news crime: on the suite city's own feed a row is crime exactly when its producer is the police's",
     kinds.size >= 3 && feed.length - crimeRows.length >= 50 && misfiled.length === 0,
     `${crimeRows.length} crime rows (${[...kinds].join("/")}) of ${feed.length} · misfiled ${misfiled.slice(0, 3).map((r) => `${r.id}: ${r.text.slice(0, 32)}`).join(" | ") || "none"}`);
-  const inNews = FILTERS.find((f) => f[0] === "news")?.[2], inCrime = FILTERS.find((f) => f[0] === "crime")?.[2];
-  check("news crime: the news and the crime sections split the feed — disjoint, together all of it — and the other chips are all inside the news",
-    FILTERS.length === 6 && FILTERS[0][0] === "news" && FILTERS[5][0] === "crime" && inNews && inCrime
-      && feed.every((r) => inNews(r) !== inCrime(r))
-      && FILTERS.slice(1, 5).every(([, , fn]) => feed.filter(fn).every((r) => !r.crime))
-      && feed.some((r) => r.crime && r.flash) && feed.some((r) => r.crime && r.bad), // the premise: crime that WOULD have been headlines and trouble
+  // Three sections since the weddings took theirs (2026-09-27): every row in exactly one, and the four other chips
+  // inside the news. The chip ids are spelt out, in the reader's order.
+  const chip = (id) => FILTERS.find((f) => f[0] === id)?.[2];
+  const inNews = chip("news"), inCrime = chip("crime"), inWeddings = chip("weddings");
+  check("news sections: the news, the crime and the weddings split the feed — every row in exactly one — and the other chips are all inside the news",
+    FILTERS.map((f) => f[0]).join() === "news,flash,bad,good,people,crime,weddings" && inNews && inCrime && inWeddings
+      && feed.every((r) => Number(!!inNews(r)) + Number(!!inCrime(r)) + Number(!!inWeddings(r)) === 1)
+      && ["flash", "bad", "good", "people"].every((id) => feed.filter(chip(id)).every((r) => inNews(r)))
+      && feed.some((r) => r.crime && r.flash) && feed.some((r) => r.crime && r.bad) // the premise: crime that WOULD have been headlines and trouble,
+      && feed.some((r) => r.wedding && r.people), // and weddings that WOULD have been people stories
     FILTERS.map((f) => f[0]).join(","));
   // A month's pop-ups: the news first, in its order; the crime as ONE, the killing named before the routine.
   const month = [
@@ -5608,6 +5612,75 @@ check("no Math.random under js/", mathRandom.length === 0, mathRandom.join(", ")
   reader.close();
   check("news crime: the badge counts the news, the crime section keeps its own count, and opening the reader reads the news, not the blotter",
     before.join() === "1,2" && after.join() === "0,2", `before ${before} · after opening ${after}`);
+}
+
+// ---- THE WEDDINGS ARE A SECTION TOO (2026-09-27; the owner: "lets give weddings their own tab"; SPEC §11b). The
+// WEDDING line is a section by the same column of the news roster (events.js TICKER_WEDDING): the news chips hold
+// none, the badge does not count them, and a wedding does not pop up — the roster gave WEDDING no row until this
+// section, so it never has; whether it should is the owner's call. The lead and the producer's id are SPELT OUT.
+{
+  const { newsRows, monthFlashes, createNews, inNews } = await import("../js/news.js");
+  const WEV = await import("../js/sim/events.js");
+  // The section IS the line's lead, so the grep again: of every lead the sim writes, WEDDING alone is a wedding — and
+  // a wedding is no other section's, no tone's and no pop-up's.
+  const simDir = path.join(ROOT, "js", "sim");
+  const leads = [...new Set(readdirSync(simDir).filter((f) => f.endsWith(".js"))
+    .flatMap((f) => [...readFileSync(path.join(simDir, f), "utf8").matchAll(/[`"']([A-Z][A-Z0-9'’ ]*[A-Z0-9]) —/g)].map((m) => m[1])))];
+  const wedLeads = leads.filter((l) => WEV.TICKER_WEDDING.test(`${l} — x`));
+  const lines = [
+    "WEDDING — Bo Lupin (wolf, a Show-off) and Ada Mousewell (mouse, a Grumbler) keep house at (3,3). Predator and prey.",
+    "WEDDING — Cy Lupin (wolf, an Idler) and Di Lupin (wolf, a Joiner), companions, keep house at (4,4). No litters from that house.",
+  ];
+  check("news weddings: of every lead the sim writes, WEDDING alone is a wedding — no other section's, no tone's, no pop-up's",
+    leads.length >= 40 && wedLeads.join() === "WEDDING"
+      && lines.every((l) => WEV.TICKER_WEDDING.test(l) && !WEV.TICKER_CRIME.test(l) && !WEV.TICKER_FLASH.test(l) && !WEV.TICKER_BAD.test(l) && !WEV.TICKER_GOOD.test(l)),
+    `${leads.length} leads · weddings: ${wedLeads.join(",") || "none"}`);
+  // On the suite city's own feed: a row is a wedding exactly when story.js's wedding writer made it.
+  const feed = newsRows(A.world);
+  const idOf = (r) => r.id.replace(/:.*$/, "");
+  const weds = feed.filter((r) => r.wedding);
+  const misfiled = feed.filter((r) => r.wedding !== (idOf(r) === "story-wedding"));
+  check("news weddings: on the suite city's own feed a row is a wedding exactly when story.js's wedding writer made it, and none is a headline",
+    weds.length >= 3 && feed.filter(inNews).length >= 50 && misfiled.length === 0 && weds.every((r) => !r.flash && !r.crime),
+    `${weds.length} weddings of ${feed.length} · misfiled ${misfiled.slice(0, 3).map((r) => `${r.id}: ${r.text.slice(0, 32)}`).join(" | ") || "none"}`);
+  // Through the pop-up path itself: a month of two weddings and a milestone pops the milestone alone.
+  const month = [lines[0], "MILESTONE — 500 animals: Zoo City is a TOWN.", lines[1]];
+  check("news weddings: a wedding never pops up — a month of two weddings and a milestone pops the milestone alone",
+    JSON.stringify(monthFlashes(month)) === JSON.stringify([month[1]]) && monthFlashes([lines[0], lines[1]]).length === 0,
+    monthFlashes(month).join(" | "));
+  // The badge counts the news; the weddings keep their own count; opening the reader reads the news, not the weddings.
+  const { installDom, stubApp, textOf } = await import("./dom-shim.mjs");
+  installDom();
+  const Ww = createWorld({ seed: "wedding-section", w: 12, h: 12 });
+  Ww.events.log = [
+    { t: 0, id: "story-wedding:1-2", line: lines[0] },
+    { t: 0, id: "story-wedding:3-4", line: lines[1] },
+    { t: 0, id: "arrest", line: "CELLS — Ranpa Howell (wolf) is in the Zoo prison at (1,1) until May for the burglary at (4,4)." },
+    { t: 0, id: "notice", line: "MILESTONE — 51 animals: Zoo City is a HAMLET." },
+  ];
+  let wpref = { news: { "check-city": [] } };
+  const reader = createNews(stubApp(Ww, { ui: { refresh() {} }, prefs: { get: () => wpref, set: (p) => { wpref = { ...wpref, ...p }; } } }));
+  const before = [reader.unread(), reader.unread("weddings"), reader.unread("crime")];
+  reader.open();
+  const after = [reader.unread(), reader.unread("weddings"), reader.unread("crime")];
+  reader.close();
+  check("news weddings: the badge counts the news, the weddings keep their own count, and opening the reader reads the news, not the weddings",
+    before.join() === "1,2,1" && after.join() === "0,2,1", `before ${before} · after opening ${after}`);
+  // The News tab and the strip button, through the real panel: the glance lists the news alone and counts the two
+  // sections under it; the button's badge is the news's, and its tooltip names both sections.
+  const { createUI } = await import("../js/ui.js");
+  const tabApp = stubApp(Ww, { prefs: { get: () => ({ news: { "check-city": [] } }), set() {} } });
+  tabApp.news = createNews(tabApp);
+  const tui = createUI(tabApp);
+  document.getElementById("tabs").elements.find((b) => b.dataset.tab === "news")?.dispatch("click");
+  const glance = textOf(document.getElementById("tabBody"));
+  tui.refresh();
+  const newsBtn = document.getElementById("tools").querySelector("#btnNews");
+  check("news weddings: the News tab lists the news alone and counts the weddings and the crime under it; the badge is the news's, the tooltip names both",
+    glance.includes("MILESTONE — 51 animals") && !glance.includes("keep house at") && !glance.includes("CELLS —")
+      && glance.includes("2 weddings — who married whom — in their own section") && glance.includes("1 crime dispatch —")
+      && newsBtn?.lastElementChild?.textContent === "news 1" && /crime 1 unread · weddings 2 unread, each in its own section/.test(newsBtn.title),
+    `${glance.slice(0, 160)} · badge ${newsBtn?.lastElementChild?.textContent} · ${newsBtn?.title}`);
 }
 
 // ---- Part F: selected people stories, named reports and linked reader ------------------------
@@ -5759,10 +5832,11 @@ check("no Math.random under js/", mathRandom.length === 0, mathRandom.join(", ")
       && feed.every((r) => r.who.every((id) => F.byId.has(id) || legacyOf(F, id)))
       && feed.every((r) => r.links.every((id) => F.byId.has(id) || legacyOf(F, id)))
       && JSON.stringify(feed.map((r) => [r.who, r.links])) === JSON.stringify(restoredFeed.map((r) => [r.who, r.links])));
-  // (Five chips until crime took its own section, 2026-09-26: the people chip is still the exact who filter, inside the news.)
+  // (Five chips until crime took its own section, 2026-09-26, and the weddings theirs, 2026-09-27: the people chip is
+  // still the exact who filter, inside the news.)
   const peopleFilter = FILTERS.find((f) => f[0] === "people");
   check("story: the people news chip is the exact who.length filter",
-    peopleFilter && feed.filter(peopleFilter[2]).every((r) => r.who.length) && feed.filter((r) => r.people && !r.crime).every(peopleFilter[2])
+    peopleFilter && feed.filter(peopleFilter[2]).every((r) => r.who.length) && feed.filter((r) => r.people && !r.crime && !r.wedding).every(peopleFilter[2])
       && feed.some((r) => r.id === "named-operation" && !r.people && r.links[0] === parents[0].id));
 
   const target = { target: { tx: 2, ty: 3, citizen: { home } }, citizen: dead.id };

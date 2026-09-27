@@ -10,13 +10,14 @@
 // Since 2026-09-26 crime is its own section of the reader (news.js FILTERS): the budget is people stories against
 // the NEWS section — the page they are printed on — and the crime section is reported beside it, not counted in it.
 // (Against the whole feed, a crime-heavy town's blotter diluted the people share and hid how much of the news
-// people stories were.)
+// people stories were.) Since 2026-09-27 the weddings are a section too, and reported beside it the same way: the
+// news is news.js's own inNews, so the probe reads the page the reader prints.
 
 import { probeSave } from "./probe-save.mjs";
 import { createWorld, ZONE, TERRAIN, CIVIC } from "../js/sim/world.js";
 import { tick } from "../js/sim/tick.js";
 import { apply } from "../js/sim/ops.js";
-import { newsRows, keyOf } from "../js/news.js";
+import { newsRows, keyOf, inNews } from "../js/news.js";
 import { legacyOf } from "../js/sim/legacy.js";
 import { save, load, stateHashNoNews } from "../js/sim/save.js";
 
@@ -92,7 +93,7 @@ function build(seed) {
 function measure(seed) {
   const { w, blocks, emitted } = build(seed);
   const all = newsRows({ ...w, events: { ...w.events, log: emitted } });
-  const news = all.filter((r) => !r.crime);
+  const news = all.filter(inNews);
   const people = news.filter((r) => r.people);
   const unresolved = emitted.flatMap((r) => [...(Array.isArray(r.who) ? r.who : []), ...(Array.isArray(r.links) ? r.links : [])])
     .filter((id) => !w.byId.has(id) && !legacyOf(w, id));
@@ -104,7 +105,8 @@ function measure(seed) {
   const currentByKey = new Map(current.map((r) => [keyOf(r), JSON.stringify([r.who, r.links])]));
   const whoLost = loaded.filter((r) => currentByKey.get(keyOf(r)) !== JSON.stringify([r.who, r.links]));
   return {
-    seed, blocks, pop: w.citizens.length, rows: all.length, news: news.length, crime: all.length - news.length, people: people.length,
+    seed, blocks, pop: w.citizens.length, rows: all.length, news: news.length, crime: all.filter((r) => r.crime).length,
+    weddings: all.filter((r) => r.wedding).length, people: people.length,
     pct: news.length ? (100 * people.length) / news.length : 0,
     obituary: all.filter((r) => r.id.startsWith("story-obituary:")).length,
     litter: all.filter((r) => r.id.startsWith("story-litter:")).length,
@@ -120,13 +122,13 @@ function measure(seed) {
 
 const rows = SEEDS.map(measure);
 if (CSV) {
-  console.log("seed,pop,dispatches,news,crime,people,peoplePctOfNews,obituary,litter,centenary,reports,flashed,multiFlashMonths,unresolved,whoLost,noNewsHash");
-  for (const r of rows) console.log([r.seed, r.pop, r.rows, r.news, r.crime, r.people, r.pct.toFixed(1), r.obituary, r.litter, r.centenary, r.reports, r.flashed, r.multi, r.unresolved, r.whoLost, r.noNews].join(","));
+  console.log("seed,pop,dispatches,news,crime,weddings,people,peoplePctOfNews,obituary,litter,centenary,reports,flashed,multiFlashMonths,unresolved,whoLost,noNewsHash");
+  for (const r of rows) console.log([r.seed, r.pop, r.rows, r.news, r.crime, r.weddings, r.people, r.pct.toFixed(1), r.obituary, r.litter, r.centenary, r.reports, r.flashed, r.multi, r.unresolved, r.whoLost, r.noNews].join(","));
 } else {
   console.log(`newsprobe: ${YEARS} years · ${SAVED ? "export (no scripted construction)" : "eight-block news town + fire + police"}`);
-  console.log("| seed | rows | news / crime | people | of the news | obit / litter / 100 | reports | flashed | unresolved / lost | no-news hash |");
+  console.log("| seed | rows | news / crime / weddings | people | of the news | obit / litter / 100 | reports | flashed | unresolved / lost | no-news hash |");
   console.log("|---|---:|---:|---:|---:|---:|---:|---:|---:|---|");
-  for (const r of rows) console.log(`| ${r.seed} | ${r.rows} | ${r.news} / ${r.crime} | ${r.people} | ${r.pct.toFixed(1)}% | ${r.obituary} / ${r.litter} / ${r.centenary} | ${r.reports} | ${r.flashed} | ${r.unresolved} / ${r.whoLost} | ${r.noNews} |`);
+  for (const r of rows) console.log(`| ${r.seed} | ${r.rows} | ${r.news} / ${r.crime} / ${r.weddings} | ${r.people} | ${r.pct.toFixed(1)}% | ${r.obituary} / ${r.litter} / ${r.centenary} | ${r.reports} | ${r.flashed} | ${r.unresolved} / ${r.whoLost} | ${r.noNews} |`);
 }
 
 // A tiny export may emit only one story: report its share, without treating

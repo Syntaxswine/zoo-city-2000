@@ -37,7 +37,7 @@ import { colourOf } from "./art/palette.js";
 import { pluralSpecies } from "./sim/landmarks.js";
 import { ageYears, isWorker } from "./sim/census.js";
 import { toolHelp } from "./tools.js";
-import { newsRows, monthFlashes } from "./news.js";
+import { newsRows, monthFlashes, inNews } from "./news.js";
 import { hallStock, hallYear } from "./sim/meat.js";
 import { needOf } from "./sim/needs.js";
 import { ACT, line as needLine } from "./sim/voice.js";
@@ -311,13 +311,13 @@ export function createUI(app) {
   function refreshNews() {
     const b = $("#btnNews");
     if (!b || !app.news) return;
-    // The badge counts the NEWS; the crime section keeps its own count (news.js), so a policed town's blotter cannot
-    // hold the button lit.
-    const n = app.news.unread(), c = app.news.unread("crime");
+    // The badge counts the NEWS; the crime and the weddings keep their own counts (news.js), so neither a policed
+    // town's blotter nor its weddings can hold the button lit.
+    const n = app.news.unread(), c = app.news.unread("crime"), wd = app.news.unread("weddings");
     b.lastElementChild.textContent = n ? `news ${n}` : "news";
     b.classList.toggle("on", n > 0);
-    const crime = c ? ` · crime ${c} unread, in its own section` : "";
-    b.title = n ? `R: ${n} unread${crime} — every dispatch this city ever made, oldest first; ← → step one at a time` : `R: the news${crime} — every dispatch this city ever made, oldest first; ← → step one at a time`;
+    const apart = `${c ? ` · crime ${c} unread` : ""}${wd ? ` · weddings ${wd} unread` : ""}${c && wd ? ", each in its own section" : c || wd ? ", in its own section" : ""}`;
+    b.title = n ? `R: ${n} unread${apart} — every dispatch this city ever made, oldest first; ← → step one at a time` : `R: the news${apart} — every dispatch this city ever made, oldest first; ← → step one at a time`;
   }
 
   // ---- demand bars ------------------------------------------------------------------------------
@@ -1115,8 +1115,8 @@ export function createUI(app) {
   function renderNews(body, w) {
     const all = newsRows(w);
     if (!all.length) { body.append(el("p", "note", "Events and advisor lines land here as the months pass. R opens the reader.")); return; }
-    // The glance is the NEWS; crime is its own section, counted here and read in the reader.
-    const rows = all.filter((r) => !r.crime), crime = all.length - rows.length;
+    // The glance is the NEWS; the crime and the weddings are sections of their own, counted here and read in the reader.
+    const rows = all.filter(inNews), crime = all.filter((r) => r.crime).length, weddings = all.filter((r) => r.wedding).length;
     const ul = el("ul", "log");
     for (const l of rows.slice(-120)) {
       const li = el("li");
@@ -1128,6 +1128,7 @@ export function createUI(app) {
     body.append(ul);
     body.append(el("p", "note", rows.length > 120 ? `the last 120 of ${rows.length} — R opens the reader, from the founding` : "R opens the reader: ← → step one dispatch at a time"));
     if (crime) body.append(el("p", "note", `${crime} crime dispatch${crime === 1 ? "" : "es"} — killings, burglaries, arrests, the street trade — in their own section: R opens the reader, then crime`));
+    if (weddings) body.append(el("p", "note", `${weddings} wedding${weddings === 1 ? "" : "s"} — who married whom — in their own section: R opens the reader, then weddings`));
   }
 
   function onTick(notices) {

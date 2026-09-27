@@ -34,13 +34,19 @@
 // So a row is in the NEWS or in the CRIME section (events.js TICKER_CRIME, one column of the news roster), the chips
 // split along that line, the badge counts the news, and a month's crime pops up once at most (monthFlashes).
 //
-//   newsRows(world) → [{ t, id, label, text, who, links, people, bad, good, flash, report, crime }]
+// WEDDINGS ARE A SECTION TOO (the owner, 2026-09-27: "lets give weddings their own tab"). With the blotter out of
+// the way, the WEDDING line was 60–67% of a policed town's news over thirty years, and 27–44% of a quiet town's.
+// It never popped up (the roster gave it no row until it took this section), so the section is the whole change: the
+// news chips hold no weddings, the badge does not count them, and the weddings keep their own count.
+//
+//   newsRows(world) → [{ t, id, label, text, who, links, people, bad, good, flash, report, crime, wedding }]
 //                     (a row's NAME is keyOf() — its month and its words)
+//   inNews(row)     → the NEWS section: neither crime nor a wedding
 //   monthFlashes(lines) → the month's pop-ups: the news's, then the crime's as one
-//   createNews(app) → { open, close, toggle, key, isOpen, unread(section = "news"), invalidate }
+//   createNews(app) → { open, close, toggle, key, isOpen, unread(section = "news" | "crime" | "weddings"), invalidate }
 
 import { dateOf } from "./sim/tick.js";
-import { TICKER_BAD, TICKER_GOOD, TICKER_FLASH, TICKER_CRIME, CRIME_LEADS } from "./sim/events.js";
+import { TICKER_BAD, TICKER_GOOD, TICKER_FLASH, TICKER_CRIME, CRIME_LEADS, TICKER_WEDDING } from "./sim/events.js";
 import { legacyOf, personName } from "./sim/legacy.js";
 
 const el = (tag, cls, text) => {
@@ -85,6 +91,7 @@ export function newsRows(world) {
     r.report = /^REPORT /.test(r.text);  // the year's own summing-up, set quieter
     r.people = r.who.length > 0;
     r.crime = TICKER_CRIME.test(r.text); // the police blotter: its own section
+    r.wedding = TICKER_WEDDING.test(r.text); // the weddings: theirs
   }
   return rows;
 }
@@ -112,26 +119,40 @@ export const keyOf = (r) => {
   return `${r.t}.${fnv(r.text + subject)}`;
 };
 
+/** The NEWS section: every row that is neither crime nor a wedding. The badge, the News tab and newsprobe read it. */
+export const inNews = (r) => !r.crime && !r.wedding;
+
 /**
- * The chips. The first five are the NEWS and hold no crime; the last is the CRIME section and holds all of it — two
- * sections that split the feed, so the blotter cannot flood the rest. (The first was "all" until the crime section.)
+ * The chips. The first five are the NEWS and hold neither crime nor weddings; the last two are sections of their own,
+ * the CRIME and the WEDDINGS, each holding all of its rows. The three sections split the feed, so neither can flood
+ * the rest. (The first chip was "all" until the crime section.)
  */
 export const FILTERS = [
-  ["news", "news", (r) => !r.crime],
-  ["flash", "headlines", (r) => !r.crime && r.flash],
-  ["bad", "trouble", (r) => !r.crime && r.bad],
-  ["good", "good", (r) => !r.crime && r.good],
-  ["people", "people", (r) => !r.crime && r.people],
+  ["news", "news", inNews],
+  ["flash", "headlines", (r) => inNews(r) && r.flash],
+  ["bad", "trouble", (r) => inNews(r) && r.bad],
+  ["good", "good", (r) => inNews(r) && r.good],
+  ["people", "people", (r) => inNews(r) && r.people],
   ["crime", "crime", (r) => r.crime],
+  ["weddings", "weddings", (r) => r.wedding],
 ];
-const SECTION_OF = { news: FILTERS[0][2], crime: FILTERS[5][2] };
+const SECTION_OF = Object.fromEntries(["news", "crime", "weddings"].map((id) => [id, FILTERS.find((f) => f[0] === id)[2]]));
+const CHIP_TITLE = {
+  news: "every dispatch but crime and weddings, the yearly report included",
+  flash: "only the lines that popped up over the map",
+  bad: "fires, floods, the books",
+  good: "milestones, fairs, festivals, landmarks",
+  people: "dispatches naming citizens you can inspect",
+  crime: "the police blotter: killings, burglaries, arrests and sentences, the street trade — kept apart so it cannot flood the rest",
+  weddings: "who married whom — every wedding, kept apart so they cannot flood the rest",
+};
 
 /**
  * A month's pop-ups, in order: every news headline first, then the month's crime as ONE pop-up at most — the line
  * itself when there is one, a count by kind when there are more. The run shows FLASH_MAX and then "+N more", so
  * before this a policed month's CELLS and RELEASED lines pushed the rest of the news off the map. Nothing is lost:
  * every line is in the log, and the reader's crime section has them one by one. The summary is presentation only —
- * never a log line, never saved.
+ * never a log line, never saved. A WEDDING never pops up: the roster gives it no pop-up (events.js).
  */
 export function monthFlashes(lines) {
   const flash = lines.filter((n) => TICKER_FLASH.test(n));
@@ -195,7 +216,7 @@ export function createNews(app) {
   /** The world changed under us (a load, an import, a new city). */
   function invalidate() { cache = null; loadRead(); }
 
-  /** Unread in one section — the NEWS by default (the badge), or "crime". */
+  /** Unread in one section — the NEWS by default (the badge), "crime" or "weddings". */
   function unread(section = "news") {
     if (city !== (app.cityName || "")) loadRead();
     const inSection = SECTION_OF[section] || SECTION_OF.news;
@@ -228,7 +249,7 @@ export function createNews(app) {
     for (const [id, label, fn] of FILTERS) {
       const n = rows.filter(fn).length;
       const b = el("button", "chip" + (filter === id ? " on" : ""), `${label} ${n}`);
-      b.title = id === "flash" ? "only the lines that popped up over the map" : id === "bad" ? "fires, floods, the books" : id === "good" ? "milestones, fairs, festivals, homecomings" : id === "people" ? "dispatches naming citizens you can inspect" : id === "crime" ? "the police blotter: killings, burglaries, arrests and sentences, the street trade — kept apart so it cannot flood the rest" : "every dispatch but crime, the yearly report included";
+      b.title = CHIP_TITLE[id] || "";
       b.addEventListener("click", () => { const at = view[cursor]; filter = id; build(); jumpNear(at); });
       chips.append(b);
     }
@@ -344,7 +365,8 @@ export function createNews(app) {
     if (headEl) {
       const u = unread();
       const c = unread("crime");
-      headEl.textContent = `${app.cityName || "this city"} · ${rows.length} dispatch${rows.length === 1 ? "" : "es"} · ${u ? `${u} unread` : "caught up"}${c ? ` · crime ${c} unread` : ""} · now ${dateOf(app.world).label}`;
+      const wd = unread("weddings");
+      headEl.textContent = `${app.cityName || "this city"} · ${rows.length} dispatch${rows.length === 1 ? "" : "es"} · ${u ? `${u} unread` : "caught up"}${c ? ` · crime ${c} unread` : ""}${wd ? ` · weddings ${wd} unread` : ""} · now ${dateOf(app.world).label}`;
     }
     if (scroll && kids[cursor]) kids[cursor].scrollIntoView({ block: "center" });
   }

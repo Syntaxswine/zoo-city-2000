@@ -621,7 +621,11 @@ Binsworth). The card says "the Burrowes family, 4 rabbits".
   No room, no wedding. One couple in `WED_COMPANIONS_P` 10 are COMPANIONS and
   keep no litter (the owner's "10% gay", in a sim with no sex: a flag on the
   household, saved only when true). The two befriend; both get a WED chapter
-  ("Married X in 2031"); story.js writes the WEDDING line and flashes it.
+  ("Married X in 2031"); story.js writes the WEDDING line. It was meant to
+  flash (the proposal: the wedding procession is the ticker moment), but the
+  news roster never gave WEDDING a row, so it has never popped up; since
+  2026-09-27 it is a section of the news of its own (§11b), and whether it
+  should pop up is the owner's call.
   Nothing parts a household but death, and the survivor is single again.
   Measured before it landed (docs/PROPOSAL-GENERATIONS-AND-SKILLS-2026-09-07.md
   §8): births rise by half, the fourth generation is alive at sixty years, the
@@ -1776,10 +1780,12 @@ that pop up on the screen in a sequential order."*
   open with a badge of 300 things you lived through.
 - **The reader** (`R`, or the strip's `news`): the feed oldest first, a
   cursor stepped with ← → and ↑ ↓, PgUp/PgDn by ten, Home/End,
-  `mark all read`, and six chips: news (every dispatch but crime) · headlines
-  (only what popped up over the map, `TICKER_FLASH`) · trouble (`TICKER_BAD`) ·
-  good (`TICKER_GOOD`) · people (rows carrying a nonempty `who`) · crime (the
-  police blotter, its own section — below). It opens on news. WASD belongs only to map movement
+  `mark all read`, and seven chips: news (every dispatch but crime and
+  weddings, `news.js` `inNews`) · headlines (only what popped up over the
+  map, `TICKER_FLASH`) · trouble (`TICKER_BAD`) · good (`TICKER_GOOD`) ·
+  people (rows carrying a nonempty `who`) — the four inside the news — · crime
+  (the police blotter, its own section — below) · weddings (theirs — below).
+  It opens on news. WASD belongs only to map movement
   and is swallowed while the modal reader stands (Part P).
   It opens on the FIRST UNREAD — and opening MARKS that row read, so the badge
   drops by one the moment you look. A row is read when the cursor LANDS on it,
@@ -1788,10 +1794,12 @@ that pop up on the screen in a sequential order."*
   it; the clock is stopped while it stands (`modalOpen()` counts it, like the
   title and the choice card).
 - **The strip button** carries the NEWS section's unread count (the crime
-  section keeps its own, in the reader's head and on its chip) and goes
+  and the weddings keep their own, in the reader's head and the button's
+  tooltip) and goes
   ink-filled while any stands — the same "this is on" that pause / overlay / zoom use.
 - **The News tab** (was Log) is the glance at the same feed: the last 120 of
-  the news section, chronological, and a line counting the crime section. It opens scrolled to the newest and follows it, unless you
+  the news section, chronological, and a line each counting the crime and the
+  weddings. It opens scrolled to the newest and follows it, unless you
   have scrolled up to read — then it stays where you put it.
 - **A month's run of flashes queues** (`flashRun`): 2.6 s for one, 1.5 s each
   for a run, labelled `(2/6)`, five at most and then `+N more this month — R
@@ -1817,6 +1825,23 @@ that pop up on the screen in a sequential order."*
   pop-ups went from 21.5–23.2 a year to 10.6–11.0 (crime 18.1–20.5 →
   7.6–8.0); a quiet town's did not move. The sim only publishes the column:
   it never names the reader (the check that says so caught a comment).
+- **Weddings are a section too** (the owner, 2026-09-27: *"lets give
+  weddings their own tab"*). With the blotter out of the news, the WEDDING
+  line (§7.2) was most of what was left of a policed town's: 794 of 1,334
+  news rows over 30 years on seed 7 (59.5%), 920 of 1,373 on seed 3 (67.0%);
+  27–44% in newsprobe's towns. It is a section by the same roster column
+  (`events.js` `TICKER_WEDDING`), so the first five chips hold no weddings
+  and the seventh all of them; the badge does not count them, and the News
+  tab counts them under the news. That is the whole change, because a
+  WEDDING has never popped up: the roster had no row for it, so
+  `TICKER_FLASH` never matched it, though story.js offers it and §7.2 said
+  it flashed. It still does not — none of the 3,327 wedding lines six
+  30-year towns wrote reached a pop-up, before or after — and whether it
+  should (once a month, as crime's summary does) is the owner's call. The
+  policed towns' news fell from 44.5–45.8 dispatches a year to 15.1–18.0,
+  and the people share of it from 69–77% to 23–30%. A section with no rows
+  is a regex that matches NOTHING (`prefixRx`): `^(?:)` would match every
+  line, and a one-row section mistyped would have swallowed the feed.
 - **People stories (Part F).** `storyTick`, after justice, is the sole bridge
   from this month's `lifeEvents` to named news rows. Three distinct
   `LOST_FRIEND` witnesses produce one obituary for a natural death or
@@ -1837,7 +1862,8 @@ that pop up on the screen in a sequential order."*
   paper into the People section.
   `NEWS_ROSTER` generates the primary trouble/good and flash regexes, so a
   roster card cannot silently miss every chip. Ordinary people stories never
-  interrupt play; only the structurally tagged `OBITUARY 100 —` flashes.
+  interrupt play; only the structurally tagged `OBITUARY 100 —` flashes (the
+  WEDDING never has — above).
 - **Budget and neutrality.** `newsprobe` retains all emitted rows beyond the
   live cap. Over seeds 7/3/5/11 × 30 years, people rows were 59/990 (6.0%),
   71/1,104 (6.4%), 53/345 (15.4%) and 62/1,111 (5.6%); every id resolved and
@@ -1847,7 +1873,9 @@ that pop up on the screen in a sequential order."*
   crime section the budget reads people against the NEWS section: 52.4 /
   42.3 / 56.4 / 33.3% over the same seeds (2026-09-26) — over 40% on three.
   The cause is the WEDDING story (`1e9d983`, 2026-09-07; 274 of seed 7's 808
-  rows), not the section, which only stopped the blotter diluting it.
+  rows), not the section, which only stopped the blotter diluting it. Since
+  the weddings took their own section (2026-09-27) the budget is met again:
+  21.8 / 14.2 / 22.1 / 9.0%, the four no-news hashes unmoved.
 
 ---
 

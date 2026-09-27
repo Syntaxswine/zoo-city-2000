@@ -30,9 +30,11 @@ function publish(world, id, line, who) {
 }
 
 /**
- * Publish this month's selected people stories. Returns ONLY story lines
- * which may pop over the map; tick.js threads these into `notices` without
- * logging them a second time. Ordinary people stories remain in the reader.
+ * Publish this month's selected people stories. Returns the story lines
+ * OFFERED to the month's pop-ups; tick.js threads these into `notices` without
+ * logging them a second time, and the news roster (events.js TICKER_FLASH)
+ * decides which pop up: OBITUARY 100 does, the WEDDING does not. Ordinary
+ * people stories remain in the reader.
  */
 export function storyTick(world) {
   if (!world?.events?.log || !Array.isArray(world.lifeEvents)) return [];
@@ -90,7 +92,9 @@ export function storyTick(world) {
   }
 
   // A wedding (SPEC §7.2) leaves one WED chapter on each partner, the arg the other's id: two
-  // witnesses to ONE line, keyed by the pair. It flashes — the owner's procession moment.
+  // witnesses to ONE line, keyed by the pair. It is offered as a pop-up — the proposal's "procession
+  // is the ticker moment" — but the roster never gave WEDDING one, so it has never popped up; since
+  // 2026-09-27 it is a section of the news of its own (SPEC §11b), and the pop-up is the owner's call.
   const wed = new Set();
   for (const e of world.lifeEvents) {
     if (e?.kind !== KIND.WED || !Number.isInteger(e.arg)) continue;
